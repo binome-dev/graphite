@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "grafi"
-version = "0.0.6"
+version = "0.0.7"
 description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI Agent through composable agentic workflows."
 authors = ["Craig Li <craig@binome.dev>"]
 license = "Mozilla Public License Version 2.0"
