@@ -206,7 +206,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
   github_release:
-    name: Tag Version (SemVer)
+    name: Github Release
     runs-on: ubuntu-latest
     needs: 
       - publish_pypi
