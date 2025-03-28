@@ -126,6 +126,7 @@ jobs:
 
     outputs:
       package-version: ${{ steps.package-version.outputs.VERSION }}
+      remote-version: ${{ steps.remote-version.outputs.LATEST_VERSION }}
 
     steps:
       - name: Checkout code
@@ -133,16 +134,31 @@ jobs:
         with:
           fetch-depth: 0  # Ensure full history for tagging
 
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
       - name: Get Package Version
         id: package-version
         run: |
           echo "VERSION=$(poetry version --short)" >> $GITHUB_OUTPUT
 
+      - name: Remote Check PyPI Version
+        id: remote-version
+        run: |
+          echo "LATEST_VERSION=$(pip index versions grafi 2>/dev/null | grep 'LATEST:' | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+
   publish_pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: version
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && ( needs.version.outputs.package-version != needs.version.outputs.remote-version )
 
 
     # Specifying a GitHub environment is optional, but strongly encouraged
@@ -214,7 +230,7 @@ jobs:
       - version
       - integration-tests
 
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' 
 
     steps:
       - name: Checkout code
@@ -238,3 +254,4 @@ jobs:
           body: Changelog Contents
           token: ${{ github.token }}
           tag: ${{ needs.version.outputs.package-version }}
+          skipIfReleaseExists: true
