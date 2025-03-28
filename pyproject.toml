@@ -1,0 +1,80 @@
+[tool.poetry]
+name = "grafi"
+version = "0.0.3"
+description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI Agent through composable agentic workflows."
+authors = ["Craig Li <craig@binome.dev>"]
+license = "Mozilla Public License Version 2.0"
+readme = "README.md"
+packages = [{ include = "grafi" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+pydantic = "^2.9.1"
+openai = "^1.45.0"
+docstring-parser = "^0.16"
+opentelemetry-api = "^1.27.0"
+opentelemetry-sdk = "^1.27.0"
+openinference-semantic-conventions = "^0.1.10"
+opentelemetry-exporter-otlp = "^1.27.0"
+openinference-instrumentation-openai = "^0.1.14"
+arize-otel = "^0.5.3"
+arize-phoenix = "^7.5.1"
+loguru = "^0.7.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-asyncio = "^0.25.3"
+chromadb = "^0.6.3"
+llama-index-core = "^0.12.25"
+llama-index-llms-openai = "^0.3.26"
+llama-index-embeddings-openai = "^0.3.1"
+tavily-python = "^0.5.1"
+duckduckgo-search = "^7.5.2"
+ollama = "^0.4.7"
+ruff = "^0.11.1"
+pre-commit = "^4.2.0"
+mypy = "^1.15.0"
+
+
+[tool.poetry.group.docs.dependencies]
+mkdoc = "^0.1"
+
+[tool.ruff]
+lint.select = [ "E", "F", "I", "TID251" ]
+lint.ignore = [ "E501" ]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+
+[tool.mypy]
+# https://mypy.readthedocs.io/en/stable/config_file.html
+disallow_untyped_defs = "True"
+explicit_package_bases = "True"
+warn_no_return = "False"
+warn_unused_ignores = "True"
+warn_redundant_casts = "True"
+allow_redefinition = "True"
+disable_error_code = "typeddict-item, return-value, override, has-type"
+
+[tool.coverage.run]
+omit = ["tests/*"]
+
+[tool.pytest-watcher]
+now = true
+delay = 0.1
+patterns = ["*.py"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

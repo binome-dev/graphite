@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workflow Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre-d3/0.6.4/dagre-d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+        }
+        #graph {
+            width: 70%;
+            height: 100vh;
+        }
+        #details-panel {
+            width: 30%;
+            height: 100vh;
+            padding: 20px;
+            background: #f5f5f5;
+            overflow-y: auto;
+        }
+        .node rect {
+            stroke: #508db6;
+            fill: #508db6;
+        }
+        .topic rect {
+            stroke: #f7b93c;
+            fill: #f7b93c;
+        }
+        .edgePath path {
+            stroke: #000;
+            stroke-width: 2px;
+            fill: none;
+        }
+        .edgePath marker {
+            fill: #000;
+            stroke: none;
+        }
+        /* Add or update this arrow path rule */
+        .edgePath marker path {
+            fill: #000;
+            stroke: none;
+        }
+        .node-label, .topic-label {
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .file-input-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="graph"></div>
+    <div id="details-panel">
+        <h2>Details</h2>
+        <div id="details-content">
+            Click a node or topic to see details
+        </div>
+        <div class="file-input-container">
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+    </div>
+    <script>
+        // Add this helper function at the beginning of your script section
+        function getTextWidth(text) {
+            const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            document.body.appendChild(tempSvg);
+            const tempText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            tempText.setAttribute("font-size", "12px");
+            tempText.setAttribute("font-family", "Arial, sans-serif");
+            tempText.textContent = text;
+            tempSvg.appendChild(tempText);
+            const width = tempText.getBBox().width;
+            document.body.removeChild(tempSvg);
+            return width;
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const manifest = JSON.parse(e.target.result);
+                        // Clear previous visualization
+                        document.getElementById('graph').innerHTML = '';
+                        createVisualization(manifest);
+                    } catch (error) {
+                        console.error('Error parsing JSON:', error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Add event listener for file input
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+        function createVisualization(manifest) {
+            // Clear previous visualization
+            document.getElementById('graph').innerHTML = '';
+            
+            const width = document.getElementById('graph').clientWidth;
+            const height = document.getElementById('graph').clientHeight;
+
+            // Create a new directed graph
+            const g = new dagreD3.graphlib.Graph({ directed: true });
+
+            // Set graph settings
+            g.setGraph({
+                rankdir: 'TB',
+                nodesep: 70,
+                ranksep: 50,
+                marginx: 20,
+                marginy: 20
+            });
+
+            // Modify the nodes adding section
+            Object.entries(manifest.nodes).forEach(([id, node]) => {
+                const textWidth = getTextWidth(id);
+                g.setNode(id, {
+                    label: id,
+                    width: Math.max(textWidth + 40, 120), // minimum 120px width, padding of 40px
+                    height: 40,
+                    class: 'node',
+                    rx: 10,
+                    ry: 10,
+                    data: node
+                });
+            });
+
+            // Modify the topic nodes section
+            Object.entries(manifest.topics).forEach(([id, topic]) => {
+                const textWidth = getTextWidth(id);
+                g.setNode(id, {
+                    label: id,
+                    width: Math.max(textWidth + 40, 120), // minimum 120px width, padding of 40px
+                    height: 15, // reduced height for topics
+                    class: 'topic',
+                    data: topic
+                });
+            });
+
+            // Add edges from topic_nodes
+            Object.entries(manifest.topic_nodes).forEach(([topicId, nodeIds]) => {
+                nodeIds.forEach(nodeId => {
+                    g.setEdge(topicId, nodeId, {
+                        curve: d3.curveBasis
+                    });
+                });
+            });
+
+            // Add edges from publish_to
+            Object.entries(manifest.nodes).forEach(([nodeId, node]) => {
+                node.publish_to?.forEach(pub => {
+                    g.setEdge(nodeId, pub.name, {
+                        curve: d3.curveBasis
+                    });
+                });
+            });
+
+            // Create the renderer
+            const svg = d3.select('#graph')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            const svgGroup = svg.append('g');
+
+            // Set up zoom support
+            const zoom = d3.zoom()
+                .on('zoom', (e) => {
+                    svgGroup.attr('transform', e.transform);
+                });
+            svg.call(zoom);
+
+            // Create the renderer
+            const render = new dagreD3.render();
+
+            // Run the renderer
+            render(svgGroup, g);
+
+            // Center the graph
+            const graphWidth = g.graph().width + 40;
+            const graphHeight = g.graph().height + 40;
+            const zoomScale = Math.min(width / graphWidth, height / graphHeight);
+            const translateX = (width - graphWidth * zoomScale) / 2;
+            const translateY = (height - graphHeight * zoomScale) / 2;
+            
+            svg.call(zoom.transform, d3.zoomIdentity
+                .translate(translateX, translateY)
+                .scale(zoomScale));
+
+            // Add click handlers
+            svgGroup.selectAll('g.node, g.topic')
+                .on('click', function(event) {
+                    // Get the element's text content which contains the node/topic ID
+                    const element = d3.select(this);
+                    const nodeId = element.select('text').text();
+                    
+                    let detailData;
+                    // Check if it's a node or topic
+                    if (manifest.nodes[nodeId]) {
+                        detailData = manifest.nodes[nodeId];
+                    } else if (manifest.topics[nodeId]) {
+                        detailData = manifest.topics[nodeId];
+                    }
+
+                    if (detailData) {
+                        const detailsContent = document.getElementById('details-content');
+                        let contentHtml = `
+                            <h3>${nodeId}</h3>
+                            ${formatDataAsHierarchy(detailData)}
+                        `;
+                        detailsContent.innerHTML = contentHtml;
+                    }
+                });
+
+            // Remove the separate showDetails function as it's now integrated above
+        }
+
+        function formatDataAsHierarchy(data) {
+            if (typeof data !== 'object' || data === null) {
+                return `<span>${data}</span>`;
+            }
+            if (Array.isArray(data)) {
+                return `<ul>${data.map(item => `<li>${formatDataAsHierarchy(item)}</li>`).join('')}</ul>`;
+            }
+            return `<ul>${Object.entries(data).map(([key, value]) => `
+                <li><strong>${key}:</strong> ${formatDataAsHierarchy(value)}</li>
+            `).join('')}</ul>`;
+        }
+
+        // Remove loadManifest() call as it's handled by file input
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
