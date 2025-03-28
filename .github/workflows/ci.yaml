@@ -221,8 +221,8 @@ jobs:
 
       - name: Set up Git user
         run: |
-          git config --global user.name "github-a
-          git config --global user.email "github-
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions@github.com"
 
       - name: Get Next Version
         id: semver
