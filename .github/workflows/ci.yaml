@@ -71,6 +71,7 @@ jobs:
   integration-tests:
     name: Run Integration Tests
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
     - name: Check out the code
@@ -211,6 +212,7 @@ jobs:
     needs: 
       - publish_pypi
       - version
+      - integration-tests
     if: github.ref == 'refs/heads/main'
 
     steps:
