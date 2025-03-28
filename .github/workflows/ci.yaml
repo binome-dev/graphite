@@ -213,6 +213,7 @@ jobs:
       - publish_pypi
       - version
       - integration-tests
+
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -226,14 +227,6 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions@github.com"
 
-      - name: Get Next Version
-        id: semver
-        uses: ietf-tools/semver-action@v1
-        with:
-          token: ${{ github.token }}
-          branch: main
-          fallbackTag: "0.0.1"
-          noVersionBumpBehavior: patch
 
       - name: Create Release
         uses: ncipollo/release-action@v1.12.0
@@ -241,7 +234,7 @@ jobs:
           allowUpdates: true
           draft: false
           makeLatest: true
-          name: ${{ steps.semver.outputs.next }}
+          name: ${{ needs.version.outputs.package-version }}
           body: Changelog Contents
           token: ${{ github.token }}
-          tag: ${{ steps.semver.outputs.bump}}
+          tag: ${{ needs.version.outputs.package-version }}
