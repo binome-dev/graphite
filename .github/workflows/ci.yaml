@@ -136,9 +136,6 @@ jobs:
         id: package-version
         run: |
           echo "VERSION=$(poetry version --short)" >> $GITHUB_OUTPUT
-  
-
-  
 
   publish_pypi:
     name: Publish to PyPI
@@ -208,39 +205,41 @@ jobs:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
-github_release:
-  name: Tag Version (SemVer)
-  runs-on: ubuntu-latest
-  needs: test
-  if: github.ref == 'refs/heads/main'
+  github_release:
+    name: Tag Version (SemVer)
+    runs-on: ubuntu-latest
+    needs: 
+      - publish_pypi
+      - version
+    if: github.ref == 'refs/heads/main'
 
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Ensure full history f
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure full history f
 
-    - name: Set up Git user
-      run: |
-        git config --global user.name "github-a
-        git config --global user.email "github-
+      - name: Set up Git user
+        run: |
+          git config --global user.name "github-a
+          git config --global user.email "github-
 
-    - name: Get Next Version
-      id: semver
-      uses: ietf-tools/semver-action@v1
-      with:
-        token: ${{ github.token }}
-        branch: main
-        fallbackTag: "0.0.1"
-        noVersionBumpBehavior: patch
+      - name: Get Next Version
+        id: semver
+        uses: ietf-tools/semver-action@v1
+        with:
+          token: ${{ github.token }}
+          branch: main
+          fallbackTag: "0.0.1"
+          noVersionBumpBehavior: patch
 
-    - name: Create Release
-      uses: ncipollo/release-action@v1.12.0
-      with:
-        allowUpdates: true
-        draft: false
-        makeLatest: true
-        name: ${{ steps.semver.outputs.next }}
-        body: Changelog Contents
-        token: ${{ github.token }}
-        tag: ${{ steps.semver.outputs.bump}}
+      - name: Create Release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          allowUpdates: true
+          draft: false
+          makeLatest: true
+          name: ${{ steps.semver.outputs.next }}
+          body: Changelog Contents
+          token: ${{ github.token }}
+          tag: ${{ steps.semver.outputs.bump}}
