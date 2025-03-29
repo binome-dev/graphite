@@ -206,6 +206,8 @@ class KycAssistant(Assistant):
         human_request_topic     = Topic(name="human_request_topic")
         agent_input_topic       = Topic(name="agent_input_topic")
 
+        agent_output_topic       = Topic(name="agent_output_topic")
+
         user_info_extract_node = Node(
             name = "InfoExtractNode",
             input = Topic.any( agent_input_topic, human_request_topic),
