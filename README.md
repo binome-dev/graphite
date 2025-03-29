@@ -206,39 +206,51 @@ class KycAssistant(Assistant):
         user_info_extract_topic = Topic(name="user_info_extract_topic")
         human_request_topic     = Topic(name="human_request_topic")
 
-        user_info_extract_node = LLMNode().name("InfoExtractNode")\
-            .subscribe( agent_input_topic.or_topic(human_request_topic) )\
-            .publish_to(user_info_extract_topic)\
-            .cmd_llm_response( OpenAITool(name="ThoughtLLM").system_message(self.user_info_extract_system_message) )
+        user_info_extract_node = Node(
+            name = "InfoExtractNode",
+            input = agent_input_topic.any_topic(human_request_topic),
+            output = user_info_extract_topic,
+            cmd = LLMResponseCommand(OpenAITool(name="ThoughtLLM").system_message(self.user_info_extract_system_message))
+        )
 
         # Create action node
-        hitl_call_topic = Topic(name="hitl_call_topic",
+        hitl_call_topic = Topic(
+            name="hitl_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls[0].function.name != "register_client")
 
-        register_user_topic = Topic(name="register_user_topic",
+        register_user_topic = Topic(
+            name="register_user_topic",
             condition=lambda msgs: msgs[-1].tool_calls[0].function.name == "register_client")
 
-        action_node = LLMNode().name("ActionNode")\
-            .subscribe(user_info_extract_topic)\
-            .publish_to(hitl_call_topic).publish_to(register_user_topic)\
-            .cmd_llm_response( OpenAITool(name="ActionLLM").system_message(self.action_llm_system_message) )
+        action_node = Node(
+              name   = "ActionNode",
+              input  = user_info_extract_topic,
+              output = hitl_call_topic.union(register_user_topic),
+              cmd    = LLMResponseCommand(OpenAITool(name="ThoughtLLM").system_message(self.action_llm_system_message)))
 
-        human_request_function_call_node = LLMFunctionCallNode().name("HumanRequestNode")\
-            .subscribe(hitl_call_topic).publish_to(human_request_topic)\
-            .cmd_function_call(tool=self.hitl_request)
+        human_request_function_call_node = Node(
+            name   = "HumanRequestNode",
+            input  = hitl_call_topic,
+            output = human_request_topic,
+            cmd = FunctionCallCommand(tool=self.hitl_request)
+        )
 
         register_user_respond_topic = Topic(name="register_user_respond")
 
         # Create an output LLM node
-        register_user_node = LLMFunctionCallNode().name("FunctionCallRegisterNode")\
-            .subscribe(register_user_topic)\
-            .publish_to(register_user_respond_topic)\
-            .cmd_function_call(tool=self.register_request)
 
-        user_reply_node = LLMNode().name("LLMResponseToUserNode")\
-            .subscribe(register_user_respond_topic)\
-            .publish_to(agent_output_topic)\
-            .cmd_llm_response( OpenAITool(name="ResponseToUserLLM").system_message(self.summary_llm_system_message) )
+        register_user_node = Node(
+            name   = "FunctionCallRegisterNode",
+            input  = register_user_topic,
+            output = register_user_respond_topic,
+            cmd = FunctionCallCommand(tool=self.register_request)
+        )
+
+        user_reply_node = Node(
+              name   = "LLMResponseToUserNode",
+              input  = register_user_respond_topic,
+              output = agent_output_topic,
+              cmd    = LLMResponseCommand(OpenAITool(name="ResponseToUserLLM").system_message(self.summary_llm_system_message)))
 
         # Create a workflow and add the nodes
         self.workflow = EventDrivenWorkflow().name("simple_function_call_workflow")\
