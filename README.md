@@ -1,35 +1,47 @@
 <p align="center">
-  <img src="/assets/graphite_logo.png" />
+  <picture>
+    <source srcset="/assets/graphite_logo_light.png" media="(prefers-color-scheme: dark)">
+    <img src="/assets/graphite_logo.png" alt="Graphite Logo">
+  </picture>
 </p>
 
 ## Introduction
 
 Graphite is a flexible, event-driven framework for building AI agents using modular, composable workflows. Graphite helps you easily build AI agents with:
 
-1. **Flexibility**: Quickly assemble AI assistants from modular, reusable components.
-2. **Observability**: Built-in monitoring and debugging with OpenTelemetry, Arize, and Phoenix integrations.
-3. **Restorability**: Reliable recovery from workflow interruptions, allowing workflows to pause and resume smoothly.
+1. **Observability**  
+   Complex AI solutions involve multiple steps, data sources, and models. Graphite’s event-driven architecture, logging, and tracing make it possible to pinpoint bottlenecks or errors in real time, ensuring that each component’s behavior is transparent and measurable.
+
+2. **Idempotency**  
+   Asynchronous workflows often require retries when partial failures occur or network conditions fluctuate. Graphite’s design emphasizes idempotent operations, preventing pub/sub data duplication or corruption when calls must be repeated.
+
+3. **Auditability**  
+   By treating events as the single source of truth, Graphite automatically logs every state change and decision path. This level of detailed recordkeeping is indispensable for users working in regulated sectors or who need full traceability for debugging and compliance.
+
+4. **Restorability**  
+   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency ([Example](/examples/react_assistant/react_assistant_recovery_example.py)).
 
 Graphite is based on:
 
-- **Event-driven Architecture**: Components communicate through events, enabling easy tracing and debugging.
-- **Modular Design**: Independent components simplify development, testing, and deployment.
+- **Event-driven Architecture**: Components communicate through events, making workflows easy to trace, debug, and extend.
+- **Modular Design**: Independently developed components simplify building, testing, and deployment.
 
 Key benefits include:
 
-- Easy workflow customization
-- Clear visibility into agent actions
-- Reliable fault recovery
-- Scalability through stateless design
-- Auditability with persistent event tracking
+- Effortless workflow customization for AI agents
+- Clear visibility into agent behavior via event sourcing
+- Reliable fault recovery and state restoration
+- Scalable, stateless architecture
+- End-to-end auditability with persistent event tracking
+- Enables both online and offline data processing by capturing all events in an event store — users can build memory, knowledge bases, analytics, or fine-tuning pipelines on top of it
 
-Graphite is ideal for building robust and transparent AI workflows, seamlessly scaling from proof of concept to enterprise deployment
+Graphite is ideal for building robust and transparent AI agent, seamlessly scaling from proof of concept to enterprise deployment
 
 ## Core Components
 
 Graphite is structured into three conceptual layers — *Assistants*, *Nodes*, and *Tools* — coordinated through a lightweight, Pub/Sub *workflow* orchestration mechanism:
 
-- **Assistants**: High-level components orchestrating workflows and managing interactions with end users.
+- **Assistants**: High-level components orchestrating AI agents workflows and managing interactions with end users.
 - **Nodes**: A node is a discrete component in a graph-based agent system that operates under an event-driven model. Its primary role is to represent its position within a workflow graph, manage event subscriptions, and designate topics for publishing.
 - **Tools**:  In our platform, tools represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic.
 - **Workflow**: Orchestrates interactions among nodes using a Pub/Sub pattern with in-memory message queuing.
@@ -42,7 +54,7 @@ Additionally, Graphite offers modules that support essential architectural patte
 - **Topic**: Implements lightweight FIFO message queuing, essential for Pub/Sub interactions.
 - **Command**: Implements the Command pattern, clearly separating request initiators from executors through defined Command objects and handlers. Commands carry all necessary context, allowing nodes to invoke tools independently and cleanly.
 - **Decorators**: Automatically capture execution details (inputs, outputs, and errors) as events without altering core business logic, facilitating auditability and traceability.
-- **Execution Context**: Manages identifiers across message lifecycles:
+- **Execution Context**: Manages identifiers across message life cycles:
   - `conversation_id`: Manages conversations, which may include multiple executions.
   - `assistant_request_id`: Tracks requests at the assistant level, facilitating complex multi-node workflows.
   - `execution_id`: Handles individual user requests, potentially involving multiple assistants in complex scenarios.
@@ -75,7 +87,7 @@ graph TD;
     InputLLM--"direct output"-->Output;
 ```
 
-Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*.
+Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*. The example code is [here](/examples/function_call_assistant/simple_function_call_assistant_tavily_example.py)
 
 ```py
 # file name: simple_function_call_assistant.py
@@ -86,7 +98,7 @@ from grafi.assistants.simple_function_call_assistant import (
 )
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.tavily_tool import TavilyTool
+from tools.tavily_tool import TavilyTool
 
 api_key = "<YOUR_OPENAI_API_KEY>"
 tavily_key = "<YOUR_TAVILY_API_KEY>"
@@ -131,7 +143,7 @@ One of the possible output would be:
 
 ### Run an Assistant with a ReAct Workflow
 
-The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI Agent Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
+The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI agents Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
 
 ```mermaid
 graph TD;
@@ -200,147 +212,7 @@ From graph, we will need add following components:
   - register user respond topic
   - agent output topic (framework provided)
 
-We use build in `Builder` to create this workflow in assistant. Here is the workflow constructs part:
-
-```python
-class KycAssistant(Assistant):
-
-    """
-    ...
-    all the assistant settings
-    ...
-    """
-
-    def _construct_workflow(self) -> "KycAssistant":
-
-        user_info_extract_topic = Topic(name="user_info_extract_topic")
-
-        user_info_extract_node = (
-            LLMNode.Builder()
-            .name("ThoughtNode")
-            .subscribe(
-                SubscriptionBuilder()
-                .subscribed_to(agent_input_topic)
-                .or_()
-                .subscribed_to(human_request_topic)
-                .build()
-            )
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ThoughtLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.user_info_extract_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(user_info_extract_topic)
-            .build()
-        )
-
-        # Create action node
-
-        hitl_call_topic = Topic(
-            name="hitl_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            != "register_client",
-        )
-
-        register_user_topic = Topic(
-            name="register_user_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            == "register_client",
-        )
-
-        action_node = (
-            LLMNode.Builder()
-            .name("ActionNode")
-            .subscribe(user_info_extract_topic)
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ActionLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.action_llm_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(hitl_call_topic)
-            .publish_to(register_user_topic)
-            .build()
-        )
-
-        human_request_function_call_node = (
-            LLMFunctionCallNode.Builder()
-            .name("HumanRequestNode")
-            .subscribe(hitl_call_topic)
-            .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.hitl_request)
-                .build()
-            )
-            .publish_to(human_request_topic)
-            .build()
-        )
-
-        register_user_respond_topic = Topic(name="register_user_respond")
-
-        # Create an output LLM node
-        register_user_node = (
-            LLMFunctionCallNode.Builder()
-            .name("FunctionCallRegisterNode")
-            .subscribe(register_user_topic)
-            .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.register_request)
-                .build()
-            )
-            .publish_to(register_user_respond_topic)
-            .build()
-        )
-
-        user_reply_node = (
-            LLMNode.Builder()
-            .name("LLMResponseToUserNode")
-            .subscribe(
-                SubscriptionBuilder().subscribed_to(register_user_respond_topic).build()
-            )
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ResponseToUserLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(agent_output_topic)
-            .build()
-        )
-
-        # Create a workflow and add the nodes
-        self.workflow = (
-            EventDrivenWorkflow.Builder()
-            .name("simple_function_call_workflow")
-            .node(user_info_extract_node)
-            .node(action_node)
-            .node(human_request_function_call_node)
-            .node(register_user_node)
-            .node(user_reply_node)
-            .build()
-        )
-
-        return self
-```
+We use build in `Builder` to create this workflow in assistant. Here is the [workflow constructs](/examples/hith_assistant/kyc_assistant.py)
 
 #### 3. Run the assistant
 
@@ -350,7 +222,7 @@ Let's create a python script with system prompts and command input.
 import json
 import uuid
 
-from grafi.assistants.kyc_assistant import KycAssistant
+from kyc_assistant import KycAssistant
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message

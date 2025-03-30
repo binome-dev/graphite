@@ -1257,13 +1257,13 @@ Combining these elements, **Graphite** provides a production-grade AI applicatio
    Complex AI solutions involve multiple steps, data sources, and models. Graphite’s event-driven architecture, logging, and tracing make it possible to pinpoint bottlenecks or errors in real time, ensuring that each component’s behavior is transparent and measurable.
 
 2. **Idempotency**  
-   Distributed workflows often require retries when partial failures occur or network conditions fluctuate. Graphite’s design emphasizes idempotent operations, preventing pub/sub data duplication or corruption when calls must be repeated.
+   Asynchronous workflows often require retries when partial failures occur or network conditions fluctuate. Graphite’s design emphasizes idempotent operations, preventing pub/sub data duplication or corruption when calls must be repeated.
 
 3. **Auditability**  
    By treating events as the single source of truth, Graphite automatically logs every state change and decision path. This level of detailed recordkeeping is indispensable for users working in regulated sectors or who need full traceability for debugging and compliance.
 
 4. **Restorability**  
-   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, stateful checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency.
+   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency.
 
 Together, these capabilities—observability, idempotency, auditability, and restorability—distinguish **Graphite** as a framework for building robust and trustworthy AI applications. Below is a detailed breakdown of how Graphite implements each feature.
 
