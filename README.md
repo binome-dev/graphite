@@ -7,13 +7,13 @@
 
 ## Introduction
 
-Graphite is a flexible, event-driven framework for building AI agent using modular, composable workflows. Graphite helps you easily build AI agent with:
+Graphite is a flexible, event-driven framework for building AI agents using modular, composable workflows. Graphite helps you easily build AI agents with:
 
 1. **Observability**  
    Complex AI solutions involve multiple steps, data sources, and models. Graphite’s event-driven architecture, logging, and tracing make it possible to pinpoint bottlenecks or errors in real time, ensuring that each component’s behavior is transparent and measurable.
 
 2. **Idempotency**  
-   Asynchronized workflows often require retries when partial failures occur or network conditions fluctuate. Graphite’s design emphasizes idempotent operations, preventing pub/sub data duplication or corruption when calls must be repeated.
+   Asynchronous workflows often require retries when partial failures occur or network conditions fluctuate. Graphite’s design emphasizes idempotent operations, preventing pub/sub data duplication or corruption when calls must be repeated.
 
 3. **Auditability**  
    By treating events as the single source of truth, Graphite automatically logs every state change and decision path. This level of detailed recordkeeping is indispensable for users working in regulated sectors or who need full traceability for debugging and compliance.
@@ -41,7 +41,7 @@ Graphite is ideal for building robust and transparent AI agent, seamlessly scali
 
 Graphite is structured into three conceptual layers — *Assistants*, *Nodes*, and *Tools* — coordinated through a lightweight, Pub/Sub *workflow* orchestration mechanism:
 
-- **Assistants**: High-level components orchestrating AI agent workflows and managing interactions with end users.
+- **Assistants**: High-level components orchestrating AI agents workflows and managing interactions with end users.
 - **Nodes**: A node is a discrete component in a graph-based agent system that operates under an event-driven model. Its primary role is to represent its position within a workflow graph, manage event subscriptions, and designate topics for publishing.
 - **Tools**:  In our platform, tools represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic.
 - **Workflow**: Orchestrates interactions among nodes using a Pub/Sub pattern with in-memory message queuing.
@@ -143,7 +143,7 @@ One of the possible output would be:
 
 ### Run an Assistant with a ReAct Workflow
 
-The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI Agent Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
+The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI agents Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
 
 ```mermaid
 graph TD;
