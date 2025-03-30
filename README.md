@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="/assets/graphite_logo.png" />
+  <picture>
+    <source srcset="/assets/graphite_logo_light.png" media="(prefers-color-scheme: dark)">
+    <img src="/assets/graphite_logo.png" alt="Graphite Logo">
+  </picture>
 </p>
 
 ## Introduction
@@ -75,7 +78,7 @@ graph TD;
     InputLLM--"direct output"-->Output;
 ```
 
-Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*.
+Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*. The example code is [here](/examples/function_call_assistant/simple_function_call_assistant_tavily_example.py)
 
 ```py
 # file name: simple_function_call_assistant.py
@@ -86,7 +89,7 @@ from grafi.assistants.simple_function_call_assistant import (
 )
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.tavily_tool import TavilyTool
+from tools.tavily_tool import TavilyTool
 
 api_key = "<YOUR_OPENAI_API_KEY>"
 tavily_key = "<YOUR_TAVILY_API_KEY>"
@@ -200,147 +203,7 @@ From graph, we will need add following components:
   - register user respond topic
   - agent output topic (framework provided)
 
-We use build in `Builder` to create this workflow in assistant. Here is the workflow constructs part:
-
-```python
-class KycAssistant(Assistant):
-
-    """
-    ...
-    all the assistant settings
-    ...
-    """
-
-    def _construct_workflow(self) -> "KycAssistant":
-
-        user_info_extract_topic = Topic(name="user_info_extract_topic")
-
-        user_info_extract_node = (
-            LLMNode.Builder()
-            .name("ThoughtNode")
-            .subscribe(
-                SubscriptionBuilder()
-                .subscribed_to(agent_input_topic)
-                .or_()
-                .subscribed_to(human_request_topic)
-                .build()
-            )
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ThoughtLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.user_info_extract_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(user_info_extract_topic)
-            .build()
-        )
-
-        # Create action node
-
-        hitl_call_topic = Topic(
-            name="hitl_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            != "register_client",
-        )
-
-        register_user_topic = Topic(
-            name="register_user_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            == "register_client",
-        )
-
-        action_node = (
-            LLMNode.Builder()
-            .name("ActionNode")
-            .subscribe(user_info_extract_topic)
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ActionLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.action_llm_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(hitl_call_topic)
-            .publish_to(register_user_topic)
-            .build()
-        )
-
-        human_request_function_call_node = (
-            LLMFunctionCallNode.Builder()
-            .name("HumanRequestNode")
-            .subscribe(hitl_call_topic)
-            .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.hitl_request)
-                .build()
-            )
-            .publish_to(human_request_topic)
-            .build()
-        )
-
-        register_user_respond_topic = Topic(name="register_user_respond")
-
-        # Create an output LLM node
-        register_user_node = (
-            LLMFunctionCallNode.Builder()
-            .name("FunctionCallRegisterNode")
-            .subscribe(register_user_topic)
-            .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.register_request)
-                .build()
-            )
-            .publish_to(register_user_respond_topic)
-            .build()
-        )
-
-        user_reply_node = (
-            LLMNode.Builder()
-            .name("LLMResponseToUserNode")
-            .subscribe(
-                SubscriptionBuilder().subscribed_to(register_user_respond_topic).build()
-            )
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("ResponseToUserLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(agent_output_topic)
-            .build()
-        )
-
-        # Create a workflow and add the nodes
-        self.workflow = (
-            EventDrivenWorkflow.Builder()
-            .name("simple_function_call_workflow")
-            .node(user_info_extract_node)
-            .node(action_node)
-            .node(human_request_function_call_node)
-            .node(register_user_node)
-            .node(user_reply_node)
-            .build()
-        )
-
-        return self
-```
+We use build in `Builder` to create this workflow in assistant. Here is the [workflow constructs](/examples/hith_assistant/kyc_assistant.py)
 
 #### 3. Run the assistant
 
@@ -350,7 +213,7 @@ Let's create a python script with system prompts and command input.
 import json
 import uuid
 
-from grafi.assistants.kyc_assistant import KycAssistant
+from kyc_assistant import KycAssistant
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
