@@ -93,7 +93,7 @@ Here is an example of using this assistant with [Tavily](https://docs.tavily.com
 # file name: simple_function_call_assistant.py
 import uuid
 
-from grafi.assistants.simple_function_call_assistant import (
+from simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
 )
 from grafi.common.models.execution_context import ExecutionContext
