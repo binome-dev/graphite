@@ -1,9 +1,7 @@
 import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
-from grafi.common.events.topic_events.publish_to_topic_event import (
-    PublishToTopicEvent,
-)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
@@ -72,12 +70,13 @@ def publish_to_topic_event_dict():
         "event_id": "test_id",
         "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",
-        "publisher_name": "test_node",
-        "publisher_type": "test_type",
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
             "offset": 0,
+            "publisher_name": "test_node",
+            "publisher_type": "test_type",
+            "consumed_event_ids": ["1", "2"],
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "execution_id",
@@ -85,8 +84,7 @@ def publish_to_topic_event_dict():
                 "user_id": "",
             },
         },
-        "consumed_event_ids": ["1", "2"],
-        "data": '[{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}]',
+        "data": '[{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}]',
     }
 
 
@@ -96,12 +94,13 @@ def publish_to_topic_event_dict_message():
         "event_id": "test_id",
         "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",
-        "publisher_name": "test_node",
-        "publisher_type": "test_type",
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
             "offset": 0,
+            "publisher_name": "test_node",
+            "publisher_type": "test_type",
+            "consumed_event_ids": ["1", "2"],
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "execution_id",
@@ -109,8 +108,7 @@ def publish_to_topic_event_dict_message():
                 "user_id": "",
             },
         },
-        "consumed_event_ids": ["1", "2"],
-        "data": '{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}',
+        "data": '{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}',
     }
 
 

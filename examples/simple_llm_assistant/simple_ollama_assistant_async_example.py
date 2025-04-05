@@ -5,9 +5,11 @@ import uuid
 
 from simple_ollama_assistant import SimpleOllamaAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+
+event_store = container.event_store
 
 
 def get_execution_context() -> ExecutionContext:
@@ -40,10 +42,6 @@ async def test_simple_llm_assistant_async():
             content="Hello, my name is Grafi, how are you?",
         )
     ]
-
-    if assistant.unfinished_requests:
-        print(assistant.unfinished_requests)
-        execution_context.assistant_request_id = assistant.unfinished_requests[0]
 
     output = await assistant.a_execute(execution_context, input_data)
 

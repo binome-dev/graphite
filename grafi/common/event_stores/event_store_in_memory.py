@@ -3,8 +3,7 @@
 from typing import List, Optional
 
 from grafi.common.event_stores.event_store import EventStore
-from grafi.common.events.event import Event, EventType
-from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
+from grafi.common.events.event import Event
 
 
 class EventStoreInMemory(EventStore):
@@ -39,13 +38,6 @@ class EventStoreInMemory(EventStore):
                 return event
         return None
 
-    def get_latest_node_event(self, node_id: str) -> Optional[Event]:
-        """Get the latest event for a given node ID."""
-        for event in reversed(self.events):
-            if isinstance(event, NodeRespondEvent) and event.node_id == node_id:
-                return event
-        return None
-
     def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given agent request ID."""
         return [
@@ -61,28 +53,3 @@ class EventStoreInMemory(EventStore):
             for event in self.events
             if event.execution_context.conversation_id == conversation_id
         ]
-
-    def get_unfinished_requests(
-        self, assistant_type: str, assistant_name: str
-    ) -> List[str]:
-        """Get all assistant_request_id for unfinished requests."""
-        # Collect all assistant_request_ids for the given assistant_type and assistant_name
-        assistant_request_ids = set(
-            event.execution_context.assistant_request_id
-            for event in self.events
-            if getattr(event, "assistant_type", None) == assistant_type
-            and getattr(event, "assistant_name", None) == assistant_name
-        )
-
-        # Identify finished requests (those with an AssistantRespondEvent)
-        finished_request_ids = set(
-            event.execution_context.assistant_request_id
-            for event in self.events
-            if event.event_type == EventType.ASSISTANT_RESPOND
-            and getattr(event, "assistant_type", None) == assistant_type
-            and getattr(event, "assistant_name", None) == assistant_name
-        )
-
-        # Unfinished requests are those started but not finished
-        unfinished_request_ids = assistant_request_ids - finished_request_ids
-        return list(unfinished_request_ids)

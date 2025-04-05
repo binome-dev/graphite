@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 .ruff_cache/
 .DS_Store
+storage/
+.pgdata/

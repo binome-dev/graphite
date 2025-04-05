@@ -9,11 +9,13 @@ from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 from simple_embedding_retrieval_assistant import SimpleEmbeddingRetrievalAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 api_key = os.getenv("OPENAI_API_KEY")
+
+event_store = container.event_store
 
 CURRENT_DIR = Path(__file__).parent
 PERSIST_DIR = CURRENT_DIR / "storage"
@@ -105,11 +107,6 @@ async def test_simple_embedding_retrieval_tool_async():
             )
         ],
     )
-
-    # Delete the PERSIST_DIR and all files in it
-    if os.path.exists(PERSIST_DIR):
-        shutil.rmtree(PERSIST_DIR)
-        print(f"Deleted {PERSIST_DIR} and all its contents")
 
     print(result)
     assert "Amazon EC2" in result[0].content

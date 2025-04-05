@@ -23,6 +23,7 @@ from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.events.workflow_events.workflow_failed_event import (
@@ -56,22 +57,12 @@ class EventStore:
         """Get an event by ID."""
         raise NotImplementedError
 
-    def get_latest_node_event(self, node_id: str) -> Optional[Event]:
-        """Get an event by node ID."""
-        raise NotImplementedError
-
     def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given agent request ID."""
         raise NotImplementedError
 
     def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID."""
-        raise NotImplementedError
-
-    def get_unfinished_requests(
-        self, assistant_type: str, assistant_name: str
-    ) -> List[str]:
-        """Get all assistant_request_id for unfinished requests."""
         raise NotImplementedError
 
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
@@ -108,5 +99,7 @@ class EventStore:
             EventType.TOPIC_EVENT.value: TopicEvent,
             EventType.CONSUME_FROM_TOPIC.value: ConsumeFromTopicEvent,
             EventType.PUBLISH_TO_TOPIC.value: PublishToTopicEvent,
+            EventType.OUTPUT_TOPIC.value: OutputTopicEvent,
+            EventType.STREAM_TOPIC_EVENT.value: OutputTopicEvent,
         }
         return event_classes.get(event_type)
