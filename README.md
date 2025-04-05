@@ -131,7 +131,7 @@ output = assistant.execute(execution_context, input_data)
 print(output[0].content)
 ```
 
-Keep these two files `simple_function_call_assistant.py` and `simple_function_call_assistant_tavily_example.py` in same directory, and run above example code:
+Keep these two files `simple_function_call_assistant.py` and `simple_function_call_assistant_tavily_example.py` in the same directory, then run the example with:
 
 ```bash
 python simple_function_call_assistant_tavily_example.py
