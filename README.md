@@ -41,7 +41,7 @@ Graphite is ideal for building robust and transparent AI agent, seamlessly scali
 
 Graphite is structured into three conceptual layers — *Assistants*, *Nodes*, and *Tools* — coordinated through a lightweight, Pub/Sub *workflow* orchestration mechanism:
 
-- **Assistants**: High-level components orchestrating AI agents workflows and managing interactions with end users.
+- **Assistants**: High-level orchestration layer that manages AI agent workflows and user interactions. Assistants handle the complete lifecycle of requests, from initial input to final response.
 - **Nodes**: A node is a discrete component in a graph-based agent system that operates under an event-driven model. Its primary role is to represent its position within a workflow graph, manage event subscriptions, and designate topics for publishing.
 - **Tools**:  In our platform, tools represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic.
 - **Workflow**: Orchestrates interactions among nodes using a Pub/Sub pattern with in-memory message queuing.
@@ -70,11 +70,11 @@ Install Graphite:
 pip install grafi
 ```
 
-Our [Examples](/examples/) shown some of our pre build workflows and agents. These pre-built assistants are tested before each release.
+While Graphite maintains a lightweight core framework, we've developed several pre-built [examples](/examples/) that demonstrate some simple assistants for various use cases. These examples serve as both practical implementations and inspiration for your own custom solutions.
 
 ### Run a Simple Workflow with Function calling
 
-One of the simplest of our pre-built workflows is `SimpleFunctionCallAssistant` - given the input, LLM will decide either run a function, or directly response to the user. The workflow looks like this:
+One of the simplest of our pre-built workflows is [`SimpleFunctionCallAssistant`](/examples/function_call_assistant/simple_function_call_assistant.py) - given the input, LLM will decide either run a function, or directly response to the user. The workflow looks like this:
 
 ```mermaid
 graph TD;
@@ -87,13 +87,13 @@ graph TD;
     InputLLM--"direct output"-->Output;
 ```
 
-Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*. The example code is [here](/examples/function_call_assistant/simple_function_call_assistant_tavily_example.py)
+Here is an example of using this assistant with [Tavily](https://docs.tavily.com/welcome) search as *function tool*. The example code is [simple_function_call_assistant_tavily_example.py](/examples/function_call_assistant/simple_function_call_assistant_tavily_example.py)
 
 ```py
 # file name: simple_function_call_assistant.py
 import uuid
 
-from grafi.assistants.simple_function_call_assistant import (
+from simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
 )
 from grafi.common.models.execution_context import ExecutionContext
@@ -131,10 +131,10 @@ output = assistant.execute(execution_context, input_data)
 print(output[0].content)
 ```
 
-To run above example code:
+Keep these two files `simple_function_call_assistant.py` and `simple_function_call_assistant_tavily_example.py` in same directory, and run above example code:
 
 ```bash
-python simple_function_call_assistant.py
+python simple_function_call_assistant_tavily_example.py
 ```
 
 One of the possible output would be:
