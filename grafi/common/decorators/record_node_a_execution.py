@@ -7,7 +7,7 @@ from typing import AsyncGenerator, List
 from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
 from pydantic_core import to_jsonable_python
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.events.node_events.node_event import (
     NODE_ID,
     NODE_NAME,
@@ -59,12 +59,12 @@ def record_node_a_execution(func):
             "input_data": input_data,
         }
 
-        if event_store:
+        if container.event_store:
             # Record the 'invoke' event
             invoke_event = NodeInvokeEvent(
                 **node_event_base,
             )
-            event_store.record_event(invoke_event)
+            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -102,20 +102,20 @@ def record_node_a_execution(func):
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
             # Exception occurred during execution
-            if event_store:
+            if container.event_store:
                 failed_event = NodeFailedEvent(
                     **node_event_base,
                     error=str(e),
                 )
-                event_store.record_event(failed_event)
+                container.event_store.record_event(failed_event)
             raise
         else:
             # Successful execution
-            if event_store:
+            if container.event_store:
                 respond_event = NodeRespondEvent(
                     **node_event_base,
                     output_data=result,
                 )
-                event_store.record_event(respond_event)
+                container.event_store.record_event(respond_event)
 
     return wrapper

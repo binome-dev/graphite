@@ -143,7 +143,7 @@ One of the possible output would be:
 
 ### Run an Assistant with a ReAct Workflow
 
-The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI Agent Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
+The ReAct (Reasoning and Action) pattern combines reasoning and action to solve complex problems step by step. To learn more about this and other agent patterns, check out our article: [AI agents Workflow Design Patterns — An Overview](https://medium.com/binome/ai-agent-workflow-design-patterns-an-overview-cf9e1f609696).
 
 ```mermaid
 graph TD;

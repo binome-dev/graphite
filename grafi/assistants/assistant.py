@@ -3,7 +3,7 @@ import os
 from typing import Any, List
 
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.record_assistant_a_execution import (
     record_assistant_a_execution,
 )
@@ -68,7 +68,7 @@ class Assistant(AssistantBase):
         finally:
             if consumed_events:
                 for event in consumed_events:
-                    event_store.record_event(event)
+                    container.event_store.record_event(event)
 
     @record_assistant_a_execution
     async def a_execute(
@@ -106,7 +106,7 @@ class Assistant(AssistantBase):
         finally:
             if consumed_events:
                 for event in consumed_events:
-                    event_store.record_event(event)
+                    container.event_store.record_event(event)
 
     def _get_consumed_events(self) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []

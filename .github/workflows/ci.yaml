@@ -193,11 +193,11 @@ jobs:
       #----------------------------------------------
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --without dev --no-interaction --no-root --sync
       
       - name: Install project
         run: |
-           poetry install --no-interaction
+           poetry install --without dev --no-interaction  --sync
            poetry build
 
       - name: mint API token

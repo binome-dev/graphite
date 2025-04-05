@@ -7,7 +7,7 @@ from typing import List, Union
 from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
 from pydantic_core import to_jsonable_python
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.events.workflow_events.workflow_event import (
     WORKFLOW_ID,
     WORKFLOW_NAME,
@@ -59,12 +59,12 @@ def record_workflow_a_execution(func):
             "input_data": input_data,
         }
 
-        if event_store:
+        if container.event_store:
             # Record the 'invoke' event
             invoke_event = WorkflowInvokeEvent(
                 **workflow_event_base,
             )
-            event_store.record_event(invoke_event)
+            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -84,12 +84,12 @@ def record_workflow_a_execution(func):
 
         except Exception as e:
             # Exception occurred during execution
-            if event_store:
+            if container.event_store:
                 failed_event = WorkflowFailedEvent(
                     **workflow_event_base,
                     error=str(e),
                 )
-                event_store.record_event(failed_event)
+                container.event_store.record_event(failed_event)
             raise
 
     return wrapper

@@ -28,12 +28,6 @@ The `AssistantBase` class provides an abstract base interface defining the found
 | `oi_span_type`   | Semantic attribute from OpenInference for tracing purposes.         |
 | `workflow`       | Associated workflow instance managed by the assistant.              |
 
-#### AssistantBase Class Methods
-
-| Method                | Description                                                              |
-|-----------------------|--------------------------------------------------------------------------|
-| `unfinished_requests` | Property retrieving unfinished requests from the event store.            |
-
 ### Assistant Class
 
 The concrete `Assistant` class extends `AssistantBase`, implementing workflow execution and managing the interactions between user inputs and the agent’s workflow components.

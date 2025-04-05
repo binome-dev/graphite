@@ -1,7 +1,7 @@
 from typing import AsyncGenerator, List
 
 from grafi.assistants.assistant import Assistant
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.record_assistant_a_stream import record_assistant_a_stream
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -52,4 +52,4 @@ class StreamAssistant(Assistant):
             return output
         finally:
             if consumed_event:
-                event_store.record_events(consumed_event)
+                container.event_store.record_events(consumed_event)

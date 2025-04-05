@@ -3,12 +3,14 @@ import uuid
 
 from simple_function_call_assistant import SimpleFunctionCallAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.impl.agent_calling_tool import AgentCallingTool
 
 api_key = os.getenv("OPENAI_API_KEY")
+
+event_store = container.event_store
 
 
 def get_execution_context():
@@ -46,10 +48,6 @@ def test_simple_function_call_assistant():
 
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
-
-    if assistant.unfinished_requests:
-        print(assistant.unfinished_requests)
-        execution_context.assistant_request_id = assistant.unfinished_requests[0]
 
     output = assistant.execute(execution_context, input_data)
     print(output)

@@ -111,8 +111,8 @@ class TestEventDrivenWorkflow:
         assert AGENT_INPUT_TOPIC in simple_workflow.topics
         assert AGENT_OUTPUT_TOPIC in simple_workflow.topics
 
-    @patch("grafi.common.containers.container.event_store")
-    def test_on_event_handler(self, mock_event_store, simple_workflow):
+    @patch("grafi.common.containers.container.container")
+    def test_on_event_handler(self, mock_container, simple_workflow):
         """Test event handler functionality"""
         # Create a publish event
         mock_event = MagicMock(spec=PublishToTopicEvent)
