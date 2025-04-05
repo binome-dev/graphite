@@ -6,9 +6,11 @@ import uuid
 
 from simple_llm_assistant import SimpleLLMAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+
+event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 
@@ -37,10 +39,6 @@ async def test_simple_llm_assistant_async():
     )
     event_store.clear_events()
     # Test the run method
-
-    if assistant.unfinished_requests:
-        print(assistant.unfinished_requests)
-        execution_context.assistant_request_id = assistant.unfinished_requests[0]
 
     input_data = [
         Message(

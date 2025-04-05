@@ -1,9 +1,7 @@
-from typing import List
-
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel, ConfigDict, Field
 
-from grafi.common.containers.container import container, event_store
+from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.models.default_id import default_id
 from grafi.workflows.workflow import Workflow
@@ -54,13 +52,3 @@ class AssistantBase(BaseModel):
 
         def build(self) -> "AssistantBase":
             raise NotImplementedError
-
-    @property
-    def unfinished_requests(self) -> List[str]:
-        """
-        Return all unfinished requests by reading from the event store.
-
-        Returns:
-            List[str]: A list of assistant_request_id for unfinished requests.
-        """
-        return event_store.get_unfinished_requests(self.type, self.name)

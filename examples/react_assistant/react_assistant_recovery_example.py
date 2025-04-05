@@ -6,9 +6,11 @@ from pathlib import Path
 from react_assistant import ReActAssistant
 from tools.tavily_tool import TavilyTool
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+
+event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 tavily_api_key = os.getenv("TAIVLY_API_KEY")
@@ -92,11 +94,6 @@ def test_react_assistant():
     # Execute the assistant's function call
     output = assistant.execute(execution_context, input_data)
     print("Assistant output:", output)
-
-    # Assert that the output is valid and check event count
-
-    # assistant.generate_workflow_graph()
-    # assistant.generate_manifest()
 
 
 test_react_assistant()

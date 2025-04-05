@@ -4,10 +4,10 @@ import functools
 import json
 from typing import AsyncGenerator, List, Union
 
-from pydantic_core import to_jsonable_python
 from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
+from pydantic_core import to_jsonable_python
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.events.tool_events.tool_event import TOOL_ID, TOOL_NAME, TOOL_TYPE
 from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
@@ -46,12 +46,12 @@ def record_tool_a_execution(func):
             "input_data": input_data,
         }
 
-        if event_store:
+        if container.event_store:
             # Record the 'invoke' event
             invoke_event = ToolInvokeEvent(
                 **tool_event_base,
             )
-            event_store.record_event(invoke_event)
+            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -92,20 +92,20 @@ def record_tool_a_execution(func):
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
             # Exception occurred during execution
-            if event_store:
+            if container.event_store:
                 failed_event = ToolFailedEvent(
                     **tool_event_base,
                     error=str(e),
                 )
-                event_store.record_event(failed_event)
+                container.event_store.record_event(failed_event)
             raise
         else:
             # Successful execution
-            if event_store:
+            if container.event_store:
                 respond_event = ToolRespondEvent(
                     **tool_event_base,
                     output_data=result,
                 )
-                event_store.record_event(respond_event)
+                container.event_store.record_event(respond_event)
 
     return wrapper

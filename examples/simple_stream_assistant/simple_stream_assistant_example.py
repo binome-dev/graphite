@@ -6,9 +6,11 @@ import uuid
 
 from simple_stream_assistant import SimpleStreamAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+
+event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 

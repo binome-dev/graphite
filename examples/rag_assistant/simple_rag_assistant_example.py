@@ -5,11 +5,13 @@ from pathlib import Path
 
 from simple_rag_assistant import SimpleRagAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 api_key = os.getenv("OPENAI_API_KEY")
+
+event_store = container.event_store
 
 try:
     from llama_index.core import (

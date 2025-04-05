@@ -16,11 +16,12 @@ class Container:
         return cls._instance
 
     @classmethod
-    def register_event_store(cls, event_store_class: Type[EventStore]) -> None:
+    def register_event_store(
+        cls, event_store_class: Type[EventStore], event_store: EventStore
+    ) -> None:
         """Register a different EventStore implementation"""
         cls._event_store_class = event_store_class
-        if cls._instance is not None:
-            cls._instance._event_store = cls._event_store_class()
+        cls._instance._event_store = event_store
 
     @property
     def event_store(self) -> EventStore:
@@ -28,4 +29,3 @@ class Container:
 
 
 container = Container()
-event_store = container.event_store

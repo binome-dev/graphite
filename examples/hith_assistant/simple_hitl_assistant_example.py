@@ -4,11 +4,13 @@ import uuid
 
 from simple_hitl_assistant import SimpleHITLAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
+
+event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 

@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.record_workflow_a_execution import (
     record_workflow_a_execution,
 )
@@ -183,7 +183,7 @@ class EventDrivenWorkflow(Workflow):
             if event:
                 published_events.append(event)
 
-        event_store.record_events(consumed_events + published_events)
+        container.event_store.record_events(consumed_events + published_events)
 
     @record_workflow_execution
     def execute(
@@ -307,7 +307,7 @@ class EventDrivenWorkflow(Workflow):
 
         events = [
             event
-            for event in event_store.get_agent_events(
+            for event in container.event_store.get_agent_events(
                 execution_context.assistant_request_id
             )
             if isinstance(event, (PublishToTopicEvent, ConsumeFromTopicEvent))
@@ -316,7 +316,7 @@ class EventDrivenWorkflow(Workflow):
         if len(events) == 0:
             # Get all the assistant respond events given converstion id as workflow input
 
-            conversation_events = event_store.get_conversation_events(
+            conversation_events = container.event_store.get_conversation_events(
                 execution_context.conversation_id
             )
 
@@ -349,7 +349,7 @@ class EventDrivenWorkflow(Workflow):
                 data=sorted_messages,
                 consumed_events=[],
             )
-            event_store.record_event(event)
+            container.event_store.record_event(event)
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for event in events:
@@ -382,7 +382,7 @@ class EventDrivenWorkflow(Workflow):
                                 user_input_event=publish_event,
                                 data=input,
                             )
-                            event_store.record_event(event)
+                            container.event_store.record_event(event)
                         self.execution_queue.append(node)
 
     def to_dict(self) -> dict[str, Any]:

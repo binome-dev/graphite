@@ -2,7 +2,7 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -11,6 +11,8 @@ from grafi.common.models.message import Message
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
+
+event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 

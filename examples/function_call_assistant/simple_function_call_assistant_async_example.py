@@ -4,13 +4,15 @@ import uuid
 
 from simple_function_call_assistant import SimpleFunctionCallAssistant
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
 
 api_key = os.getenv("OPENAI_API_KEY")
+
+event_store = container.event_store
 
 
 class WeatherMock(FunctionTool):
@@ -49,10 +51,6 @@ async def test_simple_function_call_assistant_async():
 
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
-
-    if assistant.unfinished_requests:
-        print(assistant.unfinished_requests)
-        execution_context.assistant_request_id = assistant.unfinished_requests[0]
 
     output = await assistant.a_execute(execution_context, input_data)
     print(output)

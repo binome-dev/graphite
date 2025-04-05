@@ -6,7 +6,7 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
-from grafi.common.containers.container import event_store
+from grafi.common.containers.container import container
 from grafi.common.decorators.record_node_a_execution import record_node_a_execution
 from grafi.common.decorators.record_node_execution import record_node_execution
 from grafi.common.events.event_graph import EventGraph
@@ -81,7 +81,7 @@ class LLMNode(Node):
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> List[Message]:
-        agent_events = event_store.get_agent_events(
+        agent_events = container.event_store.get_agent_events(
             execution_context.assistant_request_id
         )
         topic_events = {

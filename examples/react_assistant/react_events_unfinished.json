@@ -40,9 +40,6 @@
         }
     },
     {
-        "consumed_event_ids": [],
-        "publisher_name": "ReActAssistantWorkflow",
-        "publisher_type": "EventDrivenWorkflow",
         "event_id": "778689e667b94ba4a70bdf4847c104c4",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "PublishToTopic",
@@ -50,6 +47,9 @@
         "event_context": {
             "topic_name": "agent_input_topic",
             "offset": 0,
+            "consumed_event_ids": [],
+            "publisher_name": "ReActAssistantWorkflow",
+            "publisher_type": "EventDrivenWorkflow",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -85,8 +85,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ThoughtNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "846330a027a34ba491dc33db8174e427",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -94,6 +92,8 @@
                     "event_context": {
                         "topic_name": "agent_input_topic",
                         "offset": 0,
+                        "consumer_name": "ThoughtNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -173,8 +173,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ThoughtNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "846330a027a34ba491dc33db8174e427",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -182,6 +180,8 @@
                     "event_context": {
                         "topic_name": "agent_input_topic",
                         "offset": 0,
+                        "consumer_name": "ThoughtNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -196,8 +196,6 @@
         }
     },
     {
-        "consumer_name": "ThoughtNode",
-        "consumer_type": "LLMNode",
         "event_id": "846330a027a34ba491dc33db8174e427",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "ConsumeFromTopic",
@@ -205,6 +203,8 @@
         "event_context": {
             "topic_name": "agent_input_topic",
             "offset": 0,
+            "consumer_name": "ThoughtNode",
+            "consumer_type": "LLMNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -215,11 +215,6 @@
         "data": "[{\"content\": \"What is the elevation range for the area that the eastern sector of the Colorado orogeny extends into?\", \"refusal\": null, \"role\": \"user\", \"audio\": null, \"function_call\": null, \"tool_calls\": null, \"name\": null, \"message_id\": \"6a1196a7a65b4881bed221e1357d19e0\", \"timestamp\": 1740751821692553200, \"tool_call_id\": null, \"tools\": null}]"
     },
     {
-        "consumed_event_ids": [
-            "846330a027a34ba491dc33db8174e427"
-        ],
-        "publisher_name": "ThoughtNode",
-        "publisher_type": "LLMNode",
         "event_id": "b5b651d5eb564d32b9b5a6d5f08aecf9",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "PublishToTopic",
@@ -227,6 +222,11 @@
         "event_context": {
             "topic_name": "thought_result",
             "offset": 0,
+            "consumed_event_ids": [
+                "846330a027a34ba491dc33db8174e427"
+            ],
+            "publisher_name": "ThoughtNode",
+            "publisher_type": "LLMNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -262,8 +262,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ActionNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "14900b10dd944fc4b53baf2e1a8a89c9",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -271,6 +269,8 @@
                     "event_context": {
                         "topic_name": "thought_result",
                         "offset": 0,
+                        "consumer_name": "ActionNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -350,8 +350,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ActionNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "14900b10dd944fc4b53baf2e1a8a89c9",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -359,6 +357,8 @@
                     "event_context": {
                         "topic_name": "thought_result",
                         "offset": 0,
+                        "consumer_name": "ActionNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -373,8 +373,6 @@
         }
     },
     {
-        "consumer_name": "ActionNode",
-        "consumer_type": "LLMNode",
         "event_id": "14900b10dd944fc4b53baf2e1a8a89c9",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "ConsumeFromTopic",
@@ -382,6 +380,8 @@
         "event_context": {
             "topic_name": "thought_result",
             "offset": 0,
+            "consumer_name": "ActionNode",
+            "consumer_type": "LLMNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -392,11 +392,6 @@
         "data": "[{\"content\": \"To provide an accurate answer regarding the elevation range for the area that the eastern sector of the Colorado orogeny extends into, it would be beneficial to research or reference topographical maps or geological surveys that detail the elevation of this region. Knowing the specific mountains and terrain features involved in the eastern sector will help establish the range.\\n\\nWhile my data is limited to 2021, generally, the Colorado Rockies have varying elevations, typically ranging from around 5,000 feet in the foothills to over 14,000 feet in the higher peaks. \\n\\nThus, the next logical step is to confirm this information by checking a reliable geological resource or a detailed topographic map specific to the Colorado orogeny to determine the precise elevation range for the eastern sector. \\n\\nWould you like me to summarize the general characteristics of this region or focus on specific elevations based on known geographic data?\", \"refusal\": null, \"role\": \"assistant\", \"audio\": null, \"function_call\": null, \"tool_calls\": null, \"name\": null, \"message_id\": \"abeda118b4464abe92a7bec31bc95bdb\", \"timestamp\": 1740751826172534900, \"tool_call_id\": null, \"tools\": [{\"type\": \"function\", \"function\": {\"name\": \"web_search_using_tavily\", \"description\": \"Function to search online given a query using the Tavily API. The query can be anything.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"query\": {\"type\": \"string\", \"description\": \"The query to search for.\"}, \"max_results\": {\"type\": \"integer\", \"description\": \"The maximum number of results to return (default is 5).\"}}, \"required\": [\"query\"]}}}]}]"
     },
     {
-        "consumed_event_ids": [
-            "14900b10dd944fc4b53baf2e1a8a89c9"
-        ],
-        "publisher_name": "ActionNode",
-        "publisher_type": "LLMNode",
         "event_id": "f7a6ad1e02bb4d7b8364f484078a819c",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "PublishToTopic",
@@ -404,6 +399,11 @@
         "event_context": {
             "topic_name": "action_search_result",
             "offset": 0,
+            "consumed_event_ids": [
+                "14900b10dd944fc4b53baf2e1a8a89c9"
+            ],
+            "publisher_name": "ActionNode",
+            "publisher_type": "LLMNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -438,8 +438,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "SearchFunctionNode",
-                    "consumer_type": "LLMFunctionCallNode",
                     "event_id": "79c42cdfda3f49e6910dd6ee89791607",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -447,6 +445,8 @@
                     "event_context": {
                         "topic_name": "action_search_result",
                         "offset": 0,
+                        "consumer_name": "SearchFunctionNode",
+                        "consumer_type": "LLMFunctionCallNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -525,8 +525,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "SearchFunctionNode",
-                    "consumer_type": "LLMFunctionCallNode",
                     "event_id": "79c42cdfda3f49e6910dd6ee89791607",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -534,6 +532,8 @@
                     "event_context": {
                         "topic_name": "action_search_result",
                         "offset": 0,
+                        "consumer_name": "SearchFunctionNode",
+                        "consumer_type": "LLMFunctionCallNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -548,8 +548,6 @@
         }
     },
     {
-        "consumer_name": "SearchFunctionNode",
-        "consumer_type": "LLMFunctionCallNode",
         "event_id": "79c42cdfda3f49e6910dd6ee89791607",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "ConsumeFromTopic",
@@ -557,6 +555,8 @@
         "event_context": {
             "topic_name": "action_search_result",
             "offset": 0,
+            "consumer_name": "SearchFunctionNode",
+            "consumer_type": "LLMFunctionCallNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -567,11 +567,6 @@
         "data": "[{\"content\": null, \"refusal\": null, \"role\": \"assistant\", \"audio\": null, \"function_call\": null, \"tool_calls\": [{\"id\": \"call_eEIJQfNieM6LrIux2nPnUTCG\", \"function\": {\"arguments\": \"{\\\"query\\\":\\\"elevation range eastern sector Colorado orogeny\\\"}\", \"name\": \"web_search_using_tavily\"}, \"type\": \"function\"}], \"name\": null, \"message_id\": \"74779d257bee41fcbd17292a7d441a0b\", \"timestamp\": 1740751826942431100, \"tool_call_id\": null, \"tools\": null}]"
     },
     {
-        "consumed_event_ids": [
-            "79c42cdfda3f49e6910dd6ee89791607"
-        ],
-        "publisher_name": "SearchFunctionNode",
-        "publisher_type": "LLMFunctionCallNode",
         "event_id": "01cfcbda035b4d079cf93a5ba791d68f",
         "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
         "event_type": "PublishToTopic",
@@ -579,6 +574,11 @@
         "event_context": {
             "topic_name": "search_function_result",
             "offset": 0,
+            "consumed_event_ids": [
+                "79c42cdfda3f49e6910dd6ee89791607"
+            ],
+            "publisher_name": "SearchFunctionNode",
+            "publisher_type": "LLMFunctionCallNode",
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -613,8 +613,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ObservationNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "cc87efb7ab934ee4a7195a417a692b22",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -622,6 +620,8 @@
                     "event_context": {
                         "topic_name": "search_function_result",
                         "offset": 0,
+                        "consumer_name": "ObservationNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
@@ -700,8 +700,6 @@
         "data": {
             "input_data": [
                 {
-                    "consumer_name": "ObservationNode",
-                    "consumer_type": "LLMNode",
                     "event_id": "cc87efb7ab934ee4a7195a417a692b22",
                     "assistant_request_id": "6277fa606d804aaea28d904bee661b85",
                     "event_type": "ConsumeFromTopic",
@@ -709,6 +707,8 @@
                     "event_context": {
                         "topic_name": "search_function_result",
                         "offset": 0,
+                        "consumer_name": "ObservationNode",
+                        "consumer_type": "LLMNode",
                         "execution_context": {
                             "conversation_id": "conversation_id",
                             "execution_id": "7e69162ffc6d4a08b44e8ed55fd324ab",
