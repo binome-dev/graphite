@@ -6,7 +6,8 @@ from openai import AsyncClient, OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_a_execution import \
+    record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.execution_context import ExecutionContext
@@ -27,7 +28,7 @@ class OpenAITool(LLM):
 
     name: str = Field(default="OpenAITool")
     type: str = Field(default="OpenAITool")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
