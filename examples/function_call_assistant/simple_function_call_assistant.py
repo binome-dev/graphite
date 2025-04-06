@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -10,7 +11,8 @@ from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.functions.function_calling_command import FunctionCallingCommand
+from grafi.tools.functions.function_calling_command import \
+    FunctionCallingCommand
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
@@ -41,7 +43,7 @@ class SimpleFunctionCallAssistant(Assistant):
     api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
     function_call_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionTool = Field(default=None)
 
     class Builder(Assistant.Builder):

@@ -2,6 +2,7 @@ from collections import deque
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -58,7 +59,7 @@ class EventDrivenWorkflow(Workflow):
     topic_nodes: Dict[str, List[str]] = {}
 
     # Execution context for this run
-    execution_context: ExecutionContext = None
+    execution_context: Optional[ExecutionContext] = None
 
     # Queue of nodes that are ready to execute (in response to published events)
     execution_queue: deque[Node] = deque()
@@ -83,7 +84,7 @@ class EventDrivenWorkflow(Workflow):
                 DuplicateNodeError: if a node with the same name is already registered.
             """
             if node.name in self._workflow.nodes:
-                raise DuplicateNodeError(node.name)
+                raise DuplicateNodeError(node)
             self._workflow.nodes[node.name] = node
             return self
 

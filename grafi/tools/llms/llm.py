@@ -11,10 +11,10 @@ from pydantic import Field
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.tool import Tool
-
+from typing import Optional
 
 class LLM(Tool):
-    system_message: str = Field(default=None)
+    system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)

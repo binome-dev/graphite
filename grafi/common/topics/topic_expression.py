@@ -4,7 +4,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic import Topic
 
 
 class LogicalOp(Enum):
@@ -22,7 +22,7 @@ class SubExpr(BaseModel):
 class TopicExpr(SubExpr):
     """Represents a single subscribed Topic by name."""
 
-    topic: TopicBase
+    topic: Topic
 
     def to_dict(self) -> dict[str, Any]:
         return {"topic": self.topic.to_dict()}
@@ -61,7 +61,7 @@ def evaluate_subscription(expr: SubExpr, topics_with_new_msgs: List[str]) -> boo
         return False
 
 
-def extract_topics(expr: SubExpr) -> List[TopicBase]:
+def extract_topics(expr: SubExpr) -> List[Topic]:
     """Recursively collect topic names from a DSL expression tree."""
     if isinstance(expr, TopicExpr):
         return [expr.topic]
