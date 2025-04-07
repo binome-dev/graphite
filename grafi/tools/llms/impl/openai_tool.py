@@ -13,8 +13,7 @@ from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import \
-    record_tool_a_execution
+from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.execution_context import ExecutionContext
