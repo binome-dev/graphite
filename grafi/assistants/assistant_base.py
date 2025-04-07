@@ -49,7 +49,7 @@ class AssistantBase(BaseModel):
             return self
 
         def event_store(self, event_store: EventStore):
-            container.event_store = event_store
+            container._event_store = event_store
             return self
 
         def build(self) -> "AssistantBase":
