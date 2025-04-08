@@ -17,7 +17,6 @@ class ConsumeFromTopicEvent(TopicEvent):
     data: Union[Message, List[Message], AsyncGenerator[Message, None]]
 
     def to_dict(self):
-
         event_context = {
             "consumer_name": self.consumer_name,
             "consumer_type": self.consumer_type,

@@ -1,13 +1,54 @@
-default_language_version:
-  python: python3.12
-
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.11.1
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
     hooks:
-      # Run the linter.
-      - id: ruff
-        args: [ --fix ]
-      # Run the formatter.
-      - id: ruff-format
+      - id: black
+        name: Format grafi package
+        files: ^grafi/
+        args: ['--config=pyproject.toml']
+
+      - id: black
+        name: Format example directory
+        files: ^examples/
+        args: ['--config=pyproject.toml']
+
+      - id: black
+        name: Format tests directory
+        files: ^tests/
+        args: ['--config=pyproject.toml']
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: Lint admin_tool with flake8
+        files: ^admin_tool/
+        exclude: (__init__.py)$
+        additional_dependencies: ['flake8-pyproject']
+        args: ['--toml-config=admin_tool/pyproject.toml']
+
+      - id: flake8
+        name: Lint server with flake8
+        files: ^server/
+        exclude: (__init__.py)$
+        additional_dependencies: ['flake8-pyproject']
+        args: ['--toml-config=server/pyproject.toml']
+
+  # - repo: https://github.com/pycqa/isort
+  #   rev: 5.13.2
+  #   hooks:
+  #     - id: isort
+  #       name: Sort imports admin_tool
+  #       files: ^admin_tool/
+  #       additional_dependencies: ['toml']
+  #       exclude: (__init__.py)$
+
+  #       args: ['--settings-file=admin_tool/pyproject.toml']
+
+  #     - id: isort
+  #       name: Sort imports server
+  #       files: ^server/
+  #       additional_dependencies: ['toml']
+  #       exclude: (__init__.py)$
+  #       args: ['--settings-path=server/pyproject.toml']
+

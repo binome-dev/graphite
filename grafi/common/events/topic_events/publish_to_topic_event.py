@@ -19,7 +19,6 @@ class PublishToTopicEvent(TopicEvent):
     data: Union[Message, List[Message]]
 
     def to_dict(self):
-
         event_context = {
             "consumed_event_ids": self.consumed_event_ids,
             "publisher_name": self.publisher_name,

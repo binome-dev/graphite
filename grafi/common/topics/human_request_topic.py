@@ -23,9 +23,9 @@ class HumanRequestTopic(Topic):
     """
 
     name: str = HUMAN_REQUEST_TOPIC
-    publish_to_human_event_handler: Optional[Callable[[OutputTopicEvent], None]] = (
-        Field(default=None)
-    )
+    publish_to_human_event_handler: Optional[
+        Callable[[OutputTopicEvent], None]
+    ] = Field(default=None)
     topic_events: List[TopicEvent] = []
     consumption_offsets: Dict[str, int] = {}
 
