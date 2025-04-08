@@ -173,3 +173,4 @@ class Assistant(AssistantBase):
         output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
         with open(output_path, "w") as f:
             f.write(json.dumps(manifest_dict, indent=4))
+        return output_path

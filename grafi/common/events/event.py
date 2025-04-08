@@ -68,6 +68,6 @@ class Event(BaseModel):
         # Return a dictionary representation of the event
         raise NotImplementedError
 
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
+    def from_dict(self,cls, data: Dict[str, Any]) -> "Event":
         # Return an event object from a dictionary
         raise NotImplementedError

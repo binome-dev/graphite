@@ -40,11 +40,12 @@ class SimpleFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleFunctionCallAssistant")
     type: str = Field(default="SimpleFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default="gpt-4o-mini")
-    function_call_llm_system_message: str = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    model: Optional[str] = Field(default="gpt-4o-mini")
+    function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionTool = Field(default=None)
+    function_tool: Optional[FunctionTool] = Field(default=None)
+
 
     class Builder(Assistant.Builder):
         """Concrete builder for SimpleFunctionCallAssistant."""

@@ -2,10 +2,10 @@ from typing import List
 
 from loguru import logger
 
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import \
+    ConsumeFromTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import \
+    PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
@@ -31,7 +31,7 @@ class Topic(TopicBase):
         publisher_type: str,
         data: List[Message],
         consumed_events: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
+    ) -> PublishToTopicEvent | None:
         """
         Publishes a message's event ID to this topic if it meets the condition.
         """
@@ -48,8 +48,13 @@ class Topic(TopicBase):
                 offset=len(self.topic_events),
             )
             self.topic_events.append(event)
-
-            self.publish_event_handler(event)
+            
+            if self.publish_event_handler is not None:
+                self.publish_event_handler(event)
+            else:
+                raise ValueError(
+                    "No publish event handler provided for this topic."
+                )
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )

@@ -68,7 +68,7 @@ class Workflow(BaseModel):
         """Initial workflow state, and replays events from an unfinished request to resume execution."""
         raise NotImplementedError
 
-    def get_node_input(
+    def get_node_input(self,
         node: Node, execution_context: ExecutionContext
     ) -> Tuple[List[EventId], List[Message]]:
         """Get input messages for a node from its subscribed topics."""
