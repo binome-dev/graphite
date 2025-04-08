@@ -2,18 +2,17 @@
 
 import functools
 import json
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
+from typing import List
 
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
-from grafi.common.events.assistant_events.assistant_event import (
-    ASSISTANT_ID,
-    ASSISTANT_NAME,
-    ASSISTANT_TYPE,
-)
+from grafi.common.events.assistant_events.assistant_event import ASSISTANT_ID
+from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
+from grafi.common.events.assistant_events.assistant_event import ASSISTANT_TYPE
 from grafi.common.events.assistant_events.assistant_failed_event import (
     AssistantFailedEvent,
 )

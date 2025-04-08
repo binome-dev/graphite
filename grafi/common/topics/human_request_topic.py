@@ -1,4 +1,7 @@
-from typing import Callable, Dict, List, Optional
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from loguru import logger
 from pydantic import Field
@@ -12,7 +15,9 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS, HUMAN_REQUEST_TOPIC
+from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
+from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC
+
 
 AGENT_RESERVED_TOPICS.extend([HUMAN_REQUEST_TOPIC])
 

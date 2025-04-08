@@ -1265,7 +1265,7 @@ Together, these capabilities—observability, idempotency, auditability, and res
 
 The system leverages event sourcing to record all operations, combined with OpenTelemetry for standardized tracing. Thanks to the clearly defined three-layer execution model (assistant, node, tool) plus an orchestration workflow, each execution function is decorated to capture inputs, outputs, and any exceptions. These captures are converted into events (stored in the event store) and traces (exported to platforms like Arize or other OpenTelemetry services).
 
-Meanwhile, each Topic instance logs pub/sub interactions in the event store after processing. Coupled with the ExecutionContext object, this approach makes the entire data flow within the agentic workflow fully transparent. Because every node and tool has a unique name and ID, and each operation is stamped with execution context IDs, locating specific inputs and outputs is straightforward. Then given pub/sub events, the framework can build a directed data flows between nodes. Even there are circles, the data flow can form a DAG with publishing and consuming offset in each topic. 
+Meanwhile, each Topic instance logs pub/sub interactions in the event store after processing. Coupled with the ExecutionContext object, this approach makes the entire data flow within the agentic workflow fully transparent. Because every node and tool has a unique name and ID, and each operation is stamped with execution context IDs, locating specific inputs and outputs is straightforward. Then given pub/sub events, the framework can build a directed data flows between nodes. Even there are circles, the data flow can form a DAG with publishing and consuming offset in each topic.
 
 ### Idempotency
 

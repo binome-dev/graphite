@@ -3,11 +3,9 @@ from unittest.mock import Mock
 import pytest
 
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import (
-    FunctionSpec,
-    ParameterSchema,
-    ParametersSchema,
-)
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParameterSchema
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
 

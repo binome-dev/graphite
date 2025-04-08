@@ -4,6 +4,7 @@ from typing import Any
 from grafi.common.decorators.llm_function import llm_function
 from grafi.tools.functions.function_tool import FunctionTool
 
+
 try:
     from duckduckgo_search import DDGS
 except ImportError:

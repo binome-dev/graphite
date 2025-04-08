@@ -1,15 +1,16 @@
 import heapq
-from typing import Dict, List, Set
+from typing import Dict
+from typing import List
+from typing import Set
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.publish_to_topic_event import (
-    PublishToTopicEvent,
-)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.event_id import EventId
 
@@ -115,7 +116,7 @@ class EventGraph(BaseModel):
     def get_topology_sorted_events(self) -> List[EventGraphNode]:
         """Get all events in the graph in topological order"""
         # Keep track of visited nodes and sorted nodes
-        n = len(self.nodes)
+        # n = len(self.nodes)
 
         # Compute in-degrees
         in_degree: Dict[EventId, int] = {}

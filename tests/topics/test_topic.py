@@ -4,10 +4,10 @@ import pytest
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic import (  # Replace `your_module` with the actual module
-    AGENT_INPUT_TOPIC,
-    Topic,
+from grafi.common.topics.topic import (
+    AGENT_INPUT_TOPIC,  # Replace `your_module` with the actual module
 )
+from grafi.common.topics.topic import Topic
 
 
 @pytest.fixture

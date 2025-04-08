@@ -12,6 +12,7 @@ from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 
+
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")

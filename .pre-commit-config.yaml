@@ -1,4 +1,11 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        name: Strip trailing whitespace
+        args: ['--markdown-linebreak-ext=md']
+
   - repo: https://github.com/psf/black
     rev: 23.12.1
     hooks:
@@ -21,34 +28,48 @@ repos:
     rev: 7.0.0
     hooks:
       - id: flake8
-        name: Lint admin_tool with flake8
-        files: ^admin_tool/
+        name: Lint grafi package with flake8
+        files: ^grafi/
         exclude: (__init__.py)$
         additional_dependencies: ['flake8-pyproject']
-        args: ['--toml-config=admin_tool/pyproject.toml']
+        args: ['--toml-config=pyproject.toml']
 
       - id: flake8
-        name: Lint server with flake8
-        files: ^server/
+        name: Lint examples directory with flake8
+        files: ^examples/
         exclude: (__init__.py)$
         additional_dependencies: ['flake8-pyproject']
-        args: ['--toml-config=server/pyproject.toml']
+        args: ['--toml-config=pyproject.toml']
 
-  # - repo: https://github.com/pycqa/isort
-  #   rev: 5.13.2
-  #   hooks:
-  #     - id: isort
-  #       name: Sort imports admin_tool
-  #       files: ^admin_tool/
-  #       additional_dependencies: ['toml']
-  #       exclude: (__init__.py)$
+      - id: flake8
+        name: Lint tests directory with flake8
+        files: ^tests/
+        exclude: (__init__.py)$
+        additional_dependencies: ['flake8-pyproject']
+        args: ['--toml-config=pyproject.toml']
 
-  #       args: ['--settings-file=admin_tool/pyproject.toml']
 
-  #     - id: isort
-  #       name: Sort imports server
-  #       files: ^server/
-  #       additional_dependencies: ['toml']
-  #       exclude: (__init__.py)$
-  #       args: ['--settings-path=server/pyproject.toml']
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Sort imports grafi package
+        files: ^grafi/
+        additional_dependencies: ['toml']
+        exclude: (__init__.py)$
+        args: ['--settings-file=pyproject.toml']
+
+      - id: isort
+        name: Sort imports examples directory
+        files: ^examples/
+        additional_dependencies: ['toml']
+        exclude: (__init__.py)$
+        args: ['--settings-file=pyproject.toml']
+
+      - id: isort
+        name: Sort imports tests directory
+        files: ^tests/
+        additional_dependencies: ['toml']
+        exclude: (__init__.py)$
+        args: ['--settings-file=pyproject.toml']
 

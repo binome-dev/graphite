@@ -1,8 +1,11 @@
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
-from grafi.common.events.event import EVENT_CONTEXT, Event
+from grafi.common.events.event import EVENT_CONTEXT
+from grafi.common.events.event import Event
 from grafi.common.models.default_id import default_id
 from grafi.common.models.execution_context import ExecutionContext
+
 
 WORKFLOW_ID = "workflow_id"
 WORKFLOW_NAME = "workflow_name"

@@ -3,7 +3,8 @@ import os
 from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
+from pydantic import Field
 from tools.embeddings.embedding_response_command import EmbeddingResponseCommand
 from tools.embeddings.impl.chromadb_retrieval_tool import ChromadbRetrievalTool
 

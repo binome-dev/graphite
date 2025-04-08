@@ -3,7 +3,8 @@ import os
 from llama_index.core.indices.base import BaseIndex
 from nodes.rag_node import RagNode
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
+from pydantic import Field
 from tools.rags.rag_response_command import RagResponseCommand
 from tools.rags.rag_tool import RagTool
 

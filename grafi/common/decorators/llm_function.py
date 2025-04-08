@@ -1,14 +1,14 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, get_type_hints
+from typing import Any
+from typing import Callable
+from typing import get_type_hints
 
 from docstring_parser import parse
 
-from grafi.common.models.function_spec import (
-    FunctionSpec,
-    ParameterSchema,
-    ParametersSchema,
-)
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParameterSchema
+from grafi.common.models.function_spec import ParametersSchema
 
 
 def llm_function(func: Callable) -> Callable:

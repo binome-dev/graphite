@@ -1,4 +1,7 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Tuple
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel

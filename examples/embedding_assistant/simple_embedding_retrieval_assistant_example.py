@@ -12,6 +12,7 @@ from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
+
 api_key = os.getenv("OPENAI_API_KEY")
 
 CURRENT_DIR = Path(__file__).parent
@@ -45,7 +46,8 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
     try:
         collection = client.get_collection("aws-ec2")
         print("Using existing collection: aws-ec2")
-    except:
+    except Exception as e:
+        print(f"{e}")  # Not sure what error to expect here
         collection = client.create_collection("aws-ec2")
         print("Created new collection: aws-ec2")
 

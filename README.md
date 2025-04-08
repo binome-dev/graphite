@@ -345,7 +345,7 @@ Here is an example of the conversation between user and assistant
 Looks good. But if you push the boundary of the tests, you will hit the error real quick. Like this
 
 ```text
-> User: Hi, how are you today? 
+> User: Hi, how are you today?
 ```
 
 An error occurs, and when we debug with Phoenix, we can pinpoint its exact location:
@@ -367,7 +367,7 @@ so let's update action LLM system prompt
 and try again
 
 ```text
-> User: Hi, how are you today? 
+> User: Hi, how are you today?
 > Assistant: I'm here to assist you with gym registration. Could you please provide your full name and email?
 ```
 

@@ -1,4 +1,5 @@
-from typing import Optional, Type
+from typing import Optional
+from typing import Type
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory

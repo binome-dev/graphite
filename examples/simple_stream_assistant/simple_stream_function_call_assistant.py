@@ -7,7 +7,8 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.stream_assistant import StreamAssistant
 from grafi.common.topics.output_topic import agent_stream_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic, agent_input_topic
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.functions.function_calling_command import FunctionCallingCommand

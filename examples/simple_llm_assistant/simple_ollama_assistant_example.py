@@ -8,6 +8,7 @@ from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
+
 event_store = container.event_store
 
 
@@ -25,9 +26,9 @@ def test_simple_llm_assistant():
         SimpleOllamaAssistant.Builder()
         .name("SimpleOllamaAssistant")
         .system_message(
-            """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers. 
-                You respond warmly to questions, making users feel comfortable and understood. 
-                If you don't have all the information, you reassure users that you're here to help them find the best answer or solution. 
+            """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers.
+                You respond warmly to questions, making users feel comfortable and understood.
+                If you don't have all the information, you reassure users that you're here to help them find the best answer or solution.
                 Your tone is approachable and optimistic, and you aim to make each interaction enjoyable."""
         )
         .api_url("http://localhost:11434")

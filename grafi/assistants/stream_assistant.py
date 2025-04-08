@@ -1,4 +1,5 @@
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
+from typing import List
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.containers.container import container

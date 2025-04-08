@@ -1,12 +1,10 @@
 import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
-from grafi.common.events.tool_events.tool_event import (
-    TOOL_ID,
-    TOOL_NAME,
-    TOOL_TYPE,
-    ToolEvent,
-)
+from grafi.common.events.tool_events.tool_event import TOOL_ID
+from grafi.common.events.tool_events.tool_event import TOOL_NAME
+from grafi.common.events.tool_events.tool_event import TOOL_TYPE
+from grafi.common.events.tool_events.tool_event import ToolEvent
 from grafi.common.models.execution_context import ExecutionContext
 
 

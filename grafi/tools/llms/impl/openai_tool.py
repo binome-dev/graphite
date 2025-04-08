@@ -1,9 +1,16 @@
 import os
-from typing import Any, AsyncGenerator, Dict, Generator, List, Optional
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
 
 from deprecated import deprecated
-from openai import AsyncClient, OpenAI
-from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai import AsyncClient
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletionChunk
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution

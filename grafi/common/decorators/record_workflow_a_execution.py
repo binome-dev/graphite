@@ -2,17 +2,17 @@
 
 import functools
 import json
-from typing import List, Union
+from typing import List
+from typing import Union
 
-from openinference.semconv.trace import OpenInferenceSpanKindValues, SpanAttributes
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
 from grafi.common.containers.container import container
-from grafi.common.events.workflow_events.workflow_event import (
-    WORKFLOW_ID,
-    WORKFLOW_NAME,
-    WORKFLOW_TYPE,
-)
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_ID
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_NAME
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_TYPE
 from grafi.common.events.workflow_events.workflow_failed_event import (
     WorkflowFailedEvent,
 )

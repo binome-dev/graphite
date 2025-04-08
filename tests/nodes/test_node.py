@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
+from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -14,6 +14,7 @@ from grafi.common.models.message import Message
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
+
 
 # --- Dummy Implementations for Testing ---
 

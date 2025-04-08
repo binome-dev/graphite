@@ -1,6 +1,7 @@
 import json
 import os
-from typing import Any, List
+from typing import Any
+from typing import List
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
@@ -17,10 +18,8 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.human_request_topic import human_request_topic
-from grafi.common.topics.output_topic import (
-    agent_output_topic,
-    agent_stream_output_topic,
-)
+from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.output_topic import agent_stream_output_topic
 
 
 class Assistant(AssistantBase):

@@ -1,7 +1,14 @@
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -11,12 +18,10 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_expression import (
-    SubExpr,
-    TopicExpr,
-    evaluate_subscription,
-    extract_topics,
-)
+from grafi.common.topics.topic_expression import SubExpr
+from grafi.common.topics.topic_expression import TopicExpr
+from grafi.common.topics.topic_expression import evaluate_subscription
+from grafi.common.topics.topic_expression import extract_topics
 
 
 class Node(BaseModel):

@@ -1,4 +1,6 @@
-from typing import Any, AsyncGenerator, Dict
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -8,6 +10,7 @@ from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.tool import Tool
+
 
 try:
     from llama_index.core.base.response.schema import RESPONSE_TYPE

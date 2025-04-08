@@ -10,17 +10,16 @@ from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
+
 api_key = os.getenv("OPENAI_API_KEY")
 
 event_store = container.event_store
 
 try:
-    from llama_index.core import (
-        SimpleDirectoryReader,
-        StorageContext,
-        VectorStoreIndex,
-        load_index_from_storage,
-    )
+    from llama_index.core import SimpleDirectoryReader
+    from llama_index.core import StorageContext
+    from llama_index.core import VectorStoreIndex
+    from llama_index.core import load_index_from_storage
 except ImportError:
     raise ImportError(
         "`llama_index` not installed. Please install using `pip install llama-index-core llama-index-readers-file llama-index-embeddings-openai llama-index-llms-openai`"

@@ -1,11 +1,9 @@
 import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
-from grafi.common.events.workflow_events.workflow_event import (
-    WORKFLOW_ID,
-    WORKFLOW_NAME,
-    WORKFLOW_TYPE,
-)
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_ID
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_NAME
+from grafi.common.events.workflow_events.workflow_event import WORKFLOW_TYPE
 from grafi.common.events.workflow_events.workflow_failed_event import (
     WorkflowFailedEvent,
 )

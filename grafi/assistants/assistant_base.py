@@ -1,5 +1,7 @@
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore

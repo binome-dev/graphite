@@ -10,6 +10,7 @@ from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
+
 """ docker compose yaml
 
 version: '3.8'
@@ -56,9 +57,9 @@ def test_simple_llm_assistant():
         SimpleLLMAssistant.Builder()
         .name("SimpleLLMAssistant")
         .system_message(
-            """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers. 
-                You respond warmly to questions, and always call the user's name, making users feel comfortable and understood. 
-                If you don't have all the information, you reassure users that you're here to help them find the best answer or solution. 
+            """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers.
+                You respond warmly to questions, and always call the user's name, making users feel comfortable and understood.
+                If you don't have all the information, you reassure users that you're here to help them find the best answer or solution.
                 Your tone is approachable and optimistic, and you aim to make each interaction enjoyable."""
         )
         .api_key(api_key)
