@@ -3,6 +3,7 @@ from typing import Any, List
 
 from pydantic import BaseModel
 
+from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_base import TopicBase
 
 

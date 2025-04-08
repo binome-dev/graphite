@@ -6,9 +6,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_node_a_execution import record_node_a_execution
 from grafi.common.decorators.record_node_execution import record_node_execution
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message

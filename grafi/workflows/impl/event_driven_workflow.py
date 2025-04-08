@@ -1,21 +1,21 @@
 from collections import deque
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_workflow_a_execution import (
-    record_workflow_a_execution,
-)
-from grafi.common.decorators.record_workflow_execution import record_workflow_execution
-from grafi.common.events.assistant_events.assistant_respond_event import (
-    AssistantRespondEvent,
-)
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.decorators.record_workflow_a_execution import \
+    record_workflow_a_execution
+from grafi.common.decorators.record_workflow_execution import \
+    record_workflow_execution
+from grafi.common.events.assistant_events.assistant_respond_event import \
+    AssistantRespondEvent
+from grafi.common.events.topic_events.consume_from_topic_event import \
+    ConsumeFromTopicEvent
+from grafi.common.events.topic_events.output_topic_event import \
+    OutputTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import \
+    PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.execution_context import ExecutionContext
@@ -27,7 +27,8 @@ from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.nodes.node import Node
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
+from grafi.tools.llms.llm_stream_response_command import \
+    LLMStreamResponseCommand
 from grafi.workflows.workflow import Workflow
 
 
@@ -55,7 +56,7 @@ class EventDrivenWorkflow(Workflow):
     topic_nodes: Dict[str, List[str]] = {}
 
     # Execution context for this run
-    execution_context: ExecutionContext = None
+    execution_context: Optional[ExecutionContext] = None
 
     # Queue of nodes that are ready to execute (in response to published events)
     execution_queue: deque[Node] = deque()
@@ -80,7 +81,7 @@ class EventDrivenWorkflow(Workflow):
                 DuplicateNodeError: if a node with the same name is already registered.
             """
             if node.name in self._workflow.nodes:
-                raise DuplicateNodeError(node.name)
+                raise DuplicateNodeError(node)
             self._workflow.nodes[node.name] = node
             return self
 

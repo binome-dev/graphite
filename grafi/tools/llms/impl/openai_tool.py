@@ -27,7 +27,7 @@ class OpenAITool(LLM):
 
     name: str = Field(default="OpenAITool")
     type: str = Field(default="OpenAITool")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
