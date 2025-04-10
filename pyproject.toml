@@ -12,13 +12,8 @@ python = ">=3.10,<3.13"
 pydantic = "^2.9.1"
 openai = "^1.45.0"
 docstring-parser = "^0.16"
-opentelemetry-api = "^1.27.0"
-opentelemetry-sdk = "^1.27.0"
-openinference-semantic-conventions = "^0.1.10"
-opentelemetry-exporter-otlp = "^1.27.0"
 openinference-instrumentation-openai = "^0.1.14"
 arize-otel = "^0.5.3"
-arize-phoenix = "^7.5.1"
 loguru = "^0.7.3"
 
 
@@ -37,6 +32,7 @@ ruff = "^0.11.1"
 pre-commit = "^4.2.0"
 mypy = "^1.15.0"
 psycopg2 = "^2.9.10"
+arize-phoenix = "^7.5.1"
 
 
 [tool.poetry.group.docs.dependencies]
