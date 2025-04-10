@@ -98,7 +98,7 @@ from simple_function_call_assistant import (
 )
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from tools.tavily_tool import TavilyTool
+from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 api_key = "<YOUR_OPENAI_API_KEY>"
 tavily_key = "<YOUR_TAVILY_API_KEY>"

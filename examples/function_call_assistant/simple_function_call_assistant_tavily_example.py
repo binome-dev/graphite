@@ -2,11 +2,11 @@ import os
 import uuid
 
 from simple_function_call_assistant import SimpleFunctionCallAssistant
-from tools.tavily_tool import TavilyTool
 
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 
 event_store = container.event_store
