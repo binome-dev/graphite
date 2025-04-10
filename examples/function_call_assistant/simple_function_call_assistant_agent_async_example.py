@@ -9,6 +9,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.impl.agent_calling_tool import AgentCallingTool
 
+
 api_key = os.getenv("OPENAI_API_KEY")
 
 event_store = container.event_store
@@ -25,7 +26,7 @@ def get_execution_context():
 async def mock_agent_call_function(
     execution_context: ExecutionContext, message: Message
 ):
-    content = f"Current weather is bad now"
+    content = "Current weather is bad now"
     message = Message(role="assistant", content=content)
 
     return message.model_dump()

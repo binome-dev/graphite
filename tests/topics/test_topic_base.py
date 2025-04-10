@@ -6,7 +6,8 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS, TopicBase
+from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
+from grafi.common.topics.topic_base import TopicBase
 
 
 class MockTopic(TopicBase):

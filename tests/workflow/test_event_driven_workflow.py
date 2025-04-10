@@ -1,5 +1,8 @@
-from typing import AsyncGenerator, List
-from unittest.mock import MagicMock, Mock, patch
+from typing import AsyncGenerator
+from typing import List
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -13,7 +16,8 @@ from grafi.common.models.command import Command
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
-from grafi.common.topics.topic import AGENT_INPUT_TOPIC, Topic
+from grafi.common.topics.topic import AGENT_INPUT_TOPIC
+from grafi.common.topics.topic import Topic
 from grafi.nodes.node import Node
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 

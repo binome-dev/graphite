@@ -7,9 +7,7 @@ from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.publish_to_topic_event import (
-    PublishToTopicEvent,
-)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 

@@ -109,7 +109,7 @@
         function createVisualization(manifest) {
             // Clear previous visualization
             document.getElementById('graph').innerHTML = '';
-            
+
             const width = document.getElementById('graph').clientWidth;
             const height = document.getElementById('graph').clientHeight;
 
@@ -174,7 +174,7 @@
                 .append('svg')
                 .attr('width', width)
                 .attr('height', height);
-            
+
             const svgGroup = svg.append('g');
 
             // Set up zoom support
@@ -196,7 +196,7 @@
             const zoomScale = Math.min(width / graphWidth, height / graphHeight);
             const translateX = (width - graphWidth * zoomScale) / 2;
             const translateY = (height - graphHeight * zoomScale) / 2;
-            
+
             svg.call(zoom.transform, d3.zoomIdentity
                 .translate(translateX, translateY)
                 .scale(zoomScale));
@@ -207,7 +207,7 @@
                     // Get the element's text content which contains the node/topic ID
                     const element = d3.select(this);
                     const nodeId = element.select('text').text();
-                    
+
                     let detailData;
                     // Check if it's a node or topic
                     if (manifest.nodes[nodeId]) {

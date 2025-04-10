@@ -4,7 +4,9 @@ from grafi.common.topics.subscription_builder import (
     SubscriptionBuilder,  # Replace `your_module` with the actual module
 )
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import CombinedExpr, LogicalOp, TopicExpr
+from grafi.common.topics.topic_expression import CombinedExpr
+from grafi.common.topics.topic_expression import LogicalOp
+from grafi.common.topics.topic_expression import TopicExpr
 
 
 @pytest.fixture

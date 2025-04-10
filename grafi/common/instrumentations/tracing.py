@@ -1,7 +1,8 @@
 import os
 import socket
 
-from arize_otel import Endpoints, register_otel
+from arize_otel import Endpoints
+from arize_otel import register_otel
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from openinference.semconv.resource import ResourceAttributes
@@ -12,6 +13,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import Tracer
+
 
 phoenix_collector_host = os.getenv("PHOENIX_ENDPOINT", "127.0.0.1")
 

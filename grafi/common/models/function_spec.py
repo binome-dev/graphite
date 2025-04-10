@@ -1,8 +1,10 @@
-from typing import Dict, List
+from typing import Dict
+from typing import List
 
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from openai.types.shared_params.function_definition import FunctionDefinition
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 
 
 class ParameterSchema(BaseModel):

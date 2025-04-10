@@ -11,8 +11,10 @@ from grafi.common.models.message import Message
 
 from ..retrieval_tool import RetrievalTool
 
+
 try:
-    from chromadb import Collection, QueryResult
+    from chromadb import Collection
+    from chromadb import QueryResult
 except ImportError:
     raise ImportError(
         "`chromadb` not installed. Please install using `pip install chromadb`"

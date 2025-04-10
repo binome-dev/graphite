@@ -9,27 +9,28 @@ from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
+
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY")
 tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 observation_llm_system_message = """
-You are an AI assistant that records and reports the results obtained from executed actions. 
+You are an AI assistant that records and reports the results obtained from executed actions.
 After performing an action, provide a clear and concise summary of the findings relevant to the user's question.
 """
 thought_llm_system_message = """
-You are an AI assistant tasked with analyzing the user's question and considering the provided observation to determine the next logical step required to answer the question. 
+You are an AI assistant tasked with analyzing the user's question and considering the provided observation to determine the next logical step required to answer the question.
 Your response should describe what would be the most effective action to take based on the information gathered.
 If the information is sufficient to answer the question, return the answer with confirmation the answer is ready.
 """
 action_llm_system_message = """
-You are an AI assistant responsible for executing actions based on a given plan to retrieve information. 
+You are an AI assistant responsible for executing actions based on a given plan to retrieve information.
 Specify the appropriate action to take, such as performing a search query or accessing a specific resource, to gather the necessary data.
-If answer is ready, return **FINISH REACT**. 
+If answer is ready, return **FINISH REACT**.
 """
 summary_llm_system_message = """
-You are an AI assistant tasked with summarizing the findings from previous observations to provide a clear and accurate answer to the user's question. 
+You are an AI assistant tasked with summarizing the findings from previous observations to provide a clear and accurate answer to the user's question.
 Ensure the summary directly addresses the query based on the information gathered.
 """
 

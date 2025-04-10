@@ -1,15 +1,24 @@
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime
+from datetime import timezone
+from typing import List
+from typing import Optional
 
 from loguru import logger
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
 
+
 try:
-    from sqlalchemy import JSON, Column, DateTime, Integer, String, create_engine
+    from sqlalchemy import JSON
+    from sqlalchemy import Column
+    from sqlalchemy import DateTime
+    from sqlalchemy import Integer
+    from sqlalchemy import String
+    from sqlalchemy import create_engine
     from sqlalchemy.dialects.postgresql import JSONB
-    from sqlalchemy.orm import DeclarativeBase, sessionmaker
+    from sqlalchemy.orm import DeclarativeBase
+    from sqlalchemy.orm import sessionmaker
 except ImportError:
     raise ImportError(
         "`sqlalchemy` not installed. Please install using `pip install sqlalchemy`"

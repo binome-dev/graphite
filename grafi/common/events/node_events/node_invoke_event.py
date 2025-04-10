@@ -1,4 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 from grafi.common.events.event import EventType
 from grafi.common.events.node_events.node_event import NodeEvent

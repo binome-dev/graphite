@@ -1,5 +1,9 @@
 import json
-from typing import Any, AsyncGenerator, Callable, Dict, List
+from typing import Any
+from typing import AsyncGenerator
+from typing import Callable
+from typing import Dict
+from typing import List
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -7,11 +11,9 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import (
-    FunctionSpec,
-    ParameterSchema,
-    ParametersSchema,
-)
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParameterSchema
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
 

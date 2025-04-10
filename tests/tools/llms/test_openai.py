@@ -1,15 +1,15 @@
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 import pytest
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletionMessage
 
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import (
-    FunctionSpec,
-    ParameterSchema,
-    ParametersSchema,
-)
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParameterSchema
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 
@@ -131,7 +131,7 @@ def test_execute_function_call(monkeypatch, openai_instance, execution_context):
 
     assert isinstance(result, Message)
     assert result.role == "assistant"
-    assert result.content == None
+    assert result.content is None
     assert isinstance(result.tool_calls, list)
     assert result.tool_calls[0].id == "test_id"
     assert result.tool_calls[0].function.arguments == '{"location": "London"}'

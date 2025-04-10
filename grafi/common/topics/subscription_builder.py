@@ -1,14 +1,13 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
+from pydantic import ConfigDict
 
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import (
-    CombinedExpr,
-    LogicalOp,
-    SubExpr,
-    TopicExpr,
-)
+from grafi.common.topics.topic_expression import CombinedExpr
+from grafi.common.topics.topic_expression import LogicalOp
+from grafi.common.topics.topic_expression import SubExpr
+from grafi.common.topics.topic_expression import TopicExpr
 
 
 class SubscriptionBuilder(BaseModel):

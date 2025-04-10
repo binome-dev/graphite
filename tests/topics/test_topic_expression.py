@@ -1,13 +1,13 @@
 import pytest
 
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import (  # Replace `your_module` with the actual module
-    CombinedExpr,
-    LogicalOp,
-    TopicExpr,
-    evaluate_subscription,
-    extract_topics,
+from grafi.common.topics.topic_expression import (
+    CombinedExpr,  # Replace `your_module` with the actual module
 )
+from grafi.common.topics.topic_expression import LogicalOp
+from grafi.common.topics.topic_expression import TopicExpr
+from grafi.common.topics.topic_expression import evaluate_subscription
+from grafi.common.topics.topic_expression import extract_topics
 
 
 @pytest.fixture

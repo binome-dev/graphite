@@ -1,7 +1,12 @@
 import inspect
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -12,6 +17,7 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.event_id import EventId
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+
 
 AGENT_INPUT_TOPIC = "agent_input_topic"
 HUMAN_REQUEST_TOPIC = "human_request_topic"

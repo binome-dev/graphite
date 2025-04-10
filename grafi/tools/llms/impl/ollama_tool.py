@@ -1,6 +1,10 @@
 import json
 import uuid
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from loguru import logger
 from pydantic import Field
@@ -10,6 +14,7 @@ from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.llm import LLM
+
 
 try:
     import ollama
@@ -151,9 +156,9 @@ class OllamaTool(LLM):
             raw_tool_calls = message_data["tool_calls"]
 
             if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
+                message_args[
+                    "content"
+                ] = ""  # Clear content when function call is included
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:

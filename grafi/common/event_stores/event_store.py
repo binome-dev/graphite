@@ -1,6 +1,9 @@
 """Module for storing and managing events with optional file logging."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from loguru import logger
 
@@ -13,7 +16,8 @@ from grafi.common.events.assistant_events.assistant_invoke_event import (
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
-from grafi.common.events.event import Event, EventType
+from grafi.common.events.event import Event
+from grafi.common.events.event import EventType
 from grafi.common.events.node_events.node_failed_event import NodeFailedEvent
 from grafi.common.events.node_events.node_invoke_event import NodeInvokeEvent
 from grafi.common.events.node_events.node_respond_event import NodeRespondEvent

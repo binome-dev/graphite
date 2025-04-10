@@ -1,5 +1,7 @@
 from collections import deque
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -22,7 +24,8 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
-from grafi.common.topics.topic import AGENT_INPUT_TOPIC, Topic
+from grafi.common.topics.topic import AGENT_INPUT_TOPIC
+from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode

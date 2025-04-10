@@ -8,7 +8,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC, TopicBase
+from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
+from grafi.common.topics.topic_base import TopicBase
 
 
 class Topic(TopicBase):

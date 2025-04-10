@@ -6,7 +6,8 @@ import pytest
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec, ParametersSchema
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
 
@@ -162,6 +163,8 @@ def test_execute_with_missing_args(function_instance, execution_context):
 
 def test_function_without_llm_decorator():
     with warnings.catch_warnings(record=True) as w:
+        print(w)  # Not sure what do with this line
+
         # Define class without @llm_function decorator
         class InvalidFunction(FunctionTool):
             def test_func(self, arg: str) -> str:

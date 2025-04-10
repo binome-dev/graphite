@@ -1,4 +1,5 @@
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
+from typing import List
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues

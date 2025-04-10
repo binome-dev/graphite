@@ -1,10 +1,14 @@
 import json
-from typing import Any, Dict, List, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Union
 
 from pydantic import TypeAdapter
 from pydantic_core import to_jsonable_python
 
-from grafi.common.events.event import EVENT_CONTEXT, EventType
+from grafi.common.events.event import EVENT_CONTEXT
+from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -19,7 +23,6 @@ class PublishToTopicEvent(TopicEvent):
     data: Union[Message, List[Message]]
 
     def to_dict(self):
-
         event_context = {
             "consumed_event_ids": self.consumed_event_ids,
             "publisher_name": self.publisher_name,
