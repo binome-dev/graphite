@@ -58,6 +58,7 @@ def run_scripts_in_directory(ci_only=True, pass_local=True):
         except subprocess.CalledProcessError as e:
             print(f"Error running {file}:\n{e.stderr}")
             failed_scripts[file] = e.stderr
+            exit(1)
 
     # Summary of execution
     print("\nSummary of execution:")
