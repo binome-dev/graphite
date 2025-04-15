@@ -2,6 +2,7 @@
 
 from typing import AsyncGenerator
 from typing import List
+from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -37,9 +38,14 @@ class LLMNode(Node):
         def _init_node(self) -> "LLMNode":
             return LLMNode()
 
-    def add_function_spec(self, function_spec: FunctionSpec) -> None:
+    def add_function_spec(
+        self, function_spec: Union[FunctionSpec, List[FunctionSpec]]
+    ) -> None:
         """Add a function specification to the node."""
-        self.function_specs.append(function_spec)
+        if isinstance(function_spec, list):
+            self.function_specs.extend(function_spec)
+        else:
+            self.function_specs.append(function_spec)
 
     @record_node_execution
     def execute(
