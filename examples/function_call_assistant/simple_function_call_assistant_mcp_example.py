@@ -11,6 +11,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.impl.mcp_tool import MCPTool
 
+### Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
 
 event_store = container.event_store
 
