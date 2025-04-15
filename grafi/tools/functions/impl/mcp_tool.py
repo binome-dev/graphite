@@ -138,7 +138,7 @@ class MCPTool(FunctionTool):
                                 response_str += content_item.text + "\n"
                             elif isinstance(content_item, ImageContent):
 
-                                response_str = (getattr(content_item, "data", None),)
+                                response_str = getattr(content_item, "data", None)
 
                             elif isinstance(content_item, EmbeddedResource):
                                 # Handle embedded resources
