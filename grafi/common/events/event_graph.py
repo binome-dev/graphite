@@ -1,12 +1,13 @@
 import heapq
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Set
+from typing import Union
 
 from pydantic import BaseModel
 from pydantic import Field
 
-from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -21,7 +22,7 @@ class EventGraphNode(BaseModel):
     upstream_events: List[EventId] = Field(default=[])
     downstream_events: List[EventId] = Field(default=[])
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_id": self.event_id,
             "event": self.event.to_dict(),
@@ -30,7 +31,7 @@ class EventGraphNode(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, data: dict) -> "EventGraphNode":
         return cls(
             event_id=data["event_id"],
             event=ConsumeFromTopicEvent.from_dict(data["event"]),
@@ -43,7 +44,7 @@ class EventGraph(BaseModel):
     nodes: Dict[EventId, EventGraphNode] = Field(default={})
     root_nodes: List[EventGraphNode] = Field(default=[])
 
-    def _add_event(self, event: Event) -> EventGraphNode:
+    def _add_event(self, event: TopicEvent) -> EventGraphNode:
         """Add a new node to the graph if it doesn't exist"""
         if event.event_id not in self.nodes:
             self.nodes[event.event_id] = EventGraphNode(
@@ -54,7 +55,7 @@ class EventGraph(BaseModel):
     def build_graph(
         self,
         consume_events: List[ConsumeFromTopicEvent],
-        topic_events: Dict[str, TopicEvent],
+        topic_events: Dict[str, Union[ConsumeFromTopicEvent, PublishToTopicEvent]],
     ) -> None:
         """
         Build the event graph from a list of consume events and topic events.
@@ -77,7 +78,7 @@ class EventGraph(BaseModel):
         # Track visited events to avoid cycles
         visited: Set[EventId] = set()
 
-        def build_node_relations(consume_event: ConsumeFromTopicEvent):
+        def build_node_relations(consume_event: ConsumeFromTopicEvent) -> None:
             if consume_event.event_id in visited:
                 return
 
@@ -130,7 +131,7 @@ class EventGraph(BaseModel):
                 in_degree[up_id] += 1
 
         # 3) Initialize a min-heap with (timestamp, event_id) for nodes with in_degree == 0
-        min_heap = []
+        min_heap: List[tuple] = []
         for node in self.nodes.values():
             if in_degree[node.event_id] == 0:
                 # We push a tuple (timestamp, event_id) so that
@@ -168,14 +169,14 @@ class EventGraph(BaseModel):
 
         return ordered_result
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "nodes": {k: v.to_dict() for k, v in self.nodes.items()},
             "root_nodes": [node.to_dict() for node in self.root_nodes],
         }
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, data: dict) -> "EventGraph":
         return cls(
             nodes={k: EventGraphNode.from_dict(v) for k, v in data["nodes"].items()},
             root_nodes=[EventGraphNode.from_dict(node) for node in data["root_nodes"]],

@@ -1,7 +1,8 @@
 import inspect
-from functools import wraps
 from typing import Any
 from typing import Callable
+from typing import ParamSpec
+from typing import TypeVar
 from typing import get_type_hints
 
 from docstring_parser import parse
@@ -11,7 +12,13 @@ from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 
 
-def llm_function(func: Callable) -> Callable:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+JsonType = str
+
+
+def llm_function(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to expose a method to the LLM (Language Learning Model) by capturing and storing its metadata.
 
@@ -45,10 +52,8 @@ def llm_function(func: Callable) -> Callable:
     - Parameters without default values are marked as required.
     """
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
+    type_hints = get_type_hints(func)
+    
     # Extract function name and docstring
     func_name = func.__name__
     docstring = inspect.getdoc(func) or ""
@@ -57,7 +62,6 @@ def llm_function(func: Callable) -> Callable:
     # Extract parameters and type hints
     signature = inspect.signature(func)
     parameters = signature.parameters
-    type_hints = get_type_hints(func)
 
     # Extract parameter descriptions from docstring
     param_docs = {p.arg_name: p.description for p in parsed_doc.params}
@@ -69,7 +73,7 @@ def llm_function(func: Callable) -> Callable:
         parameters=ParametersSchema(
             properties={
                 param_name: ParameterSchema(
-                    type=_get_json_schema_type(type_hints.get(param_name, Any)),
+                    type=_py2json(type_hints.get(param_name, Any)),
                     description=param_docs.get(param_name, ""),
                 )
                 for param_name, param in parameters.items()
@@ -84,19 +88,16 @@ def llm_function(func: Callable) -> Callable:
     )
 
     # Store the function spec as an attribute on the function
-    wrapper._function_spec = func_spec
+    setattr(func, "_function_spec", func_spec)
+    return func  
 
-    return wrapper
 
-
-def _get_json_schema_type(python_type):
-    # Map Python types to JSON Schema types
-    type_mapping = {
-        str: "string",
-        int: "integer",
-        float: "number",
+def _py2json(t: type) -> JsonType:
+    return {
+        str:  "string",
+        int:  "integer",
+        float:"number",
         bool: "boolean",
         list: "array",
         dict: "object",
-    }
-    return type_mapping.get(python_type, "string")  # Default to 'string'
+    }.get(t, "string")

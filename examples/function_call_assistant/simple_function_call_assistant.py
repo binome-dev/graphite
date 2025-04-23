@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -38,46 +40,44 @@ class SimpleFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleFunctionCallAssistant")
     type: str = Field(default="SimpleFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-    function_call_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
-    function_tool: FunctionTool = Field(default=None)
+    function_call_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    function_tool: FunctionTool
 
     class Builder(Assistant.Builder):
         """Concrete builder for SimpleFunctionCallAssistant."""
 
-        def __init__(self):
+        _assistant: "SimpleFunctionCallAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleFunctionCallAssistant":
-            return SimpleFunctionCallAssistant()
+            return SimpleFunctionCallAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleFunctionCallAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def model(self, model: str) -> "SimpleFunctionCallAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
         def function_call_llm_system_message(
             self, function_call_llm_system_message: str
-        ) -> "SimpleFunctionCallAssistant.Builder":
+        ) -> Self:
             self._assistant.function_call_llm_system_message = (
                 function_call_llm_system_message
             )
             return self
 
-        def summary_llm_system_message(
-            self, summary_llm_system_message: str
-        ) -> "SimpleFunctionCallAssistant.Builder":
+        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def function_tool(
-            self, function_tool: FunctionTool
-        ) -> "SimpleFunctionCallAssistant.Builder":
+        def function_tool(self, function_tool: FunctionTool) -> Self:
             self._assistant.function_tool = function_tool
             return self
 
@@ -118,7 +118,9 @@ class SimpleFunctionCallAssistant(Assistant):
         function_result_topic = Topic(name="function_result_topic")
 
         agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None and msgs[-1].content.strip() != ""
+            lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
+            and msgs[-1].content.strip() != ""
         )
 
         function_call_node = (

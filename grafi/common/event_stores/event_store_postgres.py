@@ -179,7 +179,9 @@ class EventStorePostgres(EventStore):
                     "data": r.data,
                     "timestamp": str(r.timestamp),
                 }
-                events.append(self._create_event_from_dict(event_data))
+                event = self._create_event_from_dict(event_data)
+                if event:
+                    events.append(event)
 
             return events
         except Exception as e:
@@ -210,7 +212,9 @@ class EventStorePostgres(EventStore):
                     "data": r.data,
                     "timestamp": str(r.timestamp),
                 }
-                events.append(self._create_event_from_dict(event_data))
+                event = self._create_event_from_dict(event_data)
+                if event:
+                    events.append(event)
 
             return events
         except Exception as e:

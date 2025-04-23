@@ -5,8 +5,7 @@ import os
 import uuid
 from pathlib import Path
 
-from simple_llm_assistant import SimpleLLMAssistant
-
+from examples.multimodal_assistant.simple_llm_assistant import SimpleLLMAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -14,10 +13,10 @@ from grafi.common.models.message import Message
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-def load_image_as_base64(image_path):
+def load_image_as_base64(image_path: Path) -> str:
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
@@ -35,7 +34,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_image_llm_assistant():
+def test_simple_image_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleLLMAssistant.Builder()
@@ -63,7 +62,7 @@ def test_simple_image_llm_assistant():
 
     print(output)
     assert output is not None
-    assert "GRAPHITE" in output[0].content
+    assert "GRAPHITE" in str(output[0].content)
     assert len(event_store.get_events()) == 11
 
 

@@ -1,15 +1,17 @@
 import json
-from typing import AsyncGenerator
+from typing import Any
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
+from examples.embedding_assistant.tools.embeddings.retrieval_tool import RetrievalTool
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-
-from ..retrieval_tool import RetrievalTool
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 
 
 try:
@@ -31,57 +33,62 @@ except ImportError:
 class ChromadbRetrievalTool(RetrievalTool):
     name: str = "ChromadbRetrievalTool"
     type: str = "ChromadbRetrievalTool"
-    collection: Collection = Field(default=None)
-    embedding_model: OpenAIEmbedding = Field(default=None)
+    collection: Collection
+    embedding_model: OpenAIEmbedding
     n_results: int = Field(default=30)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     class Builder(RetrievalTool.Builder):
         """Concrete builder for ChromadbRetrievalTool."""
 
-        def __init__(self):
+        _tool: "ChromadbRetrievalTool"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "ChromadbRetrievalTool":
-            return ChromadbRetrievalTool()
+            return ChromadbRetrievalTool.model_construct()
 
-        def embedding_model(
-            self, embedding_model: OpenAIEmbedding
-        ) -> "ChromadbRetrievalTool.Builder":
+        def embedding_model(self, embedding_model: OpenAIEmbedding) -> Self:
             self._tool.embedding_model = embedding_model
             return self
 
-        def n_results(self, n_results: int) -> "ChromadbRetrievalTool.Builder":
+        def n_results(self, n_results: int) -> Self:
             self._tool.n_results = n_results
             return self
 
-        def collection(self, collection: Collection) -> "ChromadbRetrievalTool.Builder":
+        def collection(self, collection: Collection) -> Self:
             self._tool.collection = collection
             return self
 
+        def build(self) -> "ChromadbRetrievalTool":
+            return self._tool
+
     @record_tool_execution
-    def execute(self, execution_context: ExecutionContext, input_data: Message):
-        embeddings = self.embedding_model._get_text_embeddings(input_data.content)
+    def execute(
+        self, execution_context: ExecutionContext, input_data: Messages
+    ) -> Messages:
+        embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
         result: QueryResult = self.collection.query(
             query_embeddings=embeddings, n_results=self.n_results
         )
-        return self.to_message(result)
+        return self.to_messages(result)
 
     @record_tool_a_execution
     async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Message
-    ) -> AsyncGenerator[Message, None]:
-        embeddings = self.embedding_model._get_text_embeddings(input_data.content)
+        self, execution_context: ExecutionContext, input_data: Messages
+    ) -> MsgsAGen:
+        embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
         result: QueryResult = self.collection.query(
             query_embeddings=embeddings, n_results=self.n_results
         )
-        yield self.to_message(result)
+        yield self.to_messages(result)
 
-    def to_message(self, result: QueryResult) -> Message:
-        ids = result["ids"][0]
-        documents = result["documents"][0]
-        metadatas = result["metadatas"][0]
-        distances = result["distances"][0]
+    def to_messages(self, result: QueryResult) -> Messages:
+        ids = result["ids"]
+        documents = result["documents"]
+        metadatas = result["metadatas"]
+        distances = result["distances"]
         response = {
             "ids": ids,
             "documents": documents,
@@ -89,9 +96,9 @@ class ChromadbRetrievalTool(RetrievalTool):
             "distances": distances,
         }
         content = json.dumps(response)
-        return Message(role="assistant", content=content)
+        return [Message(role="assistant", content=content)]
 
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
             "name": self.name,

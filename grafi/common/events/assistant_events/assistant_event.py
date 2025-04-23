@@ -17,7 +17,7 @@ class AssistantEvent(Event):
     assistant_name: str
     assistant_type: str
 
-    def assistant_event_dict(self):
+    def assistant_event_dict(self) -> Dict[str, Any]:
         event_context = {
             ASSISTANT_ID: self.assistant_id,
             ASSISTANT_NAME: self.assistant_name,

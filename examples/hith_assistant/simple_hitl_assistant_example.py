@@ -2,8 +2,7 @@ import json
 import os
 import uuid
 
-from simple_hitl_assistant import SimpleHITLAssistant
-
+from examples.hith_assistant.simple_hitl_assistant import SimpleHITLAssistant
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
@@ -13,12 +12,12 @@ from grafi.tools.functions.function_tool import FunctionTool
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 class HumanInfo(FunctionTool):
     @llm_function
-    def request_human_information(self, question_description: str):
+    def request_human_information(self, question_description: str) -> str:
         """
         Requests human input for personal information based on a given question description.
         This method simulates requesting information from a human user during test scenarios.
@@ -39,7 +38,7 @@ class HumanInfo(FunctionTool):
         )
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -47,7 +46,7 @@ def get_execution_context():
     )
 
 
-def test_simple_hitl_assistant():
+def test_simple_hitl_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (

@@ -2,18 +2,17 @@ import asyncio
 import os
 import uuid
 
-from react_assistant import ReActAssistant
-from tools.tavily_tool import TavilyTool
-
+from examples.react_assistant.react_assistant import ReActAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
-tavily_api_key = os.getenv("TAVILY_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 observation_llm_system_message = """
 You are an AI assistant that records and reports the results obtained from executed actions.
@@ -43,7 +42,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-async def test_react_assistant_async():
+async def test_react_assistant_async() -> None:
     execution_context = get_execution_context()
 
     # Set up the assistant with DuckDuckGoTool

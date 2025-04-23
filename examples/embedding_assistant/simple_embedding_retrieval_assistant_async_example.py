@@ -3,23 +3,31 @@ import os
 import shutil
 import uuid
 from pathlib import Path
+from typing import List
+from typing import Mapping
+from typing import Union
 
 import chromadb
 from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
-from simple_embedding_retrieval_assistant import SimpleEmbeddingRetrievalAssistant
 
+from examples.embedding_assistant.simple_embedding_retrieval_assistant import (
+    SimpleEmbeddingRetrievalAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store
 
 CURRENT_DIR = Path(__file__).parent
 PERSIST_DIR = CURRENT_DIR / "storage"
+
+Scalar = Union[str, int, float, bool]
+Meta = Mapping[str, Scalar]
 
 # Delete the PERSIST_DIR and all files in it
 if os.path.exists(PERSIST_DIR):
@@ -58,7 +66,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
         # Read files from document_path
         if document_path.exists() and document_path.is_dir():
             documents = []
-            metadatas = []
+            metadatas: List[Meta] = []
             ids = []
 
             for i, file_path in enumerate(document_path.glob("*.*")):
@@ -89,7 +97,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
     return collection
 
 
-async def test_simple_embedding_retrieval_tool_async():
+async def test_simple_embedding_retrieval_tool_async() -> None:
     execution_context = get_execution_context()
     simple_rag_assistant = (
         SimpleEmbeddingRetrievalAssistant.Builder()
@@ -102,7 +110,7 @@ async def test_simple_embedding_retrieval_tool_async():
 
     result = await simple_rag_assistant.a_execute(
         execution_context,
-        input_data=[
+        [
             Message(
                 role="user",
                 content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
@@ -110,7 +118,6 @@ async def test_simple_embedding_retrieval_tool_async():
         ],
     )
 
-    print(result)
     assert "Amazon EC2" in result[0].content
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 11

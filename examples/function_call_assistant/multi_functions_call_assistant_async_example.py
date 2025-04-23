@@ -2,8 +2,9 @@ import asyncio
 import os
 import uuid
 
-from multi_functions_call_assistant import MultiFunctionsCallAssistant
-
+from examples.function_call_assistant.multi_functions_call_assistant import (
+    MultiFunctionsCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
@@ -11,7 +12,7 @@ from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
 
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store
 
@@ -20,7 +21,7 @@ class WeatherMock(FunctionTool):
     name: str = "WeatherMock"
 
     @llm_function
-    async def get_weather_mock(self, postcode: str):
+    async def get_weather_mock(self, postcode: str) -> str:
         """
         Function to get weather information for a given postcode.
 
@@ -37,7 +38,7 @@ class PopulationMock(FunctionTool):
     name: str = "PopulationMock"
 
     @llm_function
-    async def get_population_mock(self, postcode: str):
+    async def get_population_mock(self, postcode: str) -> str:
         """
         Function to get population information for a given postcode.
 
@@ -54,7 +55,7 @@ class HousePriceMock(FunctionTool):
     name: str = "HousePriceMock"
 
     @llm_function
-    async def get_house_price_mock(self, postcode: str):
+    async def get_house_price_mock(self, postcode: str) -> str:
         """
         Function to get house price information for a given postcode.
 
@@ -67,7 +68,7 @@ class HousePriceMock(FunctionTool):
         return f"The house price of {postcode} is about 250,000 in this year."
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -100,7 +101,7 @@ You are a friendly and helpful assistant with access to multiple tools. After ge
 """
 
 
-async def test_multi_functions_call_assistant_async():
+async def test_multi_functions_call_assistant_async() -> None:
     assistant = (
         MultiFunctionsCallAssistant.Builder()
         .name("MultiFunctionsCallAssistant")

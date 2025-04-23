@@ -2,7 +2,9 @@ from collections import deque
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Self
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.containers.container import container
@@ -13,6 +15,7 @@ from grafi.common.decorators.record_workflow_execution import record_workflow_ex
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
+from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -21,11 +24,13 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
+from grafi.common.topics.stream_output_topic import StreamOutputTopic
 from grafi.common.topics.topic import AGENT_INPUT_TOPIC
-from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
@@ -52,14 +57,12 @@ class EventDrivenWorkflow(Workflow):
     nodes: Dict[str, Node] = {}
 
     # Topics known to this workflow (e.g., "agent_input", "agent_stream_output")
-    topics: Dict[str, Topic] = {}
+    topics: Dict[str, TopicBase] = {}
 
     # Mapping of topic_name -> list of node_names that subscribe to that topic
     topic_nodes: Dict[str, List[str]] = {}
 
-    # Execution context for this run
-    execution_context: ExecutionContext = None
-
+    # Event graph for this workflow
     # Queue of nodes that are ready to execute (in response to published events)
     execution_queue: deque[Node] = deque()
 
@@ -69,13 +72,15 @@ class EventDrivenWorkflow(Workflow):
     class Builder(Workflow.Builder):
         """Concrete builder for EventDrivenWorkflow."""
 
-        def __init__(self):
+        _workflow: "EventDrivenWorkflow"
+
+        def __init__(self) -> None:
             self._workflow = self._init_workflow()
 
         def _init_workflow(self) -> "EventDrivenWorkflow":
-            return EventDrivenWorkflow()
+            return EventDrivenWorkflow.model_construct()
 
-        def node(self, node: Node) -> "EventDrivenWorkflow.Builder":
+        def node(self, node: Node) -> Self:
             """
             Add a Node to this workflow.
 
@@ -83,7 +88,7 @@ class EventDrivenWorkflow(Workflow):
                 DuplicateNodeError: if a node with the same name is already registered.
             """
             if node.name in self._workflow.nodes:
-                raise DuplicateNodeError(node.name)
+                raise DuplicateNodeError(node)
             self._workflow.nodes[node.name] = node
             return self
 
@@ -126,7 +131,7 @@ class EventDrivenWorkflow(Workflow):
 
             return self._workflow
 
-        def _add_topic(self, topic: Topic) -> None:
+        def _add_topic(self, topic: TopicBase) -> None:
             """
             Registers the topic within the workflow if it's not already present
             and sets a default publish handler.
@@ -136,7 +141,7 @@ class EventDrivenWorkflow(Workflow):
                 topic.publish_event_handler = self._workflow.on_event
                 self._workflow.topics[topic.name] = topic
 
-        def _handle_function_calling_nodes(self):
+        def _handle_function_calling_nodes(self) -> None:
             """
             If there are LLMFunctionCallNode(s), we link them with the LLMNode(s)
             that publish to the same topic, so that the LLM can carry the function specs.
@@ -163,15 +168,15 @@ class EventDrivenWorkflow(Workflow):
             for function_node in function_calling_nodes:
                 for topic_name in function_node._subscribed_topics:
                     for publisher_node in published_topics_to_nodes.get(topic_name, []):
-                        publisher_node.add_function_spec(
-                            function_node.get_function_specs()
-                        )
+                        function_spec = function_node.get_function_specs()
+                        if function_spec is not None:
+                            publisher_node.add_function_spec(function_spec)
 
     def _publish_events(
         self,
         node: Node,
         execution_context: ExecutionContext,
-        result: List[Message],
+        result: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
     ) -> None:
         published_events = []
@@ -186,12 +191,48 @@ class EventDrivenWorkflow(Workflow):
             if event:
                 published_events.append(event)
 
-        container.event_store.record_events(consumed_events + published_events)
+        all_events: List[Event] = []
+        all_events.extend(consumed_events)
+        all_events.extend(published_events)
+
+        container.event_store.record_events(all_events)
+
+    def _publish_stream_event(
+        self,
+        node: Node,
+        execution_context: ExecutionContext,
+        result: MsgsAGen,
+        consumed_events: List[ConsumeFromTopicEvent],
+    ) -> None:
+        published_events = []
+        for topic in node.publish_to:
+            # Only publish to stream topic, other topic will raise warning
+            if isinstance(topic, StreamOutputTopic):
+                event = topic.publish_data(
+                    execution_context=execution_context,
+                    publisher_name=node.name,
+                    publisher_type=node.type,
+                    data=result,
+                    consumed_events=consumed_events,
+                )
+
+                if event:
+                    published_events.append(event)
+            else:
+                # Raise warning if the topic is not stream topic
+                logger.warning(
+                    f"Node {node.name} publish to non-stream topic {topic.name}, "
+                    "please check the node configuration."
+                )
+
+        all_events: List[Event] = []
+        all_events.extend(consumed_events)
+        all_events.extend(published_events)
+
+        container.event_store.record_events(all_events)
 
     @record_workflow_execution
-    def execute(
-        self, execution_context: ExecutionContext, input: List[Message]
-    ) -> None:
+    def execute(self, execution_context: ExecutionContext, input: Messages) -> None:
         """
         Execute the workflow with the given context and input.
         Returns results when all nodes complete processing.
@@ -218,41 +259,37 @@ class EventDrivenWorkflow(Workflow):
 
     @record_workflow_a_execution
     async def a_execute(
-        self, execution_context: ExecutionContext, input: List[Message]
+        self, execution_context: ExecutionContext, input: Messages
     ) -> None:
         """
-        Execute the workflow with the given context and input.
-        Returns results when all nodes complete processing.
+        Run the workflow until the execution queue is empty.
+        Publishes topic events as nodes finish.
         """
+        # 1 – initial seeding
         self.initial_workflow(execution_context, input)
 
-        # Process nodes until execution queue is empty
+        # 2 – process nodes breadth‑first
         while self.execution_queue:
             node = self.execution_queue.popleft()
 
-            # Given node, collect all the messages can be linked to it
-
-            node_consumed_events: List[ConsumeFromTopicEvent] = self.get_node_input(
-                node
-            )
+            node_input: List[ConsumeFromTopicEvent] = self.get_node_input(node)
+            if not node_input:
+                continue
 
             # Execute node with collected inputs
-            if node_consumed_events:
-                if isinstance(node.command, LLMStreamResponseCommand):
-                    # Stream node usually would be the last node of the workflow which will return to user.
-                    # In this case we return the async generator to the caller
-                    result = node.a_execute(execution_context, node_consumed_events)
-                else:
-                    # Extract data from async generator and publish the data to the topic
-                    result = []
-                    async for item in node.a_execute(
-                        execution_context, node_consumed_events
-                    ):
-                        result.extend(item if isinstance(item, list) else [item])
 
-                self._publish_events(
-                    node, execution_context, result, node_consumed_events
+            if isinstance(node.command, LLMStreamResponseCommand):
+                # Stream node usually would be the last node of the workflow which will return to user.
+                # In this case we return the async generator to the caller
+                stream_result = node.a_execute(execution_context, node_input)
+
+                self._publish_stream_event(
+                    node, execution_context, stream_result, node_input
                 )
+            else:
+                async for messages in node.a_execute(execution_context, node_input):
+                    # if the node sometimes yields a single Message, normalise to list
+                    self._publish_events(node, execution_context, messages, node_input)
 
     def get_node_input(self, node: Node) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []
@@ -299,7 +336,7 @@ class EventDrivenWorkflow(Workflow):
                 self.execution_queue.append(node)
 
     def initial_workflow(
-        self, execution_context: ExecutionContext, input: List[Message]
+        self, execution_context: ExecutionContext, input: Messages
     ) -> Any:
         """Restore the workflow state from stored events."""
 
@@ -313,7 +350,7 @@ class EventDrivenWorkflow(Workflow):
             for event in container.event_store.get_agent_events(
                 execution_context.assistant_request_id
             )
-            if isinstance(event, (PublishToTopicEvent, ConsumeFromTopicEvent))
+            if isinstance(event, TopicEvent)
         ]
 
         if len(events) == 0:
@@ -330,13 +367,13 @@ class EventDrivenWorkflow(Workflow):
             }
 
             # Get all the input and output message from assistant respond events as list
-            all_messages: List[Message] = []
+            all_messages: Messages = []
             for event in assistant_respond_event_dict.values():
                 all_messages.extend(event.input_data)
                 all_messages.extend(event.output_data)
 
             # Sort the messages by timestamp
-            sorted_messages: List[Message] = sorted(
+            sorted_messages: Messages = sorted(
                 all_messages, key=lambda item: item.timestamp
             )
 
@@ -345,6 +382,9 @@ class EventDrivenWorkflow(Workflow):
 
             # Initialize by publish input data to input topic
             input_topic = self.topics.get(AGENT_INPUT_TOPIC)
+            if input_topic is None:
+                raise ValueError("Agent input topic not found in workflow topics.")
+
             event = input_topic.publish_data(
                 execution_context=execution_context,
                 publisher_name=self.name,
@@ -355,11 +395,14 @@ class EventDrivenWorkflow(Workflow):
             container.event_store.record_event(event)
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
-            for event in events:
-                self.topics[event.topic_name].restore_topic(event)
+            for topic_event in events:
+                self.topics[topic_event.topic_name].restore_topic(topic_event)
 
             publish_events = [
-                event for event in events if isinstance(event, PublishToTopicEvent)
+                event
+                for event in events
+                if isinstance(event, PublishToTopicEvent)
+                or isinstance(event, OutputTopicEvent)
             ]
             # restore the topics
 

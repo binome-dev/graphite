@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -15,13 +15,15 @@ class RetrievalTool(Tool):
     class Builder(Tool.Builder):
         """Concrete builder for retrieval tool."""
 
-        def __init__(self):
+        _tool: "RetrievalTool"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "RetrievalTool":
-            return RetrievalTool()
+            return RetrievalTool.model_construct()
 
-        def embedding_model(self, embedding_model: Any) -> "RetrievalTool.Builder":
+        def embedding_model(self, embedding_model: Any) -> Self:
             self._tool.embedding_model = embedding_model
             return self
 

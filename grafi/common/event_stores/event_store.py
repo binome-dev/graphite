@@ -4,6 +4,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Type
 
 from loguru import logger
 
@@ -71,22 +72,21 @@ class EventStore:
 
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
         """Create an event object from a dictionary."""
-        event_type = event_dict.get("event_type")
-        if not event_type:
+        event_type: Any = event_dict.get("event_type")
+        if not isinstance(event_type, str):
             raise ValueError("Event type not found in event dict.")
 
         event_class = self._get_event_class(event_type)
-        if not event_class:
+        if event_class is None:
             raise ValueError(f"Event class not found for event type: {event_type}")
 
         try:
-            event = event_class.from_dict(event_dict)
-            return event
+            return event_class.from_dict(data=event_dict)
         except Exception as e:
             logger.error(f"Failed to create event from dict: {e}")
             raise ValueError(f"Failed to create event from dict: {e}")
 
-    def _get_event_class(self, event_type: str) -> Optional[type]:
+    def _get_event_class(self, event_type: str) -> Optional[Type[Event]]:
         """Get the event class based on the event type string."""
         event_classes = {
             EventType.NODE_FAILED.value: NodeFailedEvent,

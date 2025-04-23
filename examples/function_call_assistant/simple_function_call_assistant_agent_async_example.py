@@ -1,21 +1,23 @@
 import asyncio
 import os
 import uuid
+from typing import Any
 
-from simple_function_call_assistant import SimpleFunctionCallAssistant
-
+from examples.function_call_assistant.simple_function_call_assistant import (
+    SimpleFunctionCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.tools.functions.impl.agent_calling_tool import AgentCallingTool
 
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -25,14 +27,14 @@ def get_execution_context():
 
 async def mock_agent_call_function(
     execution_context: ExecutionContext, message: Message
-):
+) -> dict[str, Any]:
     content = "Current weather is bad now"
     message = Message(role="assistant", content=content)
 
     return message.model_dump()
 
 
-async def test_simple_function_call_assistant_async():
+async def test_simple_function_call_assistant_async() -> None:
     execution_context = get_execution_context()
 
     assistant = (

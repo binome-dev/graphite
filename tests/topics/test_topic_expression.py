@@ -30,7 +30,7 @@ def test_topic_expr_to_dict(mock_topics: tuple[TopicBase, TopicBase, TopicBase])
             "name": "topic_1",
             "condition": {
                 "type": "lambda",
-                "code": "condition: Callable[[List[Message]], bool] = Field(default=lambda _: True)",
+                "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
             },
         }
     }
@@ -51,7 +51,7 @@ def test_combined_expr_to_dict(mock_topics):
                 "name": "topic_1",
                 "condition": {
                     "type": "lambda",
-                    "code": "condition: Callable[[List[Message]], bool] = Field(default=lambda _: True)",
+                    "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
                 },
             }
         },
@@ -60,7 +60,7 @@ def test_combined_expr_to_dict(mock_topics):
                 "name": "topic_2",
                 "condition": {
                     "type": "lambda",
-                    "code": "condition: Callable[[List[Message]], bool] = Field(default=lambda _: True)",
+                    "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
                 },
             }
         },

@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -24,34 +25,36 @@ class KycAssistant(Assistant):
     )
     name: str = Field(default="KycAssistant")
     type: str = Field(default="KycAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-    user_info_extract_system_message: str = Field(default=None)
-    action_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
-    hitl_request: FunctionTool = Field(default=None)
-    register_request: FunctionTool = Field(default=None)
+    user_info_extract_system_message: Optional[str] = Field(default=None)
+    action_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    hitl_request: FunctionTool
+    register_request: FunctionTool
 
     class Builder(Assistant.Builder):
         """Concrete builder for KycAssistant."""
 
-        def __init__(self):
+        _assistant: "KycAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "KycAssistant":
-            return KycAssistant()
+            return KycAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "KycAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def model(self, model: str) -> "KycAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
         def user_info_extract_system_message(
             self, user_info_extract_system_message: str
-        ) -> "KycAssistant.Builder":
+        ) -> Self:
             self._assistant.user_info_extract_system_message = (
                 user_info_extract_system_message
             )
@@ -59,23 +62,23 @@ class KycAssistant(Assistant):
 
         def action_llm_system_message(
             self, action_llm_system_message: str
-        ) -> "KycAssistant.Builder":
+        ) -> Self:
             self._assistant.action_llm_system_message = action_llm_system_message
             return self
 
         def summary_llm_system_message(
             self, summary_llm_system_message: str
-        ) -> "KycAssistant.Builder":
+        ) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def hitl_request(self, hitl_request: FunctionTool) -> "KycAssistant.Builder":
+        def hitl_request(self, hitl_request: FunctionTool) -> Self:
             self._assistant.hitl_request = hitl_request
             return self
 
         def register_request(
             self, register_request: FunctionTool
-        ) -> "KycAssistant.Builder":
+        ) -> Self:
             self._assistant.register_request = register_request
             return self
 
@@ -118,14 +121,20 @@ class KycAssistant(Assistant):
 
         hitl_call_topic = Topic(
             name="hitl_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            != "register_client",
+            condition=lambda msgs: msgs is not None 
+            and len(msgs) > 0 
+            and msgs[-1].tool_calls is not None
+            and len(msgs[-1].tool_calls) > 0
+            and msgs[-1].tool_calls[0].function.name != "register_client",
         )
 
         register_user_topic = Topic(
             name="register_user_topic",
-            condition=lambda msgs: msgs[-1].tool_calls[0].function.name
-            == "register_client",
+            condition=lambda msgs: msgs is not None 
+            and len(msgs) > 0 
+            and msgs[-1].tool_calls is not None
+            and len(msgs[-1].tool_calls) > 0
+            and msgs[-1].tool_calls[0].function.name == "register_client",
         )
 
         action_node = (

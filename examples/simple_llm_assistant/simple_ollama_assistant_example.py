@@ -2,8 +2,7 @@
 
 import uuid
 
-from simple_ollama_assistant import SimpleOllamaAssistant
-
+from examples.simple_llm_assistant.simple_ollama_assistant import SimpleOllamaAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -20,7 +19,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_llm_assistant():
+def test_simple_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleOllamaAssistant.Builder()
@@ -60,7 +59,7 @@ def test_simple_llm_assistant():
 
     print(output)
     assert output is not None
-    assert "Grafi" in output[0].content
+    assert "Grafi" in str(output[0].content)
     assert len(event_store.get_events()) == 22
 
 

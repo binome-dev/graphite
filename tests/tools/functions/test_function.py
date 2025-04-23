@@ -69,39 +69,43 @@ def test_get_function_specs(function_instance):
 
 
 def test_execute(function_instance, execution_context):
-    input_data = Message(
-        role="assistant",
-        content="",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "test_func",
-                    "arguments": json.dumps({"arg1": "hello", "arg2": 42}),
-                },
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            content="",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "test_func",
+                        "arguments": json.dumps({"arg1": "hello", "arg2": 42}),
+                    },
+                }
+            ],
+        )
+    ]
     result = function_instance.execute(execution_context, input_data)
     assert result[0].content == "hello - 42"
 
 
 def test_execute_wrong_function_name(function_instance, execution_context):
-    input_data = Message(
-        role="assistant",
-        content="",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "wrong_func",
-                    "arguments": json.dumps({"arg1": "hello", "arg2": 42}),
-                },
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            content="",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "wrong_func",
+                        "arguments": json.dumps({"arg1": "hello", "arg2": 42}),
+                    },
+                }
+            ],
+        )
+    ]
     result = function_instance.execute(execution_context, input_data)
     assert len(result) == 0
 
@@ -127,36 +131,40 @@ def test_to_dict(function_instance):
 def test_execute_with_different_args(
     function_instance, execution_context, args, expected
 ):
-    input_data = Message(
-        role="assistant",
-        content="",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {"name": "test_func", "arguments": json.dumps(args)},
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            content="",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {"name": "test_func", "arguments": json.dumps(args)},
+                }
+            ],
+        )
+    ]
     result = function_instance.execute(execution_context, input_data)
     assert result[0].content == expected
 
 
 def test_execute_with_missing_args(function_instance, execution_context):
-    input_data = Message(
-        role="assistant",
-        content="",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "test_func",
-                    "arguments": json.dumps({"arg1": "hello"}),
-                },
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            content="",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "test_func",
+                        "arguments": json.dumps({"arg1": "hello"}),
+                    },
+                }
+            ],
+        )
+    ]
     with pytest.raises(TypeError):
         function_instance.execute(execution_context, input_data)
 

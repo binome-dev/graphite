@@ -3,8 +3,7 @@
 import os
 import uuid
 
-from simple_llm_assistant import SimpleLLMAssistant
-
+from examples.simple_llm_assistant.simple_llm_assistant import SimpleLLMAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -12,7 +11,7 @@ from grafi.common.models.message import Message
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_execution_context() -> ExecutionContext:
@@ -23,7 +22,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_llm_assistant():
+def test_simple_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleLLMAssistant.Builder()
@@ -57,7 +56,7 @@ def test_simple_llm_assistant():
     output = assistant.execute(get_execution_context(), input_data)
     print(output)
     assert output is not None
-    assert "Grafi" in output[0].content
+    assert "Grafi" in str(output[0].content)
     assert len(event_store.get_events()) == 22
 
 
