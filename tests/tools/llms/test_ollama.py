@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+from ollama import ChatResponse
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
@@ -87,47 +88,49 @@ def test_execute(monkeypatch, execution_context, mock_ollama_client):
     tool = OllamaTool()
     input_data = [Message(role="user", content="Hello")]
 
-    mock_response = {
-        "message": {
-            "role": "assistant",
-            "content": "Hi there!",
+    mock_response = ChatResponse.model_validate(
+        {
+            "message": {
+                "role": "assistant",
+                "content": "Hi there!",
+            }
         }
-    }
+    )
     mock_ollama_client.return_value.chat.return_value = mock_response
 
     result = tool.execute(execution_context, input_data)
 
-    assert result.role == "assistant"
-    assert result.content == "Hi there!"
+    assert result[0].role == "assistant"
+    assert result[0].content == "Hi there!"
     mock_ollama_client.assert_called_once_with("http://localhost:11434")
     mock_ollama_client.return_value.chat.assert_called_once_with(
-        model="qwen2.5", messages=[{"role": "user", "content": "Hello"}], tools=[]
+        model="qwen2.5", messages=[{"role": "user", "content": "Hello"}], tools=None
     )
 
 
-def test_to_message():
+def test_to_messages():
     tool = OllamaTool()
-    response = {
-        "message": {
-            "role": "assistant",
-            "content": "Hi there!",
-            "tool_calls": [
-                {
-                    "id": "test_id",
-                    "type": "function",
-                    "function": {
-                        "name": "test_function",
-                        "arguments": {"arg1": "value1"},
-                    },
-                }
-            ],
+    response = ChatResponse.model_validate(
+        {
+            "message": {
+                "role": "assistant",
+                "content": "Hi there!",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "test_function",
+                            "arguments": {"arg1": "value1"},
+                        },
+                    }
+                ],
+            }
         }
-    }
-    message = tool.to_message(response)
+    )
+    message = tool.to_messages(response)
 
-    assert message.role == "assistant"
-    assert message.content == "Hi there!"
-    assert len(message.tool_calls) == 1
-    assert message.tool_calls[0].id == "test_id"
-    assert message.tool_calls[0].function.name == "test_function"
-    assert message.tool_calls[0].function.arguments == '{"arg1": "value1"}'
+    assert message[0].role == "assistant"
+    assert message[0].content == "Hi there!"
+    assert len(message[0].tool_calls) == 1
+    assert message[0].tool_calls[0].function.name == "test_function"
+    assert message[0].tool_calls[0].function.arguments == '{"arg1": "value1"}'

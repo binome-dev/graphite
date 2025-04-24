@@ -17,7 +17,7 @@ class ToolEvent(Event):
     tool_name: str
     tool_type: str
 
-    def tool_event_dict(self):
+    def tool_event_dict(self) -> Dict[str, Any]:
         event_context = {
             TOOL_ID: self.tool_id,
             TOOL_NAME: self.tool_name,

@@ -1,5 +1,6 @@
 from typing import Dict
 from typing import List
+from typing import Optional
 
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from openai.types.shared_params.function_definition import FunctionDefinition
@@ -9,7 +10,7 @@ from pydantic import Field
 
 class ParameterSchema(BaseModel):
     type: str
-    description: str = ""
+    description: Optional[str] = ""
 
 
 class ParametersSchema(BaseModel):

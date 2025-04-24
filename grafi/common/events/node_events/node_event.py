@@ -24,7 +24,7 @@ class NodeEvent(Event):
     node_name: str
     node_type: str
 
-    def node_event_dict(self):
+    def node_event_dict(self) -> Dict[str, Any]:
         event_context = {
             NODE_ID: self.node_id,
             SUBSCRIBED_TOPICS: self.subscribed_topics,

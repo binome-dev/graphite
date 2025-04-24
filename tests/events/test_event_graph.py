@@ -12,7 +12,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -26,7 +26,7 @@ def mock_events():
     # Create mock execution context and messages (minimally required for events)
 
     exec_context = get_execution_context()
-    test_message = Message(role="assistant", content="test content")
+    test_message = [Message(role="assistant", content="test content")]
 
     # Create consume events
     consume_1 = ConsumeFromTopicEvent(

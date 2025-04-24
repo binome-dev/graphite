@@ -2,8 +2,9 @@ import asyncio
 import os
 import uuid
 
-from simple_stream_function_call_assistant import SimpleStreamFunctionCallAssistant
-
+from examples.simple_stream_assistant.simple_stream_function_call_assistant import (
+    SimpleStreamFunctionCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
@@ -13,12 +14,12 @@ from grafi.tools.functions.function_tool import FunctionTool
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 class WeatherMock(FunctionTool):
     @llm_function
-    async def get_weather_mock(self, postcode: str):
+    async def get_weather_mock(self, postcode: str) -> str:
         """
         Function to get weather information for a given postcode.
 
@@ -31,7 +32,7 @@ class WeatherMock(FunctionTool):
         return f"The weather of {postcode} is bad now."
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -39,7 +40,7 @@ def get_execution_context():
     )
 
 
-async def test_simple_function_call_assistant_no_function_call():
+async def test_simple_function_call_assistant_no_function_call() -> None:
     event_store.clear_events()
     assistant = (
         SimpleStreamFunctionCallAssistant.Builder()
@@ -54,14 +55,15 @@ async def test_simple_function_call_assistant_no_function_call():
 
     content = ""
 
-    async for message in assistant.a_execute(
+    async for messages in assistant.a_execute(
         get_execution_context(),
         input_data,
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
-            print(message.content, end="", flush=True)
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None:
+                content += str(message.content)
+                print(message.content, end="", flush=True)
 
     print(content)
     assert "EC2" in content

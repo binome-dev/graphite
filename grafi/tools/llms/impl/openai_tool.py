@@ -1,23 +1,33 @@
+import asyncio
 import os
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
 from typing import Generator
 from typing import List
 from typing import Optional
+from typing import Self
+from typing import Union
+from typing import cast
 
 from deprecated import deprecated
 from openai import AsyncClient
+from openai import NotGiven
 from openai import OpenAI
+from openai import OpenAIError
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
 
 
@@ -34,7 +44,7 @@ class OpenAITool(LLM):
 
     name: str = Field(default="OpenAITool")
     type: str = Field(default="OpenAITool")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
@@ -42,17 +52,19 @@ class OpenAITool(LLM):
     class Builder(LLM.Builder):
         """Concrete builder for OpenAITool."""
 
-        def __init__(self):
+        _tool: "OpenAITool"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "OpenAITool":
-            return OpenAITool()
+            return OpenAITool.model_construct()
 
-        def api_key(self, api_key: str) -> "OpenAITool.Builder":
+        def api_key(self, api_key: Optional[str]) -> Self:
             self._tool.api_key = api_key
             return self
 
-        def model(self, model: str) -> "OpenAITool.Builder":
+        def model(self, model: str) -> Self:
             self._tool.model = model
             return self
 
@@ -60,13 +72,15 @@ class OpenAITool(LLM):
             return self._tool
 
     def prepare_api_input(
-        self, input_data: List[Message]
-    ) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
+        self, input_data: Messages
+    ) -> tuple[
+        List[ChatCompletionMessageParam], Union[List[ChatCompletionToolParam], NotGiven]
+    ]:
         """
         Prepare the input data for the OpenAI API.
 
         Args:
-            input_data (List[Message]): A list of Message objects.
+            input_data (Messages): A list of Message objects.
 
         Returns:
             tuple: A tuple containing:
@@ -74,7 +88,12 @@ class OpenAITool(LLM):
                 - A list of function specifications for the API, or None if no functions are present.
         """
         api_messages = (
-            [{"role": "system", "content": self.system_message}]
+            [
+                cast(
+                    ChatCompletionMessageParam,
+                    {"role": "system", "content": self.system_message},
+                )
+            ]
             if self.system_message
             else []
         )
@@ -88,7 +107,7 @@ class OpenAITool(LLM):
                 "tool_calls": message.tool_calls,
                 "tool_call_id": message.tool_call_id,
             }
-            api_messages.append(api_message)
+            api_messages.append(cast(ChatCompletionMessageParam, api_message))
 
         # Extract function specifications if present in latest message
         if input_data[-1].tools:
@@ -100,8 +119,8 @@ class OpenAITool(LLM):
     def execute(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> Message:
+        input_data: Messages,
+    ) -> Messages:
         """
         Execute a request to the OpenAI API.
 
@@ -109,7 +128,7 @@ class OpenAITool(LLM):
         and returns the response as a Message object.
 
         Args:
-            input_data (List[Message]): A list of Message objects representing the input messages.
+            input_data (Messages): A list of Message objects representing the input messages.
 
         Returns:
             Message: The response from the OpenAI API converted to a Message object.
@@ -128,7 +147,7 @@ class OpenAITool(LLM):
                 **self.chat_params,
             )
             # Return the raw response
-            return self.to_message(response)
+            return self.to_messages(response)
 
         except Exception as e:
             raise RuntimeError(f"OpenAI API error: {e}") from e
@@ -137,28 +156,34 @@ class OpenAITool(LLM):
     async def a_execute(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> AsyncGenerator[Message, None]:
+        input_data: Messages,
+    ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
-        try:
-            client = AsyncClient(api_key=self.api_key)
-            response = await client.chat.completions.create(
-                model=self.model,
-                messages=api_messages,
-                tools=api_tools,
-                **self.chat_params,
-            )
-            yield self.to_message(response)
-        except Exception as e:
-            raise RuntimeError(f"OpenAI API error: {e}") from e
+
+        async with AsyncClient(api_key=self.api_key) as client:
+            try:
+                response: ChatCompletion = await client.chat.completions.create(
+                    model=self.model,
+                    messages=api_messages,
+                    tools=api_tools,
+                    **self.chat_params,
+                )
+            except asyncio.CancelledError:
+                raise  # let caller handle
+            except OpenAIError as exc:
+                # turn client‑specific exceptions into your domain error
+                raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
+
+        # Convert once we are outside the `async with`, so network resources are freed
+        yield self.to_messages(response)
 
     @record_tool_stream
     @deprecated("Use a_stream() instead for streaming functionality")
     def stream(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> Generator[Message, None, None]:
+        input_data: Messages,
+    ) -> Generator[Messages, None, None]:
         """
         Stream tokens from the OpenAI model as they are generated.
         Yields partial content/tokens.
@@ -176,14 +201,14 @@ class OpenAITool(LLM):
             stream=True,
             **self.chat_params,
         ):
-            yield self.to_stream_message(chunk)
+            yield self.to_stream_messages(chunk)
 
-    @record_tool_a_execution
+    @record_tool_a_stream
     async def a_stream(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> AsyncGenerator[Message, None]:
+        input_data: Messages,
+    ) -> MsgsAGen:
         """
         Stream tokens from the OpenAI model as they are generated.
         Yields partial content/tokens.
@@ -198,9 +223,9 @@ class OpenAITool(LLM):
             stream=True,
             **self.chat_params,
         ):
-            yield self.to_stream_message(chunk)
+            yield self.to_stream_messages(chunk)
 
-    def to_stream_message(self, chunk: ChatCompletionChunk) -> Message:
+    def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """
         Convert an OpenAI API response to a Message object.
 
@@ -219,9 +244,9 @@ class OpenAITool(LLM):
         data = message_data.model_dump()
         if data.get("role") is None:
             data["role"] = "assistant"
-        return Message(**data)
+        return [Message.model_validate(data)]
 
-    def to_message(self, response: ChatCompletion) -> Message:
+    def to_messages(self, response: ChatCompletion) -> Messages:
         """
         Convert an OpenAI API response to a Message object.
 
@@ -236,7 +261,7 @@ class OpenAITool(LLM):
 
         # Extract the first choice
         choice = response.choices[0]
-        return Message(**choice.message.model_dump())
+        return [Message.model_validate(choice.message.model_dump())]
 
     def to_dict(self) -> Dict[str, Any]:
         """

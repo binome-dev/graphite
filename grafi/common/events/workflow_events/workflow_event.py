@@ -17,7 +17,7 @@ class WorkflowEvent(Event):
     workflow_name: str
     workflow_type: str
 
-    def workflow_event_dict(self):
+    def workflow_event_dict(self) -> Dict[str, Any]:
         event_context = {
             WORKFLOW_ID: self.workflow_id,
             WORKFLOW_NAME: self.workflow_name,

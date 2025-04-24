@@ -1,9 +1,9 @@
-from typing import AsyncGenerator
+from typing import Any
 from typing import List
+from typing import Optional
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import Field
 
 from grafi.common.decorators.record_node_a_execution import record_node_a_execution
 from grafi.common.decorators.record_node_execution import record_node_execution
@@ -12,7 +12,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_calling_command import FunctionCallingCommand
 
@@ -23,20 +24,22 @@ class LLMFunctionCallNode(Node):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
     name: str = "LLMFunctionCallNode"
     type: str = "LLMFunctionCallNode"
-    command: FunctionCallingCommand = Field(default=None)
+    command: FunctionCallingCommand
 
     class Builder(Node.Builder):
         """Concrete builder for LLMFunctionCallNode."""
 
+        _node: "LLMFunctionCallNode"
+
         def _init_node(self) -> "LLMFunctionCallNode":
-            return LLMFunctionCallNode()
+            return LLMFunctionCallNode.model_construct()
 
     @record_node_execution
     def execute(
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         # Parse the LLM response to extract function call details
 
         tool_response_messages = []
@@ -44,7 +47,7 @@ class LLMFunctionCallNode(Node):
         for tool_call_message in command_input:
             # Execute the function using the tool (Function class)
             function_response_message = self.command.execute(
-                execution_context, tool_call_message
+                execution_context, [tool_call_message]
             )
 
             if len(function_response_message) > 0:
@@ -58,7 +61,7 @@ class LLMFunctionCallNode(Node):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> AsyncGenerator[Message, None]:
+    ) -> MsgsAGen:
         # Parse the LLM response to extract function call details
 
         try:
@@ -67,7 +70,7 @@ class LLMFunctionCallNode(Node):
             # Execute all function calls concurrently
             for message in command_input:
                 async for function_response_message in self.command.a_execute(
-                    execution_context, message
+                    execution_context, [message]
                 ):
                     yield function_response_message
 
@@ -75,12 +78,10 @@ class LLMFunctionCallNode(Node):
             logger.error(f"Error in async function execution: {str(e)}")
             raise
 
-    def get_function_specs(self) -> List[FunctionSpec]:
+    def get_function_specs(self) -> Optional[FunctionSpec]:
         return self.command.get_function_specs()
 
-    def get_command_input(
-        self, node_input: List[ConsumeFromTopicEvent]
-    ) -> List[Message]:
+    def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         tool_calls_messages = []
 
         # Only process messages in root event nodes, which is the current node directly consumed by the workflow
@@ -103,7 +104,7 @@ class LLMFunctionCallNode(Node):
 
         return tool_calls_messages
 
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
             "oi_span_type": self.oi_span_type.value,

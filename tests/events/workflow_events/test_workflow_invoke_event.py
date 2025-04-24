@@ -53,15 +53,17 @@ def workflow_invoke_event_message() -> WorkflowInvokeEvent:
             execution_id="execution_id",
             assistant_request_id="assistant_request_id",
         ),
-        input_data=Message(
-            message_id="ea72df51439b42e4a43b217c9bca63f5",
-            timestamp=1737138526189505000,
-            role="user",
-            content="Hello, my name is Grafi, how are you doing?",
-            name=None,
-            functions=None,
-            function_call=None,
-        ),
+        input_data=[
+            Message(
+                message_id="ea72df51439b42e4a43b217c9bca63f5",
+                timestamp=1737138526189505000,
+                role="user",
+                content="Hello, my name is Grafi, how are you doing?",
+                name=None,
+                functions=None,
+                function_call=None,
+            )
+        ],
     )
 
 
@@ -84,7 +86,7 @@ def workflow_invoke_event_dict():
             },
         },
         "data": {
-            "input_data": '[{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}]'
+            "input_data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null}]'
         },
     }
 
@@ -108,7 +110,7 @@ def workflow_invoke_event_dict_message():
             },
         },
         "data": {
-            "input_data": '{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}'
+            "input_data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null}]'
         },
     }
 

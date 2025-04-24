@@ -4,6 +4,8 @@ from enum import Enum
 from typing import Any
 from typing import Dict
 from typing import Tuple
+from typing import Type
+from typing import TypeVar
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -33,9 +35,11 @@ class EventType(Enum):
     PUBLISH_TO_TOPIC = "PublishToTopic"
     CONSUME_FROM_TOPIC = "ConsumeFromTopic"
     OUTPUT_TOPIC = "OutputTopic"
+    STREAM_OUTPUT_TOPIC = "StreamOutputTopic"
 
 
 EVENT_CONTEXT = "event_context"
+T_Event = TypeVar("T_Event", bound="Event")
 
 
 class Event(BaseModel):
@@ -46,7 +50,7 @@ class Event(BaseModel):
     event_type: EventType
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def event_dict(self, *args, **kwargs):
+    def event_dict(self) -> Dict[str, Any]:
         # Flatten `execution_context` fields into the root level
         base_dict = {
             "event_id": self.event_id,
@@ -68,6 +72,7 @@ class Event(BaseModel):
         # Return a dictionary representation of the event
         raise NotImplementedError
 
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
+    @classmethod
+    def from_dict(cls: Type[T_Event], data: Dict[str, Any]) -> T_Event:  # generic
         # Return an event object from a dictionary
         raise NotImplementedError

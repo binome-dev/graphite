@@ -12,7 +12,7 @@ class EventStoreInMemory(EventStore):
 
     events: List[Event] = []
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the event store."""
         self.events = []
 

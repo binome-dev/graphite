@@ -1,7 +1,9 @@
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Self
 from typing import Tuple
+from typing import TypeVar
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
@@ -11,7 +13,7 @@ from grafi.common.events.node_events.node_event import NodeEvent
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 from grafi.nodes.node import Node
 
 
@@ -28,39 +30,37 @@ class Workflow(BaseModel):
     class Builder:
         """Inner builder class for workflow construction."""
 
-        def __init__(self):
+        def __init__(self) -> None:
             self._workflow = self._init_workflow()
 
         def _init_workflow(self) -> "Workflow":
             raise NotImplementedError
 
-        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues):
+        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
             self._workflow.oi_span_type = oi_span_type
             return self
 
-        def name(self, name: str):
+        def name(self, name: str) -> Self:
             self._workflow.name = name
             return self
 
-        def type(self, type_name: str):
+        def type(self, type_name: str) -> Self:
             self._workflow.type = type_name
             return self
 
-        def node(self, node: Node):
+        def node(self, node: Node) -> Self:
             raise NotImplementedError
 
         def build(self) -> "Workflow":
             raise NotImplementedError
 
-    def execute(
-        self, execution_context: ExecutionContext, input: List[Message]
-    ) -> List[Message]:
+    def execute(self, execution_context: ExecutionContext, input: Messages) -> None:
         """Executes the workflow with the given initial inputs."""
         raise NotImplementedError
 
     async def a_execute(
-        self, execution_context: ExecutionContext, input: List[Message]
-    ) -> List[Message]:
+        self, execution_context: ExecutionContext, input: Messages
+    ) -> None:
         """Executes the workflow with the given initial inputs."""
         raise NotImplementedError
 
@@ -69,8 +69,8 @@ class Workflow(BaseModel):
         raise NotImplementedError
 
     def get_node_input(
-        node: Node, execution_context: ExecutionContext
-    ) -> Tuple[List[EventId], List[Message]]:
+        self, node: Node, execution_context: ExecutionContext
+    ) -> Tuple[List[EventId], Messages]:
         """Get input messages for a node from its subscribed topics."""
         raise NotImplementedError
 
@@ -87,3 +87,6 @@ class Workflow(BaseModel):
         return {
             "workflow_id": self.workflow_id,
         }
+
+
+W = TypeVar("W", bound="Workflow")  # the Tool subclass

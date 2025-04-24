@@ -15,10 +15,10 @@ from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseComman
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -26,93 +26,96 @@ def get_execution_context():
     )
 
 
-def test_openai_tool_stream():
+def test_openai_tool_stream() -> None:
     event_store.clear_events()
     openai_tool = OpenAITool.Builder().api_key(api_key).build()
     content = ""
-    for message in openai_tool.stream(
+    for messages in openai_tool.stream(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
-            print(message.content, end="", flush=True)
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None:
+                content += message.content
+                print(message.content, end="", flush=True)
 
     assert len(event_store.get_events()) == 2
     assert content is not None
     assert "Grafi" in content
 
 
-async def test_openai_tool_a_stream():
+async def test_openai_tool_a_stream() -> None:
     event_store.clear_events()
     openai_tool = OpenAITool.Builder().api_key(api_key).build()
     content = ""
-    async for message in openai_tool.a_stream(
+    async for messages in openai_tool.a_stream(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
-            print(message.content + "_", end="", flush=True)
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None and isinstance(message.content, str):
+                content += message.content
+                print(message.content + "_", end="", flush=True)
 
     assert len(event_store.get_events()) == 2
     assert content is not None
     assert "Grafi" in content
 
 
-def test_openai_tool():
+def test_openai_tool() -> None:
     openai_tool = OpenAITool.Builder().api_key(api_key).build()
     event_store.clear_events()
-    message = openai_tool.execute(
+    messages = openai_tool.execute(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
+    for message in messages:
+        assert message.role == "assistant"
 
-    assert message.role == "assistant"
+        print(message.content)
 
-    print(message.content)
-
-    assert len(event_store.get_events()) == 2
-    assert message.content is not None
-    assert "Grafi" in message.content
+        assert len(event_store.get_events()) == 2
+        assert message.content is not None
+        assert "Grafi" in message.content
 
 
-def test_openai_tool_with_chat_param():
+def test_openai_tool_with_chat_param() -> None:
     chat_param = {
         "temperature": 0.1,
         "max_tokens": 15,
     }
     openai_tool = OpenAITool.Builder().api_key(api_key).chat_params(chat_param).build()
     event_store.clear_events()
-    message = openai_tool.execute(
+    messages = openai_tool.execute(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
+    for message in messages:
+        assert message.role == "assistant"
 
-    assert message.role == "assistant"
+        print(message.content)
 
-    print(message.content)
-
-    assert len(event_store.get_events()) == 2
-    assert message.content is not None
-    assert "Grafi" in message.content
-    assert len(message.content) < 70
+        assert len(event_store.get_events()) == 2
+        assert message.content is not None
+        assert "Grafi" in message.content
+        assert len(message.content) < 70
 
 
-async def test_openai_tool_async():
+async def test_openai_tool_async() -> None:
     openai_tool = OpenAITool.Builder().api_key(api_key).build()
     event_store.clear_events()
 
     content = ""
-    async for message in openai_tool.a_execute(
+    async for messages in openai_tool.a_execute(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None and isinstance(message.content, str):
+                content += message.content
 
     print(content)
 
@@ -123,7 +126,7 @@ async def test_openai_tool_async():
     assert len(event_store.get_events()) == 2
 
 
-async def test_llm_a_stream_node():
+async def test_llm_a_stream_node() -> None:
     event_store.clear_events()
     llm_stream_node = (
         LLMNode.Builder()
@@ -150,14 +153,15 @@ async def test_llm_a_stream_node():
         ],
     )
 
-    async for message in llm_stream_node.a_execute(
+    async for messages in llm_stream_node.a_execute(
         execution_context,
         [topic_event],
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
-            print(message.content, end="", flush=True)
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None and isinstance(message.content, str):
+                content += message.content
+                print(message.content, end="", flush=True)
 
     assert content is not None
     assert "Grafi" in content

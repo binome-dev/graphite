@@ -1,11 +1,13 @@
 import functools
 import json
-from typing import List
+from typing import Any
+from typing import Awaitable
+from typing import Callable
 
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
-from grafi.assistants.assistant_base import AssistantBase
+from grafi.assistants.assistant_base import A
 from grafi.common.containers.container import container
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_ID
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
@@ -21,10 +23,12 @@ from grafi.common.events.assistant_events.assistant_respond_event import (
 )
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 
 
-def record_assistant_a_execution(func):
+def record_assistant_a_execution(
+    func: Callable[[A, ExecutionContext, Messages], Awaitable[Any]],
+) -> Callable[[A, ExecutionContext, Messages], Awaitable[Any]]:
     """
     Decorator to record assistant execution events and add tracing.
 
@@ -36,33 +40,29 @@ def record_assistant_a_execution(func):
     """
 
     @functools.wraps(func)
-    async def wrapper(self: AssistantBase, *args, **kwargs):
+    async def wrapper(
+        self: A,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> Messages:
         assistant_id = self.assistant_id
-        assistant_name = self.name
-        assistant_type = self.type
-        execution_context: ExecutionContext = (
-            args[0] if args else kwargs.get("execution_context", None)
-        )
-        model = getattr(self, "model", None)
-        input_data: List[Message] = (
-            args[1] if (args and len(args) > 1) else kwargs.get("input_data", "")
-        )
-        input_data_dict = json.dumps(input_data, default=to_jsonable_python)
+        assistant_name = self.name or ""
+        assistant_type = self.type or ""
+        model: str = getattr(self, "model", "")
 
-        assistant_event_base = {
-            ASSISTANT_ID: assistant_id,
-            "execution_context": execution_context,
-            ASSISTANT_TYPE: assistant_type,
-            ASSISTANT_NAME: assistant_name,
-            "input_data": input_data,
-        }
+        input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
         if container.event_store:
             # Record the 'invoke' event
-            invoke_event = AssistantInvokeEvent(
-                **assistant_event_base,
+            container.event_store.record_event(
+                AssistantInvokeEvent(
+                    assistant_id=assistant_id,
+                    assistant_name=assistant_name,
+                    assistant_type=assistant_type,
+                    execution_context=execution_context,
+                    input_data=input_data,
+                )
             )
-            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -80,7 +80,7 @@ def record_assistant_a_execution(func):
                 span.set_attribute("model", model)
 
                 # Execute the original function
-                result = await func(self, *args, **kwargs)
+                result: Messages = await func(self, execution_context, input_data)
 
                 # Record the output data
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
@@ -89,7 +89,11 @@ def record_assistant_a_execution(func):
             # Exception occurred during execution
             if container.event_store:
                 failed_event = AssistantFailedEvent(
-                    **assistant_event_base,
+                    assistant_id=assistant_id,
+                    assistant_name=assistant_name,
+                    assistant_type=assistant_type,
+                    execution_context=execution_context,
+                    input_data=input_data,
                     error=str(e),
                 )
                 span.set_attribute("error", str(e))
@@ -99,7 +103,11 @@ def record_assistant_a_execution(func):
             # Successful execution
             if container.event_store:
                 respond_event = AssistantRespondEvent(
-                    **assistant_event_base,
+                    assistant_id=assistant_id,
+                    assistant_name=assistant_name,
+                    assistant_type=assistant_type,
+                    execution_context=execution_context,
+                    input_data=input_data,
                     output_data=result,
                 )
                 container.event_store.record_event(respond_event)

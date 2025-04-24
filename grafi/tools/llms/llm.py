@@ -1,56 +1,63 @@
+from abc import abstractmethod
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
 from typing import Generator
-from typing import List
-from typing import Union
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.tools.tool import Tool
 
 
 class LLM(Tool):
-    system_message: str = Field(default=None)
+    system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
     class Builder(Tool.Builder):
-        """Concrete builder for WorkflowDag."""
+        """Concrete builder for LLM."""
 
-        def __init__(self):
+        _tool: "LLM"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "LLM":
-            return LLM()
+            return LLM.model_construct()
 
-        def chat_params(self, params: Dict[str, Any]) -> "Tool.Builder":
+        def chat_params(self, params: Dict[str, Any]) -> Self:
             self._tool.chat_params = params
             return self
 
-        def system_message(self, system_message: str):
+        def system_message(self, system_message: Optional[str]) -> Self:
             self._tool.system_message = system_message
             return self
 
+    @abstractmethod
     def stream(
         self,
         execution_context: ExecutionContext,
-        input_data: Union[Message, List[Message]],
+        input_data: Messages,
     ) -> Generator[Message, None, None]:
         raise NotImplementedError("Subclasses must implement this method.")
 
+    @abstractmethod
     async def a_stream(
         self,
         execution_context: ExecutionContext,
-        input_data: Union[Message, List[Message]],
-    ) -> AsyncGenerator[Message, None]:
+        input_data: Messages,
+    ) -> MsgsAGen:
+        yield []  # Too keep mypy happy
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def prepare_api_input(self, input_data: List[Message]) -> Any:
+    def prepare_api_input(self, input_data: Messages) -> Any:
         """Prepare input data for API consumption."""
         raise NotImplementedError
 

@@ -1,3 +1,4 @@
+from typing import List
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
@@ -62,9 +63,9 @@ def test_execute_simple_response(monkeypatch, openai_instance, execution_context
     input_data = [Message(role="user", content="Say hello")]
     result = openai_instance.execute(execution_context, input_data)
 
-    assert isinstance(result, Message)
-    assert result.role == "assistant"
-    assert result.content == "Hello, world!"
+    assert isinstance(result, List)
+    assert result[0].role == "assistant"
+    assert result[0].content == "Hello, world!"
 
     # Verify client was initialized with the right API key
     mock_openai_cls.assert_called_once_with(api_key="test_api_key")
@@ -129,12 +130,12 @@ def test_execute_function_call(monkeypatch, openai_instance, execution_context):
     input_data[-1].tools = tools  # Add functions to the last message
     result = openai_instance.execute(execution_context, input_data)
 
-    assert isinstance(result, Message)
-    assert result.role == "assistant"
-    assert result.content is None
-    assert isinstance(result.tool_calls, list)
-    assert result.tool_calls[0].id == "test_id"
-    assert result.tool_calls[0].function.arguments == '{"location": "London"}'
+    assert isinstance(result, List)
+    assert result[0].role == "assistant"
+    assert result[0].content is None
+    assert isinstance(result[0].tool_calls, list)
+    assert result[0].tool_calls[0].id == "test_id"
+    assert result[0].tool_calls[0].function.arguments == '{"location": "London"}'
     mock_client.chat.completions.create.assert_called_once()
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == "gpt-4o-mini"

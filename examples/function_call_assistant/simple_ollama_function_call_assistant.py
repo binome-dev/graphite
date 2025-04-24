@@ -1,3 +1,6 @@
+from typing import Optional
+from typing import Self
+
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
@@ -38,44 +41,42 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     type: str = Field(default="SimpleOllamaFunctionCallAssistant")
     api_url: str = Field(default="http://localhost:11434")
     model: str = Field(default="qwen2.5")
-    function_call_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
-    function_tool: FunctionTool = Field(default=None)
+    function_call_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    function_tool: FunctionTool
 
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
 
-        def __init__(self):
+        _assistant: "SimpleOllamaFunctionCallAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleOllamaFunctionCallAssistant":
-            return SimpleOllamaFunctionCallAssistant()
+            return SimpleOllamaFunctionCallAssistant.model_construct()
 
-        def api_url(self, api_url: str) -> "SimpleOllamaFunctionCallAssistant.Builder":
+        def api_url(self, api_url: str) -> Self:
             self._assistant.api_url = api_url
             return self
 
-        def model(self, model: str) -> "SimpleOllamaFunctionCallAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
         def function_call_llm_system_message(
             self, function_call_llm_system_message: str
-        ) -> "SimpleOllamaFunctionCallAssistant.Builder":
+        ) -> Self:
             self._assistant.function_call_llm_system_message = (
                 function_call_llm_system_message
             )
             return self
 
-        def summary_llm_system_message(
-            self, summary_llm_system_message: str
-        ) -> "SimpleOllamaFunctionCallAssistant.Builder":
+        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def function_tool(
-            self, function_tool: FunctionTool
-        ) -> "SimpleOllamaFunctionCallAssistant.Builder":
+        def function_tool(self, function_tool: FunctionTool) -> Self:
             self._assistant.function_tool = function_tool
             return self
 
@@ -115,7 +116,9 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
         function_result_topic = Topic(name="function_result_topic")
 
         agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None and msgs[-1].content.strip() != ""
+            lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
+            and msgs[-1].content.strip() != ""
         )
 
         # Create a function call node

@@ -2,8 +2,9 @@ import asyncio
 import json
 import uuid
 
-from simple_ollama_function_call_assistant import SimpleOllamaFunctionCallAssistant
-
+from examples.function_call_assistant.simple_ollama_function_call_assistant import (
+    SimpleOllamaFunctionCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
@@ -16,7 +17,7 @@ event_store = container.event_store
 
 class WeatherMock(FunctionTool):
     @llm_function
-    def get_weather(self, postcode: str):
+    def get_weather(self, postcode: str) -> str:
         """
         Function to get weather information for a given postcode.
 
@@ -34,7 +35,7 @@ class WeatherMock(FunctionTool):
         )
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,
@@ -42,7 +43,7 @@ def get_execution_context():
     )
 
 
-async def test_simple_function_call_assistant_async():
+async def test_simple_function_call_assistant_async() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleOllamaFunctionCallAssistant.Builder()

@@ -8,10 +8,10 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 
 
-def get_consumed_events(messages: List[Message]) -> List[ConsumeFromTopicEvent]:
+def get_consumed_events(messages: Messages) -> List[ConsumeFromTopicEvent]:
     return [
         ConsumeFromTopicEvent(
             event_id="test_id",

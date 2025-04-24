@@ -168,6 +168,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if new version is different than PyPi remote
+        id: check-version
+        run: |
+          remote_latest_version=$(curl -s https://pypi.org/pypi/grafi/json | jq -r .info.version)
+          current_version=$(poetry version --short)
+          if [ "$remote_latest_version" == "$current_version" ]; then
+            echo "No new version to publish."
+            exit 0
+          else
+            echo "New version available: $current_version"
+          fi
+
+
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@v5

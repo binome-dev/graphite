@@ -1,13 +1,15 @@
 import os
+from typing import Optional
+from typing import Self
 
 from llama_index.core.indices.base import BaseIndex
-from nodes.rag_node import RagNode
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
-from tools.rags.rag_response_command import RagResponseCommand
-from tools.rags.rag_tool import RagTool
 
+from examples.rag_assistant.nodes.rag_node import RagNode
+from examples.rag_assistant.tools.rags.rag_response_command import RagResponseCommand
+from examples.rag_assistant.tools.rags.rag_tool import RagTool
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
@@ -32,30 +34,32 @@ class SimpleRagAssistant(Assistant):
     )
     name: str = Field(default="SimpleRagAssistant")
     type: str = Field(default="SimpleRagAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default="gpt-4o-mini")
-    index: BaseIndex = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    model: Optional[str] = Field(default="gpt-4o-mini")
+    index: BaseIndex
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
 
-        def __init__(self):
+        _assistant: "SimpleRagAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleRagAssistant":
-            return SimpleRagAssistant()
+            return SimpleRagAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleRagAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def model(self, model: str) -> "SimpleRagAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
-        def index(self, index: BaseIndex) -> "SimpleRagAssistant.Builder":
+        def index(self, index: BaseIndex) -> Self:
             self._assistant.index = index
             return self
 

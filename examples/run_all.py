@@ -3,12 +3,12 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
-sys.stdout.reconfigure(encoding="utf-8")
-
-
-def run_scripts_in_directory(ci_only=True, pass_local=True):
+def run_scripts_in_directory(ci_only: bool=True, pass_local: bool=True) -> None:
     # Path to the current Python interpreter in the active virtual environment
     python_executable = sys.executable
 
@@ -30,10 +30,10 @@ def run_scripts_in_directory(ci_only=True, pass_local=True):
     for root, subdir, _ in os.walk(current_directory):
         for folder in subdir:
             for _, _, files in os.walk(current_directory / folder):
-                for file in files:
-                    if file.endswith("_example.py"):
+                for f in files:
+                    if f.endswith("_example.py"):
                         # Store the relative path to maintain proper execution context
-                        rel_path = current_directory / folder / file
+                        rel_path = current_directory / folder / f
                         file_list.append(rel_path)
 
     passed_scripts = []

@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -30,30 +31,32 @@ class SimpleLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleLLMAssistant")
     type: str = Field(default="SimpleLLMAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    system_message: str = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    system_message: Optional[str] = Field(default=None)
     model: str = Field(default="gpt-4o-mini")
 
-    workflow: EventDrivenWorkflow = None
+    workflow: EventDrivenWorkflow
 
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
 
-        def __init__(self):
+        _assistant: "SimpleLLMAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleLLMAssistant":
-            return SimpleLLMAssistant()
+            return SimpleLLMAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleLLMAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def system_message(self, system_message: str) -> "SimpleLLMAssistant.Builder":
+        def system_message(self, system_message: str) -> Self:
             self._assistant.system_message = system_message
             return self
 
-        def model(self, model: str) -> "SimpleLLMAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 

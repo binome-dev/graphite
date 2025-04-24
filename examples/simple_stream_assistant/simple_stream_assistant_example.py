@@ -4,8 +4,9 @@ import asyncio
 import os
 import uuid
 
-from simple_stream_assistant import SimpleStreamAssistant
-
+from examples.simple_stream_assistant.simple_stream_assistant import (
+    SimpleStreamAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -13,7 +14,7 @@ from grafi.common.models.message import Message
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_execution_context() -> ExecutionContext:
@@ -24,7 +25,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-async def test_simple_llm_assistant():
+async def test_simple_llm_assistant() -> None:
     assistant = (
         SimpleStreamAssistant.Builder()
         .name("SimpleStreamAssistant")
@@ -41,14 +42,15 @@ async def test_simple_llm_assistant():
 
     content = ""
 
-    async for message in assistant.a_execute(
+    async for messages in assistant.a_execute(
         get_execution_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-        assert message.role == "assistant"
-        if message.content is not None:
-            content += message.content
-            print(message.content, end="", flush=True)
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None:
+                content += str(message.content)
+                print(message.content, end="", flush=True)
 
     print(content)
     assert "Grafi" in content
