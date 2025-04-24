@@ -1,4 +1,3 @@
-from typing import AsyncGenerator
 from typing import List
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -15,6 +14,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.command import Command
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
 from grafi.common.topics.topic import AGENT_INPUT_TOPIC
 from grafi.common.topics.topic import Topic
@@ -37,19 +38,17 @@ class MockNode(Node):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         return [Message(role="assistant", content="sync dummy")]
 
     async def a_execute(
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> AsyncGenerator[Message, None]:
-        yield Message(role="assistant", content="async dummy")
+    ) -> MsgsAGen:
+        yield [Message(role="assistant", content="async dummy")]
 
-    def get_command_input(
-        self, node_input: List[ConsumeFromTopicEvent]
-    ) -> List[Message]:
+    def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         return [Message(role="assistant", content="command dummy")]
 
 
@@ -107,7 +106,7 @@ def simple_workflow(mock_input_topic, mock_output_topic):
 
 
 class TestEventDrivenWorkflow:
-    def test_workflow_initialization(self, simple_workflow):
+    def test_workflow_initialization(self, simple_workflow) -> None:
         """Test if workflow is properly initialized with nodes and topics"""
         assert len(simple_workflow.nodes) == 1
         assert "test_node" in simple_workflow.nodes
@@ -116,7 +115,7 @@ class TestEventDrivenWorkflow:
         assert AGENT_OUTPUT_TOPIC in simple_workflow.topics
 
     @patch("grafi.common.containers.container.container")
-    def test_on_event_handler(self, mock_container, simple_workflow):
+    def test_on_event_handler(self, mock_container, simple_workflow) -> None:
         """Test event handler functionality"""
         # Create a publish event
         mock_event = MagicMock(spec=PublishToTopicEvent)
@@ -129,7 +128,7 @@ class TestEventDrivenWorkflow:
         assert len(simple_workflow.execution_queue) == 1
         assert simple_workflow.execution_queue[0].name == "test_node"
 
-    def test_builder_functionality(self, mock_input_topic, mock_output_topic):
+    def test_builder_functionality(self, mock_input_topic, mock_output_topic) -> None:
         """Test the workflow builder functionality"""
         builder = EventDrivenWorkflow.Builder()
 

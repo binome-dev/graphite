@@ -1,15 +1,21 @@
 import os
+from typing import Optional
+from typing import Self
 
 from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
-from tools.embeddings.embedding_response_command import EmbeddingResponseCommand
-from tools.embeddings.impl.chromadb_retrieval_tool import ChromadbRetrievalTool
 
 from examples.embedding_assistant.nodes.embedding_retrieval_node import (
     EmbeddingRetrievalNode,
+)
+from examples.embedding_assistant.tools.embeddings.embedding_response_command import (
+    EmbeddingResponseCommand,
+)
+from examples.embedding_assistant.tools.embeddings.impl.chromadb_retrieval_tool import (
+    ChromadbRetrievalTool,
 )
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
@@ -35,42 +41,38 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     )
     name: str = Field(default="SimpleEmbeddingRetrievalAssistant")
     type: str = Field(default="SimpleEmbeddingRetrievalAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    embedding_model: OpenAIEmbedding = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    embedding_model: Optional[OpenAIEmbedding] = Field(default=None)
     n_results: int = Field(default=30)
 
-    collection: Collection = Field(default=None)
+    collection: Collection
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
 
-        def __init__(self):
+        _assistant: "SimpleEmbeddingRetrievalAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleEmbeddingRetrievalAssistant":
-            return SimpleEmbeddingRetrievalAssistant()
+            return SimpleEmbeddingRetrievalAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleEmbeddingRetrievalAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def embedding_model(
-            self, embedding_model: OpenAIEmbedding
-        ) -> "SimpleEmbeddingRetrievalAssistant.Builder":
+        def embedding_model(self, embedding_model: OpenAIEmbedding) -> Self:
             self._assistant.embedding_model = embedding_model
             return self
 
-        def n_results(
-            self, n_results: int
-        ) -> "SimpleEmbeddingRetrievalAssistant.Builder":
+        def n_results(self, n_results: int) -> Self:
             self._assistant.n_results = n_results
             return self
 
-        def collection(
-            self, collection: Collection
-        ) -> "SimpleEmbeddingRetrievalAssistant.Builder":
+        def collection(self, collection: Collection) -> Self:
             self._assistant.collection = collection
             return self
 

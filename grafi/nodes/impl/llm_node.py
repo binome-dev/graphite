@@ -1,6 +1,6 @@
 """Module for LLM-related node implementations."""
 
-from typing import AsyncGenerator
+from typing import Any
 from typing import List
 
 from loguru import logger
@@ -18,6 +18,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 
@@ -28,14 +30,16 @@ class LLMNode(Node):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
     name: str = "LLMNode"
     type: str = "LLMNode"
-    command: LLMResponseCommand = Field(default=None)
+    command: LLMResponseCommand
     function_specs: List[FunctionSpec] = Field(default=[])
 
     class Builder(Node.Builder):
         """Concrete builder for LLMNode."""
 
+        _node: "LLMNode"
+
         def _init_node(self) -> "LLMNode":
-            return LLMNode()
+            return LLMNode.model_construct()
 
     def add_function_spec(self, function_spec: FunctionSpec) -> None:
         """Add a function specification to the node."""
@@ -46,16 +50,14 @@ class LLMNode(Node):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         logger.debug(f"Executing LLMNode with inputs: {node_input}")
 
         # Use the LLM's execute method to get the response
-        response = [
-            self.command.execute(
-                execution_context,
-                input_data=self.get_command_input(execution_context, node_input),
-            )
-        ]
+        response = self.command.execute(
+            execution_context,
+            input_data=self.get_command_input(execution_context, node_input),
+        )
 
         # Handle the response and update the output
         return response
@@ -65,23 +67,21 @@ class LLMNode(Node):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> AsyncGenerator[Message, None]:
+    ) -> MsgsAGen:
         logger.debug(f"Executing LLMNode with inputs: {node_input}")
 
-        response = self.command.a_execute(
+        # Use the LLM's execute method to get the response generator
+        async for messages in self.command.a_execute(
             execution_context,
             input_data=self.get_command_input(execution_context, node_input),
-        )
-
-        # Use the LLM's execute method to get the response generator
-        async for message in response:
-            yield message
+        ):
+            yield messages
 
     def get_command_input(
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         agent_events = container.event_store.get_agent_events(
             execution_context.assistant_request_id
         )
@@ -98,11 +98,7 @@ class LLMNode(Node):
             event_node.event for event_node in event_graph.get_topology_sorted_events()
         ]
 
-        messages = [
-            msg
-            for event in node_input_events
-            for msg in (event.data if isinstance(event.data, list) else [event.data])
-        ]
+        messages: Messages = [msg for event in node_input_events for msg in event.data]
 
         # Make sure the llm tool call message are followed by the function call messages
         # Step 1: get all the messages with tool_call_id and remove them from the messages list
@@ -114,8 +110,9 @@ class LLMNode(Node):
         # Step 2: loop over the messages again, find the llm messages with tool_calls, and append corresponding the tool_call_messages
         i = 0
         while i < len(messages):
-            if messages[i].tool_calls:
-                for tool_call in messages[i].tool_calls:
+            message = messages[i]
+            if message.tool_calls is not None:
+                for tool_call in message.tool_calls:
                     if tool_call.id in tool_call_messages:
                         messages.insert(i + 1, tool_call_messages[tool_call.id])
                     else:
@@ -127,8 +124,8 @@ class LLMNode(Node):
                             "content": None,
                             "tool_call_id": tool_call.id,
                         }
-                        messages.insert(i + 1, Message(**message_args))
-                i += len(messages[i].tool_calls) + 1
+                        messages.insert(i + 1, Message.model_validate(message_args))
+                i += len(message.tool_calls) + 1
             else:
                 i += 1
 
@@ -139,7 +136,7 @@ class LLMNode(Node):
 
         return messages
 
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
             "oi_span_type": self.oi_span_type.value,

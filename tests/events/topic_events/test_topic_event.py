@@ -20,6 +20,7 @@ def topic_event() -> TopicEvent:
         ),
         topic_name="test_topic",
         offset=0,
+        data=[],
     )
 
 
@@ -36,6 +37,7 @@ def topic_event_message() -> TopicEvent:
         ),
         topic_name="test_topic",
         offset=0,
+        data=[],
     )
 
 

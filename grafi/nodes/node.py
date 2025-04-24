@@ -1,8 +1,9 @@
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Self
+from typing import TypeVar
 from typing import Union
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -16,8 +17,10 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import SubExpr
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.common.topics.topic_expression import evaluate_subscription
@@ -35,36 +38,38 @@ class Node(BaseModel):
     command: Optional[Command] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues  # Simplified for example
     subscribed_expressions: List[SubExpr] = Field(default=[])  # DSL-based subscriptions
-    publish_to: List[Topic] = Field(default=[])  # Topics to publish to
+    publish_to: List[TopicBase] = Field(default=[])  # Topics to publish to
 
-    _subscribed_topics: Dict[str, Topic] = {}
+    _subscribed_topics: Dict[str, TopicBase] = {}
 
     class Builder:
         """Inner builder class for workflow construction."""
 
-        def __init__(self):
+        _node: "Node"
+
+        def __init__(self) -> None:
             self._node = self._init_node()
 
         def _init_node(self) -> "Node":
-            raise NotImplementedError("Implement in a concrete subclass")
+            return Node.model_construct()
 
-        def oi_span_type(self, oi_span_type: str):
+        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
             self._node.oi_span_type = oi_span_type
             return self
 
-        def name(self, name: str):
+        def name(self, name: str) -> Self:
             self._node.name = name
             return self
 
-        def type(self, type: str):
+        def type(self, type: str) -> Self:
             self._node.type = type
             return self
 
-        def command(self, command: Command):
+        def command(self, command: Command) -> Self:
             self._node.command = command
             return self
 
-        def subscribe(self, subscribe_to: Union[Topic, SubExpr]):
+        def subscribe(self, subscribe_to: Union[Topic, SubExpr]) -> Self:
             """
             Begin building a DSL expression. Returns a SubscriptionDSL.Builder,
             which the user can chain with:
@@ -80,7 +85,7 @@ class Node(BaseModel):
                 )
             return self
 
-        def publish_to(self, topic: Topic):
+        def publish_to(self, topic: TopicBase) -> Self:
             self._node.publish_to.append(topic)
             return self
 
@@ -101,7 +106,7 @@ class Node(BaseModel):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         """Execute the node's operation. (Override in subclass)"""
         raise NotImplementedError("Subclasses must implement 'execute'.")
 
@@ -109,13 +114,20 @@ class Node(BaseModel):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> AsyncGenerator[Message, None]:
+    ) -> MsgsAGen:
+        """Execute the node's operation. (Override in subclass)"""
+        yield []  # Too keep mypy happy
+        raise NotImplementedError("Subclasses must implement 'execute'.")
+
+    async def a_stream(
+        self,
+        execution_context: ExecutionContext,
+        node_input: List[ConsumeFromTopicEvent],
+    ) -> MsgsAGen:
         """Execute the node's operation. (Override in subclass)"""
         raise NotImplementedError("Subclasses must implement 'execute'.")
 
-    def get_command_input(
-        self, node_input: List[ConsumeFromTopicEvent]
-    ) -> Union[Message, List[Message]]:
+    def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         """Combine inputs in a way that's suitable for this node. (Override in subclass)"""
         raise NotImplementedError("Subclasses must implement 'get_command_input'.")
 
@@ -150,3 +162,6 @@ class Node(BaseModel):
             "publish_to": [topic.to_dict() for topic in self.publish_to],
             "command": self.command.to_dict() if self.command else None,
         }
+
+
+N = TypeVar("N", bound="Node")  # the Node subclass

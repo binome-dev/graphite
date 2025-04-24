@@ -4,8 +4,7 @@ import asyncio
 import os
 import uuid
 
-from simple_llm_assistant import SimpleLLMAssistant
-
+from examples.simple_llm_assistant.simple_llm_assistant import SimpleLLMAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -13,7 +12,7 @@ from grafi.common.models.message import Message
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_execution_context() -> ExecutionContext:
@@ -24,7 +23,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-async def test_simple_llm_assistant_async():
+async def test_simple_llm_assistant_async() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleLLMAssistant.Builder()

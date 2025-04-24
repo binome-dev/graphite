@@ -2,6 +2,7 @@
 
 import functools
 import json
+from typing import Callable
 from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -12,8 +13,6 @@ from grafi.common.containers.container import container
 from grafi.common.events.node_events.node_event import NODE_ID
 from grafi.common.events.node_events.node_event import NODE_NAME
 from grafi.common.events.node_events.node_event import NODE_TYPE
-from grafi.common.events.node_events.node_event import PUBLISH_TO_TOPICS
-from grafi.common.events.node_events.node_event import SUBSCRIBED_TOPICS
 from grafi.common.events.node_events.node_failed_event import NodeFailedEvent
 from grafi.common.events.node_events.node_invoke_event import NodeInvokeEvent
 from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
@@ -22,46 +21,44 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.nodes.node import Node
+from grafi.common.models.message import Messages
+from grafi.nodes.node import N
 
 
-def record_node_execution(func):
+def record_node_execution(
+    func: Callable[[N, ExecutionContext, List[ConsumeFromTopicEvent]], Messages],
+) -> Callable[[N, ExecutionContext, List[ConsumeFromTopicEvent]], Messages]:
     """Decorator to record node execution events and tracing."""
 
     @functools.wraps(func)
-    def wrapper(self: Node, *args, **kwargs):
+    def wrapper(
+        self: N,
+        execution_context: ExecutionContext,
+        input_data: List[ConsumeFromTopicEvent],
+    ) -> Messages:
         node_id: str = self.node_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
-        execution_context: ExecutionContext = (
-            args[0] if args else kwargs.get("execution_context", None)
-        )
-        input_data: List[ConsumeFromTopicEvent] = (
-            args[1] if len(args) > 1 else kwargs.get("node_input", None)
-        )
         publish_to_topics = [topic.name for topic in self.publish_to]
-        node_name: str = self.name
-        node_type: str = self.type
+        node_name: str = self.name or ""
+        node_type: str = self.type or ""
 
         input_data_dict = [event.to_dict() for event in input_data]
 
         subscribed_topics = [topic.name for topic in self._subscribed_topics.values()]
 
-        node_event_base = {
-            NODE_ID: node_id,
-            SUBSCRIBED_TOPICS: subscribed_topics,
-            PUBLISH_TO_TOPICS: publish_to_topics,
-            "execution_context": execution_context,
-            NODE_TYPE: node_type,
-            NODE_NAME: node_name,
-            "input_data": input_data,
-        }
-
         if container.event_store:
             # Record the 'invoke' event
-            invoke_event = NodeInvokeEvent(
-                **node_event_base,
+            container.event_store.record_event(
+                NodeInvokeEvent(
+                    node_id=node_id,
+                    subscribed_topics=subscribed_topics,
+                    publish_to_topics=publish_to_topics,
+                    execution_context=execution_context,
+                    node_type=node_type,
+                    node_name=node_name,
+                    input_data=input_data,
+                )
             )
-            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -74,10 +71,12 @@ def record_node_execution(func):
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     oi_span_type.value,
                 )
-                span.set_attribute("input", input_data_dict)
+                span.set_attribute(
+                    "input", json.dumps(input_data_dict, default=to_jsonable_python)
+                )
 
                 # Execute the node function
-                result = func(self, *args, **kwargs)
+                result = func(self, execution_context, input_data)
 
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
 
@@ -86,20 +85,34 @@ def record_node_execution(func):
         except Exception as e:
             # Exception occurred during execution
             if container.event_store:
-                failed_event = NodeFailedEvent(
-                    **node_event_base,
-                    error=str(e),
+                container.event_store.record_event(
+                    NodeFailedEvent(
+                        node_id=node_id,
+                        subscribed_topics=subscribed_topics,
+                        publish_to_topics=publish_to_topics,
+                        execution_context=execution_context,
+                        node_type=node_type,
+                        node_name=node_name,
+                        input_data=input_data,
+                        error=str(e),
+                    )
                 )
-                container.event_store.record_event(failed_event)
             raise
         else:
             # Successful execution
             if container.event_store:
-                respond_event = NodeRespondEvent(
-                    **node_event_base,
-                    output_data=result,
+                container.event_store.record_event(
+                    NodeRespondEvent(
+                        node_id=node_id,
+                        subscribed_topics=subscribed_topics,
+                        publish_to_topics=publish_to_topics,
+                        execution_context=execution_context,
+                        node_type=node_type,
+                        node_name=node_name,
+                        input_data=input_data,
+                        output_data=result,
+                    )
                 )
-                container.event_store.record_event(respond_event)
 
         return result
 

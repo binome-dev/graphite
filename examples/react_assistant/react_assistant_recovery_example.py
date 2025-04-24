@@ -3,18 +3,18 @@ import os
 import uuid
 from pathlib import Path
 
-from react_assistant import ReActAssistant
-from tools.tavily_tool import TavilyTool
-
+from examples.react_assistant.react_assistant import ReActAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
-tavily_api_key = os.getenv("TAIVLY_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
+
 
 observation_llm_system_message = """
 You are an AI assistant that records and reports the results obtained from executed actions.
@@ -56,13 +56,15 @@ def load_events_from_json() -> ExecutionContext:
     # Convert each event dict to Event object and store it
     for event_dict in events_data:
         event = event_store._create_event_from_dict(event_dict)
+        if event is None:
+            raise ValueError(f"Failed to create event from dict: {event_dict}")
         event_store.record_event(event)
         execution_context = event.execution_context
 
     return execution_context
 
 
-def test_react_assistant():
+def test_react_assistant() -> None:
     execution_context = load_events_from_json()
 
     # Set up the assistant with DuckDuckGoTool

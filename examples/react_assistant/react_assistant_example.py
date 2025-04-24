@@ -1,18 +1,18 @@
+import json
 import os
 import uuid
 
-from react_assistant import ReActAssistant
-from tools.tavily_tool import TavilyTool
-
+from examples.react_assistant.react_assistant import ReActAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
-tavily_api_key = os.getenv("TAVILY_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 observation_llm_system_message = """
 You are an AI assistant that records and reports the results obtained from executed actions.
@@ -42,7 +42,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_react_assistant():
+def test_react_assistant() -> None:
     execution_context = get_execution_context()
 
     # Set up the assistant with DuckDuckGoTool
@@ -85,11 +85,11 @@ def test_react_assistant():
 
     # Store events in a JSON file
 
-    # events = event_store.get_events()
-    # output_file = f"events.json"
+    events = event_store.get_events()
+    output_file = f"events.json"
 
-    # with open(output_file, "w") as f:
-    #     json.dump([event.to_dict() for event in events], f, indent=4)
+    with open(output_file, "w") as f:
+        json.dump([event.to_dict() for event in events], f, indent=4)
 
     # assistant.generate_workflow_graph()
     # assistant.generate_manifest()

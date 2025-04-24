@@ -4,14 +4,13 @@ import shutil
 import uuid
 from pathlib import Path
 
-from simple_rag_assistant import SimpleRagAssistant
-
+from examples.rag_assistant.simple_rag_assistant import SimpleRagAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store
 
@@ -40,18 +39,21 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def initialize_index(document_path: str = CURRENT_DIR / "data") -> VectorStoreIndex:
+def initialize_index(
+    document_path: str = str(CURRENT_DIR / "data"),
+) -> VectorStoreIndex:
     if not os.path.exists(PERSIST_DIR):
         documents = SimpleDirectoryReader(document_path).load_data()
         index = VectorStoreIndex.from_documents(documents)
-        index.storage_context.persist(persist_dir=PERSIST_DIR)
+        index.storage_context.persist(persist_dir=str(PERSIST_DIR))
+        return index
     else:
-        storage_context = StorageContext.from_defaults(persist_dir=PERSIST_DIR)
-        index = load_index_from_storage(storage_context)
-    return index
+        storage_context = StorageContext.from_defaults(persist_dir=str(PERSIST_DIR))
+        base_index = load_index_from_storage(storage_context)
+        return base_index
 
 
-async def test_rag_tool_async():
+async def test_rag_tool_async() -> None:
     index = initialize_index()
     execution_context = get_execution_context()
     simple_rag_assistant = (
@@ -64,7 +66,7 @@ async def test_rag_tool_async():
 
     result = await simple_rag_assistant.a_execute(
         execution_context,
-        input_data=[Message(role="user", content="What is AWS EC2?")],
+        [Message(role="user", content="What is AWS EC2?")],
     )
 
     print(result)

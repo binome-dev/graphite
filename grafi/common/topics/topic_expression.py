@@ -15,7 +15,7 @@ class LogicalOp(Enum):
 class SubExpr(BaseModel):
     """Base class for subscription expressions."""
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         raise NotImplementedError
 
 

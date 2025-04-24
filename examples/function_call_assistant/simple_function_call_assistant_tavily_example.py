@@ -1,8 +1,9 @@
 import os
 import uuid
 
-from simple_function_call_assistant import SimpleFunctionCallAssistant
-
+from examples.function_call_assistant.simple_function_call_assistant import (
+    SimpleFunctionCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -11,8 +12,8 @@ from grafi.tools.functions.impl.tavily_tool import TavilyTool
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
-tavily_api_key = os.getenv("TAVILY_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 
 def get_execution_context() -> ExecutionContext:
@@ -23,7 +24,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_function_call_assistant_with_tavily():
+def test_simple_function_call_assistant_with_tavily() -> None:
     execution_context = get_execution_context()
 
     # Set up the assistant with TavilyTool

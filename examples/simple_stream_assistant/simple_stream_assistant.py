@@ -1,11 +1,13 @@
 import os
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.stream_assistant import StreamAssistant
-from grafi.common.topics.output_topic import agent_stream_output_topic
+from grafi.common.topics.stream_output_topic import agent_stream_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -26,32 +28,32 @@ class SimpleStreamAssistant(StreamAssistant):
     )
     name: str = Field(default="SimpleStreamAssistant")
     type: str = Field(default="SimpleStreamAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    system_message: str = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    system_message: Optional[str] = Field(default=None)
     model: str = Field(default="gpt-4o-mini")
 
-    workflow: EventDrivenWorkflow = None
+    workflow: EventDrivenWorkflow
 
     class Builder(Assistant.Builder):
         """Concrete builder for SimpleStreamAssistant."""
 
-        def __init__(self):
+        _assistant: "SimpleStreamAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleStreamAssistant":
-            return SimpleStreamAssistant()
+            return SimpleStreamAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleStreamAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def system_message(
-            self, system_message: str
-        ) -> "SimpleStreamAssistant.Builder":
+        def system_message(self, system_message: str) -> Self:
             self._assistant.system_message = system_message
             return self
 
-        def model(self, model: str) -> "SimpleStreamAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 

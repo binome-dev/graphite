@@ -4,7 +4,6 @@ import json
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Union
 
 from pydantic import TypeAdapter
 from pydantic_core import to_jsonable_python
@@ -14,7 +13,7 @@ from grafi.common.events.node_events.node_event import NodeEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 
 
 class NodeRespondEvent(NodeEvent):
@@ -22,7 +21,7 @@ class NodeRespondEvent(NodeEvent):
 
     event_type: EventType = EventType.NODE_RESPOND
     input_data: List[ConsumeFromTopicEvent]
-    output_data: Union[Message, List[Message]]
+    output_data: Messages
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -42,7 +41,7 @@ class NodeRespondEvent(NodeEvent):
                 ConsumeFromTopicEvent.from_dict(event)
                 for event in data["data"]["input_data"]
             ],
-            output_data=TypeAdapter(List[Message]).validate_python(
+            output_data=TypeAdapter(Messages).validate_python(
                 json.loads(data["data"]["output_data"])
             ),
         )

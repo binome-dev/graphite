@@ -3,8 +3,7 @@
 import os
 import uuid
 
-from simple_llm_assistant import SimpleLLMAssistant
-
+from examples.event_store_postgres.simple_llm_assistant import SimpleLLMAssistant
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.models.execution_context import ExecutionContext
@@ -38,7 +37,7 @@ container.register_event_store(EventStorePostgres, postgres_event_store)
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 conversation_id = uuid.uuid4().hex
 
@@ -51,7 +50,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_llm_assistant():
+def test_simple_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
         SimpleLLMAssistant.Builder()
@@ -85,7 +84,7 @@ def test_simple_llm_assistant():
     output = assistant.execute(get_execution_context(), input_data)
     print(output)
     assert output is not None
-    assert "Grafi" in output[0].content
+    assert "Grafi" in str(output[0].content)
     assert len(event_store.get_conversation_events(conversation_id)) == 22
 
 

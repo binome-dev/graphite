@@ -1,18 +1,23 @@
 import json
 import uuid
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
+from typing import Generator
 from typing import List
 from typing import Optional
+from typing import Self
 
+from deprecated import deprecated
 from loguru import logger
+from ollama import ChatResponse
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
 
 
@@ -39,29 +44,34 @@ class OllamaTool(LLM):
     class Builder(LLM.Builder):
         """Concrete builder for OllamaTool."""
 
-        def __init__(self):
+        _tool: "OllamaTool"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "OllamaTool":
-            return OllamaTool()
+            return OllamaTool.model_construct()
 
-        def api_url(self, api_url: str) -> "OllamaTool.Builder":
+        def api_url(self, api_url: str) -> Self:
             self._tool.api_url = api_url
             return self
 
-        def model(self, model: str) -> "OllamaTool.Builder":
+        def model(self, model: str) -> Self:
             self._tool.model = model
             return self
 
+        def build(self) -> "OllamaTool":
+            return self._tool
+
     def prepare_api_input(
-        self, input_data: List[Message]
+        self, input_data: Messages
     ) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
-        api_messages = (
+        api_messages: List[Dict[str, Any]] = (
             [{"role": "system", "content": self.system_message}]
             if self.system_message
             else []
         )
-        api_functions = []
+        api_functions = None
 
         for message in input_data:
             api_message = {
@@ -88,8 +98,8 @@ class OllamaTool(LLM):
     def execute(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> Message:
+        input_data: Messages,
+    ) -> Messages:
         """
         Execute a request to the Ollama API asynchronously.
         """
@@ -105,7 +115,7 @@ class OllamaTool(LLM):
             )
 
             # Return the raw response as a Message object
-            return self.to_message(response)
+            return self.to_messages(response)
         except Exception as e:
             logger.error("Ollama API error: %s", e)
             raise RuntimeError(f"Ollama API error: {e}") from e
@@ -114,8 +124,8 @@ class OllamaTool(LLM):
     async def a_execute(
         self,
         execution_context: ExecutionContext,
-        input_data: List[Message],
-    ) -> AsyncGenerator[Message, None]:
+        input_data: Messages,
+    ) -> MsgsAGen:
         """
         Execute a request to the Ollama API asynchronously.
         """
@@ -131,49 +141,63 @@ class OllamaTool(LLM):
             )
 
             # Return the raw response as a Message object
-            yield self.to_message(response)
+            yield self.to_messages(response)
         except Exception as e:
             logger.error("Ollama API error: %s", e)
             raise RuntimeError(f"Ollama API error: {e}") from e
 
-    def to_message(self, response: Dict[str, Any]) -> Message:
+    @deprecated("Use a_stream() instead for streaming functionality")
+    def stream(
+        self,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> Generator[Messages, None, None]:
+        yield []
+
+    async def a_stream(
+        self,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> MsgsAGen:
+        yield []
+
+    def to_messages(self, response: ChatResponse) -> Messages:
         """
         Convert the Ollama API response to a Message object.
         """
-        message_data = response.get("message", {})
+        message_data = response.message
 
         # Handle the basic fields
-        role = message_data.get("role", "assistant")
-        content = message_data.get("content", "No content provided")
+        role = message_data.role or "assistant"
+        content = message_data.content or "No content provided"
 
-        message_args = {
+        message_args: Dict[str, Any] = {
             "role": role,
             "content": content,
         }
 
         # Process tool calls if they exist
-        if "tool_calls" in message_data and message_data["tool_calls"]:
-            raw_tool_calls = message_data["tool_calls"]
+        if "tool_calls" in message_data and message_data.tool_calls:
+            raw_tool_calls = message_data.tool_calls
 
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:
                 # Include the function call if provided
-                if "function" in raw_tool_call:
-                    function = raw_tool_call["function"]
-                    tool_call = {
-                        "id": raw_tool_call.get("id", uuid.uuid4().hex),
-                        "type": "function",
-                        "function": {
-                            "name": function["name"],
-                            "arguments": json.dumps(function["arguments"]),
-                        },
-                    }
-                    tool_calls.append(tool_call)
+                function = raw_tool_call.function
+                tool_call = {
+                    "id": uuid.uuid4().hex,
+                    "type": "function",
+                    "function": {
+                        "name": function.name,
+                        "arguments": json.dumps(function.arguments),
+                    },
+                }
+                tool_calls.append(tool_call)
 
             message_args["tool_calls"] = tool_calls
 
@@ -181,7 +205,7 @@ class OllamaTool(LLM):
         if "name" in message_data:
             message_args["name"] = message_data["name"]
 
-        return Message(**message_args)
+        return [Message.model_validate(message_args)]
 
     def to_dict(self) -> dict[str, Any]:
         return {

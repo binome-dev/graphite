@@ -1,4 +1,3 @@
-from typing import AsyncGenerator
 from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -11,6 +10,8 @@ from grafi.common.models.command import Command
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
@@ -35,19 +36,17 @@ class DummyNode(Node):
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> List[Message]:
+    ) -> Messages:
         return [Message(role="assistant", content="sync dummy")]
 
     async def a_execute(
         self,
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> AsyncGenerator[Message, None]:
-        yield Message(role="assistant", content="async dummy")
+    ) -> MsgsAGen:
+        yield [Message(role="assistant", content="async dummy")]
 
-    def get_command_input(
-        self, node_input: List[ConsumeFromTopicEvent]
-    ) -> List[Message]:
+    def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         return [Message(role="assistant", content="command dummy")]
 
 

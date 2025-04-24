@@ -52,15 +52,17 @@ def publish_to_topic_event_message() -> PublishToTopicEvent:
             assistant_request_id="assistant_request_id",
         ),
         consumed_event_ids=["1", "2"],
-        data=Message(
-            message_id="ea72df51439b42e4a43b217c9bca63f5",
-            timestamp=1737138526189505000,
-            role="user",
-            content="Hello, my name is Grafi, how are you doing?",
-            name=None,
-            functions=None,
-            function_call=None,
-        ),
+        data=[
+            Message(
+                message_id="ea72df51439b42e4a43b217c9bca63f5",
+                timestamp=1737138526189505000,
+                role="user",
+                content="Hello, my name is Grafi, how are you doing?",
+                name=None,
+                functions=None,
+                function_call=None,
+            )
+        ],
     )
 
 
@@ -84,7 +86,7 @@ def publish_to_topic_event_dict():
                 "user_id": "",
             },
         },
-        "data": '[{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}]',
+        "data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null}]',
     }
 
 
@@ -108,7 +110,7 @@ def publish_to_topic_event_dict_message():
                 "user_id": "",
             },
         },
-        "data": '{"content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "role": "user", "annotations": null, "audio": null, "function_call": null, "tool_calls": null, "name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "tool_call_id": null, "tools": null, "functions": null}',
+        "data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null}]',
     }
 
 

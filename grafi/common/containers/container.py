@@ -10,7 +10,7 @@ class Container:
     _event_store: Optional[EventStore] = None
     _event_store_class: Type[EventStore] = EventStoreInMemory
 
-    def __new__(cls):
+    def __new__(cls) -> "Container":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._event_store = cls._event_store_class()
@@ -22,6 +22,9 @@ class Container:
     ) -> None:
         """Register a different EventStore implementation"""
         cls._event_store_class = event_store_class
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._event_store = cls._event_store_class()
         cls._instance._event_store = event_store
 
     @property

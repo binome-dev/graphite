@@ -2,8 +2,9 @@
 
 import functools
 import json
-from typing import List
-from typing import Union
+from typing import Any
+from typing import Callable
+from typing import Coroutine
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from openinference.semconv.trace import SpanAttributes
@@ -21,11 +22,16 @@ from grafi.common.events.workflow_events.workflow_invoke_event import (
 )
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
-from grafi.workflows.workflow import Workflow
+from grafi.common.models.message import Messages
+from grafi.workflows.workflow import W
 
 
-def record_workflow_a_execution(func):
+CoroNone = Coroutine[Any, Any, None]  # shorthand
+
+
+def record_workflow_a_execution(
+    func: Callable[[W, ExecutionContext, Messages], CoroNone],
+) -> Callable[[W, ExecutionContext, Messages], CoroNone]:
     """
     Decorator to record workflow execution events and add tracing.
 
@@ -37,34 +43,29 @@ def record_workflow_a_execution(func):
     """
 
     @functools.wraps(func)
-    async def wrapper(self: Workflow, *args, **kwargs):
+    async def wrapper(
+        self: W,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> None:
         workflow_id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
-        execution_context: ExecutionContext = (
-            args[0] if args else kwargs.get("execution_context", None)
-        )
-        workflow_name: str = self.name
-        workflow_type: str = self.type
-        input_data: Union[Message, List[Message]] = (
-            args[1] if (args and len(args) > 1) else kwargs.get("input", {})
-        )
+        workflow_name: str = self.name or ""
+        workflow_type: str = self.type or ""
 
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        workflow_event_base = {
-            WORKFLOW_ID: workflow_id,
-            "execution_context": execution_context,
-            WORKFLOW_TYPE: workflow_type,
-            WORKFLOW_NAME: workflow_name,
-            "input_data": input_data,
-        }
-
         if container.event_store:
             # Record the 'invoke' event
-            invoke_event = WorkflowInvokeEvent(
-                **workflow_event_base,
+            container.event_store.record_event(
+                WorkflowInvokeEvent(
+                    workflow_id=workflow_id,
+                    execution_context=execution_context,
+                    workflow_type=workflow_type,
+                    workflow_name=workflow_name,
+                    input_data=input_data,
+                )
             )
-            container.event_store.record_event(invoke_event)
 
         # Execute the original function
         try:
@@ -80,16 +81,21 @@ def record_workflow_a_execution(func):
                 )
 
                 # Execute the original function
-                await func(self, *args, **kwargs)
+                await func(self, execution_context, input_data)
 
         except Exception as e:
             # Exception occurred during execution
             if container.event_store:
-                failed_event = WorkflowFailedEvent(
-                    **workflow_event_base,
-                    error=str(e),
+                container.event_store.record_event(
+                    WorkflowFailedEvent(
+                        workflow_id=workflow_id,
+                        execution_context=execution_context,
+                        workflow_type=workflow_type,
+                        workflow_name=workflow_name,
+                        input_data=input_data,
+                        error=str(e),
+                    )
                 )
-                container.event_store.record_event(failed_event)
             raise
 
     return wrapper

@@ -16,10 +16,10 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.human_request_topic import human_request_topic
 from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.output_topic import agent_stream_output_topic
 
 
 class Assistant(AssistantBase):
@@ -33,26 +33,25 @@ class Assistant(AssistantBase):
 
     @record_assistant_execution
     def execute(
-        self, execution_context: ExecutionContext, input_data: List[Message]
-    ) -> List[Message]:
+        self, execution_context: ExecutionContext, input_data: Messages
+    ) -> Messages:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
             execution_context (ExecutionContext): Context containing execution information
-            input_data (List[Message]): List of input messages to be processed
+            input_data (Messages): List of input messages to be processed
 
         Returns:
-            List[Message]: List of generated response messages, sorted by timestamp
+            Messages: List of generated response messages, sorted by timestamp
 
         Raises:
             ValueError: If the OpenAI API key is not provided and not found in environment variables
         """
-        consumed_events: List[ConsumeFromTopicEvent] = []
         try:
             # Execute the workflow with the input data
             self.workflow.execute(execution_context, input_data)
 
-            output: List[Message] = []
+            output: Messages = []
 
             consumed_events: List[ConsumeFromTopicEvent] = self._get_consumed_events()
 
@@ -71,16 +70,16 @@ class Assistant(AssistantBase):
 
     @record_assistant_a_execution
     async def a_execute(
-        self, execution_context: ExecutionContext, input_data: List[Message]
-    ) -> List[Message]:
+        self, execution_context: ExecutionContext, input_data: Messages
+    ) -> MsgsAGen:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
             execution_context (ExecutionContext): Context containing execution information
-            input_data (List[Message]): List of input messages to be processed
+            input_data (Messages): List of input messages to be processed
 
         Returns:
-            List[Message]: List of generated response messages, sorted by timestamp
+            Messages: List of generated response messages, sorted by timestamp
 
         Raises:
             ValueError: If the OpenAI API key is not provided and not found in environment variables
@@ -90,9 +89,9 @@ class Assistant(AssistantBase):
             # Execute the workflow with the input data
             await self.workflow.a_execute(execution_context, input_data)
 
-            output: List[Message] = []
+            output: Messages = []
 
-            consumed_events: List[ConsumeFromTopicEvent] = self._get_consumed_events()
+            consumed_events = self._get_consumed_events()
 
             for event in consumed_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
@@ -125,19 +124,6 @@ class Assistant(AssistantBase):
 
         if agent_output_topic.can_consume(self.name):
             events = agent_output_topic.consume(self.name)
-            for event in events:
-                consumed_event = ConsumeFromTopicEvent(
-                    topic_name=event.topic_name,
-                    consumer_name=self.name,
-                    consumer_type=self.type,
-                    execution_context=event.execution_context,
-                    offset=event.offset,
-                    data=event.data,
-                )
-                consumed_events.append(consumed_event)
-
-        if agent_stream_output_topic.can_consume(self.name):
-            events = agent_stream_output_topic.consume(self.name)
             for event in events:
                 consumed_event = ConsumeFromTopicEvent(
                     topic_name=event.topic_name,

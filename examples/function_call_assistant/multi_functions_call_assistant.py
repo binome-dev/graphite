@@ -1,5 +1,6 @@
 import os
-from typing import List
+from typing import List, Self
+from typing import Optional
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -46,28 +47,30 @@ class MultiFunctionsCallAssistant(Assistant):
     )
     name: str = Field(default="MultiFunctionsCallAssistant")
     type: str = Field(default="MultiFunctionsCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    function_call_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    function_call_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
     model: str = Field(default="gpt-4o-mini")
     function_tools: List[FunctionTool] = Field(default=[])
 
     class Builder(Assistant.Builder):
         """Concrete builder for MultiFunctionsCallAssistant."""
 
-        def __init__(self):
+        _assistant: "MultiFunctionsCallAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "MultiFunctionsCallAssistant":
-            return MultiFunctionsCallAssistant()
+            return MultiFunctionsCallAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "MultiFunctionsCallAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
         def function_call_llm_system_message(
             self, function_call_llm_system_message: str
-        ) -> "MultiFunctionsCallAssistant.Builder":
+        ) -> Self:
             self._assistant.function_call_llm_system_message = (
                 function_call_llm_system_message
             )
@@ -75,17 +78,17 @@ class MultiFunctionsCallAssistant(Assistant):
 
         def summary_llm_system_message(
             self, summary_llm_system_message: str
-        ) -> "MultiFunctionsCallAssistant.Builder":
+        ) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def model(self, model: str) -> "MultiFunctionsCallAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
         def function_tool(
             self, function_tool: FunctionTool
-        ) -> "MultiFunctionsCallAssistant.Builder":
+        ) -> Self:
             self._assistant.function_tools.append(function_tool)
             return self
 
@@ -105,7 +108,9 @@ class MultiFunctionsCallAssistant(Assistant):
         )
 
         agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None and msgs[-1].content.strip() != ""
+            lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
+            and msgs[-1].content.strip() != ""
         )
 
         # Create an input LLM node
@@ -136,6 +141,7 @@ class MultiFunctionsCallAssistant(Assistant):
             name="function_result_topic",
             condition=lambda msgs: len(msgs) > 0
             and msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
             and msgs[-1].content.strip() != "",
         )
 

@@ -48,19 +48,21 @@ def test_execute_successful(agent_calling_tool):
         execution_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
-    input_data = Message(
-        role="assistant",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "test_agent",
-                    "arguments": '{"prompt": "test prompt"}',
-                },
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "test_agent",
+                        "arguments": '{"prompt": "test prompt"}',
+                    },
+                }
+            ],
+        )
+    ]
 
     result = agent_calling_tool.execute(execution_context, input_data)
     print(result)
@@ -76,19 +78,21 @@ def test_execute_invalid_function_name(agent_calling_tool):
         execution_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
-    input_data = Message(
-        role="assistant",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "wrong_agent",
-                    "arguments": '{"prompt": "test prompt"}',
-                },
-            }
-        ],
-    )
+    input_data = [
+        Message(
+            role="assistant",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "wrong_agent",
+                        "arguments": '{"prompt": "test prompt"}',
+                    },
+                }
+            ],
+        )
+    ]
 
     result = agent_calling_tool.execute(execution_context, input_data)
 
@@ -101,21 +105,19 @@ def test_execute_none_function_call(agent_calling_tool):
         execution_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
-    input_data = Message(role="assistant")
+    input_data = [Message(role="assistant")]
 
     with pytest.raises(ValueError, match="Agent call is None."):
         agent_calling_tool.execute(execution_context, input_data)
 
 
-def test_to_message(agent_calling_tool):
+def test_to_messages(agent_calling_tool):
     response = "test response"
-    result = agent_calling_tool.to_message(response, "test_id")
+    result = agent_calling_tool.to_messages(response, "test_id")
 
-    print(result)
-
-    assert result.role == "tool"
-    assert result.content == "test response"
-    assert result.tool_call_id == "test_id"
+    assert result[0].role == "tool"
+    assert result[0].content == "test response"
+    assert result[0].tool_call_id == "test_id"
 
 
 def test_to_dict(agent_calling_tool: AgentCallingTool):

@@ -90,8 +90,8 @@ def setup_tracing() -> "Tracer":
         trace.set_tracer_provider(tracer_provider)
     else:
         # Fallback to InMemorySpanExporter if the endpoint is not available
-        span_exporter = InMemorySpanExporter()
-        span_exporter.shutdown()
+        span_exporter_im = InMemorySpanExporter()
+        span_exporter_im.shutdown()
         logger.debug("OTLP endpoint is not available. Using InMemorySpanExporter.")
 
     return trace.get_tracer(__name__)

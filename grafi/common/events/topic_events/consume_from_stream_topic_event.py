@@ -1,23 +1,19 @@
-import json
 from typing import Any
 from typing import Dict
-
-from pydantic import TypeAdapter
-from pydantic_core import to_jsonable_python
+from typing import cast
 
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 
 
-class ConsumeFromTopicEvent(TopicEvent):
+class ConsumeFromStreamTopicEvent(TopicEvent):
     event_type: EventType = EventType.CONSUME_FROM_TOPIC
     consumer_name: str
     consumer_type: str
-    data: Messages
+    data: MsgsAGen
 
     def to_dict(self) -> Dict[str, Any]:
         event_context = {
@@ -31,20 +27,14 @@ class ConsumeFromTopicEvent(TopicEvent):
         return {
             EVENT_CONTEXT: event_context,
             **super().event_dict(),
-            "data": json.dumps(self.data, default=to_jsonable_python),
+            "data": None,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConsumeFromTopicEvent":
+    def from_dict(cls, data: Dict[str, Any]) -> "ConsumeFromStreamTopicEvent":
         execution_context = ExecutionContext.model_validate(
             data[EVENT_CONTEXT]["execution_context"]
         )
-
-        data_dict = json.loads(data["data"])
-        if isinstance(data_dict, list):
-            data_obj = TypeAdapter(Messages).validate_python(data_dict)
-        else:
-            data_obj = [Message.model_validate(data_dict)]
 
         base_event = cls.event_base(data)
         return cls(
@@ -56,5 +46,5 @@ class ConsumeFromTopicEvent(TopicEvent):
             topic_name=data[EVENT_CONTEXT]["topic_name"],
             offset=data[EVENT_CONTEXT]["offset"],
             execution_context=execution_context,
-            data=data_obj,
+            data=cast(MsgsAGen, None),
         )

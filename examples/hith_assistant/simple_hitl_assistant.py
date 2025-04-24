@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -39,44 +40,46 @@ class SimpleHITLAssistant(Assistant):
     )
     name: str = Field(default="SimpleHITLAssistant")
     type: str = Field(default="SimpleHITLAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-    hitl_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
-    hitl_request: FunctionTool = Field(default=None)
+    hitl_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    hitl_request: FunctionTool
 
     class Builder(Assistant.Builder):
         """Concrete builder for SimpleHITLAssistant."""
 
-        def __init__(self):
+        _assistant: "SimpleHITLAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "SimpleHITLAssistant":
-            return SimpleHITLAssistant()
+            return SimpleHITLAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "SimpleHITLAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
-        def model(self, model: str) -> "SimpleHITLAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
         def hitl_llm_system_message(
             self, hitl_llm_system_message: str
-        ) -> "SimpleHITLAssistant.Builder":
+        ) -> Self:
             self._assistant.hitl_llm_system_message = hitl_llm_system_message
             return self
 
         def summary_llm_system_message(
             self, summary_llm_system_message: str
-        ) -> "SimpleHITLAssistant.Builder":
+        ) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
         def hitl_request(
             self, hitl_request: FunctionTool
-        ) -> "SimpleHITLAssistant.Builder":
+        ) -> Self:
             self._assistant.hitl_request = hitl_request
             return self
 

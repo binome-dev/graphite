@@ -2,6 +2,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Self
 
 from loguru import logger
 from pydantic import Field
@@ -11,17 +12,16 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
-from grafi.common.topics.topic import Topic
+from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
+from grafi.common.topics.topic_base import TopicBase
 
 
-AGENT_STREAM_OUTPUT_TOPIC = "agent_stream_output_topic"
 AGENT_OUTPUT_TOPIC = "agent_output_topic"
-AGENT_RESERVED_TOPICS.extend([AGENT_STREAM_OUTPUT_TOPIC, AGENT_OUTPUT_TOPIC])
+AGENT_RESERVED_TOPICS.extend([AGENT_OUTPUT_TOPIC])
 
 
-class OutputTopic(Topic):
+class OutputTopic(TopicBase):
     """
     A topic implementation for output events.
     """
@@ -30,16 +30,21 @@ class OutputTopic(Topic):
     publish_event_handler: Optional[Callable[[OutputTopicEvent], None]] = Field(
         default=None
     )
-    topic_events: List[OutputTopicEvent] = []
     consumption_offsets: Dict[str, int] = {}
 
-    class Builder:
-        def __init__(self):
-            self._topic = OutputTopic()
+    class Builder(TopicBase.Builder):
+
+        _topic: "OutputTopic"
+
+        def __init__(self) -> None:
+            self._topic = self._init_topic()
+
+        def _init_topic(self) -> "OutputTopic":
+            return OutputTopic.model_construct()
 
         def publish_event_handler(
             self, publish_event_handler: Callable[[OutputTopicEvent], None]
-        ):
+        ) -> Self:
             self._topic.publish_event_handler = publish_event_handler
             return self
 
@@ -51,9 +56,9 @@ class OutputTopic(Topic):
         execution_context: ExecutionContext,
         publisher_name: str,
         publisher_type: str,
-        data: List[Message],
+        data: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
-    ):
+    ) -> Optional[OutputTopicEvent]:
         """
         Publishes a message's event ID to this topic if it meets the condition.
         """
@@ -70,8 +75,8 @@ class OutputTopic(Topic):
                 offset=len(self.topic_events),
             )
             self.topic_events.append(event)
-
-            self.publish_event_handler(event)
+            if self.publish_event_handler:
+                self.publish_event_handler(event)
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )
@@ -81,5 +86,4 @@ class OutputTopic(Topic):
             return None
 
 
-agent_stream_output_topic = OutputTopic(name=AGENT_STREAM_OUTPUT_TOPIC)
 agent_output_topic = OutputTopic(name=AGENT_OUTPUT_TOPIC)

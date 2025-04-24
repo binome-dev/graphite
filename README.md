@@ -93,7 +93,7 @@ Here is an example of using this assistant with [Tavily](https://docs.tavily.com
 # file name: simple_function_call_assistant.py
 import uuid
 
-from simple_function_call_assistant import (
+from .simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
 )
 from grafi.common.models.execution_context import ExecutionContext
@@ -268,7 +268,7 @@ Strictly follow these validation rules and do not assume missing details."
 """
 
 
-def get_execution_context():
+def get_execution_context() -> ExecutionContext:
     return ExecutionContext(
         conversation_id="conversation_id",
         execution_id=uuid.uuid4().hex,

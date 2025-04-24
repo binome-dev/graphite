@@ -1,7 +1,10 @@
+from typing import Self
+from typing import Type
+from typing import TypeVar
+
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import ConfigDict
-from pydantic import Field
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
@@ -25,32 +28,39 @@ class AssistantBase(BaseModel):
     type: str
     oi_span_type: OpenInferenceSpanKindValues
 
-    workflow: Workflow = Field(default=None)
+    workflow: Workflow
 
     class Builder:
         """Inner builder class for Assistant construction."""
 
-        def __init__(self):
+        _assistant: "AssistantBase"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "AssistantBase":
-            raise NotImplementedError
+            return AssistantBase.model_construct()
 
-        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues):
+        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
             self._assistant.oi_span_type = oi_span_type
             return self
 
-        def name(self, name: str):
+        def name(self, name: str) -> Self:
             self._assistant.name = name
             return self
 
-        def type(self, type_name: str):
+        def type(self, type_name: str) -> Self:
             self._assistant.type = type_name
             return self
 
-        def event_store(self, event_store: EventStore):
-            container.event_store = event_store
+        def event_store(
+            self, event_store_class: Type[EventStore], event_store: EventStore
+        ) -> Self:
+            container.register_event_store(event_store_class, event_store)
             return self
 
         def build(self) -> "AssistantBase":
             raise NotImplementedError
+
+
+A = TypeVar("A", bound="AssistantBase")  # the AssistantBase subclass

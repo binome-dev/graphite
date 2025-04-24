@@ -1,5 +1,6 @@
 import json
 from typing import Any
+from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.tools.functions.function_tool import FunctionTool
@@ -21,38 +22,35 @@ class DuckDuckGoTool(FunctionTool):
     # Set up API key and Tavily client
     name: str = "DuckDuckGoTool"
     type: str = "DuckDuckGoTool"
-    fixed_max_results: int = None
-    headers: Any = None
-    proxy: str = None
-    proxies: Any = None
+    fixed_max_results: int = 10
+    headers: dict[str, str] | None = None
+    proxy: str | None = None
     timeout: int = 10
 
     class Builder(FunctionTool.Builder):
         """Concrete builder for DuckDuckGoTool."""
 
-        def __init__(self):
+        _tool: "DuckDuckGoTool"
+
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "DuckDuckGoTool":
-            return DuckDuckGoTool()
+            return DuckDuckGoTool.model_construct()
 
-        def fixed_max_results(self, fixed_max_results: str) -> "DuckDuckGoTool.Builder":
+        def fixed_max_results(self, fixed_max_results: int) -> Self:
             self._tool.fixed_max_results = fixed_max_results
             return self
 
-        def headers(self, headers: Any) -> "DuckDuckGoTool.Builder":
+        def headers(self, headers: Any) -> Self:
             self._tool.headers = headers
             return self
 
-        def proxy(self, proxy: str) -> "DuckDuckGoTool.Builder":
+        def proxy(self, proxy: str) -> Self:
             self._tool.proxy = proxy
             return self
 
-        def proxies(self, proxies: Any) -> "DuckDuckGoTool.Builder":
-            self._tool.proxies = proxies
-            return self
-
-        def timeout(self, timeout: int) -> "DuckDuckGoTool.Builder":
+        def timeout(self, timeout: int) -> Self:
             self._tool.timeout = timeout
             return self
 
@@ -74,7 +72,6 @@ class DuckDuckGoTool(FunctionTool):
         ddgs = DDGS(
             headers=self.headers,
             proxy=self.proxy,
-            proxies=self.proxies,
             timeout=self.timeout,
         )
 
@@ -93,6 +90,5 @@ class DuckDuckGoTool(FunctionTool):
             "fixed_max_results": self.fixed_max_results,
             "headers": self.headers,
             "proxy": self.proxy,
-            "proxies": self.proxies,
             "timeout": self.timeout,
         }

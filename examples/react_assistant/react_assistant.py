@@ -5,6 +5,7 @@
 #                |--- observation <-|
 
 import os
+from typing import Optional, Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -29,42 +30,44 @@ class ReActAssistant(Assistant):
     )
     name: str = Field(default="ReActAssistant")
     type: str = Field(default="ReActAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    thought_llm_system_message: str = Field(default=None)
-    action_llm_system_message: str = Field(default=None)
-    observation_llm_system_message: str = Field(default=None)
-    summary_llm_system_message: str = Field(default=None)
-    search_tool: FunctionTool = Field(default=None)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    thought_llm_system_message: Optional[str] = Field(default=None)
+    action_llm_system_message: Optional[str] = Field(default=None)
+    observation_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    search_tool: FunctionTool
     model: str = Field(default="gpt-4o-mini")
 
     class Builder(Assistant.Builder):
         """Concrete builder for ReActAssistant."""
 
-        def __init__(self):
+        _assistant: "ReActAssistant"
+
+        def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
         def _init_assistant(self) -> "ReActAssistant":
-            return ReActAssistant()
+            return ReActAssistant.model_construct()
 
-        def api_key(self, api_key: str) -> "ReActAssistant.Builder":
+        def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
             return self
 
         def thought_llm_system_message(
             self, thought_llm_system_message: str
-        ) -> "ReActAssistant.Builder":
+        ) -> Self:
             self._assistant.thought_llm_system_message = thought_llm_system_message
             return self
 
         def action_llm_system_message(
             self, action_llm_system_message: str
-        ) -> "ReActAssistant.Builder":
+        ) -> Self:
             self._assistant.action_llm_system_message = action_llm_system_message
             return self
 
         def observation_llm_system_message(
             self, observation_llm_system_message: str
-        ) -> "ReActAssistant.Builder":
+        ) -> Self:
             self._assistant.observation_llm_system_message = (
                 observation_llm_system_message
             )
@@ -72,15 +75,15 @@ class ReActAssistant(Assistant):
 
         def summary_llm_system_message(
             self, summary_llm_system_message: str
-        ) -> "ReActAssistant.Builder":
+        ) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def search_tool(self, search_tool: FunctionTool) -> "ReActAssistant.Builder":
+        def search_tool(self, search_tool: FunctionTool) -> Self:
             self._assistant.search_tool = search_tool
             return self
 
-        def model(self, model: str) -> "ReActAssistant.Builder":
+        def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
@@ -132,6 +135,7 @@ class ReActAssistant(Assistant):
         action_result_finish_topic = Topic(
             name="action_finish_result",
             condition=lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
             and msgs[-1].content.strip() != "",
         )
 
