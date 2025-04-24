@@ -51,7 +51,7 @@ def test_execute_function(duckduckgo_tool, mock_ddgs):
         execution_id="test_execution_id",
         assistant_request_id="test_req",
     )
-    input_message = Message(
+    input_message = [Message(
         role="user",
         content="Search for Python",
         tool_calls=[
@@ -64,7 +64,7 @@ def test_execute_function(duckduckgo_tool, mock_ddgs):
                 },
             }
         ],
-    )
+    )]
 
     result = duckduckgo_tool.execute(execution_context, input_message)
 
@@ -99,7 +99,7 @@ def test_execute_with_invalid_function_name(duckduckgo_tool):
         execution_id="test_execution_id",
         assistant_request_id="test_req",
     )
-    input_message = Message(
+    input_message = [Message(
         role="user",
         content="Search for Python",
         tool_calls=[
@@ -112,7 +112,7 @@ def test_execute_with_invalid_function_name(duckduckgo_tool):
                 },
             }
         ],
-    )
+    )]
 
     result = duckduckgo_tool.execute(execution_context, input_message)
     assert len(result) == 0
@@ -130,7 +130,7 @@ async def test_error_handling(duckduckgo_tool):
             execution_id="test_execution_id",
             assistant_request_id="test_req",
         )
-        input_message = Message(
+        input_message = [Message(
             role="user",
             content="Search for Python",
             tool_calls=[
@@ -143,7 +143,7 @@ async def test_error_handling(duckduckgo_tool):
                     },
                 }
             ],
-        )
+        )]
 
         with pytest.raises(Exception) as excinfo:
             duckduckgo_tool.execute(execution_context, input_message)

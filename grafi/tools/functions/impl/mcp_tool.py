@@ -6,10 +6,12 @@ from typing import Optional
 from loguru import logger
 from pydantic import Field
 
+from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.tool import Tool
 
 
 try:
@@ -26,7 +28,7 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
 
 
-class MCPTool(FunctionTool):
+class MCPTool(Tool):
     """
     MCPTool extends FunctionTool to provide web search functionality using the MCP API.
     """
@@ -35,18 +37,20 @@ class MCPTool(FunctionTool):
     name: str = "MCPTool"
     type: str = "MCPTool"
     function_specs: List[FunctionSpec] = Field(default_factory=list)
-    server_params: Optional[StdioServerParameters] = (None,)
-    prompts: Optional[ListPromptsResult] = (None,)
-    resources: Optional[ListResourcesResult] = (None,)
+    server_params: Optional[StdioServerParameters] = None
+    prompts: Optional[ListPromptsResult] = None
+    resources: Optional[ListResourcesResult] = None
 
     class Builder(FunctionTool.Builder):
         """Concrete builder for MCPTool."""
+
+        _tool: "MCPTool"
 
         def __init__(self):
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "MCPTool":
-            return MCPTool()
+            return MCPTool.model_construct()
 
         def server_params(
             self, server_params: StdioServerParameters
@@ -85,6 +89,8 @@ class MCPTool(FunctionTool):
                             FunctionSpec.model_validate(func_spec)
                         )
 
+
+    @record_tool_a_execution
     async def a_execute(
         self,
         execution_context: ExecutionContext,
