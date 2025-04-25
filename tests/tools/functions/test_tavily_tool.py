@@ -43,8 +43,8 @@ def test_tavily_tool_initialization(tavily_tool):
 
 
 def test_function_registration(tavily_tool):
-    assert callable(tavily_tool.function)
-    assert tavily_tool.function.__name__ == "web_search_using_tavily"
+    assert callable(tavily_tool.functions["web_search_using_tavily"])
+    assert "web_search_using_tavily" in tavily_tool.functions
 
 
 def test_execute_web_search_using_tavily(tavily_tool):

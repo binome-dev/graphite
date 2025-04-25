@@ -33,3 +33,6 @@ class FunctionSpec(BaseModel):
                 parameters=self.parameters.model_dump(),
             ),
         )
+
+
+FunctionSpecs = List[FunctionSpec]

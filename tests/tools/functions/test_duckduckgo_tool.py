@@ -25,7 +25,7 @@ def mock_ddgs():
         yield mock_instance
 
 
-def test_duckduckgo_tool_initialization(duckduckgo_tool):
+def test_duckduckgo_tool_initialization(duckduckgo_tool: DuckDuckGoTool):
     assert duckduckgo_tool.name == "DuckDuckGoTool"
     assert duckduckgo_tool.type == "DuckDuckGoTool"
     assert duckduckgo_tool.fixed_max_results == None
@@ -51,20 +51,22 @@ def test_execute_function(duckduckgo_tool, mock_ddgs):
         execution_id="test_execution_id",
         assistant_request_id="test_req",
     )
-    input_message = [Message(
-        role="user",
-        content="Search for Python",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "web_search_using_duckduckgo",
-                    "arguments": '{"query": "Python programming"}',
-                },
-            }
-        ],
-    )]
+    input_message = [
+        Message(
+            role="user",
+            content="Search for Python",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "web_search_using_duckduckgo",
+                        "arguments": '{"query": "Python programming"}',
+                    },
+                }
+            ],
+        )
+    ]
 
     result = duckduckgo_tool.execute(execution_context, input_message)
 
@@ -83,14 +85,12 @@ def test_builder_configuration():
         .fixed_max_results(5)
         .headers({"User-Agent": "test"})
         .proxy("http://proxy.test")
-        .proxies({"http": "proxy"})
         .build()
     )
 
     assert tool.fixed_max_results == 5
     assert tool.headers == {"User-Agent": "test"}
     assert tool.proxy == "http://proxy.test"
-    assert tool.proxies == {"http": "proxy"}
 
 
 def test_execute_with_invalid_function_name(duckduckgo_tool):
@@ -99,20 +99,22 @@ def test_execute_with_invalid_function_name(duckduckgo_tool):
         execution_id="test_execution_id",
         assistant_request_id="test_req",
     )
-    input_message = [Message(
-        role="user",
-        content="Search for Python",
-        tool_calls=[
-            {
-                "id": "test_id",
-                "type": "function",
-                "function": {
-                    "name": "invalid_function",
-                    "arguments": '{"query": "Python programming"}',
-                },
-            }
-        ],
-    )]
+    input_message = [
+        Message(
+            role="user",
+            content="Search for Python",
+            tool_calls=[
+                {
+                    "id": "test_id",
+                    "type": "function",
+                    "function": {
+                        "name": "invalid_function",
+                        "arguments": '{"query": "Python programming"}',
+                    },
+                }
+            ],
+        )
+    ]
 
     result = duckduckgo_tool.execute(execution_context, input_message)
     assert len(result) == 0
@@ -130,20 +132,22 @@ async def test_error_handling(duckduckgo_tool):
             execution_id="test_execution_id",
             assistant_request_id="test_req",
         )
-        input_message = [Message(
-            role="user",
-            content="Search for Python",
-            tool_calls=[
-                {
-                    "id": "test_id",
-                    "type": "function",
-                    "function": {
-                        "name": "web_search_using_duckduckgo",
-                        "arguments": '{"query": "Python programming"}',
-                    },
-                }
-            ],
-        )]
+        input_message = [
+            Message(
+                role="user",
+                content="Search for Python",
+                tool_calls=[
+                    {
+                        "id": "test_id",
+                        "type": "function",
+                        "function": {
+                            "name": "web_search_using_duckduckgo",
+                            "arguments": '{"query": "Python programming"}',
+                        },
+                    }
+                ],
+            )
+        ]
 
         with pytest.raises(Exception) as excinfo:
             duckduckgo_tool.execute(execution_context, input_message)

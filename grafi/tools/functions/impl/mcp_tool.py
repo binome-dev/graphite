@@ -4,14 +4,14 @@ from typing import List
 from typing import Optional
 
 from loguru import logger
-from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 from grafi.tools.functions.function_tool import FunctionTool
-from grafi.tools.tool import Tool
 
 
 try:
@@ -28,7 +28,7 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
 
 
-class MCPTool(Tool):
+class MCPTool(FunctionTool):
     """
     MCPTool extends FunctionTool to provide web search functionality using the MCP API.
     """
@@ -36,7 +36,6 @@ class MCPTool(Tool):
     # Set up API key and MCP client
     name: str = "MCPTool"
     type: str = "MCPTool"
-    function_specs: List[FunctionSpec] = Field(default_factory=list)
     server_params: Optional[StdioServerParameters] = None
     prompts: Optional[ListPromptsResult] = None
     resources: Optional[ListResourcesResult] = None
@@ -89,13 +88,20 @@ class MCPTool(Tool):
                             FunctionSpec.model_validate(func_spec)
                         )
 
+    @record_tool_execution
+    def execute(
+        self, execution_context: ExecutionContext, input_data: Messages
+    ) -> Messages:
+        raise NotImplementedError(
+            "MCPTool does not support synchronous execution. Use a_execute instead."
+        )
 
     @record_tool_a_execution
     async def a_execute(
         self,
         execution_context: ExecutionContext,
-        input_data: Message,
-    ) -> AsyncGenerator[Message, None]:
+        input_data: Messages,
+    ) -> AsyncGenerator[Messages, None]:
         """
         Execute the MCPTool with the provided input data.
 
@@ -106,8 +112,8 @@ class MCPTool(Tool):
         Returns:
             List[Message]: The output messages from the function execution.
         """
-
-        if input_data.tool_calls is None:
+        input_message = input_data[0]
+        if input_message.tool_calls is None:
             logger.warning("Function call is None.")
             raise ValueError("Function call is None.")
 
@@ -115,8 +121,7 @@ class MCPTool(Tool):
 
         async with stdio_client(self.server_params) as (read, write):
             async with ClientSession(read, write) as session:
-
-                for tool_call in input_data.tool_calls:
+                for tool_call in input_message.tool_calls:
                     if any(
                         spec.name == tool_call.function.name
                         for spec in self.function_specs
@@ -155,8 +160,8 @@ class MCPTool(Tool):
                                     f"[Unsupported content type: {content_item.type}]\n"
                                 )
 
-                        messages.append(
-                            self.to_message(
+                        messages.extend(
+                            self.to_messages(
                                 response=response_str, tool_call_id=tool_call.id
                             )
                         )

@@ -54,23 +54,25 @@ def mock_tool_list():
 
 
 @pytest.fixture
-def test_message():
+def test_messages():
 
-    message = Message(
-        role="user",
-        content=None,
-        tool_calls=[
-            {
-                "id": "test_call_id",
-                "type": "function",
-                "function": {
-                    "name": "test_function",
-                    "arguments": json.dumps({"arg1": "hello"}),
-                },
-            }
-        ],
-    )
-    return message
+    messages = [
+        Message(
+            role="user",
+            content=None,
+            tool_calls=[
+                {
+                    "id": "test_call_id",
+                    "type": "function",
+                    "function": {
+                        "name": "test_function",
+                        "arguments": json.dumps({"arg1": "hello"}),
+                    },
+                }
+            ],
+        )
+    ]
+    return messages
 
 
 @pytest.fixture
@@ -141,18 +143,20 @@ class TestMCPTool:
             execution_id="test_execution_id",
             assistant_request_id="test_req",
         )
-        message = Message(
-            role="user",
-            content="No tool calls here.",
-        )
+        messages = [
+            Message(
+                role="user",
+                content="No tool calls here.",
+            )
+        ]
 
         with pytest.raises(ValueError, match="Function call is None."):
-            async for _ in mcp_tool.a_execute(context, message):
+            async for _ in mcp_tool.a_execute(context, messages):
                 pass
 
     @pytest.mark.asyncio
     async def test_a_execute_text_content(
-        self, mock_stdio_client, mock_client_session, test_message, mock_text_content
+        self, mock_stdio_client, mock_client_session, test_messages, mock_text_content
     ):
         # Setup
         mcp_tool = MCPTool()
@@ -185,7 +189,7 @@ class TestMCPTool:
 
         # Execute and collect results
         results = []
-        async for result in mcp_tool.a_execute(context, test_message):
+        async for result in mcp_tool.a_execute(context, test_messages):
             results.append(result)
 
         # Assertions
@@ -196,7 +200,7 @@ class TestMCPTool:
 
     @pytest.mark.asyncio
     async def test_a_execute_image_content(
-        self, mock_stdio_client, mock_client_session, test_message, mock_image_content
+        self, mock_stdio_client, mock_client_session, test_messages, mock_image_content
     ):
         # Setup
         mcp_tool = MCPTool()
@@ -229,7 +233,7 @@ class TestMCPTool:
 
         # Execute and collect results
         results = []
-        async for result in mcp_tool.a_execute(context, test_message):
+        async for result in mcp_tool.a_execute(context, test_messages):
             results.append(result)
 
         # Verify the image data is returned
@@ -237,7 +241,7 @@ class TestMCPTool:
 
     @pytest.mark.asyncio
     async def test_a_execute_error_response(
-        self, mock_stdio_client, mock_client_session, test_message
+        self, mock_stdio_client, mock_client_session, test_messages
     ):
         # Setup
         mcp_tool = MCPTool()
@@ -270,5 +274,5 @@ class TestMCPTool:
 
         # Execute and verify error is raised
         with pytest.raises(Exception, match="Error from MCP tool 'test_function'"):
-            async for _ in mcp_tool.a_execute(context, test_message):
+            async for _ in mcp_tool.a_execute(context, test_messages):
                 pass

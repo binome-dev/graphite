@@ -22,7 +22,7 @@ class DuckDuckGoTool(FunctionTool):
     # Set up API key and Tavily client
     name: str = "DuckDuckGoTool"
     type: str = "DuckDuckGoTool"
-    fixed_max_results: int = 10
+    fixed_max_results: int | None = None
     headers: dict[str, str] | None = None
     proxy: str | None = None
     timeout: int = 10

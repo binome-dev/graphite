@@ -2,6 +2,7 @@ import inspect
 import json
 from typing import Any
 from typing import Callable
+from typing import Dict
 from typing import Optional
 from typing import Self
 
@@ -14,6 +15,7 @@ from grafi.common.decorators.record_tool_a_execution import record_tool_a_execut
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -37,8 +39,8 @@ class FunctionTool(Tool):
 
     name: str = "FunctionTool"
     type: str = "FunctionTool"
-    function_specs: Optional[FunctionSpec] = Field(default=None)
-    function: Optional[Callable] = Field(default=None)
+    function_specs: FunctionSpecs = Field(default=list)
+    functions: Dict[str, Callable] = Field(default=dict)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     class Builder(Tool.Builder):
@@ -55,8 +57,8 @@ class FunctionTool(Tool):
         def function(self, function: Callable) -> Self:
             if not hasattr(function, "_function_spec"):
                 function = llm_function(function)
-            self._tool.function = function
-            self._tool.function_specs = function._function_spec
+            self._tool.functions[function.__name__] = function
+            self._tool.function_specs.append(function._function_spec)
             return self
 
         def build(self) -> "FunctionTool":
@@ -76,17 +78,24 @@ class FunctionTool(Tool):
         if cls is FunctionTool:
             return
 
+        cls.functions = {}
+        cls.function_specs = []
         for _, attr in cls.__dict__.items():
-            if getattr(attr, "_function_spec", None):
-                cls.function = attr
-                cls.function_specs = attr._function_spec
-                break
+            if (
+                getattr(attr, "_function_spec", None)
+                and attr is not None
+                and isinstance(attr, Callable)
+                and isinstance(attr._function_spec, FunctionSpec)
+            ):
+                function_spec: FunctionSpec = attr._function_spec
+                cls.functions[function_spec.name] = attr
+                cls.function_specs.append(function_spec)
         else:
             logger.warning(
                 f"{cls.__name__}: no method decorated with @llm_function found."
             )
 
-    def get_function_specs(self) -> Optional[FunctionSpec]:
+    def get_function_specs(self) -> FunctionSpecs:
         """
         Retrieve the specifications of the registered function.
 
@@ -121,12 +130,8 @@ class FunctionTool(Tool):
         messages: Messages = []
 
         for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
-            if (
-                self.function_specs
-                and self.function
-                and tool_call.function.name == self.function_specs.name
-            ):
-                func = self.function
+            if tool_call.function.name in self.functions:
+                func = self.functions[tool_call.function.name]
                 response = func(
                     self,
                     **json.loads(tool_call.function.arguments),
@@ -164,12 +169,8 @@ class FunctionTool(Tool):
         messages: Messages = []
 
         for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
-            if (
-                self.function_specs
-                and self.function
-                and tool_call.function.name == self.function_specs.name
-            ):
-                func = self.function
+            if tool_call.function.name in self.functions:
+                func = self.functions[tool_call.function.name]
                 response = func(self, **json.loads(tool_call.function.arguments))
                 if inspect.isawaitable(response):
                     response = await response
@@ -200,8 +201,6 @@ class FunctionTool(Tool):
             "name": self.name,
             "type": self.type,
             "oi_span_type": self.oi_span_type.value,
-            "function_specs": (
-                self.function_specs.model_dump() if self.function_specs else None
-            ),
-            "function": self.function.__class__.__name__ if self.function else None,
+            "function_specs": [spec.model_dump() for spec in self.function_specs],
+            "function": list(self.functions.keys()),
         }

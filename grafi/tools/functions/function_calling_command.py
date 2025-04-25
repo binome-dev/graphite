@@ -1,10 +1,9 @@
 from typing import Any
-from typing import Optional
 from typing import Self
 
 from grafi.common.models.command import Command
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.functions.function_tool import FunctionTool
@@ -43,7 +42,7 @@ class FunctionCallingCommand(Command):
         ):
             yield message
 
-    def get_function_specs(self) -> Optional[FunctionSpec]:
+    def get_function_specs(self) -> FunctionSpecs:
         return self.function_tool.get_function_specs()
 
     def to_dict(self) -> dict[str, Any]:
