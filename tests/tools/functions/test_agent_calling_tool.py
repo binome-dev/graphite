@@ -35,11 +35,12 @@ def test_agent_calling_tool_initialization(agent_calling_tool):
 
 def test_get_function_specs(agent_calling_tool):
     specs = agent_calling_tool.get_function_specs()
-    assert specs.name == "test_agent"
-    assert specs.description == "Test agent description"
-    assert specs.parameters.type == "object"
-    assert "prompt" in specs.parameters.properties
-    assert specs.parameters.required == ["prompt"]
+    assert len(specs) == 1
+    assert specs[0].name == "test_agent"
+    assert specs[0].description == "Test agent description"
+    assert specs[0].parameters.type == "object"
+    assert "prompt" in specs[0].parameters.properties
+    assert specs[0].parameters.required == ["prompt"]
 
 
 def test_execute_successful(agent_calling_tool):

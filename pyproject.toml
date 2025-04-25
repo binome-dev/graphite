@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "grafi"
-version = "0.0.10"
+version = "0.0.11"
 description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI agents through composable agentic workflows."
 authors = ["Craig Li <craig@binome.dev>"]
 license = "Mozilla Public License Version 2.0"
@@ -16,6 +16,7 @@ openinference-instrumentation-openai = "^0.1.14"
 arize-otel = "^0.5.3"
 loguru = "^0.7.3"
 types-deprecated = "^1.2.15.20250304"
+mcp = "^1.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -32,9 +33,10 @@ sqlalchemy = "^2.0.40"
 ruff = "^0.11.1"
 pre-commit = "^4.2.0"
 mypy = "^1.15.0"
-psycopg2 = "^2.9.10"
+psycopg2-binary = "^2.9.10"
 arize-phoenix = "^7.5.1"
 h11 = ">=0.15.0"
+
 
 
 [tool.poetry.group.docs.dependencies]

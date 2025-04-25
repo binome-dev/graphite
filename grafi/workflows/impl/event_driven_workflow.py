@@ -168,9 +168,9 @@ class EventDrivenWorkflow(Workflow):
             for function_node in function_calling_nodes:
                 for topic_name in function_node._subscribed_topics:
                     for publisher_node in published_topics_to_nodes.get(topic_name, []):
-                        function_spec = function_node.get_function_specs()
-                        if function_spec is not None:
-                            publisher_node.add_function_spec(function_spec)
+                        publisher_node.add_function_spec(
+                            function_node.get_function_specs()
+                        )
 
     def _publish_events(
         self,

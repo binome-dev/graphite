@@ -1,6 +1,5 @@
 from typing import Any
 from typing import List
-from typing import Optional
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -11,7 +10,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
@@ -78,7 +77,7 @@ class LLMFunctionCallNode(Node):
             logger.error(f"Error in async function execution: {str(e)}")
             raise
 
-    def get_function_specs(self) -> Optional[FunctionSpec]:
+    def get_function_specs(self) -> FunctionSpecs:
         return self.command.get_function_specs()
 
     def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:

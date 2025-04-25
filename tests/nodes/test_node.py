@@ -8,7 +8,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.command import Command
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -30,7 +30,7 @@ class DummyNode(Node):
     name: str = "LLMNode"
     type: str = "LLMNode"
     command: Command = Field(default=None)
-    function_specs: List[FunctionSpec] = Field(default=[])
+    function_specs: FunctionSpecs = Field(default=[])
 
     def execute(
         self,

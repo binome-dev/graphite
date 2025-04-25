@@ -16,7 +16,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -31,7 +31,7 @@ class LLMNode(Node):
     name: str = "LLMNode"
     type: str = "LLMNode"
     command: LLMResponseCommand
-    function_specs: List[FunctionSpec] = Field(default=[])
+    function_specs: FunctionSpecs = Field(default=[])
 
     class Builder(Node.Builder):
         """Concrete builder for LLMNode."""
@@ -41,9 +41,9 @@ class LLMNode(Node):
         def _init_node(self) -> "LLMNode":
             return LLMNode.model_construct()
 
-    def add_function_spec(self, function_spec: FunctionSpec) -> None:
+    def add_function_spec(self, function_spec: FunctionSpecs) -> None:
         """Add a function specification to the node."""
-        self.function_specs.append(function_spec)
+        self.function_specs.extend(function_spec)
 
     @record_node_execution
     def execute(

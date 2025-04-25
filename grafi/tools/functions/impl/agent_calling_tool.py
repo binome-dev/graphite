@@ -55,29 +55,22 @@ class AgentCallingTool(FunctionTool):
             return self
 
         def build(self) -> "AgentCallingTool":
-            self._tool.function_specs = FunctionSpec(
-                name=self._tool.agent_name,
-                description=self._tool.agent_description,
-                parameters=ParametersSchema(
-                    properties={
-                        "prompt": ParameterSchema(
-                            type="string",
-                            description=self._tool.argument_description,
-                        )
-                    },
-                    required=["prompt"],
-                ),
+            self._tool.function_specs.append(
+                FunctionSpec(
+                    name=self._tool.agent_name,
+                    description=self._tool.agent_description,
+                    parameters=ParametersSchema(
+                        properties={
+                            "prompt": ParameterSchema(
+                                type="string",
+                                description=self._tool.argument_description,
+                            )
+                        },
+                        required=["prompt"],
+                    ),
+                )
             )
             return self._tool
-
-    def get_function_specs(self) -> FunctionSpec:
-        """
-        Retrieve the specifications of the registered function.
-
-        Returns:
-            List[Dict[str, Any]]: A list containing the function specifications.
-        """
-        return self.function_specs
 
     @record_tool_execution
     def execute(

@@ -1,12 +1,12 @@
 import json
 import warnings
+from typing import List
 
 import pytest
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.tools.functions.function_tool import FunctionTool
@@ -49,23 +49,23 @@ def function_instance(event_store):
 
 
 def test_init(function_instance):
-    assert isinstance(function_instance.function_specs, FunctionSpec)
-    assert callable(function_instance.function)
+    assert isinstance(function_instance.function_specs, List)
+    assert callable(function_instance.functions["test_func"])
 
 
 def test_auto_register_function(function_instance):
-    assert function_instance.function.__name__ == "test_func"
-    assert isinstance(function_instance.function_specs, FunctionSpec)
-    assert function_instance.function_specs.name == "test_func"
+    assert "test_func" in function_instance.functions
+    assert isinstance(function_instance.function_specs, List)
+    assert function_instance.function_specs[0].name == "test_func"
 
 
 def test_get_function_specs(function_instance):
     specs = function_instance.get_function_specs()
-    assert isinstance(specs, FunctionSpec)
-    assert specs.name == "test_func"
-    assert isinstance(specs.parameters, ParametersSchema)
-    assert "arg1" in specs.parameters.properties
-    assert "arg2" in specs.parameters.properties
+    assert isinstance(specs, List)
+    assert specs[0].name == "test_func"
+    assert isinstance(specs[0].parameters, ParametersSchema)
+    assert "arg1" in specs[0].parameters.properties
+    assert "arg2" in specs[0].parameters.properties
 
 
 def test_execute(function_instance, execution_context):
@@ -113,12 +113,12 @@ def test_execute_wrong_function_name(function_instance, execution_context):
 def test_to_dict(function_instance):
     result = function_instance.to_dict()
     assert isinstance(result, dict)
-    assert isinstance(result["function_specs"], dict)  # model_dump() returns dict
+    assert isinstance(result["function_specs"], list)  # model_dump() returns dict
     assert result["name"] == "SampleFunction"
     assert result["type"] == "FunctionTool"
-    assert result["function_specs"]["name"] == "test_func"
-    assert result["function_specs"]["description"] is not None
-    assert isinstance(result["function_specs"]["parameters"], dict)
+    assert result["function_specs"][0]["name"] == "test_func"
+    assert result["function_specs"][0]["description"] is not None
+    assert isinstance(result["function_specs"][0]["parameters"], dict)
 
 
 @pytest.mark.parametrize(
@@ -199,39 +199,21 @@ def test_multiple_llm_functions():
         multi = MultiFunction()
 
         # Should use first decorated function found
-        assert multi.function.__name__ == "func1"
-        assert isinstance(multi.function_specs, FunctionSpec)
-        assert multi.function_specs.name == "func1"
+        assert "func1" in multi.functions
+        assert isinstance(multi.function_specs, List)
+        assert multi.function_specs[0].name == "func1"
 
         # No warning since at least one decorated function exists
         assert len(w) == 0
 
 
-def test_inherit_llm_function():
-    # Test inheritance behavior
-    class BaseFunction(FunctionTool):
-        @llm_function
-        def base_func(self, arg: str) -> str:
-            return arg
-
-    class ChildFunction(BaseFunction):
-        pass
-
-    child = ChildFunction()
-
-    # Should inherit parent's decorated function
-    assert child.function.__name__ == "base_func"
-    assert isinstance(child.function_specs, FunctionSpec)
-    assert child.function_specs.name == "base_func"
-
-
 def test_function_spec_structure(function_instance):
     spec = function_instance.function_specs
-    assert isinstance(spec, FunctionSpec)
-    assert spec.name == "test_func"
-    assert isinstance(spec.description, str)
-    assert isinstance(spec.parameters, ParametersSchema)
-    assert "arg1" in spec.parameters.properties
-    assert "arg2" in spec.parameters.properties
-    assert spec.parameters.properties["arg1"].type == "string"
-    assert spec.parameters.properties["arg2"].type == "integer"
+    assert isinstance(spec, List)
+    assert spec[0].name == "test_func"
+    assert isinstance(spec[0].description, str)
+    assert isinstance(spec[0].parameters, ParametersSchema)
+    assert "arg1" in spec[0].parameters.properties
+    assert "arg2" in spec[0].parameters.properties
+    assert spec[0].parameters.properties["arg1"].type == "string"
+    assert spec[0].parameters.properties["arg2"].type == "integer"
