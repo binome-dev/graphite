@@ -4,8 +4,10 @@ import os
 import uuid
 
 from mcp import StdioServerParameters
-from simple_function_call_assistant import SimpleFunctionCallAssistant
 
+from examples.function_call_assistant.simple_function_call_assistant import (
+    SimpleFunctionCallAssistant,
+)
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
@@ -16,7 +18,7 @@ from grafi.tools.functions.impl.mcp_tool import MCPTool
 
 event_store = container.event_store
 
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_execution_context() -> ExecutionContext:
@@ -27,7 +29,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-async def test_simple_function_call_assistant_with_mcp():
+async def test_simple_function_call_assistant_with_mcp() -> None:
     execution_context = get_execution_context()
 
     server_params = StdioServerParameters(

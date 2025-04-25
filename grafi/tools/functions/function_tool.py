@@ -39,8 +39,8 @@ class FunctionTool(Tool):
 
     name: str = "FunctionTool"
     type: str = "FunctionTool"
-    function_specs: FunctionSpecs = Field(default=list)
-    functions: Dict[str, Callable] = Field(default=dict)
+    function_specs: FunctionSpecs = Field(default=[])
+    functions: Dict[str, Callable] = Field(default={})
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     class Builder(Tool.Builder):
@@ -84,7 +84,6 @@ class FunctionTool(Tool):
             if (
                 getattr(attr, "_function_spec", None)
                 and attr is not None
-                and isinstance(attr, Callable)
                 and isinstance(attr._function_spec, FunctionSpec)
             ):
                 function_spec: FunctionSpec = attr._function_spec

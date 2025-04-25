@@ -45,7 +45,7 @@ class MCPTool(FunctionTool):
 
         _tool: "MCPTool"
 
-        def __init__(self):
+        def __init__(self) -> None:
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "MCPTool":
@@ -61,7 +61,10 @@ class MCPTool(FunctionTool):
             await self._build_function_specs()
             return self._tool
 
-        async def _build_function_specs(self):
+        async def _build_function_specs(self) -> None:
+
+            if self._tool.server_params is None:
+                raise ValueError("Server parameters are not set.")
 
             async with stdio_client(self._tool.server_params) as (read, write):
                 async with ClientSession(read, write) as session:
@@ -119,6 +122,9 @@ class MCPTool(FunctionTool):
 
         messages: List[Message] = []
 
+        if self.server_params is None:
+            raise ValueError("Server parameters are not set.")
+
         async with stdio_client(self.server_params) as (read, write):
             async with ClientSession(read, write) as session:
                 for tool_call in input_message.tool_calls:
@@ -134,7 +140,9 @@ class MCPTool(FunctionTool):
                             f"Calling MCP Tool '{tool_name}' with args: {kwargs}"
                         )
 
-                        result: CallToolResult = await session.call_tool(tool_name, kwargs)  # type: ignore
+                        result: CallToolResult = await session.call_tool(
+                            tool_name, kwargs
+                        )
 
                         # Return an error if the tool call failed
                         if result.isError:
@@ -149,7 +157,7 @@ class MCPTool(FunctionTool):
                                 response_str += content_item.text + "\n"
                             elif isinstance(content_item, ImageContent):
 
-                                response_str = getattr(content_item, "data", None)
+                                response_str = getattr(content_item, "data", "")
 
                             elif isinstance(content_item, EmbeddedResource):
                                 # Handle embedded resources
