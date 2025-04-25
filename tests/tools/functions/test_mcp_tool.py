@@ -129,7 +129,7 @@ class TestMCPTool:
         builder = MCPTool.Builder()
         builder = builder.server_params(MagicMock())
 
-        tool = await builder.build()
+        tool = await builder.a_build()
 
         assert len(tool.function_specs) == 1
         assert tool.function_specs[0].name == "test_tool"

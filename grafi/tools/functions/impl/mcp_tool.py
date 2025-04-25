@@ -57,11 +57,16 @@ class MCPTool(FunctionTool):
             self._tool.server_params = server_params
             return self
 
-        async def build(self) -> "MCPTool":
-            await self._build_function_specs()
+        def build(self) -> None:
+            raise NotImplementedError(
+                "MCPTool does not support synchronous execution. Use a_build instead."
+            )
+
+        async def a_build(self) -> "MCPTool":
+            await self._a_build_function_specs()
             return self._tool
 
-        async def _build_function_specs(self) -> None:
+        async def _a_build_function_specs(self) -> None:
 
             if self._tool.server_params is None:
                 raise ValueError("Server parameters are not set.")

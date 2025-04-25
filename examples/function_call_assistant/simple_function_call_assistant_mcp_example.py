@@ -42,7 +42,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         SimpleFunctionCallAssistant.Builder()
         .name("MCPAssistant")
         .api_key(api_key)
-        .function_tool(await MCPTool.Builder().server_params(server_params).build())
+        .function_tool(await MCPTool.Builder().server_params(server_params).a_build())
         .build()
     )
 
