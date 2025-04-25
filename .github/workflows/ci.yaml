@@ -167,6 +167,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
 
       - name: Check if new version is different than PyPi remote
         id: check-version
@@ -179,16 +188,6 @@ jobs:
           else
             echo "New version available: $current_version"
           fi
-
-
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
 
       #----------------------------------------------
       #       load cached venv if cache exists
