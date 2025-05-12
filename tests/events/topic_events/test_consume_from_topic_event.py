@@ -69,6 +69,7 @@ def consume_from_topic_event_message() -> ConsumeFromTopicEvent:
 @pytest.fixture
 def consume_from_topic_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ConsumeFromTopic",
         "assistant_request_id": "assistant_request_id",
@@ -92,6 +93,7 @@ def consume_from_topic_event_dict():
 @pytest.fixture
 def consume_from_topic_event_dict_message():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ConsumeFromTopic",
         "assistant_request_id": "assistant_request_id",

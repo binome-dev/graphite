@@ -48,6 +48,7 @@ def node_failed_event(execution_context) -> NodeFailedEvent:
 @pytest.fixture
 def node_failed_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "NodeInvoke",
         "assistant_request_id": "assistant_request_id",
@@ -80,6 +81,7 @@ def node_failed_event_dict():
                             "user_id": "",
                         },
                     },
+                    "event_version": "1.0",
                     "event_id": "test_id",
                     "assistant_request_id": "assistant_request_id",
                     "event_type": "ConsumeFromTopic",

@@ -38,6 +38,7 @@ def assistant_invoke_event() -> AssistantInvokeEvent:
 @pytest.fixture
 def assistant_invoke_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "AssistantInvoke",
         "assistant_request_id": "assistant_request_id",

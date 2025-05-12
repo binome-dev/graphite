@@ -69,6 +69,7 @@ def publish_to_topic_event_message() -> PublishToTopicEvent:
 @pytest.fixture
 def publish_to_topic_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",
@@ -93,6 +94,7 @@ def publish_to_topic_event_dict():
 @pytest.fixture
 def publish_to_topic_event_dict_message():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",

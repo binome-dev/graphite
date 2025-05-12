@@ -50,7 +50,7 @@ async def test_simple_function_call_assistant_async() -> None:
         .name("SimpleFunctionCallAssistant")
         .api_url("http://localhost:11434")
         .function_tool(WeatherMock(name="WeatherMock"))
-        .model("qwen2.5")
+        .model("qwen3")
         .build()
     )
 

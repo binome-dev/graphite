@@ -67,6 +67,7 @@ def node_respond_event(execution_context) -> NodeRespondEvent:
 @pytest.fixture
 def node_respond_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "NodeInvoke",
         "assistant_request_id": "assistant_request_id",
@@ -100,6 +101,7 @@ def node_respond_event_dict():
                         },
                     },
                     "event_id": "test_id",
+                    "event_version": "1.0",
                     "assistant_request_id": "assistant_request_id",
                     "event_type": "ConsumeFromTopic",
                     "timestamp": "2009-02-13T23:31:30+00:00",

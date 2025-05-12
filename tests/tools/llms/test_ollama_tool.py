@@ -32,7 +32,7 @@ def test_ollama_tool_initialization():
     assert tool.name == "OllamaTool"
     assert tool.type == "OllamaTool"
     assert tool.api_url == "http://localhost:11434"
-    assert tool.model == "qwen2.5"
+    assert tool.model == "qwen3"
 
 
 def test_prepare_api_input():
@@ -104,7 +104,7 @@ def test_execute(monkeypatch, execution_context, mock_ollama_client):
     assert result[0].content == "Hi there!"
     mock_ollama_client.assert_called_once_with("http://localhost:11434")
     mock_ollama_client.return_value.chat.assert_called_once_with(
-        model="qwen2.5", messages=[{"role": "user", "content": "Hello"}], tools=None
+        model="qwen3", messages=[{"role": "user", "content": "Hello"}], tools=None
     )
 
 

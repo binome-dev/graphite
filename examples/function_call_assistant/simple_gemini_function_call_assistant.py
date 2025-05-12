@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from typing import Self
 
@@ -13,12 +14,12 @@ from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.functions.function_calling_command import FunctionCallingCommand
 from grafi.tools.functions.function_tool import FunctionTool
-from grafi.tools.llms.impl.ollama_tool import OllamaTool
+from grafi.tools.llms.impl.gemini_tool import GeminiTool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
-class SimpleOllamaFunctionCallAssistant(Assistant):
+class SimpleGeminiFunctionCallAssistant(Assistant):
     """
     A simple assistant class that uses OpenAI's language model to process input,
     make function calls, and generate responses.
@@ -37,10 +38,10 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    name: str = Field(default="SimpleOllamaFunctionCallAssistant")
-    type: str = Field(default="SimpleOllamaFunctionCallAssistant")
-    api_url: str = Field(default="http://localhost:11434")
-    model: str = Field(default="qwen3")
+    name: str = Field(default="SimpleGeminiFunctionCallAssistant")
+    type: str = Field(default="SimpleGeminiFunctionCallAssistant")
+    api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
+    model: str = Field(default="gemini-2.0-flash-lite")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionTool
@@ -48,16 +49,16 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
 
-        _assistant: "SimpleOllamaFunctionCallAssistant"
+        _assistant: "SimpleGeminiFunctionCallAssistant"
 
         def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
-        def _init_assistant(self) -> "SimpleOllamaFunctionCallAssistant":
-            return SimpleOllamaFunctionCallAssistant.model_construct()
+        def _init_assistant(self) -> "SimpleGeminiFunctionCallAssistant":
+            return SimpleGeminiFunctionCallAssistant.model_construct()
 
-        def api_url(self, api_url: str) -> Self:
-            self._assistant.api_url = api_url
+        def api_key(self, api_key: str) -> Self:
+            self._assistant.api_key = api_key
             return self
 
         def model(self, model: str) -> Self:
@@ -80,11 +81,11 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
             self._assistant.function_tool = function_tool
             return self
 
-        def build(self) -> "SimpleOllamaFunctionCallAssistant":
+        def build(self) -> "SimpleGeminiFunctionCallAssistant":
             self._assistant._construct_workflow()
             return self._assistant
 
-    def _construct_workflow(self) -> "SimpleOllamaFunctionCallAssistant":
+    def _construct_workflow(self) -> "SimpleGeminiFunctionCallAssistant":
         function_call_topic = Topic(
             name="function_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls
@@ -94,14 +95,14 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
         # Create an input LLM node
         llm_input_node = (
             LLMNode.Builder()
-            .name("OllamaInputNode")
+            .name("GeminiInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
                 LLMResponseCommand.Builder()
                 .llm(
-                    OllamaTool.Builder()
+                    GeminiTool.Builder()
                     .name("UserInputLLM")
-                    .api_url(self.api_url)
+                    .api_key(self.api_key)
                     .model(self.model)
                     .system_message(self.function_call_llm_system_message)
                     .build()
@@ -138,16 +139,16 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
         # Create an output LLM node
         llm_output_node = (
             LLMNode.Builder()
-            .name("OllamaOutputNode")
+            .name("GeminiOutputNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
             .command(
                 LLMResponseCommand.Builder()
                 .llm(
-                    OllamaTool.Builder()
+                    GeminiTool.Builder()
                     .name("UserOutputLLM")
-                    .api_url(self.api_url)
+                    .api_key(self.api_key)
                     .model(self.model)
                     .system_message(self.summary_llm_system_message)
                     .build()
@@ -161,7 +162,7 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
         # Create a workflow and add the nodes
         self.workflow = (
             EventDrivenWorkflow.Builder()
-            .name("simple_ollama_function_call_workflow")
+            .name("simple_gemini_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
             .node(llm_output_node)

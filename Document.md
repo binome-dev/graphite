@@ -490,7 +490,7 @@ Fields:
 | `name`     | Descriptive identifier for the tool (defaults to `"OllamaTool"`).              |
 | `type`     | Tool type indicator (defaults to `"OllamaTool"`).                              |
 | `api_url`  | URL of the Ollama API endpoint (defaults to `"http://localhost:11434"`).       |
-| `model`    | Ollama model name (defaults to `"qwen2.5"`).                                   |
+| `model`    | Ollama model name (defaults to `"qwen3"`).                                   |
 
 Methods:
 
