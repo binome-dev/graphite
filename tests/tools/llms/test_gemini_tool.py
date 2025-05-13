@@ -73,8 +73,8 @@ def test_execute_simple_response(monkeypatch, gemini_instance, execution_context
     assert call_kwargs["model"] == "gemini-2.0-flash-lite"
 
     # Contents must include system message
-    assert call_kwargs["contents"][0]["role"] == "system"
-    assert call_kwargs["contents"][0]["parts"][0]["text"] == "dummy system message"
+    assert call_kwargs["contents"][0].role == "user"
+    assert call_kwargs["contents"][0].parts[0].text == "dummy system message"
 
 
 # --------------------------------------------------------------------------- #
@@ -159,8 +159,8 @@ def test_prepare_api_input(gemini_instance):
 
     contents, tools = gemini_instance.prepare_api_input(msgs)
 
-    assert contents[0]["role"] == "system"  # dummy system msg added later
-    assert contents[-1]["role"] == "model"
+    assert contents[0].role == "user"  # dummy system msg added later
+    assert contents[-1].role == "model"
     assert tools == [] or tools is None
 
 

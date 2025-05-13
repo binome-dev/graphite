@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from anthropic import NOT_GIVEN
 from anthropic.types.text_block import TextBlock
 
 from grafi.common.models.execution_context import ExecutionContext
@@ -85,7 +86,7 @@ def test_execute_simple_response(monkeypatch, claude_instance, execution_context
     assert kwargs["messages"][1]["role"] == "user"
     assert kwargs["messages"][1]["content"] == "Say hello"
     # no tools in this call
-    assert kwargs["tools"] == []
+    assert kwargs["tools"] == NOT_GIVEN
 
 
 # --------------------------------------------------------------------------- #
@@ -152,7 +153,7 @@ def test_prepare_api_input(claude_instance):
     # first element must be dummy system instruction from instance
     assert api_messages[0]["content"] == "dummy system message"
     assert api_messages[-1]["role"] == "assistant"
-    assert api_tools == []
+    assert api_tools == NOT_GIVEN
 
 
 # --------------------------------------------------------------------------- #
