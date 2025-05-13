@@ -40,7 +40,7 @@ class SimpleClaudeFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleClaudeFunctionCallAssistant")
     type: str = Field(default="SimpleClaudeFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY"))
+    api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     model: str = Field(default="claude-3-5-haiku-20241022")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)

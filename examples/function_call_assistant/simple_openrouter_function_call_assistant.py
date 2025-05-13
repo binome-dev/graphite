@@ -40,7 +40,7 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleOpenRouterFunctionCallAssistant")
     type: str = Field(default="SimpleOpenRouterFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY"))
+    api_key: str = Field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
     model: str = Field(default="openrouter/auto")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)

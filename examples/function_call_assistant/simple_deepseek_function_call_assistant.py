@@ -40,7 +40,7 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleDeepseekFunctionCallAssistant")
     type: str = Field(default="SimpleDeepseekFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY"))
+    api_key: str = Field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY", ""))
     model: str = Field(default="deepseek-chat")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)

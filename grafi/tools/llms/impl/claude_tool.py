@@ -13,6 +13,7 @@ from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Self
+from typing import Union
 
 from deprecated import deprecated
 from pydantic import Field
@@ -29,9 +30,13 @@ from grafi.tools.llms.llm import LLM
 
 
 try:
+    from anthropic import NOT_GIVEN
     from anthropic import Anthropic
     from anthropic import AsyncAnthropic
+    from anthropic import NotGiven
     from anthropic.types import Message as AnthropicMessage
+    from anthropic.types import MessageParam
+    from anthropic.types import ToolParam
     from anthropic.types.text_block import TextBlock
     from anthropic.types.tool_use_block import ToolUseBlock
 except ImportError:
@@ -90,15 +95,15 @@ class ClaudeTool(LLM):
 
     def prepare_api_input(
         self, input_data: Messages
-    ) -> tuple[List[dict[str, str]], Optional[List[dict[str, Any]]]]:
+    ) -> tuple[List[MessageParam], Union[List[ToolParam], NotGiven]]:
         """grafi → Anthropic message list (& optional tools)."""
-        messages: List[dict[str, str]] = []
+        messages: List[MessageParam] = []
 
         if self.system_message:
             messages.append({"role": "system", "content": self.system_message})
 
         for m in input_data:
-            if m.content is not None and m.content.strip() != "":
+            if m.content is not None:
                 messages.append(
                     {
                         "role": "user" if m.role == "tool" else m.role,
@@ -106,18 +111,19 @@ class ClaudeTool(LLM):
                     }
                 )
 
-        tools = []
+        tools: List[ToolParam] = []
         if input_data and input_data[-1].tools:
             for tool in input_data[-1].tools:
                 function = tool.get("function")
-                tools.append(
-                    {
-                        "name": function["name"],
-                        "description": function["description"],
-                        "input_schema": function["parameters"],
-                    }
-                )
-        return messages, tools
+                if function is not None:
+                    tools.append(
+                        {
+                            "name": function["name"],
+                            "description": function["description"],
+                            "input_schema": function["parameters"],
+                        }
+                    )
+        return messages, tools or NOT_GIVEN
 
     # ------------------------------------------------------------------ #
     # Blocking call                                                      #

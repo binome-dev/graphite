@@ -4,8 +4,10 @@ from typing import Any
 from typing import Dict
 from typing import Generator
 from typing import List
+from typing import Literal
 from typing import Optional
 from typing import Self
+from typing import cast
 
 from deprecated import deprecated
 from loguru import logger
@@ -217,18 +219,25 @@ class OllamaTool(LLM):
         if isinstance(chunk, ChatResponse):
             # `chunk.message.content` is the incremental bit
             msg = chunk.message
-            role = msg.role or "assistant"
+            role_value = msg.role or "assistant"
             content = msg.content or ""
         else:  # plain dict (↔ ollama.chat(..., stream=True) docs)
             msg = chunk.get("message", {})
-            role = msg.get("role", "assistant")
+            role_value = msg.get("role", "assistant")
             content = msg.get("content", "")
+
+        if role_value in ("system", "user", "assistant", "tool"):
+            safe_role: Literal["system", "user", "assistant", "tool"] = cast(
+                Literal["system", "user", "assistant", "tool"], role_value
+            )
+        else:
+            safe_role = "assistant"
 
         # skip empty deltas to avoid emitting blank messages
         if not content:
             return []
 
-        return [Message(role=role, content=content)]
+        return [Message(role=safe_role, content=content)]
 
     def to_messages(self, response: ChatResponse) -> Messages:
         """

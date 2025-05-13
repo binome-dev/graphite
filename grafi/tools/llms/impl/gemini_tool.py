@@ -34,8 +34,13 @@ from grafi.tools.llms.llm import LLM
 
 try:
     from google import genai
-    from google.genai import types
+    from google.genai.types import Content
+    from google.genai.types import ContentListUnion
+    from google.genai.types import FunctionDeclaration
     from google.genai.types import GenerateContentResponse
+    from google.genai.types import Part
+    from google.genai.types import Schema
+    from google.genai.types import Tool
 except ImportError:
     raise ImportError(
         "`google-genai` not installed. Please install using `pip install google-genai`"
@@ -97,7 +102,7 @@ class GeminiTool(LLM):
 
     def prepare_api_input(
         self, input_data: Messages
-    ) -> tuple[List[dict[str, Any]], Optional[List[dict[str, Any]]]]:
+    ) -> tuple[ContentListUnion, Optional[Tool]]:
         """
         Map grafi ``Message`` objects -> Gemini *contents* list.
 
@@ -111,41 +116,41 @@ class GeminiTool(LLM):
         Function/tool declarations are passed via GenerateContentConfig,
         so we simply return them for the caller to insert.
         """
-        contents: List[dict[str, Any]] = []
+        contents: List[Content] = []
 
         # prepend system instruction in Gemini style if present
         if self.system_message:
             contents.append(
-                {
-                    "role": "system",
-                    "parts": [{"text": self.system_message}],
-                }
+                Content(
+                    role="user",
+                    parts=[Part(text=self.system_message)],
+                )
             )
 
         for m in input_data:
             # Gemini only needs role + parts; we ignore tool_call fields here
-            if m.content is not None and m.content.strip() != "":
+            if m.content is not None and isinstance(m.content, str):
                 contents.append(
-                    {
-                        "role": GEMINI_ROLE_MAP.get(m.role, m.role),
-                        "parts": [{"text": m.content}],
-                    }
+                    Content(
+                        role=GEMINI_ROLE_MAP.get(m.role, m.role),
+                        parts=[Part(text=m.content)],
+                    )
                 )
 
-        function_declarations = []
+        function_declarations: List[FunctionDeclaration] = []
         if input_data and input_data[-1].tools:
             for tool in input_data[-1].tools:
                 function = tool.get("function")
-                print(f"Function: {function}")
-                function_declaration = {
-                    "name": function["name"],
-                    "description": function["description"],
-                    "parameters": function["parameters"],
-                }
-                function_declarations.append(function_declaration)
+                if function is not None:
+                    function_declaration = FunctionDeclaration(
+                        name=function["name"],
+                        description=function["description"],
+                        parameters=Schema.model_validate(function["parameters"]),
+                    )
+                    function_declarations.append(function_declaration)
 
         return contents, (
-            [types.Tool(function_declarations=function_declarations)]
+            [Tool(function_declarations=function_declarations)]
             if function_declarations
             else None
         )
@@ -166,7 +171,7 @@ class GeminiTool(LLM):
         cfg = types.GenerateContentConfig(
             tools=tools if tools else None, **self.chat_params  # type: ignore[arg-type]
         )
-        print(tools)
+
         try:
             response: GenerateContentResponse = client.models.generate_content(
                 model=self.model,
