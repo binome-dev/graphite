@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import uuid
 from typing import Any
 from typing import Dict
 from typing import Generator
@@ -129,7 +130,7 @@ class GeminiTool(LLM):
 
         for m in input_data:
             # Gemini only needs role + parts; we ignore tool_call fields here
-            if m.content is not None and isinstance(m.content, str):
+            if m.content is not None and isinstance(m.content, str) and m.content != "":
                 contents.append(
                     Content(
                         role=GEMINI_ROLE_MAP.get(m.role, m.role),
@@ -308,7 +309,7 @@ class GeminiTool(LLM):
             for raw_function_call in response.function_calls:
                 # Include the function call if provided
                 tool_call = {
-                    "id": raw_function_call.id,
+                    "id": raw_function_call.id or uuid.uuid4().hex,
                     "type": "function",
                     "function": {
                         "name": raw_function_call.name,

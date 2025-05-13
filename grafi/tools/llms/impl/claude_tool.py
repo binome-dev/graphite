@@ -103,7 +103,7 @@ class ClaudeTool(LLM):
             messages.append({"role": "system", "content": self.system_message})
 
         for m in input_data:
-            if m.content is not None:
+            if m.content is not None and isinstance(m.content, str) and m.content != "":
                 messages.append(
                     {
                         "role": "user" if m.role == "tool" else m.role,
