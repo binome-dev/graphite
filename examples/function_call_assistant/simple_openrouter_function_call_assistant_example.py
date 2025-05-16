@@ -1,8 +1,8 @@
-import json
+import os
 import uuid
 
-from examples.function_call_assistant.simple_ollama_function_call_assistant import (
-    SimpleOllamaFunctionCallAssistant,
+from examples.function_call_assistant.simple_openrouter_function_call_assistant import (
+    SimpleOpenRouterFunctionCallAssistant,
 )
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
@@ -13,10 +13,12 @@ from grafi.tools.functions.function_tool import FunctionTool
 
 event_store = container.event_store
 
+api_key = os.getenv("OPENROUTER_API_KEY", "")
+
 
 class WeatherMock(FunctionTool):
     @llm_function
-    def get_weather(self, postcode: str) -> str:
+    def get_weather_mock(self, postcode: str) -> str:
         """
         Function to get weather information for a given postcode.
 
@@ -26,12 +28,7 @@ class WeatherMock(FunctionTool):
         Returns:
             str: A string containing a weather report for the given postcode.
         """
-        return json.dumps(
-            {
-                "postcode": postcode,
-                "weather": "Sunny",
-            }
-        )
+        return f"The weather of {postcode} is bad now."
 
 
 def get_execution_context() -> ExecutionContext:
@@ -44,12 +41,12 @@ def get_execution_context() -> ExecutionContext:
 
 def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
+
     assistant = (
-        SimpleOllamaFunctionCallAssistant.Builder()
-        .name("SimpleFunctionCallAssistant")
-        .api_url("http://localhost:11434")
+        SimpleOpenRouterFunctionCallAssistant.Builder()
+        .name("SimpleOpenRouterFunctionCallAssistant")
+        .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))
-        .model("qwen3")
         .build()
     )
 
@@ -59,11 +56,17 @@ def test_simple_function_call_assistant() -> None:
     output = assistant.execute(execution_context, input_data)
     print(output)
     assert output is not None
-    print(len(event_store.get_events()))
     assert "12345" in str(output[0].content)
-    assert "sunny" in str(output[0].content)
+    assert "bad" in str(output[0].content)
+    print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 23
 
+    # Test restore from finished requests
 
-# Run the test function asynchronously
+    input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
+    output = assistant.execute(execution_context, input_data)
+
+    assert output == []
+
+
 test_simple_function_call_assistant()

@@ -1,4 +1,5 @@
-from typing import Optional, Self
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -32,7 +33,7 @@ class SimpleOllamaAssistant(Assistant):
     type: str = Field(default="SimpleOllamaAssistant")
     api_url: str = Field(default="http://localhost:11434")
     system_message: Optional[str] = Field(default=None)
-    model: str = Field(default="qwen2.5")
+    model: str = Field(default="qwen3")
 
     class Builder(Assistant.Builder):
         """Concrete builder for WorkflowDag."""
@@ -49,9 +50,7 @@ class SimpleOllamaAssistant(Assistant):
             self._assistant.api_url = api_url
             return self
 
-        def system_message(
-            self, system_message: str
-        ) -> Self:
+        def system_message(self, system_message: str) -> Self:
             self._assistant.system_message = system_message
             return self
 

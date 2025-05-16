@@ -41,6 +41,7 @@ def tool_failed_event() -> ToolFailedEvent:
 @pytest.fixture
 def tool_failed_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ToolFailed",
         "assistant_request_id": "assistant_request_id",

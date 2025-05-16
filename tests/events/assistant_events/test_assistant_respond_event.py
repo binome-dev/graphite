@@ -58,6 +58,7 @@ def assistant_respond_event() -> AssistantRespondEvent:
 @pytest.fixture
 def assistant_respond_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "AssistantRespond",
         "assistant_request_id": "assistant_request_id",

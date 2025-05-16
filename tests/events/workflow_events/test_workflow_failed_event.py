@@ -43,6 +43,7 @@ def workflow_failed_event() -> WorkflowFailedEvent:
 @pytest.fixture
 def workflow_failed_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "WorkflowFailed",
         "assistant_request_id": "assistant_request_id",

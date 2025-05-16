@@ -46,6 +46,7 @@ class Event(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     event_id: EventId = default_id
+    event_version: str = "1.0"
     execution_context: ExecutionContext
     event_type: EventType
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -54,6 +55,7 @@ class Event(BaseModel):
         # Flatten `execution_context` fields into the root level
         base_dict = {
             "event_id": self.event_id,
+            "event_version": self.event_version,
             "assistant_request_id": self.execution_context.assistant_request_id,
             "event_type": self.event_type.value,
             "timestamp": self.timestamp.isoformat(),

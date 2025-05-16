@@ -59,6 +59,7 @@ def node_event(execution_context) -> NodeEvent:
 @pytest.fixture
 def node_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "NodeInvoke",
         "assistant_request_id": "assistant_request_id",

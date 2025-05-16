@@ -36,6 +36,7 @@ def assistant_failed_event() -> AssistantFailedEvent:
 @pytest.fixture
 def assistant_failed_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "AssistantFailed",
         "assistant_request_id": "assistant_request_id",

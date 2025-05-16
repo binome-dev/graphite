@@ -99,6 +99,7 @@ def tool_respond_event_message() -> ToolRespondEvent:
 @pytest.fixture
 def tool_respond_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ToolRespond",
         "assistant_request_id": "assistant_request_id",
@@ -124,6 +125,7 @@ def tool_respond_event_dict():
 @pytest.fixture
 def tool_respond_event_dict_message():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ToolRespond",
         "assistant_request_id": "assistant_request_id",

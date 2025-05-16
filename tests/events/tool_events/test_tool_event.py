@@ -28,6 +28,7 @@ def tool_event() -> ToolEvent:
 @pytest.fixture
 def tool_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "ToolInvoke",
         "assistant_request_id": "assistant_request_id",

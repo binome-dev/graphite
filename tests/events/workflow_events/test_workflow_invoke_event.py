@@ -70,6 +70,7 @@ def workflow_invoke_event_message() -> WorkflowInvokeEvent:
 @pytest.fixture
 def workflow_invoke_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "WorkflowInvoke",
         "assistant_request_id": "assistant_request_id",
@@ -94,6 +95,7 @@ def workflow_invoke_event_dict():
 @pytest.fixture
 def workflow_invoke_event_dict_message():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "WorkflowInvoke",
         "assistant_request_id": "assistant_request_id",

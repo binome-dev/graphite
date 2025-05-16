@@ -28,6 +28,7 @@ def workflow_event() -> WorkflowEvent:
 @pytest.fixture
 def workflow_event_dict():
     return {
+        "event_version": "1.0",
         "event_id": "test_id",
         "event_type": "WorkflowInvoke",
         "assistant_request_id": "assistant_request_id",

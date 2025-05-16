@@ -4,8 +4,10 @@ from typing import Any
 from typing import Dict
 from typing import Generator
 from typing import List
+from typing import Literal
 from typing import Optional
 from typing import Self
+from typing import cast
 
 from deprecated import deprecated
 from loguru import logger
@@ -13,7 +15,9 @@ from ollama import ChatResponse
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_execution import record_tool_execution
+from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -39,7 +43,7 @@ class OllamaTool(LLM):
     name: str = Field(default="OllamaTool")
     type: str = Field(default="OllamaTool")
     api_url: str = Field(default="http://localhost:11434")
-    model: str = Field(default="qwen2.5")
+    model: str = Field(default="qwen3")
 
     class Builder(LLM.Builder):
         """Concrete builder for OllamaTool."""
@@ -146,20 +150,94 @@ class OllamaTool(LLM):
             logger.error("Ollama API error: %s", e)
             raise RuntimeError(f"Ollama API error: {e}") from e
 
+    @record_tool_stream
     @deprecated("Use a_stream() instead for streaming functionality")
     def stream(
         self,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> Generator[Messages, None, None]:
-        yield []
+        """
+        Synchronous token streaming from Ollama.
 
+        Yields incremental `Message` lists that contain only the newly
+        generated chunk.
+        """
+        api_messages, api_functions = self.prepare_api_input(input_data)
+        client = ollama.Client(self.api_url)
+
+        try:
+            for chunk in client.chat(
+                model=self.model,
+                messages=api_messages,
+                tools=api_functions,
+                stream=True,
+            ):
+                yield self.to_stream_messages(chunk)
+        except Exception as e:
+            logger.error("Ollama streaming error: %s", e)
+            raise RuntimeError(f"Ollama streaming error: {e}") from e
+
+    @record_tool_a_stream
     async def a_stream(
         self,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> MsgsAGen:
-        yield []
+        """
+        Asynchronous token streaming from Ollama.
+
+        Follows the same semantics as `stream()` but returns an
+        asynchronous generator.
+        """
+        api_messages, api_functions = self.prepare_api_input(input_data)
+        client = ollama.AsyncClient(self.api_url)
+
+        try:
+            stream = await client.chat(  # returns an *async* generator
+                model=self.model,
+                messages=api_messages,
+                tools=api_functions,
+                stream=True,
+            )
+            async for chunk in stream:
+                yield self.to_stream_messages(chunk)
+        except Exception as e:
+            logger.error("Ollama async streaming error: %s", e)
+            raise RuntimeError(f"Ollama async streaming error: {e}") from e
+
+    def to_stream_messages(self, chunk: ChatResponse | dict[str, Any]) -> Messages:
+        """
+        Convert a single streaming chunk coming from the Ollama client to
+        the grafi `Message` envelope expected by downstream nodes.
+
+        Ollama yields either a `ChatResponse` object or a plain dict that
+        contains a `"message"` entry with incremental text.
+        Only the **delta** is propagated so the caller can assemble the
+        final answer.
+        """
+        if isinstance(chunk, ChatResponse):
+            # `chunk.message.content` is the incremental bit
+            msg = chunk.message
+            role_value = msg.role or "assistant"
+            content = msg.content or ""
+        else:  # plain dict (↔ ollama.chat(..., stream=True) docs)
+            msg = chunk.get("message", {})
+            role_value = msg.get("role", "assistant")
+            content = msg.get("content", "")
+
+        if role_value in ("system", "user", "assistant", "tool"):
+            safe_role: Literal["system", "user", "assistant", "tool"] = cast(
+                Literal["system", "user", "assistant", "tool"], role_value
+            )
+        else:
+            safe_role = "assistant"
+
+        # skip empty deltas to avoid emitting blank messages
+        if not content:
+            return []
+
+        return [Message(role=safe_role, content=content)]
 
     def to_messages(self, response: ChatResponse) -> Messages:
         """
