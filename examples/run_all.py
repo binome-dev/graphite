@@ -13,21 +13,11 @@ def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> N
     # Path to the current Python interpreter in the active virtual environment
     python_executable = sys.executable
 
-    openai_api_key = os.environ[
-        "OPENAI_API_KEY"
-    ]  # Replace with your actual OpenAI API key
-    tavily_api_key = os.environ[
-        "TAVILY_API_KEY"
-    ]  # Replace with your actual Tavily API key
-
-    os.environ["OPENAI_API_KEY"] = openai_api_key
-    os.environ["TAVILY_API_KEY"] = tavily_api_key
-
     # Get the directory of the current script
     current_directory = Path(__file__).parent
 
     # Find all Python example files in subdirectories
-    file_list = []
+    file_list = {}
     for root, subdir, _ in os.walk(current_directory):
         for folder in subdir:
             for _, _, files in os.walk(current_directory / folder):
@@ -35,30 +25,43 @@ def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> N
                     if f.endswith("_example.py"):
                         # Store the relative path to maintain proper execution context
                         rel_path = current_directory / folder / f
-                        file_list.append(rel_path)
+
+                        if folder not in file_list:
+                            file_list[folder] = [rel_path]
+                        else:
+                            file_list[folder].append(rel_path)
 
     passed_scripts = []
     failed_scripts = {}
 
-    # Run each script
-    for file in file_list:
-        if "ollama" in str(file) and pass_local:
-            continue
+    for key, value in file_list.items():
+        for file in value:
+            if "ollama" in str(file) and pass_local:
+                continue
 
-        file_path = os.path.join(current_directory, file)
-        try:
-            print(f"Running {file} with {python_executable}...")
-            result = subprocess.run(
-                [python_executable, file_path],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            print(f"Output of {file}:\n{result.stdout}")
-            passed_scripts.append(file)
-        except subprocess.CalledProcessError as e:
-            print(f"Error running {file}:\n{e.stderr}")
-            failed_scripts[file] = e.stderr
+            print(f"Will run {key} -- {file}")
+
+    # Run each script
+    for key, value in file_list.items():
+        print(f"Running scripts in folder: {key}")
+        for file in value:
+            if "ollama" in str(file) and pass_local:
+                continue
+
+            file_path = os.path.join(current_directory, file)
+            try:
+                print(f"Running {file} with {python_executable}...")
+                result = subprocess.run(
+                    [python_executable, file_path],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                print(f"Output of {file}:\n{result.stdout}")
+                passed_scripts.append(file)
+            except subprocess.CalledProcessError as e:
+                print(f"Error running {file}:\n{e.stderr}")
+                failed_scripts[file] = e.stderr
 
     # Summary of execution
     print("\nSummary of execution:")
