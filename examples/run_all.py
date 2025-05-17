@@ -1,14 +1,15 @@
 import argparse
+import io
 import os
 import subprocess
 import sys
 from pathlib import Path
-import io
-
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
-def run_scripts_in_directory(ci_only: bool=True, pass_local: bool=True) -> None:
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+
+
+def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> None:
     # Path to the current Python interpreter in the active virtual environment
     python_executable = sys.executable
 
