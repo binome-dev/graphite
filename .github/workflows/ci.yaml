@@ -71,7 +71,7 @@ jobs:
   integration-tests:
     name: Run Integration Tests
     runs-on: ubuntu-latest
-#    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
 
     steps:
     - name: Check out the code
@@ -85,6 +85,17 @@ jobs:
 
     - name: Install Poetry
       uses: abatilo/actions-poetry@v2
+
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v4
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: poetry install --no-interaction #--no-root
 
     - name: Run Integration Test ALL
       run: |
