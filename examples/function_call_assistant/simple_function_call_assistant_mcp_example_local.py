@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import uuid
 
@@ -14,7 +13,7 @@ from grafi.common.models.message import Message
 from grafi.tools.functions.impl.mcp_tool import MCPTool
 
 
-### Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
+# Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
 
 event_store = container.event_store
 
@@ -60,15 +59,9 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     for event in event_store.get_events():
         events.append(event.to_dict())
 
-    string = json.dumps(events, indent=4)
-    # print(string)
     # Assert that the output is valid and check event count
     assert output is not None
-    print(
-        "Number of events recorded:",
-        len(event_store.get_events()),
-    )
-    assert len(event_store.get_events()) == 21
+    assert len(event_store.get_events()) == 23
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

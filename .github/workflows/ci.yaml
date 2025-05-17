@@ -86,12 +86,6 @@ jobs:
     - name: Install Poetry
       uses: abatilo/actions-poetry@v2
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-          role-to-assume: "arn:aws:iam::328524571810:role/gha_graphite_ci_ops"
-          aws-region: "us-east-1"
-
     - name: Load cached venv
       id: cached-poetry-dependencies
       uses: actions/cache@v4
@@ -103,18 +97,12 @@ jobs:
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: poetry install --no-interaction #--no-root
 
-    - name: Get Secrets = OPEN API KEY
-      id: secrets
-      uses: aws-actions/aws-secretsmanager-get-secrets@v2
-      with:
-        secret-ids: |
-          OPENAI_API_KEY, openai-api-key
-          TAVILY_API_KEY, tavily-api-key
-
     - name: Run Integration Test ALL
       run: |
         poetry run python examples/run_all.py
       env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -172,7 +160,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@v5

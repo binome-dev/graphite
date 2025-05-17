@@ -1,4 +1,3 @@
-import json
 import os
 import uuid
 
@@ -82,17 +81,6 @@ def test_react_assistant() -> None:
         "Number of events recorded:",
         len(event_store.get_events()),
     )
-
-    # Store events in a JSON file
-
-    events = event_store.get_events()
-    output_file = f"events.json"
-
-    with open(output_file, "w") as f:
-        json.dump([event.to_dict() for event in events], f, indent=4)
-
-    # assistant.generate_workflow_graph()
-    # assistant.generate_manifest()
 
 
 test_react_assistant()
