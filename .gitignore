@@ -173,3 +173,4 @@ cython_debug/
 .DS_Store
 storage/
 .pgdata/
+.vscode/
