@@ -10,6 +10,7 @@ from typing import Union
 from typing import cast
 
 from deprecated import deprecated
+from openai import NOT_GIVEN
 from openai import AsyncClient
 from openai import NotGiven
 from openai import OpenAI
@@ -97,7 +98,7 @@ class OpenAITool(LLM):
             if self.system_message
             else []
         )
-        api_tools = None
+        api_tools = NOT_GIVEN
 
         for message in input_data:
             api_message = {
@@ -140,7 +141,14 @@ class OpenAITool(LLM):
 
         try:
             client = OpenAI(api_key=self.api_key)
-            response = client.chat.completions.create(
+
+            req_func = (
+                client.chat.completions.create
+                if not self.structured_output
+                else client.beta.chat.completions.parse
+            )
+
+            response = req_func(
                 model=self.model,
                 messages=api_messages,
                 tools=api_tools,
@@ -162,7 +170,12 @@ class OpenAITool(LLM):
 
         async with AsyncClient(api_key=self.api_key) as client:
             try:
-                response: ChatCompletion = await client.chat.completions.create(
+                req_func = (
+                    client.chat.completions.create
+                    if not self.structured_output
+                    else client.beta.chat.completions.parse
+                )
+                response: ChatCompletion = await req_func(
                     model=self.model,
                     messages=api_messages,
                     tools=api_tools,
