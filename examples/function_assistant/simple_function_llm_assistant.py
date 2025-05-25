@@ -4,7 +4,6 @@ from typing import Optional
 from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
@@ -19,6 +18,9 @@ from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+OutputType = type
 
 
 class SimpleFunctionLLMAssistant(Assistant):
@@ -44,7 +46,7 @@ class SimpleFunctionLLMAssistant(Assistant):
     type: str = Field(default="SimpleFunctionLLMAssistant")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-    output_format: BaseModel
+    output_format: OutputType
     function: Callable
 
     class Builder(Assistant.Builder):
@@ -66,7 +68,7 @@ class SimpleFunctionLLMAssistant(Assistant):
             self._assistant.model = model
             return self
 
-        def output_format(self, output_format: type) -> Self:
+        def output_format(self, output_format: OutputType) -> Self:
             self._assistant.output_format = output_format
             return self
 

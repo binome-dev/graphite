@@ -98,7 +98,6 @@ class OpenAITool(LLM):
             if self.system_message
             else []
         )
-        api_tools = NOT_GIVEN
 
         for message in input_data:
             api_message = {
@@ -111,8 +110,8 @@ class OpenAITool(LLM):
             api_messages.append(cast(ChatCompletionMessageParam, api_message))
 
         # Extract function specifications if present in latest message
-        if input_data[-1].tools:
-            api_tools = input_data[-1].tools
+
+        api_tools = input_data[-1].tools if input_data[-1].tools else NOT_GIVEN
 
         return api_messages, api_tools
 

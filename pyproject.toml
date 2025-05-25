@@ -91,6 +91,10 @@ module = "googlesearch.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "jsonpickle.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
 

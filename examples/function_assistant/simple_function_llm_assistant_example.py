@@ -45,11 +45,12 @@ def print_user_form(input_messages: Messages) -> List[str]:
     for message in input_messages:
         if message.role == "assistant" and message.content:
             try:
-                form = UserForm.model_validate_json(message.content)
-                print(
-                    f"User Form Details:\nFirst Name: {form.first_name}\nLast Name: {form.last_name}\nLocation: {form.location}\nGender: {form.gender}\n"
-                )
-                user_details.append(form.model_dump_json(indent=2))
+                if isinstance(message.content, str):
+                    form = UserForm.model_validate_json(message.content)
+                    print(
+                        f"User Form Details:\nFirst Name: {form.first_name}\nLast Name: {form.last_name}\nLocation: {form.location}\nGender: {form.gender}\n"
+                    )
+                    user_details.append(form.model_dump_json(indent=2))
             except Exception as e:
                 raise ValueError(
                     f"Failed to parse user form from message content: {message.content}. Error: {e}"

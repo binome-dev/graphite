@@ -1,4 +1,5 @@
 import inspect
+import json
 from typing import Any
 from typing import Callable
 from typing import List
@@ -8,7 +9,6 @@ from typing import Union
 import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
-from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
@@ -26,7 +26,7 @@ class FunctionTool(Tool):
 
     name: str = "FunctionTool"
     type: str = "FunctionTool"
-    function: Callable[[Messages], OutputType] = Field(default=None)
+    function: Callable[[Messages], OutputType]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     class Builder(Tool.Builder):
@@ -74,7 +74,7 @@ class FunctionTool(Tool):
         elif isinstance(response, list) and all(
             isinstance(item, BaseModel) for item in response
         ):
-            response_str = [item.model_dump_json() for item in response]
+            response_str = json.dumps([item.model_dump() for item in response])
         elif isinstance(response, str):
             response_str = response
         else:
