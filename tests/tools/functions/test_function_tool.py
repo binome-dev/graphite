@@ -34,7 +34,7 @@ def test_execute_returns_message(function_tool):
     result = function_tool.execute(context, input_messages)
     assert isinstance(result, list)
     assert isinstance(result[0], Message)
-    assert result[0].role == "tool"
+    assert result[0].role == "function"
     assert "42" in result[0].content
 
 
@@ -51,7 +51,7 @@ async def test_a_execute_returns_message(function_tool):
     async for msg in agen:
         messages.extend(msg)
     assert isinstance(messages[0], Message)
-    assert messages[0].role == "tool"
+    assert messages[0].role == "function"
     assert "42" in messages[0].content
 
 

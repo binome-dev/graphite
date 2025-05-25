@@ -23,7 +23,6 @@ OutputType = Union[BaseModel, List[BaseModel]]
 
 
 class FunctionTool(Tool):
-
     name: str = "FunctionTool"
     type: str = "FunctionTool"
     function: Callable[[Messages], OutputType]
@@ -51,7 +50,6 @@ class FunctionTool(Tool):
     def execute(
         self, execution_context: ExecutionContext, input_data: Messages
     ) -> Messages:
-
         response = self.function(input_data)
 
         return self.to_messages(response=response)
@@ -60,7 +58,6 @@ class FunctionTool(Tool):
     async def a_execute(
         self, execution_context: ExecutionContext, input_data: Messages
     ) -> MsgsAGen:
-
         response = self.function(input_data)
         if inspect.isawaitable(response):
             response = await response
@@ -80,7 +77,7 @@ class FunctionTool(Tool):
         else:
             response_str = jsonpickle.encode(response)
 
-        message_args = {"role": "tool", "content": response_str}
+        message_args = {"role": "function", "content": response_str}
 
         return [Message.model_validate(message_args)]
 
