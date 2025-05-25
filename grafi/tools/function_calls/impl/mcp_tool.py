@@ -11,7 +11,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 try:
@@ -28,9 +28,9 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
 
 
-class MCPTool(FunctionTool):
+class MCPTool(FunctionCallTool):
     """
-    MCPTool extends FunctionTool to provide web search functionality using the MCP API.
+    MCPTool extends FunctionCallTool to provide web search functionality using the MCP API.
     """
 
     # Set up API key and MCP client
@@ -40,7 +40,7 @@ class MCPTool(FunctionTool):
     prompts: Optional[ListPromptsResult] = None
     resources: Optional[ListResourcesResult] = None
 
-    class Builder(FunctionTool.Builder):
+    class Builder(FunctionCallTool.Builder):
         """Concrete builder for MCPTool."""
 
         _tool: "MCPTool"

@@ -6,13 +6,13 @@ from examples.hith_assistant.kyc_assistant import KycAssistant
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-class ClientInfo(FunctionTool):
+class ClientInfo(FunctionCallTool):
     @llm_function
     def request_client_information(self, question_description: str) -> str:
         """
@@ -34,7 +34,7 @@ class ClientInfo(FunctionTool):
         )
 
 
-class RegisterClient(FunctionTool):
+class RegisterClient(FunctionCallTool):
     @llm_function
     def register_client(self, name: str, email: str) -> str:
         """

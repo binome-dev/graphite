@@ -98,7 +98,7 @@ from .simple_function_call_assistant import (
 )
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.tavily_tool import TavilyTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 
 api_key = "<YOUR_OPENAI_API_KEY>"
 tavily_key = "<YOUR_TAVILY_API_KEY>"
@@ -226,10 +226,10 @@ from kyc_assistant import KycAssistant
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_tool import FunctionCallTool
 
 
-class ClientInfo(FunctionTool):
+class ClientInfo(FunctionCallTool):
 
     @llm_function
     def request_client_information(self, question_description: str):
@@ -239,7 +239,7 @@ class ClientInfo(FunctionTool):
         return json.dumps({"question_description": question_description})
 
 
-class RegisterClient(FunctionTool):
+class RegisterClient(FunctionCallTool):
 
     @llm_function
     def register_client(self, name: str, email: str):

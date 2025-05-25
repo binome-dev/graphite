@@ -1,11 +1,11 @@
 import json
-from typing import Any, Self
+from typing import Any
 from typing import Dict
 from typing import Literal
-
+from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 try:
@@ -16,9 +16,9 @@ except ImportError:
     )
 
 
-class TavilyTool(FunctionTool):
+class TavilyTool(FunctionCallTool):
     """
-    TavilyTools extends FunctionTool to provide web search functionality using the Tavily API.
+    TavilyTools extends FunctionCallTool to provide web search functionality using the Tavily API.
     """
 
     # Set up API key and Tavily client
@@ -28,7 +28,7 @@ class TavilyTool(FunctionTool):
     search_depth: Literal["basic", "advanced"] = "advanced"
     max_tokens: int = 6000
 
-    class Builder(FunctionTool.Builder):
+    class Builder(FunctionCallTool.Builder):
         """Concrete builder for TavilyTool."""
 
         _tool: "TavilyTool"
@@ -43,9 +43,7 @@ class TavilyTool(FunctionTool):
             self._tool.client = TavilyClient(api_key)
             return self
 
-        def search_depth(
-            self, search_depth: Literal["basic", "advanced"]
-        ) -> Self:
+        def search_depth(self, search_depth: Literal["basic", "advanced"]) -> Self:
             self._tool.search_depth = search_depth
             return self
 

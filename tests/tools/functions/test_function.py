@@ -9,10 +9,10 @@ from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
-class SampleFunction(FunctionTool):
+class SampleFunction(FunctionCallTool):
     name: str = "SampleFunction"
 
     @llm_function
@@ -115,7 +115,7 @@ def test_to_dict(function_instance):
     assert isinstance(result, dict)
     assert isinstance(result["function_specs"], list)  # model_dump() returns dict
     assert result["name"] == "SampleFunction"
-    assert result["type"] == "FunctionTool"
+    assert result["type"] == "FunctionCallTool"
     assert result["function_specs"][0]["name"] == "test_func"
     assert result["function_specs"][0]["description"] is not None
     assert isinstance(result["function_specs"][0]["parameters"], dict)
@@ -174,7 +174,7 @@ def test_function_without_llm_decorator():
         print(w)  # Not sure what do with this line
 
         # Define class without @llm_function decorator
-        class InvalidFunction(FunctionTool):
+        class InvalidFunction(FunctionCallTool):
             def test_func(self, arg: str) -> str:
                 return arg.upper()
 
@@ -186,7 +186,7 @@ def test_function_without_llm_decorator():
 def test_multiple_llm_functions():
     with warnings.catch_warnings(record=True) as w:
         # Define class with multiple @llm_function decorators
-        class MultiFunction(FunctionTool):
+        class MultiFunction(FunctionCallTool):
             @llm_function
             def func1(self, arg: str) -> str:
                 return arg.upper()

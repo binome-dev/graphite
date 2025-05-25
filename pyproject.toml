@@ -16,6 +16,7 @@ openinference-instrumentation-openai = "^0.1.14"
 arize-otel = "^0.5.3"
 loguru = "^0.7.3"
 types-deprecated = "^1.2.15.20250304"
+jsonpickle = "^4.1.0"
 
 
 

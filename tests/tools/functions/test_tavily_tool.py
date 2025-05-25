@@ -5,7 +5,7 @@ from tavily import TavilyClient
 
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.execution_context import ExecutionContext
-from grafi.tools.functions.impl.tavily_tool import TavilyTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 
 
 @pytest.fixture

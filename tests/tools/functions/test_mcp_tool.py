@@ -12,12 +12,12 @@ from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.mcp_tool import MCPTool
+from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 
 @pytest.fixture
 def mock_stdio_client():
-    with patch("grafi.tools.functions.impl.mcp_tool.stdio_client") as mock:
+    with patch("grafi.tools.function_calls.impl.mcp_tool.stdio_client") as mock:
         context_manager = AsyncMock()
         mock.return_value = context_manager
         context_manager.__aenter__.return_value = (AsyncMock(), AsyncMock())
@@ -26,7 +26,7 @@ def mock_stdio_client():
 
 @pytest.fixture
 def mock_client_session():
-    with patch("grafi.tools.functions.impl.mcp_tool.ClientSession") as mock:
+    with patch("grafi.tools.function_calls.impl.mcp_tool.ClientSession") as mock:
         session = AsyncMock()
         mock.return_value = session
         session.__aenter__.return_value = session

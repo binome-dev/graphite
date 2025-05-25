@@ -6,26 +6,26 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
-class FunctionCallingCommand(Command):
+class FunctionCallCommand(Command):
     """A command that calls a function on the context object."""
 
-    function_tool: FunctionTool
+    function_tool: FunctionCallTool
 
     class Builder(Command.Builder):
-        """Concrete builder for FunctionCallingCommand."""
+        """Concrete builder for FunctionCallCommand."""
 
-        _command: "FunctionCallingCommand"
+        _command: "FunctionCallCommand"
 
         def __init__(self) -> None:
             self._command = self._init_command()
 
-        def _init_command(self) -> "FunctionCallingCommand":
-            return FunctionCallingCommand.model_construct()
+        def _init_command(self) -> "FunctionCallCommand":
+            return FunctionCallCommand.model_construct()
 
-        def function_tool(self, function_tool: FunctionTool) -> Self:
+        def function_tool(self, function_tool: FunctionCallTool) -> Self:
             self._command.function_tool = function_tool
             return self
 

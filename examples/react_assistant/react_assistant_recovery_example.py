@@ -7,7 +7,7 @@ from examples.react_assistant.react_assistant import ReActAssistant
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.tavily_tool import TavilyTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 
 
 event_store = container.event_store

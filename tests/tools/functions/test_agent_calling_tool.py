@@ -5,7 +5,7 @@ import pytest
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.agent_calling_tool import AgentCallingTool
+from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
 
 
 @pytest.fixture
