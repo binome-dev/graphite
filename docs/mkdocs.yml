@@ -1,0 +1,37 @@
+theme:
+  name: material
+  palette:
+    accent: blue grey
+    #scheme: default
+  logo: static/GRAPHITE_icon_Dark.png
+  favicon: static/GRAPHITE_Favico_Dark.png
+  font:
+    code: Roboto Mono
+nav:
+  - Home: index.md
+  - Features: getting-started/features.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Core Concepts:
+    - Arhitecture Overview: user-guide/architecture.md 
+    - Assistant: user-guide/assistant.md
+    - Event Driven Workflow: user-guide/event-driven-workflow.md
+    - Node: user-guide/node.md
+    - Command: user-guide/command.md
+    - Tools: 
+      - Tools Core: user-guide/tools/tools.md
+      - OpenAI: user-guide/tools/openai.md
+      - Ollama: user-guide/tools/ollama.md
+      - Function Calls: user-guide/tools/function-call.md
+    - Executor: user-guide/executor.md
+    - Models: user-guide/models.md
+    - Topics: user-guide/topics.md
+    - Conventional Rules: user-guide/conventional-rules.md
+
+
+site_name: graphite
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.inlinehilite

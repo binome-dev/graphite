@@ -1,0 +1,1435 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../../user-guide/architecture/">
+      
+      
+      <link rel="icon" href="../../static/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Quickstart - graphite</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue-grey">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#getting-started-with-graphite-the-hello-world-assistant" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="graphite" class="md-header__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            graphite
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Quickstart
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="graphite" class="md-nav__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    graphite
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-create-a-new-project-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Create a New Project Directory
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-initialize-a-poetry-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Initialize a Poetry Project
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-create-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Create Assistant
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Create Assistant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-simplefunctionllmassistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class SimpleFunctionLLMAssistant
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Builder
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-call-the-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Call the Assistant
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Call the Assistant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup-openai_api_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup OPENAI_API_KEY
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-userform-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the UserForm model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-print_user_form-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the print_user_form function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-get_execution_context-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the get_execution_context function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#putting-it-all-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      Putting it all together
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-run-the-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Run the Application
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Summary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Core Concepts
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Core Concepts
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Arhitecture Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/assistant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Assistant
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/event-driven-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Event Driven Workflow
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Command
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Tools
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_6">
+            <span class="md-nav__icon md-icon"></span>
+            Tools
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/tools/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tools Core
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/tools/openai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    OpenAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/tools/ollama/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ollama
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/tools/function-call/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Function Calls
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Executor
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Topics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/conventional-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Conventional Rules
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-create-a-new-project-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Create a New Project Directory
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-initialize-a-poetry-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Initialize a Poetry Project
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-create-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Create Assistant
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Create Assistant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#class-simplefunctionllmassistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class SimpleFunctionLLMAssistant
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Builder
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-call-the-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Call the Assistant
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Call the Assistant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup-openai_api_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup OPENAI_API_KEY
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-userform-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the UserForm model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-print_user_form-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the print_user_form function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-the-get_execution_context-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create the get_execution_context function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#putting-it-all-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      Putting it all together
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-run-the-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Run the Application
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      Summary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="getting-started-with-graphite-the-hello-world-assistant">Getting Started with Graphite: The Hello, World! Assistant</h1>
+<p><a href="https://github.com/binome-dev/graphite">Graphite</a> is an event-driven AI agent framework designed for modularity, observability, and composability. This guide will walk you through building a minimal "Hello, World" agent using the <code>grafi</code> package. For this example we will create a simple function call assistant that generates a mock user form and wrap it in a node to be used with the Graphite framework.</p>
+<hr />
+<h2 id="prerequisites">Prerequisites</h2>
+<p>Make sure the following are installed:</p>
+<ul>
+<li>Python <strong>3.11 or 3.12</strong> (required by the <code>grafi</code> package)</li>
+<li><a href="https://python-poetry.org/docs/#installation">Poetry</a></li>
+<li>Git</li>
+</ul>
+<blockquote>
+<p>⚠️ <strong>Important:</strong> <code>grafi</code> requires Python &gt;=3.11 and &lt;3.13. Python 3.13+ is not yet supported.</p>
+</blockquote>
+<hr />
+<h2 id="1-create-a-new-project-directory">1. Create a New Project Directory</h2>
+<pre><code class="language-bash">mkdir graphite-hello-world
+cd graphite-hello-world
+</code></pre>
+<hr />
+<h2 id="2-initialize-a-poetry-project">2. Initialize a Poetry Project</h2>
+<p>This will create the <code>pyproject.toml</code> file that Poetry needs. Be sure to specify a compatible Python version:</p>
+<pre><code class="language-bash">poetry init --name graphite-hello-world -n
+</code></pre>
+<p>Then open <code>pyproject.toml</code> and ensure it includes:</p>
+<pre><code class="language-toml">[tool.poetry.dependencies]
+grafi = &quot;^0.0.12&quot;
+python = &quot;&gt;=3.11,&lt;3.13&quot;
+</code></pre>
+<p>Now install the dependencies:</p>
+<pre><code class="language-bash">poetry install --no-root
+</code></pre>
+<p>This will automatically create a virtual environment and install <code>grafi</code> with the appropriate Python version.</p>
+<blockquote>
+<p>💡 You can also create the virtual environment with the correct Python version explicitly:</p>
+<p><code>bash
+poetry env use python3.12</code></p>
+</blockquote>
+<hr />
+<h2 id="3-create-assistant">3. Create Assistant</h2>
+<p>In graphite an assistant is a specialized node that can handle events and perform actions based on the input it receives. We will create a simple assistant that uses OpenAI's language model to process input, make function calls, and generate responses.</p>
+<p>Create a file named <code>assistant.py</code> and add the code from our example directory <a href="https://github.com/binome-dev/graphite/blob/main/examples/function_assistant/simple_function_llm_assistant.py" title="SimpleFunctionLLMAssistant">here</a></p>
+<h3 id="class-simplefunctionllmassistant">Class <code>SimpleFunctionLLMAssistant</code></h3>
+<pre><code class="language-python"># assistant.py
+class SimpleFunctionLLMAssistant(Assistant):
+
+    oi_span_type: OpenInferenceSpanKindValues = Field(
+        default=OpenInferenceSpanKindValues.AGENT
+    )
+    name: str = Field(default=&quot;SimpleFunctionLLMAssistant&quot;)
+    type: str = Field(default=&quot;SimpleFunctionLLMAssistant&quot;)
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv(&quot;OPENAI_API_KEY&quot;))
+    model: str = Field(default=&quot;gpt-4o-mini&quot;)
+    output_format: OutputType
+    function: Callable
+</code></pre>
+<ul>
+<li><code>oi_span_type</code>: this field defines the OpenInference span kind for the assistant, which is set to <code>AGENT</code>, ,you will see this span kind in the OpenTelemetry traces.</li>
+<li><code>name</code>: the name of the assistant. This could be any string that identifies the assistant.</li>
+<li><code>type</code>: the type of the assistant, which is set to <code>SimpleFunctionLLMAssistant</code>.</li>
+<li><code>api_key</code>: the API key for OpenAI, which can be set via an environment variable or directly in the code.</li>
+<li><code>model</code>: the model to be used by the assistant, defaulting to <code>gpt-4o-mini</code>.</li>
+<li><code>output_format</code>: the format of the output, which is an instance of <code>OutputType</code>. This will be later used to define the output to be returned by the assistant. Will be mapped to a pydantic class.</li>
+<li><code>function</code>: a callable function that the assistant will use to process the input data. This function is a python function, can be any callable that takes input and returns output. In this case, it will be used to process the user form data.</li>
+</ul>
+<h3 id="class-builder">Class <code>Builder</code></h3>
+<p>Every assistant in Graphite has an inner class called builder class that allows you to construct the assistant step by step. The <code>Builder</code> class for <code>SimpleFunctionLLMAssistant</code> will allow you to set the API key, model, output format, and function before building the assistant. This class uses the builder pattern to create an instance of <code>SimpleFunctionLLMAssistant</code>. It is used to initialize the assistant with the fields that have been defined in the previous step.</p>
+<pre><code class="language-python">class SimpleFunctionLLMAssistant(Assistant):
+   ...
+   ...
+    class Builder(Assistant.Builder):
+        &quot;&quot;&quot;Concrete builder for SimpleFunctionLLMAssistant.&quot;&quot;&quot;
+
+        _assistant: &quot;SimpleFunctionLLMAssistant&quot;
+
+        def __init__(self) -&gt; None:
+            self._assistant = self._init_assistant()
+
+        def _init_assistant(self) -&gt; &quot;SimpleFunctionLLMAssistant&quot;:
+            return SimpleFunctionLLMAssistant.model_construct()
+
+        def api_key(self, api_key: str) -&gt; Self:
+            self._assistant.api_key = api_key
+            return self
+
+        def model(self, model: str) -&gt; Self:
+            self._assistant.model = model
+            return self
+
+        def output_format(self, output_format: OutputType) -&gt; Self:
+            self._assistant.output_format = output_format
+            return self
+
+        def function(self, function: Callable) -&gt; Self:
+            self._assistant.function = function
+            return self
+
+        def build(self) -&gt; &quot;SimpleFunctionLLMAssistant&quot;:
+            self._assistant._construct_workflow()
+            return self._assistant
+</code></pre>
+<pre><code class="language-python3">    def _construct_workflow(self) -&gt; &quot;SimpleFunctionLLMAssistant&quot;:
+        function_topic = Topic(name=&quot;function_call_topic&quot;)
+
+        llm_input_node = (
+            LLMNode.Builder()
+            .name(&quot;OpenAIInputNode&quot;)
+            .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
+            .command(
+                LLMResponseCommand.Builder()
+                .llm(
+                    OpenAITool.Builder()
+                    .name(&quot;UserInputLLM&quot;)
+                    .api_key(self.api_key)
+                    .model(self.model)
+                    .chat_params({&quot;response_format&quot;: self.output_format})
+                    .build()
+                )
+                .build()
+            )
+            .publish_to(function_topic)
+            .build()
+        )
+
+        # Create a function node
+
+        function_call_node = (
+            FunctionNode.Builder()
+            .name(&quot;FunctionCallNode&quot;)
+            .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
+            .command(
+                FunctionCommand.Builder()
+                .function_tool(FunctionTool.Builder().function(self.function).build())
+                .build()
+            )
+            .publish_to(agent_output_topic)
+            .build()
+        )
+
+        # Create a workflow and add the nodes
+        self.workflow = (
+            EventDrivenWorkflow.Builder()
+            .name(&quot;simple_function_call_workflow&quot;)
+            .node(llm_input_node)
+            .node(function_call_node)
+            .build()
+        )
+
+        return self
+</code></pre>
+<hr />
+<h2 id="4-call-the-assistant">4. Call the Assistant</h2>
+<p>Create a <code>main.py</code> that will call the assistant created previously.</p>
+<h3 id="setup-openai_api_key">Setup <code>OPENAI_API_KEY</code></h3>
+<pre><code class="language-python">from grafi.common.containers.container import container
+event_store = container.event_store
+
+api_key = os.getenv(&quot;OPENAI_API_KEY&quot;, &quot;&quot;)
+</code></pre>
+<p>Replace your <code>OPENAI_API_KEY</code> in the environment variable or set it directly in the code for testing purposes.</p>
+<pre><code class="language-bash">export OPENAI_API_KEY=&quot;sk-proj-***********&quot;
+</code></pre>
+<h3 id="create-the-userform-model">Create the <code>UserForm</code> model</h3>
+<pre><code class="language-python3">from pydantic import BaseModel
+
+class UserForm(BaseModel):
+    &quot;&quot;&quot;
+    A simple user form model for demonstration purposes.
+    &quot;&quot;&quot;
+
+    first_name: str
+    last_name: str
+    location: str
+    gender: str
+
+</code></pre>
+<h3 id="create-the-print_user_form-function">Create the <code>print_user_form</code> function</h3>
+<p>A function to print user form details from the messages received by the assistant.</p>
+<pre><code class="language-python3">from grafi.common.models.message import Message, Messages
+def print_user_form(input_messages: Messages) -&gt; List[str]:
+    &quot;&quot;&quot;
+    Function to print user form details.
+
+    Args:
+        Messages: The input messages containing user form details.
+
+    Returns:
+        list: A list string containing the user form details.
+    &quot;&quot;&quot;
+
+    user_details = []
+
+    for message in input_messages:
+        if message.role == &quot;assistant&quot; and message.content:
+            try:
+                if isinstance(message.content, str):
+                    form = UserForm.model_validate_json(message.content)
+                    print(
+                        f&quot;User Form Details:\nFirst Name: {form.first_name}\nLast Name: {form.last_name}\nLocation: {form.location}\nGender: {form.gender}\n&quot;
+                    )
+                    user_details.append(form.model_dump_json(indent=2))
+            except Exception as e:
+                raise ValueError(
+                    f&quot;Failed to parse user form from message content: {message.content}. Error: {e}&quot;
+                )
+
+    return user_details
+</code></pre>
+<h3 id="create-the-get_execution_context-function">Create the <code>get_execution_context</code> function</h3>
+<p>This function will create an <code>ExecutionContext</code> for the assistant to use during execution. It generates unique IDs for conversation and execution to be tracked through the event store.</p>
+<pre><code class="language-python3">import uuid
+from grafi.common.models.execution_context import ExecutionContext
+
+def get_execution_context() -&gt; ExecutionContext:
+    return ExecutionContext(
+        conversation_id=&quot;conversation_id&quot;,
+        execution_id=uuid.uuid4().hex,
+        assistant_request_id=uuid.uuid4().hex,
+    )
+</code></pre>
+<h3 id="putting-it-all-together">Putting it all together</h3>
+<pre><code class="language-python3">execution_context = get_execution_context()
+
+assistant = (
+    SimpleFunctionLLMAssistant.Builder()
+    .name(&quot;SimpleFunctionLLMAssistant&quot;)
+    .api_key(api_key)
+    .function(print_user_form)
+    .output_format(UserForm)
+    .build()
+)
+
+# Test the run method
+input_data = [
+    Message(
+        role=&quot;user&quot;,
+        content=&quot;Generate mock user.&quot;,
+    )
+]
+
+output = assistant.execute(execution_context, input_data)
+print(output)
+</code></pre>
+<hr />
+<h2 id="5-run-the-application">5. Run the Application</h2>
+<p>Use Poetry to execute the script inside the virtual environment:</p>
+<pre><code class="language-bash">poetry run python main.py
+</code></pre>
+<p>You should see:</p>
+<pre><code>graphite-hello-world-OsMKLmDe-py3.12 ❯ poetry run python main.py
+2025-05-26 19:19:10.299 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:27 - Endpoint check failed: [Errno -3] Temporary failure in name resolution
+2025-05-26 19:19:10.300 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:27 - Endpoint check failed: [Errno 111] Connection refused
+2025-05-26 19:19:10.300 | DEBUG    | grafi.common.instrumentations.tracing:setup_tracing:95 - OTLP endpoint is not available. Using InMemorySpanExporter.
+2025-05-26 19:19:10.341 | INFO     | grafi.common.topics.topic:publish_data:76 - [agent_input_topic] Message published with event_id: 858d841f8b8d48498fc3c31cf9a50c24
+2025-05-26 19:19:10.341 | DEBUG    | grafi.nodes.impl.llm_node:execute:57 - Executing LLMNode with inputs: [ConsumeFromTopicEvent(event_id='11ede69c47c34222a9bcb7c81adfb469', event_version='1.0', execution_context=ExecutionContext(conversation_id='conversation_id', execution_id='467fb5006a25440c80f5801c05bfc807', assistant_request_id='c574d43fdea94280817facb9c3a597dc', user_id=''), event_type=&lt;EventType.CONSUME_FROM_TOPIC: 'ConsumeFromTopic'&gt;, timestamp=datetime.datetime(2025, 5, 26, 18, 19, 10, 341430, tzinfo=datetime.timezone.utc), topic_name='agent_input_topic', offset=0, data=[Message(name=None, message_id='16e956e2e0424362b6362f6899bff798', timestamp=1748283550341049054, content='Generate mock user.', refusal=None, annotations=None, audio=None, role='user', tool_call_id=None, tools=None, function_call=None, tool_calls=None)], consumer_name='OpenAIInputNode', consumer_type='LLMNode')]
+2025-05-26 19:19:11.840 | INFO     | grafi.common.topics.topic:publish_data:76 - [function_call_topic] Message published with event_id: b1ee77395c3e449193d1a2175133bf98
+User Form Details:
+First Name: John
+Last Name: Doe
+Location: New York, USA
+Gender: Male
+
+2025-05-26 19:19:11.841 | INFO     | grafi.common.topics.output_topic:publish_data:80 - [agent_output_topic] Message published with event_id: 7398d115a1fb4a4c9e2b14a4dcf6a114
+[Message(name=None, message_id='5bc27a0909b146049e0d5ce5c66e068f', timestamp=1748283551841195922, content='[&quot;{\\n  \\&quot;first_name\\&quot;: \\&quot;John\\&quot;,\\n  \\&quot;last_name\\&quot;: \\&quot;Doe\\&quot;,\\n  \\&quot;location\\&quot;: \\&quot;New York, USA\\&quot;,\\n  \\&quot;gender\\&quot;: \\&quot;Male\\&quot;\\n}&quot;]', refusal=None, annotations=None, audio=None, role='function', tool_call_id=None, tools=None, function_call=None, tool_calls=None)]
+</code></pre>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>✅ Initialized a Poetry project
+✅ Installed <code>grafi</code> with the correct Python version constraint
+✅ Wrote a minimal agent that handles an event
+✅ Ran the agent using a test event</p>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ul>
+<li>Explore the <a href="https://github.com/binome-dev/graphite">Graphite GitHub Repository</a> for full-featured examples.</li>
+<li>Extend your agent to respond to different event types.</li>
+<li>Dive into advanced features like memory, workflows, and tools.</li>
+</ul>
+<hr />
+<p>Happy building! 🚀</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

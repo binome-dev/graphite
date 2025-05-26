@@ -1,0 +1,1533 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../models/">
+      
+      
+        <link rel="next" href="../conventional-rules/">
+      
+      
+      <link rel="icon" href="../../static/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Topics - graphite</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue-grey">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#topicbase" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="graphite" class="md-header__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            graphite
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Topics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="graphite" class="md-nav__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    graphite
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Core Concepts
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Core Concepts
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Arhitecture Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assistant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Assistant
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-driven-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Event Driven Workflow
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Command
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Tools
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_6">
+            <span class="md-nav__icon md-icon"></span>
+            Tools
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tools Core
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/openai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    OpenAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/ollama/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ollama
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/function-call/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Function Calls
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Executor
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Topics
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Topics
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#topicbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      TopicBase
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-request-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Human Request Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic-expression" class="md-nav__link">
+    <span class="md-ellipsis">
+      Topic Expression
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subscription-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subscription Builder
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reserved-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reserved Topics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event Graph
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Graph">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rationale-for-topological-and-timestamp-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rationale for Topological and Timestamp Sorting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventional-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Conventional Rules
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#topicbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      TopicBase
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-request-topic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Human Request Topic
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic-expression" class="md-nav__link">
+    <span class="md-ellipsis">
+      Topic Expression
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subscription-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subscription Builder
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reserved-topics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reserved Topics
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event Graph
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Graph">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rationale-for-topological-and-timestamp-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rationale for Topological and Timestamp Sorting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Topics</h1>
+
+<p><code>TopicBase</code> and <code>Topic</code> represent logical message queues in the event-driven workflow. They temporarily store messages in a First-In-First-Out (FIFO) fashion and track how many messages each consumer has read using an offset system. This allows components—like Nodes, Assistants, or Tools—to communicate asynchronously by publishing and consuming messages.</p>
+<h4 id="topicbase">TopicBase</h4>
+<p><code>TopicBase</code> provides the core interface and data structures for managing published events, consumption offsets, and conditions used to filter which messages are accepted.</p>
+<p>Fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>The topic’s human-readable name.</td>
+</tr>
+<tr>
+<td><code>condition</code></td>
+<td>A function deciding if incoming messages should be published to this topic. Defaults to True.</td>
+</tr>
+<tr>
+<td><code>publish_event_handler</code></td>
+<td>An optional callback that runs after a successful publish.</td>
+</tr>
+<tr>
+<td><code>topic_events</code></td>
+<td>A list of <code>TopicEvent</code> objects representing messages accepted by the topic.</td>
+</tr>
+<tr>
+<td><code>consumption_offsets</code></td>
+<td>Maps consumer identifiers to the index of the last message they consumed.</td>
+</tr>
+</tbody>
+</table>
+<p>Methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish_data(...)</code></td>
+<td>Publishes data to the topic if it meets the <code>condition</code>. Must be implemented in subclasses.</td>
+</tr>
+<tr>
+<td><code>can_consume(consumer_name)</code></td>
+<td>Checks if a consumer has unread messages in this topic.</td>
+</tr>
+<tr>
+<td><code>consume(consumer_name)</code></td>
+<td>Retrieves the unread messages for the consumer, updates its offset, and returns the relevant events.</td>
+</tr>
+<tr>
+<td><code>reset()</code></td>
+<td>Clears <code>topic_events</code> and <code>consumption_offsets</code>, effectively reverting the topic to its initial state.</td>
+</tr>
+<tr>
+<td><code>restore_topic(topic_event)</code></td>
+<td>Rebuilds the topic’s state from a <code>TopicEvent</code>, adding to <code>topic_events</code> or adjusting consumption offsets.</td>
+</tr>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Serializes basic fields like <code>name</code> and <code>condition</code>.</td>
+</tr>
+<tr>
+<td><code>serialize_callable()</code></td>
+<td>Helper that extracts details about the <code>condition</code> function (e.g., lambda source code or function name).</td>
+</tr>
+</tbody>
+</table>
+<p><code>TopicBase</code> also includes a builder pattern that simplifies creating and customizing topics (e.g., adding a <code>condition</code>). Subclasses extend <code>publish_data</code>, <code>can_consume</code>, and <code>consume</code> to store and retrieve messages in a more concrete manner.</p>
+<h4 id="topic">Topic</h4>
+<p><code>Topic</code> is a direct subclass of <code>TopicBase</code> that implements the required methods for a working FIFO message queue. Components publish via <code>publish_data</code>, and consumers read new messages via <code>consume</code>, each consumer having an independent offset.</p>
+<p><code>Topic</code> shares all fields from <code>TopicBase</code> and does not introduce additional fields beyond its default name.</p>
+<p>Methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish_data(...)</code></td>
+<td>Creates a <code>PublishToTopicEvent</code> if the <code>condition</code> is met and calls <code>publish_event_handler</code> to handle event.</td>
+</tr>
+<tr>
+<td><code>can_consume(consumer_name)</code></td>
+<td>Checks if <code>consumer_name</code>’s offset is behind <code>len(topic_events)</code>, meaning there are new, unread messages.</td>
+</tr>
+<tr>
+<td><code>consume(consumer_name)</code></td>
+<td>Retrieves unconsumed messages, updates the consumer’s offset, and returns the new events.</td>
+</tr>
+</tbody>
+</table>
+<p>A typical workflow involves creating a <code>Topic</code> instance (or more specialized subclass), optionally setting a <code>condition</code> to filter messages, and then connecting nodes or assistants that publish or consume messages. Whenever data is published, <code>Topic</code> increments the offset and stores the new event. When a consumer checks <code>can_consume</code>, the topic compares its offset with the total published messages to determine if any remain unread.</p>
+<p>This design ensures that each consumer reads messages in the correct order, preserving FIFO behavior while enabling asynchronous, distributed interactions across the event-driven workflow.</p>
+<h4 id="output-topic">Output Topic</h4>
+<p><code>OutputTopic</code> is a specialized subclass of <code>Topic</code> designed for user-facing events. When data is published to an <code>OutputTopic</code>, it uses <code>OutputTopicEvent</code> rather than a standard <code>PublishToTopicEvent</code>, indicating that these messages should ultimately be returned to the user.</p>
+<p>Fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Defaults to <code>AGENT_OUTPUT_TOPIC</code>, representing the system’s standard output channel.</td>
+</tr>
+<tr>
+<td><code>publish_event_handler</code></td>
+<td>An optional callback that executes whenever an <code>OutputTopicEvent</code> is successfully published.</td>
+</tr>
+<tr>
+<td><code>topic_events</code></td>
+<td>A list of <code>OutputTopicEvent</code> objects, maintaining the published output messages in FIFO order.</td>
+</tr>
+<tr>
+<td><code>consumption_offsets</code></td>
+<td>Maps consumer identifiers (e.g., assistant names) to the last read event offset, ensuring each reads in order.</td>
+</tr>
+</tbody>
+</table>
+<p>Methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish_data(...)</code></td>
+<td>Creates an <code>OutputTopicEvent</code> with the given messages if the <code>condition</code> is met. Append event to topic, then call handler.</td>
+</tr>
+<tr>
+<td><code>_publish(event)</code></td>
+<td>Inherited from <code>TopicBase</code>; assigns an offset and appends the event to <code>topic_events</code> if allowed by <code>condition</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Use Case:</p>
+<p>Typically, an assistant consumer will subscribe to the OutputTopic to retrieve user-facing results. By separating output into a dedicated topic, the system can more easily track final responses, funneling them back to the user through consistent workflows.</p>
+<h4 id="human-request-topic">Human Request Topic</h4>
+<p><code>HumanRequestTopic</code> is a specialized extension of <code>Topic</code> dedicated to handling requests that require human intervention or input. When the workflow needs user input, it publishes an <code>OutputTopicEvent</code> to <code>HumanRequestTopic</code>. On the user’s response, that input is appended back to the same topic, keeping the entire request-response cycle self-contained.</p>
+<p>Fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Defaults to <code>HUMAN_REQUEST_TOPIC</code>, indicating it’s the main channel for human-driven requests.</td>
+</tr>
+<tr>
+<td><code>publish_to_human_event_handler</code></td>
+<td>A callback triggered after successfully publishing an <code>OutputTopicEvent</code> for user-facing interactions.</td>
+</tr>
+<tr>
+<td><code>topic_events</code></td>
+<td>A list of <code>TopicEvent</code> (or <code>OutputTopicEvent</code>) objects, preserving a history of user requests and appended responses.</td>
+</tr>
+<tr>
+<td><code>consumption_offsets</code></td>
+<td>Maps consumer identifiers to the offset of the last read event, enabling a FIFO workflow for multiple consumers.</td>
+</tr>
+</tbody>
+</table>
+<p>Methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish_data(...)</code></td>
+<td>Publishes data to the topic as an <code>OutputTopicEvent</code> and add to topic if <code>condition</code> is met. Then invoke <code>publish_to_human_event_handler</code></td>
+</tr>
+<tr>
+<td><code>can_append_user_input(consumer_name, event)</code></td>
+<td>Check if can add the user input event given its parent <code>PublishToTopicEvent</code>.</td>
+</tr>
+<tr>
+<td><code>append_user_input(user_input_event, data)</code></td>
+<td>Appends actual user responses using a standard <code>PublishToTopicEvent</code>, ensuring they become available for downstream nodes.</td>
+</tr>
+</tbody>
+</table>
+<p>Usage:</p>
+<ol>
+<li><strong>Publishing Requests</strong>: When a node or another component needs user input, it calls <code>publish_data(...)</code> on <code>HumanRequestTopic</code>, generating an <code>OutputTopicEvent</code>. This signals the assistant to display or relay a query to the user.</li>
+<li><strong>Appending User Input</strong>: After the user responds, the assistant (or another client) calls <code>append_user_input(...)</code>, creating a <code>PublishToTopicEvent</code> that effectively stores the user’s messages in the same topic.</li>
+<li><strong>Downstream Consumption</strong>: Any node subscribed to the <code>HumanRequestTopic</code> can consume new messages as they appear, enabling further automated logic once the user’s response is available.</li>
+</ol>
+<p>Rational:</p>
+<p>By splitting user interaction into distinct publish and append steps, the system provides a clear interface for capturing requests and responses, all under a single, specialized topic designed for human-driven workflows.</p>
+<h4 id="topic-expression">Topic Expression</h4>
+<p><strong>Topic Expression</strong> provides a mini DSL (Domain-Specific Language) for building complex subscription logic based on multiple topics. By combining topic references using logical operators (AND, OR), you can specify whether a node should wait for messages in all required topics (<code>AND</code>) or at least one of several possible topics (<code>OR</code>). This approach offers a flexible way to manage event-driven subscriptions.</p>
+<p>Models</p>
+<p><code>LogicalOp</code></p>
+<table>
+<thead>
+<tr>
+<th>Enum Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AND</code></td>
+<td>Both sides must be satisfied for expression</td>
+</tr>
+<tr>
+<td><code>OR</code></td>
+<td>At least one side must be satisfied</td>
+</tr>
+</tbody>
+</table>
+<p><code>SubExpr</code> (Base Class)</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SubExpr</code></td>
+<td>Abstract base class for any subscription expression.</td>
+</tr>
+</tbody>
+</table>
+<p><code>TopicExpr</code> (extended from <code>SubExpr</code>)</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>topic</code></td>
+<td>A <code>TopicBase</code> object representing a single topic in the subscription tree.</td>
+</tr>
+</tbody>
+</table>
+<p><code>TopicExpr</code> states that a subscriber is interested in a single topic. If new, unread messages exist in that topic, the expression evaluates to <code>True</code>.</p>
+<p><code>CombinedExpr</code> (extended from <code>SubExpr</code>)</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>op</code></td>
+<td>A <code>LogicalOp</code> indicating <code>AND</code> or <code>OR</code>.</td>
+</tr>
+<tr>
+<td><code>left</code></td>
+<td>Another <code>SubExpr</code> node.</td>
+</tr>
+<tr>
+<td><code>right</code></td>
+<td>Another <code>SubExpr</code> node.</td>
+</tr>
+</tbody>
+</table>
+<p><code>CombinedExpr</code> composes two sub-expressions with a logical operator, enabling complex nested conditions.</p>
+<p>Methods</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>evaluate_subscription(expr, topics_with_new_msgs)</code></td>
+<td>Checks whether a subscription expression (<code>expr</code>) is fulfilled by the given list of topics that have new messages. Returns <code>True</code> if the condition is met (based on <code>AND</code>/<code>OR</code> logic).</td>
+</tr>
+<tr>
+<td><code>extract_topics(expr)</code></td>
+<td>Recursively collects all <code>TopicBase</code> objects from the DSL expression tree, letting the system know which topics a node depends on.</td>
+</tr>
+</tbody>
+</table>
+<p>Key Points:</p>
+<ol>
+<li><strong>Flexibility</strong>: You can nest multiple expressions to create complex logic. For instance, <code>(TopicA AND (TopicB OR TopicC))</code>.</li>
+<li><strong>Maintainability</strong>: By separating subscription logic into DSL expressions, the system remains clear and easy to debug.</li>
+<li><strong>Integration</strong>: Each <code>TopicExpr</code> references an actual <code>TopicBase</code>, ensuring that the DSL and the underlying queue system stay in sync.</li>
+</ol>
+<h4 id="subscription-builder">Subscription Builder</h4>
+<p><code>SubscriptionBuilder</code> streamlines the process of creating complex topic subscription expressions, allowing you to chain logical operations (<code>AND</code>, <code>OR</code>) and define whether a node requires messages from multiple topics or at least one. This builder pattern provides a concise DSL for specifying these conditions without manually constructing <code>TopicExpr</code> and <code>CombinedExpr</code> objects.</p>
+<p>Fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>root_expr</code></td>
+<td>The current root of the subscription expression tree (<code>SubExpr</code>), built incrementally by chaining.</td>
+</tr>
+<tr>
+<td><code>pending_op</code></td>
+<td>A <code>LogicalOp</code> (AND/OR) that awaits completion of the next <code>subscribed_to(...)</code> call.</td>
+</tr>
+</tbody>
+</table>
+<p>Methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>subscribed_to(topic: TopicBase)</code></td>
+<td>Adds a new <code>TopicExpr</code> node referencing <code>topic</code>. If <code>pending_op</code> is set, combines it with the existing <code>root_expr</code> via a <code>CombinedExpr</code>.</td>
+</tr>
+<tr>
+<td><code>and_()</code></td>
+<td>Sets <code>pending_op</code> to <code>LogicalOp.AND</code>, indicating the next topic reference should form an AND relationship.</td>
+</tr>
+<tr>
+<td><code>or_()</code></td>
+<td>Sets <code>pending_op</code> to <code>LogicalOp.OR</code>, indicating the next topic reference should form an OR relationship.</td>
+</tr>
+<tr>
+<td><code>build()</code></td>
+<td>Finalizes the builder, returning the constructed <code>SubExpr</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Usage Example:</p>
+<pre><code class="language-python">
+# Suppose you have two Topic objects: topicA and topicB
+# Build an expression: (topicA AND topicB)
+subscription_expr = (
+    SubscriptionBuilder()
+    .subscribed_to(topicA)
+    .and_()
+    .subscribed_to(topicB)
+    .build()
+)
+
+# The resulting expression can be assigned to a node, which then requires new messages from both topics.
+node_builder.subscribed_to(subscription_expr)
+</code></pre>
+<p>Key Points:</p>
+<ol>
+<li><strong>Chained Syntax</strong>: The builder pattern enables a straightforward DSL-like syntax: <code>.subscribed_to(topicA).and_().subscribed_to(topicB).build()</code>.</li>
+<li><strong>Operator Checks</strong>: If <code>and_()</code> or <code>or_()</code> is called without a subsequent <code>subscribed_to(...)</code>, or vice versa, a <code>ValueError</code> is raised.</li>
+<li><strong>Integration</strong>: Once created, the resulting <code>SubExpr</code> can be evaluated against incoming messages with <code>evaluate_subscription()</code> or used for introspection with <code>extract_topics()</code>. This provides flexible, powerful subscription logic for nodes in an event-driven system.</li>
+</ol>
+<h4 id="reserved-topics">Reserved Topics</h4>
+<p>These topics are reserved for essential system operations in the event-driven workflow, ensuring consistent handling of inputs, outputs, and user-interactive events.</p>
+<ol>
+<li>Input Topic<ul>
+<li><strong><code>agent_input_topic</code></strong>: Receives user or external inputs, starting the workflow by providing initial messages or commands for further processing.</li>
+</ul>
+</li>
+<li>Output Topics<ul>
+<li><strong><code>agent_stream_output_topic</code></strong>: Streams partial or incremental responses during long-running or asynchronous operations. Typically used for real-time updates.</li>
+<li><strong><code>agent_output_topic</code></strong>: Publishes final agent responses that are ready to be returned to the user or external systems. The <code>Assistant</code> is the only consumer of this topic.</li>
+</ul>
+</li>
+<li>Human Request Topic<ul>
+<li><strong><code>human_request_topic</code></strong>: A special topic for user involvement. When the system needs additional information or confirmation from humans, it posts requests here; once the user responds, messages are appended to the same topic and become available for downstream processing.</li>
+</ul>
+</li>
+</ol>
+<p>Using these reserved topics helps maintain a clear, consistent architecture for input processing, output streaming, final responses, and human-driven request handling. They are key building blocks for standardizing communication across the workflow.</p>
+<h3 id="event-graph">Event Graph</h3>
+<p><code>EventGraph</code> organizes events (particularly <code>ConsumeFromTopicEvent</code> and <code>PublishToTopicEvent</code>) into a directed graph structure. It traces how messages flow from published events through consumed ones, enabling advanced operations like retrieving a sorted sequence of all ancestor messages. This is especially important for Large Language Model (LLM) interactions, where the full conversation history (including intermediate nodes) must be serialized in a coherent, chronological order.</p>
+<h4 id="fields">Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nodes</code></td>
+<td>A dictionary mapping event IDs to <code>EventGraphNode</code> objects.</td>
+</tr>
+<tr>
+<td><code>root_nodes</code></td>
+<td>A list of <code>EventGraphNode</code> objects representing the starting points (e.g., directly consumed events).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="methods">Methods</h4>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_add_event(event)</code></td>
+<td>Creates a new <code>EventGraphNode</code> for a given <code>Event</code> if it does not already exist.</td>
+</tr>
+<tr>
+<td><code>build_graph(consume_events, topic_events)</code></td>
+<td>Constructs the event graph from a list of consume events and a dictionary of topic events. It links each consume event to its corresponding publish event, building upstream/downstream refs.</td>
+</tr>
+<tr>
+<td><code>get_root_event_nodes()</code></td>
+<td>Returns the root nodes, i.e., the events that begin sub-graphs (often direct consume events).</td>
+</tr>
+<tr>
+<td><code>get_topology_sorted_events()</code></td>
+<td>Performs a custom topological sort, ordering events by reverse timestamp within each dependency layer, and then reversing the result for ascending chronological output.</td>
+</tr>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Serializes the entire graph, including each node’s event and references.</td>
+</tr>
+<tr>
+<td><code>from_dict(...)</code></td>
+<td>Deserializes the graph from a dictionary, recreating each <code>EventGraphNode</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="rationale-for-topological-and-timestamp-sorting">Rationale for Topological and Timestamp Sorting</h4>
+<p>When feeding conversation or workflow history to an LLM, it’s crucial to maintain logical and temporal ordering of all ancestor events. By combining topological ordering with timestamp-based sorting, the <code>EventGraph</code> ensures:</p>
+<ol>
+<li><strong>Correct Causality</strong>: Dependencies (publish -&gt; consume) appear before reliant events.</li>
+<li><strong>Chronological Consistency</strong>: Events with similar dependency levels are ordered by their actual creation time.</li>
+<li><strong>Complete Context</strong>: The LLM receives a fully serialized token sequence of all ancestor interactions, enabling more coherent responses.</li>
+</ol>
+<p>By leveraging the <code>EventGraph</code> class, developers can reliably trace the chain of message publications and consumptions, producing a robust representation of the workflow’s complete ancestry—critical for advanced LLM tasks or debugging complex distributed processes.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>
