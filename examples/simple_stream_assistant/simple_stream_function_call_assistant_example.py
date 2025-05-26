@@ -9,7 +9,7 @@ from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 event_store = container.event_store
@@ -17,7 +17,7 @@ event_store = container.event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-class WeatherMock(FunctionTool):
+class WeatherMock(FunctionCallTool):
     @llm_function
     async def get_weather_mock(self, postcode: str) -> str:
         """

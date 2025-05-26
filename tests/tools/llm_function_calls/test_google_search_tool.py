@@ -1,12 +1,11 @@
 import json
-from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 
 
 # --------------------------------------------------------------------------- #
@@ -25,7 +24,7 @@ def mock_search():
     real network.  We yield a single fake SearchResult-like object that
     has the same public attrs (title/url/description).
     """
-    with patch("grafi.tools.functions.impl.google_search_tool.search") as mock:
+    with patch("grafi.tools.function_calls.impl.google_search_tool.search") as mock:
 
         class _FakeSearchResult:  # minimal stand-in for googlesearch.SearchResult
             def __init__(self, title, url, desc):
@@ -164,7 +163,7 @@ def test_execute_with_invalid_function(google_search_tool):
         )
     ]
 
-    # FunctionTool.execute() should ignore unknown tools → empty reply list
+    # FunctionCallTool.execute() should ignore unknown tools → empty reply list
     result = google_search_tool.execute(execution_context, bad_call_message)
     assert result == []
 
@@ -174,7 +173,7 @@ def test_execute_with_invalid_function(google_search_tool):
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
 async def test_error_handling(google_search_tool):
-    with patch("grafi.tools.functions.impl.google_search_tool.search") as mock:
+    with patch("grafi.tools.function_calls.impl.google_search_tool.search") as mock:
         mock.side_effect = Exception("Search failed")
 
         execution_context = ExecutionContext(

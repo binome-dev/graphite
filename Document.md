@@ -319,13 +319,13 @@ The [`LLMStreamResponseCommand`](/grafi/tools/llms/llm_stream_response_command.p
 
 ### Function Calling Command
 
-[`FunctionCallingCommand`](/grafi/tools/functions/function_calling_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionTool`. By assigning a `FunctionTool` to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.
+[`FunctionCallCommand`](/grafi/tools/functions/function_calling_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionCallTool`. By assigning a `FunctionCallTool` to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.
 
 Fields:
 
 | Field             | Description                                                                                 |
 |-------------------|---------------------------------------------------------------------------------------------|
-| `function_tool`   | A `FunctionTool` instance that encapsulates the registered function and its execution logic.|
+| `function_tool`   | A `FunctionCallTool` instance that encapsulates the registered function and its execution logic.|
 
 Methods:
 
@@ -336,7 +336,7 @@ Methods:
 | `get_function_specs()`                            | Retrieves the function specifications (schema, name, parameters) from the underlying `function_tool`.                  |
 | `to_dict()`                                       | Serializes the command’s current state, including the `function_tool` configuration.                                   |
 
-By passing a `FunctionTool` to the `function_tool` field, you can seamlessly integrate function-based logic into a Node’s orchestration without embedding execution details in the Node or the tool consumer. This separation keeps workflows flexible and easy to extend.
+By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly integrate function-based logic into a Node’s orchestration without embedding execution details in the Node or the tool consumer. This separation keeps workflows flexible and easy to extend.
 
 ### Embedding Response Command and RAG Response Command
 
@@ -504,9 +504,9 @@ Methods:
 
 This tool can be configured with its internal `Builder` class, allowing customization of fields such as the `api_url` or `model` before constructing an instance. By integrating `OllamaTool` into the workflow, developers can leverage local or remote Ollama services without altering the overarching event-driven logic. Messages from the workflow are passed to Ollama, and responses are returned in a consistent format, preserving a clear separation between orchestration and execution logic.
 
-### FunctionTool
+### FunctionCallTool
 
-`FunctionTool` is designed to allow Language Models (LLMs) to invoke specific Python functions directly through JSON-formatted calls. When a message from the LLM references a particular function name along with arguments, `FunctionTool` checks if it has a function matching that name and, if so, invokes it.
+`FunctionCallTool` is designed to allow Language Models (LLMs) to invoke specific Python functions directly through JSON-formatted calls. When a message from the LLM references a particular function name along with arguments, `FunctionCallTool` checks if it has a function matching that name and, if so, invokes it.
 
 This design greatly reduces the complexity of integrating advanced logic: the LLM simply issues a request to invoke a function, and the tool handles the invocation details behind the scenes.
 
@@ -514,10 +514,10 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 
 | Field               | Description                                                                                   |
 |---------------------|-----------------------------------------------------------------------------------------------|
-| `name`             | Descriptive identifier (defaults to `"FunctionTool"`).                                       |
-| `type`             | Tool type (defaults to `"FunctionTool"`).                                                    |
+| `name`             | Descriptive identifier (defaults to `"FunctionCallTool"`).                                       |
+| `type`             | Tool type (defaults to `"FunctionCallTool"`).                                                    |
 | `function_specs`   | Captures metadata describing the registered function, such as parameter definitions.          |
-| `function`         | The actual callable that `FunctionTool` invokes when a function call matches `function_specs`.|
+| `function`         | The actual callable that `FunctionCallTool` invokes when a function call matches `function_specs`.|
 | `oi_span_type`     | Semantic tracing attribute (`TOOL`) for observability.                                        |
 
 #### Methods
@@ -530,12 +530,12 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `execute`            | Evaluates whether incoming messages match the registered function’s name and, if so, calls it with the JSON arguments.  |
 | `a_execute`          | Asynchronous equivalent to `execute`, allowing concurrency if the function is a coroutine.                               |
 | `to_message`         | Converts execution results into a `Message` object, preserving context like the `tool_call_id`.                          |
-| `to_dict`            | Serializes the `FunctionTool` instance, listing function specifications for debugging or persistence.                    |
+| `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
 
 #### How It Works
 
 1. **Function Registration**: A Python function is wrapped or decorated using `@llm_function`. This generates a schema (`function_specs`) describing its name, arguments, and docstring.
-2. **Invocation**: When a message arrives specifying a function call, `FunctionTool` checks whether it corresponds to the registered function’s name.
+2. **Invocation**: When a message arrives specifying a function call, `FunctionCallTool` checks whether it corresponds to the registered function’s name.
 3. **JSON Parsing**: The arguments are parsed from the `tool_call` field. If they match, the tool dispatches the function call with the given parameters.
 4. **Response**: After execution, the returned data is converted into a new `Message`, allowing the workflow to process the function’s output seamlessly.
 
@@ -543,13 +543,13 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 
 - **Builder Pattern**: Use the builder’s `.function(...)` method to assign the function you want to expose. This ensures your function is properly decorated if not already.
 - **Flexible**: By simply swapping out the underlying callable, you can quickly adapt to new or updated logic without modifying the rest of the workflow.
-- **Observability**: Because `FunctionTool` implements the `Tool` interface and integrates with the event-driven architecture, all executions can be monitored and logged.
+- **Observability**: Because `FunctionCallTool` implements the `Tool` interface and integrates with the event-driven architecture, all executions can be monitored and logged.
 
-With `FunctionTool`, you can integrate specialized Python functions into an LLM-driven workflow with minimal extra overhead. As your system grows and evolves, it provides a clean way to add or modify functionality while retaining a uniform interaction pattern with the LLM.
+With `FunctionCallTool`, you can integrate specialized Python functions into an LLM-driven workflow with minimal extra overhead. As your system grows and evolves, it provides a clean way to add or modify functionality while retaining a uniform interaction pattern with the LLM.
 
 #### Agent Calling Tool
 
-`AgentCallingTool` extends the `FunctionTool` concept to enable multi-agent systems, allowing an LLM to call another agent by name, pass relevant arguments (as a message prompt), and return the agent’s response as part of the workflow.
+`AgentCallingTool` extends the `FunctionCallTool` concept to enable multi-agent systems, allowing an LLM to call another agent by name, pass relevant arguments (as a message prompt), and return the agent’s response as part of the workflow.
 
 Fields:
 
@@ -589,14 +589,14 @@ By integrating `AgentCallingTool` into your event-driven workflow, you can build
 
 #### Example - Weather Mock Tool
 
-A simple mock implementation of a weather service tool that inherits from `FunctionTool`. This class provides a straightforward way to use `FunctionTool`. It is easy to use - just instantiate and call the method. And implements the `FunctionTool` interface for seamless integration. Uses `@llm_function` decorator for automatic registering function.
+A simple mock implementation of a weather service tool that inherits from `FunctionCallTool`. This class provides a straightforward way to use `FunctionCallTool`. It is easy to use - just instantiate and call the method. And implements the `FunctionCallTool` interface for seamless integration. Uses `@llm_function` decorator for automatic registering function.
 
 `@llm_function` is a decorator that enables your Python functions to be seamlessly called by a Language Model (LLM). By inspecting type hints, parsing docstrings, and inferring parameter definitions, this decorator automatically constructs a `FunctionSpec` object that describes your function’s name, parameters (including default values and descriptions), and return type. It then attaches this metadata to the decorated function, making it discoverable and callable within an LLM-driven workflow.
 
 In practical terms, `@llm_function` allows an LLM to dynamically invoke your function with structured, JSON-based arguments. As a result, you can integrate arbitrary Python functions into your dialogue or workflow system without manually encoding parameter details, ensuring consistent and accurate function calls.
 
 ```python
-class WeatherMock(FunctionTool):
+class WeatherMock(FunctionCallTool):
 
     @llm_function
     async def get_weather_mock(self, postcode: str):
@@ -614,7 +614,7 @@ class WeatherMock(FunctionTool):
 
 #### Example - Tavily Search Tool
 
-[TavilyTool](/grafi/tools/functions/impl/tavily_tool.py) extends FunctionTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply `@llm_function` to the function that will be called by the LLM. By adding the `@llm_function` decorator to `web_search_using_tavily`, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.
+[TavilyTool](/grafi/tools/functions/impl/tavily_tool.py) extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply `@llm_function` to the function that will be called by the LLM. By adding the `@llm_function` decorator to `web_search_using_tavily`, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.
 
 TavilyTool fields:
 
@@ -649,7 +649,7 @@ You can customize TavilyTool by extending `web_search_using_tavily` with additio
 
 ### Customized Tools
 
-When your requirements exceed what `FunctionTool` can provide, you can implement a custom tool within the framework, ensuring your specialized logic and configuration remain fully integrated into the event-driven workflow.
+When your requirements exceed what `FunctionCallTool` can provide, you can implement a custom tool within the framework, ensuring your specialized logic and configuration remain fully integrated into the event-driven workflow.
 
 Here are two examples
 

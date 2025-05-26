@@ -13,8 +13,8 @@ from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.functions.function_calling_command import FunctionCallingCommand
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
@@ -39,7 +39,7 @@ class SimpleStreamFunctionCallAssistant(StreamAssistant):
     model: str = Field(default="gpt-4o-mini")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionTool
+    function_tool: FunctionCallTool
 
     workflow: EventDrivenWorkflow
 
@@ -78,7 +78,7 @@ class SimpleStreamFunctionCallAssistant(StreamAssistant):
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def function_tool(self, function_tool: FunctionTool) -> Self:
+        def function_tool(self, function_tool: FunctionCallTool) -> Self:
             self._assistant.function_tool = function_tool
             return self
 
@@ -132,9 +132,7 @@ class SimpleStreamFunctionCallAssistant(StreamAssistant):
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.function_tool)
-                .build()
+                FunctionCallCommand.Builder().function_tool(self.function_tool).build()
             )
             .publish_to(function_result_topic)
             .build()

@@ -14,7 +14,7 @@ from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
-from grafi.tools.functions.function_calling_command import FunctionCallingCommand
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 
 
 class LLMFunctionCallNode(Node):
@@ -23,7 +23,7 @@ class LLMFunctionCallNode(Node):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
     name: str = "LLMFunctionCallNode"
     type: str = "LLMFunctionCallNode"
-    command: FunctionCallingCommand
+    command: FunctionCallCommand
 
     class Builder(Node.Builder):
         """Concrete builder for LLMFunctionCallNode."""

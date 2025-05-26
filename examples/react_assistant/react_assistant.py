@@ -5,7 +5,8 @@
 #                |--- observation <-|
 
 import os
-from typing import Optional, Self
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -17,8 +18,8 @@ from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.functions.function_calling_command import FunctionCallingCommand
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
@@ -35,7 +36,7 @@ class ReActAssistant(Assistant):
     action_llm_system_message: Optional[str] = Field(default=None)
     observation_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
-    search_tool: FunctionTool
+    search_tool: FunctionCallTool
     model: str = Field(default="gpt-4o-mini")
 
     class Builder(Assistant.Builder):
@@ -53,15 +54,11 @@ class ReActAssistant(Assistant):
             self._assistant.api_key = api_key
             return self
 
-        def thought_llm_system_message(
-            self, thought_llm_system_message: str
-        ) -> Self:
+        def thought_llm_system_message(self, thought_llm_system_message: str) -> Self:
             self._assistant.thought_llm_system_message = thought_llm_system_message
             return self
 
-        def action_llm_system_message(
-            self, action_llm_system_message: str
-        ) -> Self:
+        def action_llm_system_message(self, action_llm_system_message: str) -> Self:
             self._assistant.action_llm_system_message = action_llm_system_message
             return self
 
@@ -73,13 +70,11 @@ class ReActAssistant(Assistant):
             )
             return self
 
-        def summary_llm_system_message(
-            self, summary_llm_system_message: str
-        ) -> Self:
+        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def search_tool(self, search_tool: FunctionTool) -> Self:
+        def search_tool(self, search_tool: FunctionCallTool) -> Self:
             self._assistant.search_tool = search_tool
             return self
 
@@ -169,7 +164,7 @@ class ReActAssistant(Assistant):
             .name("SearchFunctionNode")
             .subscribe(action_result_search_topic)
             .command(
-                FunctionCallingCommand.Builder().function_tool(self.search_tool).build()
+                FunctionCallCommand.Builder().function_tool(self.search_tool).build()
             )
             .publish_to(search_function_result_topic)
             .build()

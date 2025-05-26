@@ -10,7 +10,7 @@ from examples.function_call_assistant.simple_function_call_assistant import (
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.mcp_tool import MCPTool
+from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 
 # Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.

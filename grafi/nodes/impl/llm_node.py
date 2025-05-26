@@ -10,6 +10,9 @@ from pydantic import Field
 from grafi.common.containers.container import container
 from grafi.common.decorators.record_node_a_execution import record_node_a_execution
 from grafi.common.decorators.record_node_execution import record_node_execution
+from grafi.common.events.assistant_events.assistant_respond_event import (
+    AssistantRespondEvent,
+)
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -82,6 +85,36 @@ class LLMNode(Node):
         execution_context: ExecutionContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
+        """Prepare the input for the LLM command based on the node input and execution context."""
+
+        # Get conversation history messages from the event store
+
+        conversation_events = container.event_store.get_conversation_events(
+            execution_context.conversation_id
+        )
+
+        assistant_respond_event_dict = {
+            event.event_id: event
+            for event in conversation_events
+            if isinstance(event, AssistantRespondEvent)
+        }
+
+        # Get all the input and output message from assistant respond events as list
+        all_messages: Messages = []
+        for event in assistant_respond_event_dict.values():
+            if (
+                event.execution_context.assistant_request_id
+                != execution_context.assistant_request_id
+            ):
+                all_messages.extend(event.input_data)
+                all_messages.extend(event.output_data)
+
+        # Sort the messages by timestamp
+        sorted_messages: Messages = sorted(
+            all_messages, key=lambda item: item.timestamp
+        )
+
+        # Retrieve agent events related to the current assistant request
         agent_events = container.event_store.get_agent_events(
             execution_context.assistant_request_id
         )
@@ -134,7 +167,9 @@ class LLMNode(Node):
             last_message = messages[-1]
             last_message.tools = [spec.to_openai_tool() for spec in self.function_specs]
 
-        return messages
+        sorted_messages.extend(messages)
+
+        return sorted_messages
 
     def to_dict(self) -> dict[str, Any]:
         return {

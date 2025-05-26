@@ -8,7 +8,7 @@ from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 api_key = os.getenv("OPENAI_API_KEY", "")
@@ -16,7 +16,7 @@ api_key = os.getenv("OPENAI_API_KEY", "")
 event_store = container.event_store
 
 
-class WeatherMock(FunctionTool):
+class WeatherMock(FunctionCallTool):
     name: str = "WeatherMock"
 
     @llm_function
@@ -33,7 +33,7 @@ class WeatherMock(FunctionTool):
         return f"The weather of {postcode} is bad now."
 
 
-class PopulationMock(FunctionTool):
+class PopulationMock(FunctionCallTool):
     name: str = "PopulationMock"
 
     @llm_function
@@ -50,7 +50,7 @@ class PopulationMock(FunctionTool):
         return f"The population of {postcode} is about 100,000 at this moment."
 
 
-class HousePriceMock(FunctionTool):
+class HousePriceMock(FunctionCallTool):
     name: str = "HousePriceMock"
 
     @llm_function

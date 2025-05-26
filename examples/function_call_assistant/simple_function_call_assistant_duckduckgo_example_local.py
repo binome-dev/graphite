@@ -7,7 +7,7 @@ from examples.function_call_assistant.simple_function_call_assistant import (
 from grafi.common.containers.container import container
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.duckduckgo_tool import DuckDuckGoTool
+from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 
 
 event_store = container.event_store

@@ -1,5 +1,6 @@
 import os
-from typing import Optional, Self
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -12,8 +13,8 @@ from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.functions.function_calling_command import FunctionCallingCommand
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
@@ -44,7 +45,7 @@ class SimpleHITLAssistant(Assistant):
     model: str = Field(default="gpt-4o-mini")
     hitl_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
-    hitl_request: FunctionTool
+    hitl_request: FunctionCallTool
 
     class Builder(Assistant.Builder):
         """Concrete builder for SimpleHITLAssistant."""
@@ -65,21 +66,15 @@ class SimpleHITLAssistant(Assistant):
             self._assistant.model = model
             return self
 
-        def hitl_llm_system_message(
-            self, hitl_llm_system_message: str
-        ) -> Self:
+        def hitl_llm_system_message(self, hitl_llm_system_message: str) -> Self:
             self._assistant.hitl_llm_system_message = hitl_llm_system_message
             return self
 
-        def summary_llm_system_message(
-            self, summary_llm_system_message: str
-        ) -> Self:
+        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
             self._assistant.summary_llm_system_message = summary_llm_system_message
             return self
 
-        def hitl_request(
-            self, hitl_request: FunctionTool
-        ) -> Self:
+        def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
             self._assistant.hitl_request = hitl_request
             return self
 
@@ -132,9 +127,7 @@ class SimpleHITLAssistant(Assistant):
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
             .command(
-                FunctionCallingCommand.Builder()
-                .function_tool(self.hitl_request)
-                .build()
+                FunctionCallCommand.Builder().function_tool(self.hitl_request).build()
             )
             .publish_to(human_request_topic)
             .build()

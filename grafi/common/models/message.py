@@ -4,7 +4,6 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import Iterable
 from typing import List
-from typing import Literal
 from typing import Optional
 from typing import Union
 
@@ -14,6 +13,7 @@ from openai.types.chat.chat_completion_message import FunctionCall
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
 )
+from openai.types.chat.chat_completion_role import ChatCompletionRole
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import BaseModel
 from pydantic import Field
@@ -49,7 +49,7 @@ class Message(BaseModel):
     audio response from the model.
     [Learn more](https://platform.openai.com/docs/guides/audio).
     """
-    role: Literal["system", "user", "assistant", "tool"]
+    role: ChatCompletionRole
     tool_call_id: Optional[str] = None
     tools: Optional[Iterable[ChatCompletionToolParam]] = None
     function_call: Optional[FunctionCall] = None

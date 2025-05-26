@@ -12,9 +12,6 @@ from grafi.common.decorators.record_workflow_a_execution import (
     record_workflow_a_execution,
 )
 from grafi.common.decorators.record_workflow_execution import record_workflow_execution
-from grafi.common.events.assistant_events.assistant_respond_event import (
-    AssistantRespondEvent,
-)
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -354,31 +351,6 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         if len(events) == 0:
-            # Get all the assistant respond events given converstion id as workflow input
-
-            conversation_events = container.event_store.get_conversation_events(
-                execution_context.conversation_id
-            )
-
-            assistant_respond_event_dict = {
-                event.event_id: event
-                for event in conversation_events
-                if isinstance(event, AssistantRespondEvent)
-            }
-
-            # Get all the input and output message from assistant respond events as list
-            all_messages: Messages = []
-            for event in assistant_respond_event_dict.values():
-                all_messages.extend(event.input_data)
-                all_messages.extend(event.output_data)
-
-            # Sort the messages by timestamp
-            sorted_messages: Messages = sorted(
-                all_messages, key=lambda item: item.timestamp
-            )
-
-            # Add the input data from the current assistant input
-            sorted_messages.extend(input)
 
             # Initialize by publish input data to input topic
             input_topic = self.topics.get(AGENT_INPUT_TOPIC)
@@ -389,7 +361,7 @@ class EventDrivenWorkflow(Workflow):
                 execution_context=execution_context,
                 publisher_name=self.name,
                 publisher_type=self.type,
-                data=sorted_messages,
+                data=input,
                 consumed_events=[],
             )
             container.event_store.record_event(event)

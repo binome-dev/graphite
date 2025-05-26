@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 from typing import Optional
 from typing import Self
 
@@ -10,16 +11,19 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
+from grafi.nodes.impl.function_node import FunctionNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
-from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.functions.function_command import FunctionCommand
+from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
-class SimpleFunctionCallAssistant(Assistant):
+OutputType = type
+
+
+class SimpleFunctionLLMAssistant(Assistant):
     """
     A simple assistant class that uses OpenAI's language model to process input,
     make function calls, and generate responses.
@@ -38,24 +42,23 @@ class SimpleFunctionCallAssistant(Assistant):
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    name: str = Field(default="SimpleFunctionCallAssistant")
-    type: str = Field(default="SimpleFunctionCallAssistant")
+    name: str = Field(default="SimpleFunctionLLMAssistant")
+    type: str = Field(default="SimpleFunctionLLMAssistant")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionCallTool
+    output_format: OutputType
+    function: Callable
 
     class Builder(Assistant.Builder):
-        """Concrete builder for SimpleFunctionCallAssistant."""
+        """Concrete builder for SimpleFunctionLLMAssistant."""
 
-        _assistant: "SimpleFunctionCallAssistant"
+        _assistant: "SimpleFunctionLLMAssistant"
 
         def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
-        def _init_assistant(self) -> "SimpleFunctionCallAssistant":
-            return SimpleFunctionCallAssistant.model_construct()
+        def _init_assistant(self) -> "SimpleFunctionLLMAssistant":
+            return SimpleFunctionLLMAssistant.model_construct()
 
         def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
@@ -65,32 +68,20 @@ class SimpleFunctionCallAssistant(Assistant):
             self._assistant.model = model
             return self
 
-        def function_call_llm_system_message(
-            self, function_call_llm_system_message: str
-        ) -> Self:
-            self._assistant.function_call_llm_system_message = (
-                function_call_llm_system_message
-            )
+        def output_format(self, output_format: OutputType) -> Self:
+            self._assistant.output_format = output_format
             return self
 
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
+        def function(self, function: Callable) -> Self:
+            self._assistant.function = function
             return self
 
-        def function_tool(self, function_tool: FunctionCallTool) -> Self:
-            self._assistant.function_tool = function_tool
-            return self
-
-        def build(self) -> "SimpleFunctionCallAssistant":
+        def build(self) -> "SimpleFunctionLLMAssistant":
             self._assistant._construct_workflow()
             return self._assistant
 
-    def _construct_workflow(self) -> "SimpleFunctionCallAssistant":
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
-            is not None,  # only when the last message is a function call
-        )
+    def _construct_workflow(self) -> "SimpleFunctionLLMAssistant":
+        function_topic = Topic(name="function_call_topic")
 
         llm_input_node = (
             LLMNode.Builder()
@@ -103,54 +94,24 @@ class SimpleFunctionCallAssistant(Assistant):
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
-                    .system_message(self.function_call_llm_system_message)
+                    .chat_params({"response_format": self.output_format})
                     .build()
                 )
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(agent_output_topic)
+            .publish_to(function_topic)
             .build()
         )
 
-        # Create a function call node
-
-        function_result_topic = Topic(name="function_result_topic")
-
-        agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
-        )
+        # Create a function node
 
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            FunctionNode.Builder()
             .name("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
+            .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
             .command(
-                FunctionCallCommand.Builder().function_tool(self.function_tool).build()
-            )
-            .publish_to(function_result_topic)
-            .build()
-        )
-
-        # Create an output LLM node
-        llm_output_node = (
-            LLMNode.Builder()
-            .name("OpenAIOutputNode")
-            .subscribe(
-                SubscriptionBuilder().subscribed_to(function_result_topic).build()
-            )
-            .command(
-                LLMResponseCommand.Builder()
-                .llm(
-                    OpenAITool.Builder()
-                    .name("UserOutputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+                FunctionCommand.Builder()
+                .function_tool(FunctionTool.Builder().function(self.function).build())
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -163,7 +124,6 @@ class SimpleFunctionCallAssistant(Assistant):
             .name("simple_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
-            .node(llm_output_node)
             .build()
         )
 

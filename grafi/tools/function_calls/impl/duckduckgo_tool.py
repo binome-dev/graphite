@@ -3,7 +3,7 @@ from typing import Any
 from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 try:
@@ -14,9 +14,9 @@ except ImportError:
     )
 
 
-class DuckDuckGoTool(FunctionTool):
+class DuckDuckGoTool(FunctionCallTool):
     """
-    DuckDuckGoTool extends FunctionTool to provide web search functionality using the DuckDuckGo Search API.
+    DuckDuckGoTool extends FunctionCallTool to provide web search functionality using the DuckDuckGo Search API.
     """
 
     # Set up API key and Tavily client
@@ -27,7 +27,7 @@ class DuckDuckGoTool(FunctionTool):
     proxy: str | None = None
     timeout: int = 10
 
-    class Builder(FunctionTool.Builder):
+    class Builder(FunctionCallTool.Builder):
         """Concrete builder for DuckDuckGoTool."""
 
         _tool: "DuckDuckGoTool"

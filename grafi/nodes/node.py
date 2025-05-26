@@ -19,7 +19,6 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import SubExpr
 from grafi.common.topics.topic_expression import TopicExpr
@@ -69,13 +68,13 @@ class Node(BaseModel):
             self._node.command = command
             return self
 
-        def subscribe(self, subscribe_to: Union[Topic, SubExpr]) -> Self:
+        def subscribe(self, subscribe_to: Union[TopicBase, SubExpr]) -> Self:
             """
             Begin building a DSL expression. Returns a SubscriptionDSL.Builder,
             which the user can chain with:
                 .subscribed_to(topicA).and_().subscribed_to(topicB).build()
             """
-            if isinstance(subscribe_to, Topic):
+            if isinstance(subscribe_to, TopicBase):
                 self._node.subscribed_expressions.append(TopicExpr(topic=subscribe_to))
             elif isinstance(subscribe_to, SubExpr):
                 self._node.subscribed_expressions.append(subscribe_to)

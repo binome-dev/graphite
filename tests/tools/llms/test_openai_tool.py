@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from openai import NOT_GIVEN
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
@@ -84,7 +85,7 @@ def test_execute_simple_response(monkeypatch, openai_instance, execution_context
             "tool_call_id": None,
         },
     ]
-    assert call_args["tools"] is None
+    assert call_args["tools"] is NOT_GIVEN
 
 
 def test_execute_function_call(monkeypatch, openai_instance, execution_context):

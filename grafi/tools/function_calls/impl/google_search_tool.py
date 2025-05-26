@@ -8,7 +8,7 @@ from typing import Self
 from loguru import logger
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 try:
@@ -27,9 +27,9 @@ except ImportError:
     )
 
 
-class GoogleSearchTool(FunctionTool):
+class GoogleSearchTool(FunctionCallTool):
     """
-    Google Search extends FunctionTool to provide web search functionality using the Google Search API.
+    Google Search extends FunctionCallTool to provide web search functionality using the Google Search API.
     """
 
     name: str = "GoogleSearchTool"
@@ -40,7 +40,7 @@ class GoogleSearchTool(FunctionTool):
     proxy: Optional[str] = None
     timeout: Optional[int] = 10
 
-    class Builder(FunctionTool.Builder):
+    class Builder(FunctionCallTool.Builder):
         """Concrete builder for GoogleSearchTool."""
 
         _tool: "GoogleSearchTool"

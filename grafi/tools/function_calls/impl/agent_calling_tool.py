@@ -15,10 +15,10 @@ from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
-class AgentCallingTool(FunctionTool):
+class AgentCallingTool(FunctionCallTool):
     name: str = "AgentCallingTool"
     type: str = "AgentCallingTool"
     agent_name: str = ""
@@ -27,7 +27,7 @@ class AgentCallingTool(FunctionTool):
     agent_call: Callable[[ExecutionContext, Message], Any]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    class Builder(FunctionTool.Builder):
+    class Builder(FunctionCallTool.Builder):
 
         _tool: "AgentCallingTool"
 

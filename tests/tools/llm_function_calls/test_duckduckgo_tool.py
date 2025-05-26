@@ -6,7 +6,7 @@ import pytest
 
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.tools.functions.impl.duckduckgo_tool import DuckDuckGoTool
+from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def duckduckgo_tool() -> DuckDuckGoTool:
 
 @pytest.fixture
 def mock_ddgs():
-    with patch("grafi.tools.functions.impl.duckduckgo_tool.DDGS") as mock:
+    with patch("grafi.tools.function_calls.impl.duckduckgo_tool.DDGS") as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
         mock_instance.text.return_value = [
@@ -122,7 +122,7 @@ def test_execute_with_invalid_function_name(duckduckgo_tool):
 
 @pytest.mark.asyncio
 async def test_error_handling(duckduckgo_tool):
-    with patch("grafi.tools.functions.impl.duckduckgo_tool.DDGS") as mock:
+    with patch("grafi.tools.function_calls.impl.duckduckgo_tool.DDGS") as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
         mock_instance.text.side_effect = Exception("Search failed")

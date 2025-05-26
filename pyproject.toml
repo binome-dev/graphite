@@ -16,6 +16,7 @@ openinference-instrumentation-openai = "^0.1.14"
 arize-otel = "^0.5.3"
 loguru = "^0.7.3"
 types-deprecated = "^1.2.15.20250304"
+jsonpickle = "^4.1.0"
 
 
 
@@ -87,6 +88,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "googlesearch.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "jsonpickle.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

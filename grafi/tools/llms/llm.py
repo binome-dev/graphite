@@ -21,6 +21,11 @@ class LLM(Tool):
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
+    structured_output: bool = Field(
+        default=False,
+        description="Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text).",
+    )
+
     class Builder(Tool.Builder):
         """Concrete builder for LLM."""
 
@@ -34,6 +39,8 @@ class LLM(Tool):
 
         def chat_params(self, params: Dict[str, Any]) -> Self:
             self._tool.chat_params = params
+            if "response_format" in params:
+                self._tool.structured_output = True
             return self
 
         def system_message(self, system_message: Optional[str]) -> Self:
