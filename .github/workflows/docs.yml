@@ -8,6 +8,11 @@ on:
   
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 env:
   PYTHON_VERSION: "3.12"
 jobs:
