@@ -20,10 +20,11 @@ jobs:
         with:
           version: "latest"
 
-      - name: Create virtualenv and install dependencies
+      - name: Update Dependencies
         working-directory: ./docs
         run: |
-          uv sync
+          uv venv .venv
+          .venv/bin/uv sync
 
       - name: Build MkDocs site
         working-directory: ./docs
