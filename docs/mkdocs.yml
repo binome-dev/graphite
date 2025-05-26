@@ -3,8 +3,8 @@ theme:
   palette:
     accent: blue grey
     #scheme: default
-  logo: static/logo.png
-  favicon: static/favicon.png 
+  logo: static/GRAPHITE_icon_Dark.png
+  favicon: static/GRAPHITE_Favico_Dark.png
   font:
     code: Roboto Mono
 nav:
