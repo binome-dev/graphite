@@ -6,7 +6,12 @@ on:
       - "**"
     tags:
       - "v*.*.*"
-
+    paths:
+      - garfi/**
+      - tests/**
+      - poetry.lock
+      - poetry.toml
+      - pyproject.toml
 
 concurrency:
   group: graphite-ci-pipeline

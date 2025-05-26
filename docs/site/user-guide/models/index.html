@@ -1,0 +1,1456 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../executor/">
+      
+      
+        <link rel="next" href="../topics/">
+      
+      
+      <link rel="icon" href="../../static/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Models - graphite</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue-grey">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#message" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="graphite" class="md-header__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            graphite
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Models
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="graphite" class="md-nav__button md-logo" aria-label="graphite" data-md-component="logo">
+      
+  <img src="../../static/logo.png" alt="logo">
+
+    </a>
+    graphite
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quickstart
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Core Concepts
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Core Concepts
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Arhitecture Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../assistant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Assistant
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event-driven-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Event Driven Workflow
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Command
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Tools
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_6">
+            <span class="md-nav__icon md-icon"></span>
+            Tools
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tools Core
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/openai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    OpenAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/ollama/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ollama
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/function-call/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Function Calls
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Executor
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#message" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Message">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-activity-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Component activity event
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publish-and-subscribe-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publish and Subscribe Event
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Topics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventional-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Conventional Rules
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#message" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Message">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-activity-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Component activity event
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publish-and-subscribe-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      Publish and Subscribe Event
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Models</h1>
+
+<p>In the Graphite, varies models provide the fundamental data structures that underpin the event-driven workflow. Message represents the content exchanged between users, assistants, and language models, enabling consistent communication and processing. Event captures the various actions and state changes in the system, from workflow initiation to final outputs. Meanwhile, Topic defines the named channels where events are published and consumed, establishing a structured mechanism for coordinating data flow across the platform.</p>
+<h3 id="message">Message</h3>
+<p><code>Message</code> extends OpenAI’s <code>ChatCompletionMessage</code>, serving as a standardized data structure for both incoming and outgoing content in the event-driven workflow. Each <code>Message</code> instance retains essential metadata such as timestamps, unique identifiers, and optional tool references, facilitating robust and traceable communication between users, assistants, and LLM tools.</p>
+<h4 id="fields">Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>An optional name indicating the source or identifier for the message (e.g., function name).</td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td>A unique identifier for the message, defaulting to a generated UUID.</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>The time in nanoseconds when the message was created, allowing strict chronological ordering.</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>Specifies the speaker’s role (<code>system</code>, <code>user</code>, <code>assistant</code>, or <code>tool</code>).</td>
+</tr>
+<tr>
+<td><code>tool_call_id</code></td>
+<td>Associates the message with a particular tool invocation if relevant.</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td>An optional list of OpenAI's <code>ChatCompletionToolParam</code> for referencing available tool calls.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="usage-example">Usage Example</h4>
+<pre><code class="language-python">from grafi.common.models.message import Message
+
+# Creating a user message
+user_message = Message(
+    role=&quot;user&quot;,
+    content=&quot;What is the capital of France?&quot;
+)
+
+# Creating an assistant message
+assistant_message = Message(
+    role=&quot;assistant&quot;,
+    content=&quot;The capital of France is Paris.&quot;
+)
+</code></pre>
+<p>In both cases, the <code>Message</code> class provides a consistent structure for storing conversation state, bridging the gap between OpenAI’s chat messages and the system’s event-driven architecture.</p>
+<h3 id="event">Event</h3>
+<p><code>Event</code> is the foundational data model in the event driven architecture, capturing the common fields and logic shared by all event types. Each subclass of <code>Event</code> (e.g., Node events, Topic events) extends this base with specialized data. The core <code>Event</code> model also offers a standard interface for serialization (<code>to_dict</code>) and deserialization (<code>from_dict</code>), promoting consistency across the platform.</p>
+<p>The <code>Event</code> fields are:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_id</code></td>
+<td>Unique identifier for the event, defaulting to a generated UUID.</td>
+</tr>
+<tr>
+<td><code>execution_context</code></td>
+<td>A reference to the workflow’s current state, including assistant request details and other metadata.</td>
+</tr>
+<tr>
+<td><code>event_type</code></td>
+<td>An <code>EventType</code> enum value describing the kind of event (e.g., NodeInvoke, ToolRespond).</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>The UTC timestamp of event creation, used for ordering and auditing.</td>
+</tr>
+</tbody>
+</table>
+<p>The benefits are:</p>
+<ul>
+<li><strong>Consistency</strong>: All events adhere to the same schema for IDs, context, and timestamps.</li>
+<li><strong>Extensibility</strong>: Subclasses can introduce additional fields while still retaining base serialization logic.</li>
+<li><strong>Traceability</strong>: The shared timestamp and <code>execution_context</code> fields provide a reliable audit trail.</li>
+</ul>
+<p>By leveraging this <strong>Event</strong> model, the system enforces uniform data handling for everything from node invocations to assistant responses, simplifying debugging and logging throughout the workflow lifecycle.</p>
+<h4 id="component-activity-event">Component activity event</h4>
+<p>In the Graphite’s layered architecture, each principal component (Assistant, Node, Tool, and Workflow) can invoke, respond, or fail during execution. And there are events associate with each actions, such as invoke  event, respond event and failed event. For nodes specifically, these actions are tracked as three distinct event types:</p>
+<ol>
+<li><strong>NodeInvokeEvent</strong>: The node is invoked with input data.</li>
+<li><strong>NodeRespondEvent</strong>: The node completes execution and returns output data.</li>
+<li><strong>NodeFailedEvent</strong>: The node encounters an error during execution.</li>
+</ol>
+<p>These events capture the inputs, outputs, timestamps, and other metadata essential for observing and debugging node behavior.</p>
+<p>Here is the <code>Node</code> base event <code>NodeEvent</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node_id</code></td>
+<td>Unique identifier for the node. Defaults to a generated UUID.</td>
+</tr>
+<tr>
+<td><code>node_name</code></td>
+<td>Human-readable name of the node.</td>
+</tr>
+<tr>
+<td><code>node_type</code></td>
+<td>Describes the functional category of the node (e.g., "LLMNode").</td>
+</tr>
+<tr>
+<td><code>subscribed_topics</code></td>
+<td>The list of event topics to which this node is subscribed.</td>
+</tr>
+<tr>
+<td><code>publish_to_topics</code></td>
+<td>The list of event topics where the node publishes output.</td>
+</tr>
+<tr>
+<td><code>execution_context</code></td>
+<td>Workflow metadata, including request details and IDs.</td>
+</tr>
+<tr>
+<td><code>event_type</code></td>
+<td>The specific event variant: <code>NODE_INVOKE</code>, <code>NODE_RESPOND</code>, or <code>NODE_FAILED</code>.</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>The UTC timestamp when the event was generated.</td>
+</tr>
+</tbody>
+</table>
+<p>and the <code>Node</code> base event methods</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node_event_dict()</code></td>
+<td>Returns a dictionary merging base event data (<code>event_dict()</code>) with node-specific fields (e.g., ID, topics).</td>
+</tr>
+<tr>
+<td><code>node_event_base()</code></td>
+<td>Class method that reconstructs node-specific fields (like <code>node_id</code> and <code>node_name</code>) from a dictionary.</td>
+</tr>
+<tr>
+<td><code>event_dict()</code></td>
+<td>Inherited from <code>Event</code>; provides flattening of <code>execution_context</code> and standard event metadata.</td>
+</tr>
+<tr>
+<td><code>event_base()</code></td>
+<td>Inherited from <code>Event</code>; extracts <code>event_id</code>, <code>event_type</code>, and <code>timestamp</code> from a serialized event.</td>
+</tr>
+<tr>
+<td><code>to_dict()</code> / <code>from_dict()</code></td>
+<td>Implemented in subclasses, each adjusts data serialization or deserialization for the event’s unique fields.</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeInvokeEvent</code> extended from  <code>NodeEvent</code>, with additional field:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td>A list of <code>ConsumeFromTopicEvent</code> representing the node’s consumed messages upon invocation.</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeInvokeEvent</code> implemented the serialise and deserialise methods <code>to_dict()</code> and <code>from_dict(data)</code>.  </p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Returns the merged dictionary from <code>node_event_dict()</code> plus the serialized list of input events (<code>input_data</code>).</td>
+</tr>
+<tr>
+<td><code>from_dict(data)</code></td>
+<td>Class method that calls <code>node_event_base</code> for the base event fields, then rebuilds <code>input_data</code> by deserializing each consumed event dict.</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeRespondEvent</code> extended from <code>NodeEvent</code>, with two additional fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td>A list of <code>ConsumeFromTopicEvent</code> messages that the node consumed.</td>
+</tr>
+<tr>
+<td><code>output_data</code></td>
+<td>The resulting message(s) (<code>Message</code> or list of <code>Message</code>) produced by the node’s execution.</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeRespondEvent</code> implemented the serialise and deserialise methods <code>to_dict()</code> and <code>from_dict(data)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Calls <code>node_event_dict()</code> and includes JSON-serialized <code>output_data</code>.</td>
+</tr>
+<tr>
+<td><code>from_dict()</code></td>
+<td>Deserializes <code>input_data</code> and <code>output_data</code>; uses <code>node_event_base</code> for common fields.</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeFailedEvent</code> extended from  <code>NodeEvent</code>, with additional field:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td>A list of <code>ConsumeFromTopicEvent</code> messages that led to this error condition.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>Contains information about the error encountered (stack trace, message, or custom error object).</td>
+</tr>
+</tbody>
+</table>
+<p><code>NodeFailedEvent</code> implemented the serialise and deserialise methods <code>to_dict()</code> and <code>from_dict(data)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Uses <code>node_event_dict()</code> and adds an <code>error</code> field.</td>
+</tr>
+<tr>
+<td><code>from_dict()</code></td>
+<td>Builds the event from <code>node_event_base</code>, restoring <code>input_data</code> and capturing <code>error</code> details.</td>
+</tr>
+</tbody>
+</table>
+<p>Collectively, these <strong>Node Activity Events</strong> form a consistent pattern for tracking node lifecycle across invoke, respond, and fail states. The same concept applies to other components in the system (e.g., Assistant, Tool, Workflow), each featuring its respective invoke, respond, and failed events. This design ensures clear traceability and systematic error handling within the event-driven workflow architecture.</p>
+<h4 id="publish-and-subscribe-event">Publish and Subscribe Event</h4>
+<p>Publish and subscribe events capture data published to or consumed from specific channels - topics - in the system. They enable Nodes to communicate asynchronously by sending and receiving messages on named topics. The platform distinguishes three main types:</p>
+<ol>
+<li><strong>PublishToTopicEvent</strong>: Emitted when data is published to a topic.</li>
+<li><strong>ConsumeFromTopicEvent</strong>: Occurs when a consumer retrieves data from a topic.</li>
+<li><strong>OutputTopicEvent</strong>: A special publish event intended for final user-facing outputs, typically consumed by an Assistant.</li>
+</ol>
+<p><code>TopicEvent</code> is the base event, it extends from <code>Event</code> class, and added following fields</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>topic_name</code></td>
+<td>Identifies the topic to which this event pertains (e.g., "agent_input", "agent_output").</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td>A numeric indicator of the event’s position in the topic stream.</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>The message(s) (or generator of messages) being transferred.</td>
+</tr>
+<tr>
+<td><code>event_id</code></td>
+<td>Inherited from <code>Event</code>; unique identifier for this event.</td>
+</tr>
+<tr>
+<td><code>event_type</code></td>
+<td>Inherited from <code>Event</code>; marks it as a topic event variant (e.g., <code>PUBLISH_TO_TOPIC</code>).</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>Inherited from <code>Event</code>; records the time the event was created (UTC).</td>
+</tr>
+<tr>
+<td><code>execution_context</code></td>
+<td>Inherited from <code>Event</code>; includes metadata such as <code>assistant_request_id</code> for tracing.</td>
+</tr>
+</tbody>
+</table>
+<p><code>TopicEvent</code> has following methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>topic_event_dict()</code></td>
+<td>Combines base event data (<code>event_dict()</code>) with topic-specific fields and JSON-serialized <code>data</code>.</td>
+</tr>
+<tr>
+<td><code>topic_event_base(dict)</code></td>
+<td>Class method that deserializes topic data (including <code>Message</code> objects) and merges with base event fields.</td>
+</tr>
+<tr>
+<td><code>event_dict()</code></td>
+<td>From the <code>Event</code> class; flattens <code>execution_context</code> and includes standard metadata (event ID, type, etc.).</td>
+</tr>
+<tr>
+<td><code>event_base(dict)</code></td>
+<td>From the <code>Event</code> class; extracts <code>event_id</code>, <code>event_type</code>, and <code>timestamp</code>.</td>
+</tr>
+<tr>
+<td><code>to_dict() / from_dict()</code></td>
+<td>Implemented in each subclass, customizing how <code>data</code> or additional fields are serialized.</td>
+</tr>
+</tbody>
+</table>
+<p><code>PublishToTopicEvent</code> extends <code>TopicEvent</code> with following additional fields</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumed_event_ids</code></td>
+<td>A list of event IDs indicating which prior events (e.g., consumed messages) led to this publish.</td>
+</tr>
+<tr>
+<td><code>publisher_name</code></td>
+<td>The name of the component (Node, Assistant, etc.) publishing the data.</td>
+</tr>
+<tr>
+<td><code>publisher_type</code></td>
+<td>The type/category of the publisher (e.g., "Node", "Assistant").</td>
+</tr>
+</tbody>
+</table>
+<p><code>PublishToTopicEvent</code> implemented the following methods</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Adds <code>consumed_event_ids</code>, <code>publisher_name</code>, and <code>publisher_type</code> to the standard topic event dict.</td>
+</tr>
+<tr>
+<td><code>from_dict(dict)</code></td>
+<td>Recreates the event by merging base topic fields with the additional publisher-related fields.</td>
+</tr>
+</tbody>
+</table>
+<p><code>ConsumeFromTopicEvent</code> extends <code>TopicEvent</code> with following additional fields</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumer_name</code></td>
+<td>The name of the component consuming the data (Node, Assistant, etc.).</td>
+</tr>
+<tr>
+<td><code>consumer_type</code></td>
+<td>The category or type of the consumer (e.g., "Node", "Assistant").</td>
+</tr>
+</tbody>
+</table>
+<p><code>ConsumeFromTopicEvent</code> implemented the following methods</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Adds consumer-specific fields (<code>consumer_name</code>, <code>consumer_type</code>) to the base topic event data.</td>
+</tr>
+<tr>
+<td><code>from_dict(dict)</code></td>
+<td>Restores the consume event by parsing both base topic fields and the consumer-related fields.</td>
+</tr>
+</tbody>
+</table>
+<p><code>OutputTopicEvent</code> is a special form of <code>PublishToTopicEvent</code> used exclusively for final outputs. Typically consumed by an <strong>Assistant</strong> to relay data back to the user.</p>
+<p><code>OutputTopicEvent</code>'s additional details are</p>
+<ul>
+<li><strong>EventType</strong> is fixed to <code>OUTPUT_TOPIC</code>.</li>
+<li><code>data</code> can be a single <code>Message</code>, multiple <code>Message</code> objects, or a generator of messages. Currently, serialization is pending further implementation.</li>
+</ul>
+<p><code>OutputTopicEvent</code> implemented the following methods</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_dict()</code></td>
+<td>Extends <code>PublishToTopicEvent.to_dict()</code>, placeholder for future data serialization logic.</td>
+</tr>
+<tr>
+<td><code>from_dict(dict)</code></td>
+<td>Placeholder for data deserialization from a dictionary, to be implemented.</td>
+</tr>
+</tbody>
+</table>
+<p>These topic-based events enable decoupled communication within the system. <strong>PublishToTopicEvent</strong> moves data onto a topic, <strong>ConsumeFromTopicEvent</strong> retrieves it, and <strong>OutputTopicEvent</strong> designates final user-facing outputs. By standardizing how messages flow through topics, the platform ensures reliability, traceability, and straightforward integration among nodes, assistants, and tools.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>
