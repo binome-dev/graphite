@@ -15,7 +15,7 @@
         <link rel="next" href="../tools/tools/">
       
       
-      <link rel="icon" href="../../static/favicon.png">
+      <link rel="icon" href="../../static/GRAPHITE_Favico_Dark.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
     
     
@@ -88,7 +88,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="graphite" class="md-header__button md-logo" aria-label="graphite" data-md-component="logo">
       
-  <img src="../../static/logo.png" alt="logo">
+  <img src="../../static/GRAPHITE_icon_Dark.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -185,7 +185,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="graphite" class="md-nav__button md-logo" aria-label="graphite" data-md-component="logo">
       
-  <img src="../../static/logo.png" alt="logo">
+  <img src="../../static/GRAPHITE_icon_Dark.png" alt="logo">
 
     </a>
     graphite
@@ -888,7 +888,7 @@
 <p>Developers implement custom Commands tailored to specific logic or operational needs by inheriting from this base Command class and overriding the required methods. This approach empowers developers to flexibly craft specialized behaviors while maintaining consistency across the workflow execution environment.</p>
 <p>The concrete implementation of <code>Command</code> interface should be with its associated tools. Here are some examples.</p>
 <h3 id="llm-response-command-and-llm-stream-command">LLM Response Command and LLM Stream Command</h3>
-<p><a href="/grafi/tools/llms/llm_response_command.py"><code>LLMResponseCommand</code></a> encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py"><code>LLMResponseCommand</code></a> encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.</p>
 <p>Fields:</p>
 <table>
 <thead>
@@ -927,9 +927,9 @@
 </tr>
 </tbody>
 </table>
-<p>The <a href="/grafi/tools/llms/llm_stream_response_command.py"><code>LLMStreamResponseCommand</code></a> specializes <code>LLMResponseCommand</code> for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_execute.</p>
+<p>The <a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py"><code>LLMStreamResponseCommand</code></a> specializes <code>LLMResponseCommand</code> for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_execute.</p>
 <h3 id="function-calling-command">Function Calling Command</h3>
-<p><a href="/grafi/tools/functions/function_calling_command.py"><code>FunctionCallCommand</code></a> is a concrete implementation of the Command interface that allows a Node to call a <code>FunctionCallTool</code>. By assigning a <code>FunctionCallTool</code> to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/function_call_command.py"><code>FunctionCallCommand</code></a> is a concrete implementation of the Command interface that allows a Node to call a <code>FunctionCallTool</code>. By assigning a <code>FunctionCallTool</code> to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.</p>
 <p>Fields:</p>
 <table>
 <thead>
@@ -974,7 +974,7 @@
 </table>
 <p>By passing a <code>FunctionCallTool</code> to the <code>function_tool</code> field, you can seamlessly integrate function-based logic into a Node’s orchestration without embedding execution details in the Node or the tool consumer. This separation keeps workflows flexible and easy to extend.</p>
 <h3 id="embedding-response-command-and-rag-response-command">Embedding Response Command and RAG Response Command</h3>
-<p><a href="/grafi/tools/embeddings/embedding_response_command.py"><code>EmbeddingResponseCommand</code></a> encapsulates a <code>RetrievalTool</code> for transforming input messages into embeddings, retrieving relevant content, and returning it as a <code>Message</code>. This command is used by <code>EmbeddingRetrievalNode</code>.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/embedding_response_command.py"><code>EmbeddingResponseCommand</code></a> encapsulates a <code>RetrievalTool</code> for transforming input messages into embeddings, retrieving relevant content, and returning it as a <code>Message</code>. This command is used by <code>EmbeddingRetrievalNode</code>.</p>
 <p><code>EmbeddingResponseCommand</code> fields:</p>
 <table>
 <thead>
@@ -1013,7 +1013,7 @@
 </tr>
 </tbody>
 </table>
-<p><a href="/grafi/tools/rags/rag_response_command.py"><code>RagResponseCommand</code></a> similarly delegates to a <code>RagTool</code> that performs retrieval-augmented generation. This command is used by <code>RagNode</code>.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py"><code>RagResponseCommand</code></a> similarly delegates to a <code>RagTool</code> that performs retrieval-augmented generation. This command is used by <code>RagNode</code>.</p>
 <p><code>RagResponseCommand</code> fields:</p>
 <table>
 <thead>
