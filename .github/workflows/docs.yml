@@ -30,7 +30,7 @@ jobs:
 
       - run: mkdocs gh-deploy --config-file docs/mkdocs.yml --force
 
-deploy_mkdocs:
+  deploy_mkdocs:
     needs: build_mkdocs
     environment:
       name: github-pages
