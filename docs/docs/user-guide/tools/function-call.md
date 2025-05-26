@@ -108,7 +108,7 @@ class WeatherMock(FunctionCallTool):
 
 #### Example - Tavily Search Tool
 
-[TavilyTool](/grafi/tools/functions/impl/tavily_tool.py) extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply `@llm_function` to the function that will be called by the LLM. By adding the `@llm_function` decorator to `web_search_using_tavily`, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.
+[TavilyTool](https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/tavily_tool.py) extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply `@llm_function` to the function that will be called by the LLM. By adding the `@llm_function` decorator to `web_search_using_tavily`, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.
 
 TavilyTool fields:
 
@@ -149,9 +149,9 @@ Here are two examples
 
 #### RetrievalTool
 
-[`RetrievalTool`](/grafi/tools/embeddings/retrieval_tool.py) defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from `Tool` and introduces an `embedding_model` field for custom embedding generation. By default, `RetrievalTool` provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass `RetrievalTool` for more specialized use cases.
+[`RetrievalTool`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/retrieval_tool.py) defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from `Tool` and introduces an `embedding_model` field for custom embedding generation. By default, `RetrievalTool` provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass `RetrievalTool` for more specialized use cases.
 
-The [`ChromadbRetrievalTool`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py) is a concrete subclass of `RetrievalTool`, tailored for queries against a ChromaDB collection. It uses an `OpenAIEmbedding` model (or any suitable `OpenAIEmbedding` subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During `execute` or `a_execute`, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a `Message` object, making the data seamlessly available to the rest of the workflow. Because it inherits from `RetrievalTool`, you can still configure or replace the embedding model as needed.
+The [`ChromadbRetrievalTool`](https://github.com/binome-dev/graphite/blob/6e2e0b5bd2959e5a3a9402399df9d66e60490535/examples/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py) is a concrete subclass of `RetrievalTool`, tailored for queries against a ChromaDB collection. It uses an `OpenAIEmbedding` model (or any suitable `OpenAIEmbedding` subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During `execute` or `a_execute`, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a `Message` object, making the data seamlessly available to the rest of the workflow. Because it inherits from `RetrievalTool`, you can still configure or replace the embedding model as needed.
 
 RetrievalTool fields:
 

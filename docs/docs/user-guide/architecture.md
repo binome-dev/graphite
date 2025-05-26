@@ -6,4 +6,4 @@ In this documentation, we'll explore Graphite's architecture and each component 
 
 Below is an overview of the Graphite architecture. In the following sections, we'll break down each component and explore them in detail.
 
-![graphite_architecture](/static/graphite_architecture.png)
+![graphite_architecture](../static/graphite_architecture.png)

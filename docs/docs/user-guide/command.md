@@ -22,7 +22,7 @@ The concrete implementation of `Command` interface should be with its associated
 
 ### LLM Response Command and LLM Stream Command
 
-[`LLMResponseCommand`](/grafi/tools/llms/llm_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
+[`LLMResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
 
 Fields:
 
@@ -38,11 +38,11 @@ Key methods are:
 | `a_execute(execution_context, input_data)`    | Asynchronously streams generated messages from the LLM.                                              |
 | `to_dict()`                                   | Serializes the command’s state, including its associated LLM configuration.                          |
 
-The [`LLMStreamResponseCommand`](/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMResponseCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_execute.
+The [`LLMStreamResponseCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMResponseCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_execute.
 
 ### Function Calling Command
 
-[`FunctionCallCommand`](/grafi/tools/functions/function_calling_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionCallTool`. By assigning a `FunctionCallTool` to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.
+[`FunctionCallCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/function_call_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionCallTool`. By assigning a `FunctionCallTool` to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.
 
 Fields:
 
@@ -63,7 +63,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 ### Embedding Response Command and RAG Response Command
 
-[`EmbeddingResponseCommand`](/grafi/tools/embeddings/embedding_response_command.py) encapsulates a `RetrievalTool` for transforming input messages into embeddings, retrieving relevant content, and returning it as a `Message`. This command is used by `EmbeddingRetrievalNode`.
+[`EmbeddingResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/embedding_response_command.py) encapsulates a `RetrievalTool` for transforming input messages into embeddings, retrieving relevant content, and returning it as a `Message`. This command is used by `EmbeddingRetrievalNode`.
 
 `EmbeddingResponseCommand` fields:
 
@@ -79,7 +79,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 | `a_execute(execution_context, input_data)`    | Asynchronously calls `retrieval_tool.a_execute`, yielding one or more `Message` objects.                       |
 | `to_dict()`                                   | Serializes the command’s state, including the `retrieval_tool` configuration.                                  |
 
-[`RagResponseCommand`](/grafi/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
+[`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
 
 `RagResponseCommand` fields:
 

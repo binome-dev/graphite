@@ -51,7 +51,7 @@ This documentation will guide you through:
 5. **Visualization** - Create interactive graph visualizations
 6. **Advanced Topics** - Custom plugins, performance tuning, and deployment
 
-Ready to dive in? Start with our [Quick Start Guide](./getting-started/quickstart.md) to get Graphite up and running in minutes, or explore the [Core Concepts](./concepts.md) to understand the fundamentals of graph-based data processing.
+Ready to dive in? Start with our [Quick Start Guide](./getting-started/quickstart.md) to get Graphite up and running in minutes, or explore the [Core Concepts](./user-guide/architecture.md) to understand the fundamentals of graph-based data processing.
 
 ## Community and Support
 
