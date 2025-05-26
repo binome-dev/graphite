@@ -15,7 +15,7 @@
         <link rel="next" href="../../executor/">
       
       
-      <link rel="icon" href="../../../static/favicon.png">
+      <link rel="icon" href="../../../static/GRAPHITE_Favico_Dark.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
     
     
@@ -88,7 +88,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../../.." title="graphite" class="md-header__button md-logo" aria-label="graphite" data-md-component="logo">
       
-  <img src="../../../static/logo.png" alt="logo">
+  <img src="../../../static/GRAPHITE_icon_Dark.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -185,7 +185,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../../.." title="graphite" class="md-nav__button md-logo" aria-label="graphite" data-md-component="logo">
       
-  <img src="../../../static/logo.png" alt="logo">
+  <img src="../../../static/GRAPHITE_icon_Dark.png" alt="logo">
 
     </a>
     graphite
@@ -1216,7 +1216,7 @@
         return f&quot;The weather of {postcode} is bad now.&quot;
 </code></pre>
 <h4 id="example-tavily-search-tool">Example - Tavily Search Tool</h4>
-<p><a href="/grafi/tools/functions/impl/tavily_tool.py">TavilyTool</a> extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply <code>@llm_function</code> to the function that will be called by the LLM. By adding the <code>@llm_function</code> decorator to <code>web_search_using_tavily</code>, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/tavily_tool.py">TavilyTool</a> extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply <code>@llm_function</code> to the function that will be called by the LLM. By adding the <code>@llm_function</code> decorator to <code>web_search_using_tavily</code>, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.</p>
 <p>TavilyTool fields:</p>
 <table>
 <thead>
@@ -1270,8 +1270,8 @@
 <p>When your requirements exceed what <code>FunctionCallTool</code> can provide, you can implement a custom tool within the framework, ensuring your specialized logic and configuration remain fully integrated into the event-driven workflow.</p>
 <p>Here are two examples</p>
 <h4 id="retrievaltool">RetrievalTool</h4>
-<p><a href="/grafi/tools/embeddings/retrieval_tool.py"><code>RetrievalTool</code></a> defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from <code>Tool</code> and introduces an <code>embedding_model</code> field for custom embedding generation. By default, <code>RetrievalTool</code> provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass <code>RetrievalTool</code> for more specialized use cases.</p>
-<p>The <a href="https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py"><code>ChromadbRetrievalTool</code></a> is a concrete subclass of <code>RetrievalTool</code>, tailored for queries against a ChromaDB collection. It uses an <code>OpenAIEmbedding</code> model (or any suitable <code>OpenAIEmbedding</code> subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During <code>execute</code> or <code>a_execute</code>, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a <code>Message</code> object, making the data seamlessly available to the rest of the workflow. Because it inherits from <code>RetrievalTool</code>, you can still configure or replace the embedding model as needed.</p>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/retrieval_tool.py"><code>RetrievalTool</code></a> defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from <code>Tool</code> and introduces an <code>embedding_model</code> field for custom embedding generation. By default, <code>RetrievalTool</code> provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass <code>RetrievalTool</code> for more specialized use cases.</p>
+<p>The <a href="https://github.com/binome-dev/graphite/blob/6e2e0b5bd2959e5a3a9402399df9d66e60490535/examples/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py"><code>ChromadbRetrievalTool</code></a> is a concrete subclass of <code>RetrievalTool</code>, tailored for queries against a ChromaDB collection. It uses an <code>OpenAIEmbedding</code> model (or any suitable <code>OpenAIEmbedding</code> subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During <code>execute</code> or <code>a_execute</code>, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a <code>Message</code> object, making the data seamlessly available to the rest of the workflow. Because it inherits from <code>RetrievalTool</code>, you can still configure or replace the embedding model as needed.</p>
 <p>RetrievalTool fields:</p>
 <table>
 <thead>
