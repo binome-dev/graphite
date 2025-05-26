@@ -34,7 +34,7 @@ jobs:
             mkdocs-material
 
 
-      - run: mkdocs build --site-dir site --config-file docs/mkdocs.yml
+      - run: mkdocs build --site-dir docs/site --config-file docs/mkdocs.yml
 
 
       - name: Deploy to GitHub Pages
