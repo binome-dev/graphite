@@ -47,9 +47,10 @@ jobs:
       - run: pip install \
             mkdocs-material
 
-      - run: |
-        cd docs
-        mkdocs gh-deploy --force
+      - name: Deploy To Github Pages
+        run: |
+          cd docs 
+          mkdocs gh-deploy --force
 
 
 
