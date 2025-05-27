@@ -1,4 +1,12 @@
 theme:
+  code:
+    highlight_theme: github-dark  # Or any Pygments theme name
+  features:
+    #- navigation.tabs
+    - navigation.top
+    - navigation.sections
+    #- content.action.edit
+    #- content.action.view
   name: material
   palette:
     accent: blue grey
@@ -7,6 +15,8 @@ theme:
   favicon: static/GRAPHITE_Favico_Dark.png
   font:
     code: Roboto Mono
+repo_name: binome-dev/graphite
+repo_url: https://github.com/binome-dev/graphite
 nav:
   - Home: index.md
   - Features: getting-started/features.md
@@ -33,5 +43,12 @@ nav:
 site_name: graphite
 
 markdown_extensions:
-  - pymdownx.highlight
-  - pymdownx.inlinehilite
+  - codehilite:
+      guess_lang: false
+      linenums: false
+
+#  - pymdownx.highlight
+#  - pymdownx.inlinehilite
+
+plugins:
+  - search
