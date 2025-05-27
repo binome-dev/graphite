@@ -2,6 +2,8 @@ name: Deploy MkDocs to GitHub Pages
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
@@ -17,7 +19,6 @@ env:
   PYTHON_VERSION: "3.12"
 jobs:
   deploy_mkdocs:
-    #if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -51,15 +52,3 @@ jobs:
         run: |
           cd docs 
           mkdocs gh-deploy --force
-
-
-
-      #- run: mkdocs build --site-dir site --config-file docs/mkdocs.yml
-
-
-      #- name: Deploy to GitHub Pages
-      #  uses: peaceiris/actions-gh-pages@v4
-      #  with:
-      #    github_token: ${{ secrets.GITHUB_TOKEN }}
-      #    publish_dir: ./docs/site
-
