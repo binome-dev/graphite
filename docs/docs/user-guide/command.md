@@ -97,3 +97,22 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 Both commands enable a node to delegate specialized retrieval operations to their respective tools, without needing to manage the internal logic of how embeddings or RAG processes are performed.
 
+### Function Command
+
+[`FunctionCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/functions/function_command.py) is a concrete implementation of the Command interface that allows a Node to execute general function-based operations through a `FunctionTool`. This command provides a flexible framework for integrating custom function logic into event-driven workflows, enabling nodes to perform various computational tasks without embedding execution details directly in the node logic.
+
+`FunctionCommand` fields:
+
+| Field           | Description                                                                          |
+|-----------------|--------------------------------------------------------------------------------------|
+| `function_tool` | A `FunctionTool` instance that encapsulates the function execution logic.           |
+
+`FunctionCommand` methods:
+
+| Method                                        | Description                                                                                                    |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `execute(execution_context, input_data)`      | Synchronously calls `function_tool.execute`, returning the resulting `Message`.                               |
+| `a_execute(execution_context, input_data)`    | Asynchronously calls `function_tool.a_execute`, yielding one or more `Message` objects.                       |
+| `to_dict()`                                   | Serializes the command's state, including the `function_tool` configuration.                                  |
+
+The `FunctionCommand` enables nodes to delegate function-based operations to their respective tools, maintaining clean separation between workflow orchestration and function execution logic. This design allows for easy integration of various computational tasks while keeping the system modular and extensible.
