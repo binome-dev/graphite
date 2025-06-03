@@ -84,6 +84,8 @@ class DeepseekTool(LLM):
             return self
 
         def build(self) -> "DeepseekTool":
+            if not self._tool.api_key:
+                raise ValueError("API key must be set for DeepseekTool")
             return self._tool
 
     # ------------------------------------------------------------------ #

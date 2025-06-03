@@ -89,6 +89,8 @@ class GeminiTool(LLM):
             return self
 
         def build(self) -> "GeminiTool":
+            if not self._tool.api_key:
+                raise ValueError("API key must be provided for GeminiTool")
             return self._tool
 
     # --------------------------------------------------------------------- #
@@ -300,11 +302,10 @@ class GeminiTool(LLM):
 
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
-
             if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
+                message_args[
+                    "content"
+                ] = ""  # Clear content when function call is included
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided

@@ -85,6 +85,8 @@ class ClaudeTool(LLM):
             return self
 
         def build(self) -> "ClaudeTool":
+            if not self._tool.api_key:
+                raise ValueError("API key must be set for ClaudeTool.")
             return self._tool
 
     # ------------------------------------------------------------------ #

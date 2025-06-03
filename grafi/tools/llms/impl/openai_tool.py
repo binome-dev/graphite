@@ -70,6 +70,8 @@ class OpenAITool(LLM):
             return self
 
         def build(self) -> "OpenAITool":
+            if not self._tool.api_key:
+                raise ValueError("API key must be provided for OpenAITool.")
             return self._tool
 
     def prepare_api_input(

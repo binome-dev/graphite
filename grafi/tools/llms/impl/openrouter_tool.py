@@ -89,6 +89,8 @@ class OpenRouterTool(LLM):
             return self
 
         def build(self) -> "OpenRouterTool":
+            if not self._tool.api_key:
+                raise ValueError("API key must be set for OpenRouterTool")
             return self._tool
 
     # ------------------------------------------------------------------ #
