@@ -1,6 +1,6 @@
 # Getting Started with Graphite: The Hello, World! Assistant
 
-[Graphite](https://github.com/binome-dev/graphite) is an event-driven AI agent framework designed for modularity, observability, and composability. This guide will walk you through building a minimal "Hello, World" agent using the `grafi` package. For this example we will create a simple function call assistant that generates a mock user form and wrap it in a node to be used with the Graphite framework.
+[Graphite](https://github.com/binome-dev/graphite) is a powerful event-driven AI agent framework built for modularity, observability, and seamless composition of AI workflows. This comprehensive guide will walk you through creating your first ReAct (Reasoning and Acting) agent using the `grafi` package. In this tutorial, we'll build a function-calling assistant that demonstrates how to integrate language models with google search function within the Graphite framework, showcasing the core concepts of event-driven AI agent development.
 
 ---
 
@@ -19,8 +19,8 @@ Make sure the following are installed:
 ## 1. Create a New Project Directory
 
 ```bash
-mkdir graphite-hello-world
-cd graphite-hello-world
+mkdir graphite-react
+cd graphite-react
 ```
 
 ---
@@ -30,7 +30,7 @@ cd graphite-hello-world
 This will create the `pyproject.toml` file that Poetry needs. Be sure to specify a compatible Python version:
 
 ```bash
-poetry init --name graphite-hello-world -n
+poetry init --name graphite-react -n
 ```
 
 Then open `pyproject.toml` and ensure it includes:
@@ -57,82 +57,123 @@ This will automatically create a virtual environment and install `grafi` with th
 
 ---
 
-## 3. Create Assistant
+## 3. Create ReAct Assistant
 
 In graphite an assistant is a specialized node that can handle events and perform actions based on the input it receives. We will create a simple assistant that uses OpenAI's language model to process input, make function calls, and generate responses.
 
-Create a file named `assistant.py` and add the code from our example directory <a href="https://github.com/binome-dev/graphite/blob/main/examples/function_assistant/simple_function_llm_assistant.py" title="SimpleFunctionLLMAssistant">here</a>
-### Class `SimpleFunctionLLMAssistant`
+Create a file named `react_assistant.py` and add the code like following:
+
+### Class `ReactAssistant`
 ```python
-# assistant.py
-class SimpleFunctionLLMAssistant(Assistant):
+# react assistant.py
+import os
+import uuid
+from typing import Optional
+from typing import Self
+
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import Field
+
+from grafi.assistants.assistant import Assistant
+from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Message
+from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.subscription_builder import SubscriptionBuilder
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic import agent_input_topic
+from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
+from grafi.nodes.impl.llm_node import LLMNode
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.tools.llms.llm_response_command import LLMResponseCommand
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+AGENT_SYSTEM_MESSAGE = """
+You are a helpful and knowledgeable agent. To achieve your goal of answering complex questions
+correctly, you have access to the search tool.
+
+To answer questions, you'll need to go through multiple steps involving step-by-step thinking and
+selecting search tool if necessary.
+
+Response in a concise and clear manner, ensuring that your answers are accurate and relevant to the user's query.
+"""
+
+
+class ReactAssistant(Assistant):
 
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    name: str = Field(default="SimpleFunctionLLMAssistant")
-    type: str = Field(default="SimpleFunctionLLMAssistant")
+    name: str = Field(default="ReactAssistant")
+    type: str = Field(default="ReactAssistant")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
+    function_call_tool: FunctionCallTool = Field(
+        default=GoogleSearchTool.Builder()
+        .name("GoogleSearchTool")
+        .fixed_max_results(3)
+        .build()
+    )
     model: str = Field(default="gpt-4o-mini")
-    output_format: OutputType
-    function: Callable
-```
-- `oi_span_type`: this field defines the OpenInference span kind for the assistant, which is set to `AGENT`, ,you will see this span kind in the OpenTelemetry traces.
-- `name`: the name of the assistant. This could be any string that identifies the assistant.
-- `type`: the type of the assistant, which is set to `SimpleFunctionLLMAssistant`.
-- `api_key`: the API key for OpenAI, which can be set via an environment variable or directly in the code.
-- `model`: the model to be used by the assistant, defaulting to `gpt-4o-mini`.
-- `output_format`: the format of the output, which is an instance of `OutputType`. This will be later used to define the output to be returned by the assistant. Will be mapped to a pydantic class.
-- `function`: a callable function that the assistant will use to process the input data. This function is a python function, can be any callable that takes input and returns output. In this case, it will be used to process the user form data.
 
-
-### Class `Builder`
-Every assistant in Graphite has an inner class called builder class that allows you to construct the assistant step by step. The `Builder` class for `SimpleFunctionLLMAssistant` will allow you to set the API key, model, output format, and function before building the assistant. This class uses the builder pattern to create an instance of `SimpleFunctionLLMAssistant`. It is used to initialize the assistant with the fields that have been defined in the previous step.
-
-```python
-class SimpleFunctionLLMAssistant(Assistant):
-   ...
-   ...
     class Builder(Assistant.Builder):
-        """Concrete builder for SimpleFunctionLLMAssistant."""
+        """Concrete builder for ReactAssistant."""
 
-        _assistant: "SimpleFunctionLLMAssistant"
+        _assistant: "ReactAssistant"
 
         def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
-        def _init_assistant(self) -> "SimpleFunctionLLMAssistant":
-            return SimpleFunctionLLMAssistant.model_construct()
+        def _init_assistant(self) -> "ReactAssistant":
+            return ReactAssistant.model_construct()
 
         def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
+            return self
+
+        def system_prompt(self, system_prompt: str) -> Self:
+            self._assistant.system_prompt = system_prompt
+            return self
+
+        def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
+            self._assistant.function_call_tool = function_call_tool
             return self
 
         def model(self, model: str) -> Self:
             self._assistant.model = model
             return self
 
-        def output_format(self, output_format: OutputType) -> Self:
-            self._assistant.output_format = output_format
-            return self
-
-        def function(self, function: Callable) -> Self:
-            self._assistant.function = function
-            return self
-
-        def build(self) -> "SimpleFunctionLLMAssistant":
+        def build(self) -> "ReactAssistant":
             self._assistant._construct_workflow()
             return self._assistant
-```
 
-```python3
-    def _construct_workflow(self) -> "SimpleFunctionLLMAssistant":
-        function_topic = Topic(name="function_call_topic")
+    def _construct_workflow(self) -> "ReactAssistant":
+        function_call_topic = Topic(
+            name="function_call_topic",
+            condition=lambda msgs: msgs[-1].tool_calls
+            is not None,  # only when the last message is a function call
+        )
+        function_result_topic = Topic(name="function_result_topic")
 
-        llm_input_node = (
+        agent_output_topic.condition = (
+            lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
+            and msgs[-1].content.strip() != ""
+        )
+
+        llm_node = (
             LLMNode.Builder()
             .name("OpenAIInputNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input_topic)
+                .or_()
+                .subscribed_to(function_result_topic)
+                .build()
+            )
             .command(
                 LLMResponseCommand.Builder()
                 .llm(
@@ -140,35 +181,35 @@ class SimpleFunctionLLMAssistant(Assistant):
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
-                    .chat_params({"response_format": self.output_format})
+                    .system_message(self.system_prompt)
                     .build()
                 )
                 .build()
             )
-            .publish_to(function_topic)
+            .publish_to(function_call_topic)
+            .publish_to(agent_output_topic)
             .build()
         )
 
-        # Create a function node
-
+        # Create a function call node
         function_call_node = (
-            FunctionNode.Builder()
+            LLMFunctionCallNode.Builder()
             .name("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
+            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCommand.Builder()
-                .function_tool(FunctionTool.Builder().function(self.function).build())
+                FunctionCallCommand.Builder()
+                .function_tool(self.function_call_tool)
                 .build()
             )
-            .publish_to(agent_output_topic)
+            .publish_to(function_result_topic)
             .build()
         )
 
         # Create a workflow and add the nodes
         self.workflow = (
             EventDrivenWorkflow.Builder()
-            .name("simple_function_call_workflow")
-            .node(llm_input_node)
+            .name("simple_agent_workflow")
+            .node(llm_node)
             .node(function_call_node)
             .build()
         )
@@ -182,116 +223,37 @@ class SimpleFunctionLLMAssistant(Assistant):
 
 Create a `main.py` that will call the assistant created previously.
 
-### Setup `OPENAI_API_KEY`
-
 ```python
-from grafi.common.containers.container import container
-event_store = container.event_store
-
-api_key = os.getenv("OPENAI_API_KEY", "")
-```
-
-Replace your `OPENAI_API_KEY` in the environment variable or set it directly in the code for testing purposes.
-
-```bash
-export OPENAI_API_KEY="sk-proj-***********"
-```
-
-### Create the `UserForm` model
-```python3
-from pydantic import BaseModel
-
-class UserForm(BaseModel):
-    """
-    A simple user form model for demonstration purposes.
-    """
-
-    first_name: str
-    last_name: str
-    location: str
-    gender: str
-
-```
-
-### Create the `print_user_form` function
-
-A function to print user form details from the messages received by the assistant.
-
-```python3
-from grafi.common.models.message import Message, Messages
-def print_user_form(input_messages: Messages) -> List[str]:
-    """
-    Function to print user form details.
-
-    Args:
-        Messages: The input messages containing user form details.
-
-    Returns:
-        list: A list string containing the user form details.
-    """
-
-    user_details = []
-
-    for message in input_messages:
-        if message.role == "assistant" and message.content:
-            try:
-                if isinstance(message.content, str):
-                    form = UserForm.model_validate_json(message.content)
-                    print(
-                        f"User Form Details:\nFirst Name: {form.first_name}\nLast Name: {form.last_name}\nLocation: {form.location}\nGender: {form.gender}\n"
-                    )
-                    user_details.append(form.model_dump_json(indent=2))
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to parse user form from message content: {message.content}. Error: {e}"
-                )
-
-    return user_details
-```
-
-### Create the `get_execution_context` function
-
-This function will create an `ExecutionContext` for the assistant to use during execution. It generates unique IDs for conversation and execution to be tracked through the event store.
-
-```python3
+import os
 import uuid
+
 from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Message
+from <your react assistant path> import ReactAssistant
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
-        conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
-    )
-```
+api_key = "<your openai api key>"
 
-### Putting it all together
+react_assistant = ReactAssistant.Builder().api_key(api_key).build()
 
-```python3
-execution_context = get_execution_context()
+execution_context = ExecutionContext(
+            conversation_id=uuid.uuid4().hex,
+            execution_id=uuid.uuid4().hex,
+            assistant_request_id=uuid.uuid4().hex,
+        )
 
-assistant = (
-    SimpleFunctionLLMAssistant.Builder()
-    .name("SimpleFunctionLLMAssistant")
-    .api_key(api_key)
-    .function(print_user_form)
-    .output_format(UserForm)
-    .build()
-)
+question = "your question"
 
-# Test the run method
 input_data = [
-    Message(
-        role="user",
-        content="Generate mock user.",
-    )
-]
+            Message(
+                role="user",
+                content=qestion,
+            )
+        ]
 
-output = assistant.execute(execution_context, input_data)
-print(output)
+output = react_assistant.execute(execution_context, input_data)
+print(output[0].content)
 ```
 
----
 
 ## 5. Run the Application
 
@@ -301,24 +263,14 @@ Use Poetry to execute the script inside the virtual environment:
 poetry run python main.py
 ```
 
-You should see:
+You should see the output result
 
 ```
-graphite-hello-world-OsMKLmDe-py3.12 ❯ poetry run python main.py
-2025-05-26 19:19:10.299 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:27 - Endpoint check failed: [Errno -3] Temporary failure in name resolution
-2025-05-26 19:19:10.300 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:27 - Endpoint check failed: [Errno 111] Connection refused
-2025-05-26 19:19:10.300 | DEBUG    | grafi.common.instrumentations.tracing:setup_tracing:95 - OTLP endpoint is not available. Using InMemorySpanExporter.
-2025-05-26 19:19:10.341 | INFO     | grafi.common.topics.topic:publish_data:76 - [agent_input_topic] Message published with event_id: 858d841f8b8d48498fc3c31cf9a50c24
-2025-05-26 19:19:10.341 | DEBUG    | grafi.nodes.impl.llm_node:execute:57 - Executing LLMNode with inputs: [ConsumeFromTopicEvent(event_id='11ede69c47c34222a9bcb7c81adfb469', event_version='1.0', execution_context=ExecutionContext(conversation_id='conversation_id', execution_id='467fb5006a25440c80f5801c05bfc807', assistant_request_id='c574d43fdea94280817facb9c3a597dc', user_id=''), event_type=<EventType.CONSUME_FROM_TOPIC: 'ConsumeFromTopic'>, timestamp=datetime.datetime(2025, 5, 26, 18, 19, 10, 341430, tzinfo=datetime.timezone.utc), topic_name='agent_input_topic', offset=0, data=[Message(name=None, message_id='16e956e2e0424362b6362f6899bff798', timestamp=1748283550341049054, content='Generate mock user.', refusal=None, annotations=None, audio=None, role='user', tool_call_id=None, tools=None, function_call=None, tool_calls=None)], consumer_name='OpenAIInputNode', consumer_type='LLMNode')]
-2025-05-26 19:19:11.840 | INFO     | grafi.common.topics.topic:publish_data:76 - [function_call_topic] Message published with event_id: b1ee77395c3e449193d1a2175133bf98
-User Form Details:
-First Name: John
-Last Name: Doe
-Location: New York, USA
-Gender: Male
+Graphite is an open-source framework designed for building domain-specific AI agents using composable workflows. It features an event-driven architecture that allows developers to create customizable workflows. This framework is particularly focused on constructing AI assistants that can interact within specific domains effectively.
 
-2025-05-26 19:19:11.841 | INFO     | grafi.common.topics.output_topic:publish_data:80 - [agent_output_topic] Message published with event_id: 7398d115a1fb4a4c9e2b14a4dcf6a114
-[Message(name=None, message_id='5bc27a0909b146049e0d5ce5c66e068f', timestamp=1748283551841195922, content='["{\\n  \\"first_name\\": \\"John\\",\\n  \\"last_name\\": \\"Doe\\",\\n  \\"location\\": \\"New York, USA\\",\\n  \\"gender\\": \\"Male\\"\\n}"]', refusal=None, annotations=None, audio=None, role='function', tool_call_id=None, tools=None, function_call=None, tool_calls=None)]
+For more detailed information, you can refer to the following resources:
+1. [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
+2. [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
 ```
 
 ---
@@ -326,9 +278,12 @@ Gender: Male
 ## Summary
 
 ✅ Initialized a Poetry project
+
 ✅ Installed `grafi` with the correct Python version constraint
+
 ✅ Wrote a minimal agent that handles an event
-✅ Ran the agent using a test event
+
+✅ Ran the agent with a question
 
 ---
 
