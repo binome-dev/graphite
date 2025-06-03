@@ -1,71 +1,3 @@
-# Getting Started with Graphite: The Hello, World! Assistant
-
-[Graphite](https://github.com/binome-dev/graphite) is a powerful event-driven AI agent framework built for modularity, observability, and seamless composition of AI workflows. This comprehensive guide will walk you through creating your first ReAct (Reasoning and Acting) agent using the `grafi` package. In this tutorial, we'll build a function-calling assistant that demonstrates how to integrate language models with google search function within the Graphite framework, showcasing the core concepts of event-driven AI agent development.
-
----
-
-## Prerequisites
-
-Make sure the following are installed:
-
-* Python **3.11 or 3.12** (required by the `grafi` package)
-* [Poetry](https://python-poetry.org/docs/#installation)
-* Git
-
-> ⚠️ **Important:** `grafi` requires Python >=3.11 and <3.13. Python 3.13+ is not yet supported.
-
----
-
-## 1. Create a New Project Directory
-
-```bash
-mkdir graphite-react
-cd graphite-react
-```
-
----
-
-## 2. Initialize a Poetry Project
-
-This will create the `pyproject.toml` file that Poetry needs. Be sure to specify a compatible Python version:
-
-```bash
-poetry init --name graphite-react -n
-```
-
-Then open `pyproject.toml` and ensure it includes:
-
-```toml
-[tool.poetry.dependencies]
-grafi = "^0.0.12"
-python = ">=3.11,<3.13"
-```
-
-Now install the dependencies:
-
-```bash
-poetry install --no-root
-```
-
-This will automatically create a virtual environment and install `grafi` with the appropriate Python version.
-
-> 💡 You can also create the virtual environment with the correct Python version explicitly:
->
-> ```bash
-> poetry env use python3.12
-> ```
-
----
-
-## 3. Create ReAct Assistant
-
-In graphite an assistant is a specialized node that can handle events and perform actions based on the input it receives. We will create a simple assistant that uses OpenAI's language model to process input, make function calls, and generate responses.
-
-Create a file named `react_assistant.py` and add the code like following:
-
-### Class `ReactAssistant`
-```python
-# react assistant.py
 import os
 import uuid
 from typing import Optional
@@ -102,13 +34,12 @@ Response in a concise and clear manner, ensuring that your answers are accurate 
 """
 
 
-class ReactAssistant(Assistant):
-
+class SimpleAgent(Assistant):
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    name: str = Field(default="ReactAssistant")
-    type: str = Field(default="ReactAssistant")
+    name: str = Field(default="SimpleAgent")
+    type: str = Field(default="SimpleAgent")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
@@ -120,15 +51,15 @@ class ReactAssistant(Assistant):
     model: str = Field(default="gpt-4o-mini")
 
     class Builder(Assistant.Builder):
-        """Concrete builder for ReactAssistant."""
+        """Concrete builder for SimpleAgent."""
 
-        _assistant: "ReactAssistant"
+        _assistant: "SimpleAgent"
 
         def __init__(self) -> None:
             self._assistant = self._init_assistant()
 
-        def _init_assistant(self) -> "ReactAssistant":
-            return ReactAssistant.model_construct()
+        def _init_assistant(self) -> "SimpleAgent":
+            return SimpleAgent.model_construct()
 
         def api_key(self, api_key: str) -> Self:
             self._assistant.api_key = api_key
@@ -146,11 +77,11 @@ class ReactAssistant(Assistant):
             self._assistant.model = model
             return self
 
-        def build(self) -> "ReactAssistant":
+        def build(self) -> "SimpleAgent":
             self._assistant._construct_workflow()
             return self._assistant
 
-    def _construct_workflow(self) -> "ReactAssistant":
+    def _construct_workflow(self) -> "SimpleAgent":
         function_call_topic = Topic(
             name="function_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls
@@ -215,84 +146,41 @@ class ReactAssistant(Assistant):
         )
 
         return self
-```
 
----
-
-## 4. Call the Assistant
-
-Create a `main.py` that will call the assistant created previously.
-
-```python
-import os
-import uuid
-
-from grafi.common.models.execution_context import ExecutionContext
-from grafi.common.models.message import Message
-from <your react assistant path> import ReactAssistant
-
-api_key = "<your openai api key>"
-
-react_assistant = ReactAssistant.Builder().api_key(api_key).build()
-
-execution_context = ExecutionContext(
+    def run(self, qestion: str):
+        execution_context = ExecutionContext(
             conversation_id=uuid.uuid4().hex,
             execution_id=uuid.uuid4().hex,
             assistant_request_id=uuid.uuid4().hex,
         )
 
-question = "your question"
-
-input_data = [
+        # Test the run method
+        input_data = [
             Message(
                 role="user",
                 content=qestion,
             )
         ]
 
-output = react_assistant.execute(execution_context, input_data)
-print(output[0].content)
-```
+        output = super().execute(execution_context, input_data)
+
+        return output[0].content
 
 
-## 5. Run the Application
+def create_agent(
+    system_prompt: Optional[str] = None,
+    function_call_tool: Optional[FunctionCallTool] = None,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> SimpleAgent:
+    buider = SimpleAgent.Builder()
 
-Use Poetry to execute the script inside the virtual environment:
-
-```bash
-poetry run python main.py
-```
-
-You should see the output result
-
-```
-Graphite is an open-source framework designed for building domain-specific AI agents using composable workflows. It features an event-driven architecture that allows developers to create customizable workflows. This framework is particularly focused on constructing AI assistants that can interact within specific domains effectively.
-
-For more detailed information, you can refer to the following resources:
-1. [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
-2. [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
-```
-
----
-
-## Summary
-
-✅ Initialized a Poetry project
-
-✅ Installed `grafi` with the correct Python version constraint
-
-✅ Wrote a minimal agent that handles an event
-
-✅ Ran the agent with a question
-
----
-
-## Next Steps
-
-* Explore the [Graphite GitHub Repository](https://github.com/binome-dev/graphite) for full-featured examples.
-* Extend your agent to respond to different event types.
-* Dive into advanced features like memory, workflows, and tools.
-
----
-
-Happy building! 🚀
+    if system_prompt:
+        buider.system_prompt(system_prompt)
+    if function_call_tool:
+        buider.function_call_tool(function_call_tool)
+    if model:
+        buider.model(model)
+    if api_key:
+        buider.api_key(api_key)
+    return buider.build()

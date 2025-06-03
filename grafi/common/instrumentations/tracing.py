@@ -1,8 +1,8 @@
 import os
 import socket
 
-from arize_otel import Endpoints
-from arize_otel import register_otel
+from arize.otel import Endpoint
+from arize.otel import register
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from openinference.semconv.resource import ResourceAttributes
@@ -31,7 +31,7 @@ def is_local_endpoint_available(host: str, port: int) -> bool:
 env = os.getenv("ENV", "local")
 arize_api_key = os.getenv("ARIZE_API_KEY", "")
 arize_space_id = os.getenv("ARIZE_SPACE_ID", "")
-arize_model_id = os.getenv("ARIZE_MODEL_ID", "")
+arize_project_name = os.getenv("ARIZE_PROJECT_NAME", "")
 
 
 def setup_tracing() -> "Tracer":
@@ -40,13 +40,13 @@ def setup_tracing() -> "Tracer":
         collector_api_key = arize_api_key
         os.environ["PHOENIX_CLIENT_HEADERS"] = f"api_key={collector_api_key}"
 
-        collector_endpoint = Endpoints.ARIZE
+        collector_endpoint = Endpoint.ARIZE
 
-        register_otel(
-            endpoints=collector_endpoint,
+        register(
+            endpoint=collector_endpoint,
             space_id=arize_space_id,  # in app space settings page
             api_key=collector_api_key,  # in app space settings page
-            model_id=arize_model_id,  # name this to whatever you would like
+            model_id=arize_project_name,  # name this to whatever you would like
         )
 
         logger.info(

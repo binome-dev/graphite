@@ -142,3 +142,28 @@ The `EmbeddingRetrievalNode` and `RagNode` classes represent specialized Nodes t
 
 These specialized Nodes serve as practical examples, guiding developers to extend or customize Nodes for specific, application-driven use cases within event-driven workflows.
 
+
+### FunctionNode
+
+The `FunctionNode` class represents a specialized Node within an event-driven workflow designed for executing function-based operations. It serves as a versatile component that can handle various function executions within the workflow, processing input messages and generating appropriate responses through its encapsulated command logic.
+
+#### FunctionNode Class Fields
+
+| Field          | Description                                                              |
+|----------------|--------------------------------------------------------------------------|
+| `node_id`      | Unique identifier for the FunctionNode instance.                         |
+| `name`         | Human-readable identifier for the node (`"FunctionNode"`).               |
+| `type`         | Specifies node type (`"FunctionNode"`).                                 |
+| `oi_span_type` | Semantic attribute for OpenInference tracing (`RETRIEVER`).              |
+| `command`      | Command object encapsulating function-specific execution logic.          |
+
+#### FunctionNode Class Methods
+
+| Method              | Description                                                                                        |
+|---------------------|----------------------------------------------------------------------------------------------------|
+| `execute`           | Performs synchronous function operations and returns generated responses as messages.              |
+| `a_execute`         | Executes functions asynchronously, yielding generated responses in a message stream.              |
+| `get_command_input` | Combines all input messages from node input events to serve as input for function processing.     |
+| `to_dict`           | Serializes the node's configuration and current state for persistence or debugging.               |
+
+The `FunctionNode` provides a flexible framework for integrating custom function logic into event-driven workflows, making it suitable for various computational tasks that require message processing and response generation.
