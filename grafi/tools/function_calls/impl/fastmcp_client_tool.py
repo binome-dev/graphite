@@ -17,8 +17,10 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 try:
     from fastmcp import Client
-    from fastmcp import FastMCP
-    from fastmcp import Resource 
+    from fastmcp.exceptions import McpError
+    from mcp.types import EmbeddedResource
+    from mcp.types import ImageContent
+    from mcp.types import TextContent
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
 
@@ -35,13 +37,14 @@ class FastMCPClient(FunctionCallTool):
     port : int = 8000 
     # Here not sure if we want to make the host and port as arguments or the entire client config? Gonna use client_config for now but maybe we want
     # to make it more flexible in the future.
-    client : Client = None
     client_config = {
         "mcpServers": {
             "remote": {"url": "http://localhost:8080/mcp"},
+            "transport": "streamable-http"
         }
-
     }
+    client : Optional[Client] = None
+
 
     class Builder(FunctionCallTool.Builder):
         """Concrete builder for MCPTool."""
@@ -68,8 +71,8 @@ class FastMCPClient(FunctionCallTool):
 
         async def _a_build_function_specs(self) -> None:
 
-            client = Client(self._tool.client_config) 
-            async with self._tool.client:
+            client = Client(self._tool.client_config)  # Initialize the client with the config
+            async with client:
                 logger.info(f"Client connected: {client.is_connected()}")
                 tools_list = await client.list_tools()
 
@@ -123,7 +126,7 @@ class FastMCPClient(FunctionCallTool):
         if self.client_config is None:
             raise ValueError("Client Config not set.")
 
-        client = Client(self._tool.client_config) 
+        client = Client(self.client_config) 
         async with client:
             logger.info(f"Client connected: {client.is_connected()}")
             for tool_call in input_message.tool_calls:
@@ -138,21 +141,43 @@ class FastMCPClient(FunctionCallTool):
                     logger.info(
                         f"Calling MCP Tool '{tool_name}' with args: {kwargs}"
                     )
+                    try:
 
-                    result = await client.call_tool(
-                        tool_name, kwargs
-                    )
+                        results = await client.call_tool(
+                            tool_name, kwargs
+                        )
+                        response_str = ""
+                        for result in results:
+                            if isinstance(result, TextContent):
+                                response_str = result.text + "\n"
 
-                    # Return an error if the tool call failed
-                    if result.isError:
-                        raise Exception(
-                            f"Error from MCP tool '{tool_name}': {result.content}"
+                            if isinstance(result, TextContent):
+                                response_str += result.text + "\n"
+                            elif isinstance(result, ImageContent):
+
+                                response_str = getattr(result, "data", "")
+
+                            elif isinstance(result, EmbeddedResource):
+                                # Handle embedded resources
+                                response_str += f"[Embedded resource: {result.resource.model_dump_json()}]\n"
+                            else:
+                                # Handle other content types
+                                response_str += (
+                                    f"[Unsupported content type: {result.type}]\n"
+                                )
+
+                        messages.extend(
+                            self.to_messages(
+                                response=response_str, tool_call_id=tool_call.id
+                            )
                         )
 
-                    # Can't write this last bit as I can't get the imports to work to execute this
-                    response_str = ""
-                    for content_item in result.content:
-                        if isinstance(content_item, TextContent):
-                            response_str += content_item.text + "\n"
-                        elif isinstance(content_item, ImageContent):
+                    except McpError as e:
+                    # Return an error if the tool call failed
+                        logger.error(f"Error calling MCP tool: {e}")
+                        raise e
+
+        yield messages
+
+
 
