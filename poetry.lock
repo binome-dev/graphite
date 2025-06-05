@@ -275,33 +275,35 @@ opentelemetry-sdk = ">=1.22"
 
 [[package]]
 name = "arize-phoenix"
-version = "7.12.3"
+version = "10.6.2"
 description = "AI Observability and Evaluation"
 optional = false
 python-versions = "<3.14,>=3.9"
 groups = ["dev"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "arize_phoenix-7.12.3-py3-none-any.whl", hash = "sha256:d8f043e48217709dde475647d640723d9cb3bdd2a85074464c0aa483eb5b1169"},
-    {file = "arize_phoenix-7.12.3.tar.gz", hash = "sha256:b33569386a8df3318edaea98fce2bbb7d5fc22556b8c338fc45ce579e329658b"},
+    {file = "arize_phoenix-10.6.2-py3-none-any.whl", hash = "sha256:069184268e53a7835a8e114284455c2184fcfbe7d852cb441fce2065b02226a3"},
+    {file = "arize_phoenix-10.6.2.tar.gz", hash = "sha256:e8165d0980178d2bbdf3b1768b1fed33f26300dd2be75f2db1a122106a0aaf08"},
 ]
 
 [package.dependencies]
 aioitertools = "*"
 aiosqlite = "*"
 alembic = ">=1.3.0,<2"
-arize-phoenix-evals = ">=0.13.1"
-arize-phoenix-otel = ">=0.5.1"
+arize-phoenix-client = "*"
+arize-phoenix-evals = ">=0.20.6"
+arize-phoenix-otel = ">=0.10.1"
 authlib = "*"
 cachetools = "*"
+email-validator = "*"
 fastapi = "*"
 grpc-interceptor = "*"
 grpcio = "*"
 httpx = "*"
 jinja2 = "*"
 numpy = "!=2.0.0"
-openinference-instrumentation = ">=0.1.12"
-openinference-semantic-conventions = ">=0.1.12"
+openinference-instrumentation = ">=0.1.32"
+openinference-semantic-conventions = ">=0.1.17"
 opentelemetry-exporter-otlp = "*"
 opentelemetry-proto = ">=1.12.0"
 opentelemetry-sdk = "*"
@@ -310,26 +312,42 @@ pandas = ">=1.0"
 protobuf = ">=3.20.2,<6.0"
 psutil = "*"
 pyarrow = "*"
-pydantic = ">=1.0,<2.0.dev0 || >=2.1.dev0,<3"
+pydantic = ">=2.1.0"
 python-multipart = "*"
 scikit-learn = "*"
 scipy = "*"
 sqlalchemy = {version = ">=2.0.4,<3", extras = ["asyncio"]}
 sqlean-py = ">=3.45.1"
 starlette = "*"
-strawberry-graphql = "0.253.1"
+strawberry-graphql = "0.270.1"
 tqdm = "*"
 typing-extensions = ">=4.6"
 uvicorn = "*"
-websockets = "*"
 wrapt = ">=1.17.2"
 
 [package.extras]
-container = ["anthropic (>=0.45.2)", "fast-hdbscan (>=0.2.0)", "google-generativeai", "numba (>=0.60.0)", "openai (>=1.0.0)", "opentelemetry-exporter-otlp", "opentelemetry-instrumentation-fastapi", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-sqlalchemy", "opentelemetry-proto (>=1.12.0)", "opentelemetry-sdk", "opentelemetry-semantic-conventions", "prometheus-client", "py-grpc-prometheus", "strawberry-graphql[opentelemetry] (==0.253.1)", "umap-learn", "uvloop"]
-dev = ["anthropic", "arize[autoembeddings,llm-evaluation]", "asgi-lifespan", "asyncpg", "faker (>=30.1.0)", "gcsfs", "google-cloud-aiplatform (>=1.3)", "grpc-interceptor[testing]", "hatch", "jupyter", "langchain (>=0.0.334)", "litellm (>=1.0.3)", "llama-index (>=0.10.3)", "mypy (==1.12.1)", "nbqa", "pandas (>=1.0)", "pandas-stubs (==2.2.2.240603)", "portpicker", "pre-commit", "prometheus-client", "psycopg[binary,pool]", "pytest (==8.3.3)", "pytest-asyncio", "pytest-cov", "pytest-postgresql", "pytest-xdist", "ruff (==0.6.9)", "strawberry-graphql[debug-server,opentelemetry] (==0.253.1)", "tabulate", "tox (==4.18.1)", "tox-uv (==1.11.3)", "types-tabulate", "uv (==0.4.8)", "uvloop"]
+container = ["aiohttp", "anthropic (>=0.49.0)", "azure-identity", "fast-hdbscan (>=0.2.0)", "google-generativeai", "numba (>=0.60.0)", "openai (>=1.0.0)", "opentelemetry-exporter-otlp", "opentelemetry-instrumentation-fastapi", "opentelemetry-instrumentation-grpc", "opentelemetry-instrumentation-sqlalchemy", "opentelemetry-proto (>=1.12.0)", "opentelemetry-sdk", "opentelemetry-semantic-conventions", "prometheus-client", "py-grpc-prometheus", "strawberry-graphql[opentelemetry] (==0.270.1)", "umap-learn", "uvloop"]
+dev = ["anthropic (>=0.49.0)", "arize[autoembeddings,llm-evaluation]", "asgi-lifespan", "asyncpg", "faker (>=30.1.0)", "gcsfs", "google-cloud-aiplatform (>=1.3)", "grpc-interceptor[testing]", "hatch", "jupyter", "langchain (>=0.0.334)", "litellm (>=1.0.3,<1.57.5)", "llama-index (>=0.10.3)", "mypy (==1.12.1)", "nbqa", "pandas (>=1.0)", "pandas-stubs (==2.2.2.240603)", "portpicker", "pre-commit", "prometheus-client", "psycopg[binary,pool]", "pytest (==8.3.3)", "pytest-asyncio", "pytest-cov", "pytest-postgresql", "pytest-xdist", "ruff (==0.6.9)", "strawberry-graphql[debug-server,opentelemetry] (==0.270.1)", "tabulate", "tox (==4.18.1)", "tox-uv (==1.11.3)", "types-jsonschema", "types-tabulate", "uv (==0.4.8)", "uvloop"]
 embeddings = ["fast-hdbscan (>=0.2.0)", "numba (>=0.60.0)", "umap-learn"]
 llama-index = ["llama-index (==0.11.0)", "llama-index-agent-openai (>=0.2.7)", "llama-index-embeddings-openai (>=0.1.10)", "llama-index-llms-openai (>=0.1.24)", "llama-index-readers-file (>=0.1.25)"]
 pg = ["asyncpg", "psycopg[binary,pool]"]
+
+[[package]]
+name = "arize-phoenix-client"
+version = "1.10.0"
+description = "LLM Observability"
+optional = false
+python-versions = "<3.14,>=3.9"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "arize_phoenix_client-1.10.0-py3-none-any.whl", hash = "sha256:8dfd486bc1a84a361b9e4e09569b55c3994c46f1b09e44e48c99a0cf9d0a2a8b"},
+    {file = "arize_phoenix_client-1.10.0.tar.gz", hash = "sha256:15bf6d0ec62bd298e4abddc2ff61e66c1e3bef8e5bcac7838f5035fade0b237e"},
+]
+
+[package.dependencies]
+httpx = "*"
+typing-extensions = "*"
 
 [[package]]
 name = "arize-phoenix-evals"
@@ -355,25 +373,26 @@ test = ["anthropic (>=0.18.0)", "boto3", "lameenc", "litellm (>=1.28.9)", "mistr
 
 [[package]]
 name = "arize-phoenix-otel"
-version = "0.9.2"
+version = "0.10.3"
 description = "LLM Observability"
 optional = false
 python-versions = "<3.14,>=3.8"
 groups = ["dev"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "arize_phoenix_otel-0.9.2-py3-none-any.whl", hash = "sha256:5286b33c58b596ef8edd9a4255ee00fd74f774b1e5dbd9393e77e87870a14d76"},
-    {file = "arize_phoenix_otel-0.9.2.tar.gz", hash = "sha256:a48c7d41f3ac60dc75b037f036bf3306d2af4af371cdb55e247e67957749bc31"},
+    {file = "arize_phoenix_otel-0.10.3-py3-none-any.whl", hash = "sha256:c371b4dee67cee591771d7bbcbb831fae45495a5fbc6351a508f09c25595db81"},
+    {file = "arize_phoenix_otel-0.10.3.tar.gz", hash = "sha256:c59a3cf3b59f1a5852064763a8f3c72ea2319ec3cc55446d87e91085e18ef1a5"},
 ]
 
 [package.dependencies]
-openinference-instrumentation = ">=0.1.21"
-openinference-semantic-conventions = ">=0.1.9"
+openinference-instrumentation = ">=0.1.32"
+openinference-semantic-conventions = ">=0.1.17"
 opentelemetry-exporter-otlp = "*"
 opentelemetry-proto = ">=1.12.0"
 opentelemetry-sdk = "*"
 opentelemetry-semantic-conventions = "*"
 typing-extensions = ">=4.5,<5"
+wrapt = "*"
 
 [[package]]
 name = "asgiref"
@@ -1073,6 +1092,28 @@ files = [
 ]
 
 [[package]]
+name = "dnspython"
+version = "2.7.0"
+description = "DNS toolkit"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "dnspython-2.7.0-py3-none-any.whl", hash = "sha256:b4c34b7d10b51bcc3a5071e7b8dee77939f1e878477eeecc965e9835f63c6c86"},
+    {file = "dnspython-2.7.0.tar.gz", hash = "sha256:ce9c432eda0dc91cf618a5cedf1a4e142651196bbcd2c80e89ed5a907e5cfaf1"},
+]
+
+[package.extras]
+dev = ["black (>=23.1.0)", "coverage (>=7.0)", "flake8 (>=7)", "hypercorn (>=0.16.0)", "mypy (>=1.8)", "pylint (>=3)", "pytest (>=7.4)", "pytest-cov (>=4.1.0)", "quart-trio (>=0.11.0)", "sphinx (>=7.2.0)", "sphinx-rtd-theme (>=2.0.0)", "twine (>=4.0.0)", "wheel (>=0.42.0)"]
+dnssec = ["cryptography (>=43)"]
+doh = ["h2 (>=4.1.0)", "httpcore (>=1.0.0)", "httpx (>=0.26.0)"]
+doq = ["aioquic (>=1.0.0)"]
+idna = ["idna (>=3.7)"]
+trio = ["trio (>=0.23)"]
+wmi = ["wmi (>=1.5.1)"]
+
+[[package]]
 name = "docstring-parser"
 version = "0.16"
 description = "Parse Python docstrings in reST, Google and Numpydoc format"
@@ -1120,6 +1161,42 @@ files = [
 ]
 
 [[package]]
+name = "email-validator"
+version = "2.2.0"
+description = "A robust email address syntax and deliverability validation library."
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631"},
+    {file = "email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7"},
+]
+
+[package.dependencies]
+dnspython = ">=2.0.0"
+idna = ">=2.0.0"
+
+[[package]]
+name = "exceptiongroup"
+version = "1.3.0"
+description = "Backport of PEP 654 (exception groups)"
+optional = false
+python-versions = ">=3.7"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "exceptiongroup-1.3.0-py3-none-any.whl", hash = "sha256:4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10"},
+    {file = "exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88"},
+]
+
+[package.dependencies]
+typing-extensions = {version = ">=4.6.0", markers = "python_version < \"3.13\""}
+
+[package.extras]
+test = ["pytest (>=6)"]
+
+[[package]]
 name = "fastapi"
 version = "0.115.12"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -1140,6 +1217,30 @@ typing-extensions = ">=4.8.0"
 [package.extras]
 all = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "itsdangerous (>=1.1.0)", "jinja2 (>=3.1.5)", "orjson (>=3.2.1)", "pydantic-extra-types (>=2.0.0)", "pydantic-settings (>=2.0.0)", "python-multipart (>=0.0.18)", "pyyaml (>=5.3.1)", "ujson (>=4.0.1,!=4.0.2,!=4.1.0,!=4.2.0,!=4.3.0,!=5.0.0,!=5.1.0)", "uvicorn[standard] (>=0.12.0)"]
 standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "jinja2 (>=3.1.5)", "python-multipart (>=0.0.18)", "uvicorn[standard] (>=0.12.0)"]
+
+[[package]]
+name = "fastmcp"
+version = "2.6.1"
+description = "The fast, Pythonic way to build MCP servers."
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "fastmcp-2.6.1-py3-none-any.whl", hash = "sha256:d83a2fcffa721cbb91b29c738d39de20b54e1b1ebef5be652d6a4956ecac7ad3"},
+    {file = "fastmcp-2.6.1.tar.gz", hash = "sha256:212f15a4edf8289e5c3c70796910dc612ef891f84df3257a277457bb761d1362"},
+]
+
+[package.dependencies]
+authlib = ">=1.5.2"
+exceptiongroup = ">=1.2.2"
+httpx = ">=0.28.1"
+mcp = ">=1.9.2,<2.0.0"
+openapi-pydantic = ">=0.5.1"
+python-dotenv = ">=1.1.0"
+rich = ">=13.9.4"
+typer = ">=0.15.2"
+websockets = ">=14.0"
 
 [[package]]
 name = "filelock"
@@ -2461,15 +2562,15 @@ tests = ["pytest", "simplejson"]
 
 [[package]]
 name = "mcp"
-version = "1.7.1"
+version = "1.9.2"
 description = "Model Context Protocol SDK"
 optional = false
 python-versions = ">=3.10"
 groups = ["dev"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "mcp-1.7.1-py3-none-any.whl", hash = "sha256:f7e6108977db6d03418495426c7ace085ba2341b75197f8727f96f9cfd30057a"},
-    {file = "mcp-1.7.1.tar.gz", hash = "sha256:eb4f1f53bd717f75dda8a1416e00804b831a8f3c331e23447a03b78f04b43a6e"},
+    {file = "mcp-1.9.2-py3-none-any.whl", hash = "sha256:bc29f7fd67d157fef378f89a4210384f5fecf1168d0feb12d22929818723f978"},
+    {file = "mcp-1.9.2.tar.gz", hash = "sha256:3c7651c053d635fd235990a12e84509fe32780cd359a5bbef352e20d4d963c05"},
 ]
 
 [package.dependencies]
@@ -3060,16 +3161,32 @@ realtime = ["websockets (>=13,<16)"]
 voice-helpers = ["numpy (>=2.0.2)", "sounddevice (>=0.5.1)"]
 
 [[package]]
+name = "openapi-pydantic"
+version = "0.5.1"
+description = "Pydantic OpenAPI schema implementation"
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "openapi_pydantic-0.5.1-py3-none-any.whl", hash = "sha256:a3a09ef4586f5bd760a8df7f43028b60cafb6d9f61de2acba9574766255ab146"},
+    {file = "openapi_pydantic-0.5.1.tar.gz", hash = "sha256:ff6835af6bde7a459fb93eb93bb92b8749b754fc6e51b2f1590a19dc3005ee0d"},
+]
+
+[package.dependencies]
+pydantic = ">=1.8"
+
+[[package]]
 name = "openinference-instrumentation"
-version = "0.1.28"
+version = "0.1.32"
 description = "OpenInference instrumentation utilities"
 optional = false
 python-versions = "<3.14,>=3.8"
 groups = ["main", "dev"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "openinference_instrumentation-0.1.28-py3-none-any.whl", hash = "sha256:4eee3b06fc6fdd777b587762a03d68f470821afe783b21e2460218ad9e158e82"},
-    {file = "openinference_instrumentation-0.1.28.tar.gz", hash = "sha256:7eee22ad63adb7f76a03181a3b0d972f5616fd6d0504c502b30a525f6f664f6a"},
+    {file = "openinference_instrumentation-0.1.32-py3-none-any.whl", hash = "sha256:dbc11a6e1cb719522749b0cd1226feaecdbeeaebe7ff0b73ecb31143a9d92b57"},
+    {file = "openinference_instrumentation-0.1.32.tar.gz", hash = "sha256:f59e02d9b45acc8aab4c11c00f6cc6ff6b63a2487e04741cf145702e85408072"},
 ]
 
 [package.dependencies]
@@ -5053,19 +5170,20 @@ full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart 
 
 [[package]]
 name = "strawberry-graphql"
-version = "0.253.1"
+version = "0.270.1"
 description = "A library for creating GraphQL APIs"
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = ">=3.9"
 groups = ["dev"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "strawberry_graphql-0.253.1-py3-none-any.whl", hash = "sha256:f24cc55560546968255094aa080fb11a14eace4d61cd27eaf98dded863a2af17"},
-    {file = "strawberry_graphql-0.253.1.tar.gz", hash = "sha256:be43eac92e0896a7f1061ab293b89b060d369974e4c1444d16ad377d7a6f030d"},
+    {file = "strawberry_graphql-0.270.1-py3-none-any.whl", hash = "sha256:3593086dc08614ae241cb88f7691e90f90b01cab6ee6351cb3838fc5ba8bfab0"},
+    {file = "strawberry_graphql-0.270.1.tar.gz", hash = "sha256:d64524a943851d83252e39b82ef768ee494259edecf9510b37bad9a46b745db8"},
 ]
 
 [package.dependencies]
-graphql-core = ">=3.2.0,<3.4.0"
+graphql-core = {version = ">=3.2.0,<3.4.0", markers = "python_version >= \"3.9\" and python_version < \"4.0\""}
+packaging = ">=23"
 python-dateutil = ">=2.7.0,<3.0.0"
 typing-extensions = ">=4.5.0"
 
@@ -5074,7 +5192,7 @@ aiohttp = ["aiohttp (>=3.7.4.post0,<4.0.0)"]
 asgi = ["python-multipart (>=0.0.7)", "starlette (>=0.18.0)"]
 chalice = ["chalice (>=1.22,<2.0)"]
 channels = ["asgiref (>=3.2,<4.0)", "channels (>=3.0.5)"]
-cli = ["graphlib_backport", "libcst (>=0.4.7)", "pygments (>=2.3,<3.0)", "rich (>=12.0.0)", "typer (>=0.7.0)"]
+cli = ["libcst (>=0.4.7)", "pygments (>=2.3,<3.0)", "rich (>=12.0.0)", "typer (>=0.7.0)"]
 debug = ["libcst (>=0.4.7)", "rich (>=12.0.0)"]
 debug-server = ["libcst (>=0.4.7)", "pygments (>=2.3,<3.0)", "python-multipart (>=0.0.7)", "rich (>=12.0.0)", "starlette (>=0.18.0)", "typer (>=0.7.0)", "uvicorn (>=0.11.6)"]
 django = ["Django (>=3.2)", "asgiref (>=3.2,<4.0)"]
@@ -5905,4 +6023,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "966726cd0f67ff1d820de9c8b6a94ef0fa1374ba25f492b7f9615039de95381a"
+content-hash = "10456eebbef33491d1b7840ad29573d5619f69155a55f9ac814626ed5be5c401"
