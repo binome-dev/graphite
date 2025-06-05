@@ -1,10 +1,11 @@
-
 import json
+from typing import Any
 from typing import AsyncGenerator
+from typing import Dict
 from typing import List
-from typing import Optional
 
 from loguru import logger
+from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
 from grafi.common.decorators.record_tool_execution import record_tool_execution
@@ -33,18 +34,7 @@ class FastMCPClient(FunctionCallTool):
     # Set up API key and MCP client
     name: str = "FastMCPTool"
     type: str = "FastMCPClient"
-    host: str = "localhost"
-    port : int = 8000 
-    # Here not sure if we want to make the host and port as arguments or the entire client config? Gonna use client_config for now but maybe we want
-    # to make it more flexible in the future.
-    client_config = {
-        "mcpServers": {
-            "remote": {"url": "http://localhost:8080/mcp"},
-            "transport": "streamable-http"
-        }
-    }
-    client : Optional[Client] = None
-
+    client_config: Dict[str, Any] = Field(default_factory=lambda: {})
 
     class Builder(FunctionCallTool.Builder):
         """Concrete builder for MCPTool."""
@@ -52,13 +42,25 @@ class FastMCPClient(FunctionCallTool):
         _tool: "FastMCPClient"
 
         def __init__(self) -> None:
-            if self._tool.client_config is {}:
-                raise ValueError("Client Config are not set.")
-            self.client = Client(self._tool.client_config) # Not sure if saving the client reference is good here, might just have to initialize it in the a_build function, keeping here for reference
             self._tool = self._init_tool()
 
         def _init_tool(self) -> "FastMCPClient":
             return FastMCPClient.model_construct()
+
+        def client_config(
+            self, client_config: Dict[str, Any]
+        ) -> "FastMCPClient.Builder":
+            """
+            Set the client configuration for the MCP client.
+
+            Args:
+                client_config (Dict[str, Any]): The configuration dictionary for the MCP client.
+
+            Returns:
+                FastMCPClient.Builder: The builder instance for method chaining.
+            """
+            self._tool.client_config = client_config
+            return self
 
         def build(self) -> None:
             raise NotImplementedError(
@@ -70,8 +72,17 @@ class FastMCPClient(FunctionCallTool):
             return self._tool
 
         async def _a_build_function_specs(self) -> None:
+            client_config = self._tool.client_config
+            if (
+                client_config is None
+                or client_config is {}
+                or client_config.get("mcpServers") is None
+            ):
+                raise ValueError("Client Config are not set.")
 
-            client = Client(self._tool.client_config)  # Initialize the client with the config
+            client = Client(
+                self._tool.client_config
+            )  # Initialize the client with the config
             async with client:
                 logger.info(f"Client connected: {client.is_connected()}")
                 tools_list = await client.list_tools()
@@ -86,11 +97,9 @@ class FastMCPClient(FunctionCallTool):
                     self._tool.function_specs.append(
                         FunctionSpec.model_validate(func_spec)
                     )
-                 
+
                 self.resources = await client.list_resources()
                 self.prompts = await client.list_prompts()
-            
-
 
     @record_tool_execution
     def execute(
@@ -126,26 +135,19 @@ class FastMCPClient(FunctionCallTool):
         if self.client_config is None:
             raise ValueError("Client Config not set.")
 
-        client = Client(self.client_config) 
+        client = Client(self.client_config)
         async with client:
             logger.info(f"Client connected: {client.is_connected()}")
             for tool_call in input_message.tool_calls:
                 if any(
-                    spec.name == tool_call.function.name
-                    for spec in self.function_specs
+                    spec.name == tool_call.function.name for spec in self.function_specs
                 ):
-
                     tool_name = tool_call.function.name
                     kwargs = json.loads(tool_call.function.arguments)
 
-                    logger.info(
-                        f"Calling MCP Tool '{tool_name}' with args: {kwargs}"
-                    )
+                    logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
                     try:
-
-                        results = await client.call_tool(
-                            tool_name, kwargs
-                        )
+                        results = await client.call_tool(tool_name, kwargs)
                         response_str = ""
                         for result in results:
                             if isinstance(result, TextContent):
@@ -154,7 +156,6 @@ class FastMCPClient(FunctionCallTool):
                             if isinstance(result, TextContent):
                                 response_str += result.text + "\n"
                             elif isinstance(result, ImageContent):
-
                                 response_str = getattr(result, "data", "")
 
                             elif isinstance(result, EmbeddedResource):
@@ -173,11 +174,8 @@ class FastMCPClient(FunctionCallTool):
                         )
 
                     except McpError as e:
-                    # Return an error if the tool call failed
+                        # Return an error if the tool call failed
                         logger.error(f"Error calling MCP tool: {e}")
                         raise e
 
         yield messages
-
-
-

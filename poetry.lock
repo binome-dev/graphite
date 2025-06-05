@@ -1153,6 +1153,30 @@ all = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>
 standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "jinja2 (>=3.1.5)", "python-multipart (>=0.0.18)", "uvicorn[standard] (>=0.12.0)"]
 
 [[package]]
+name = "fastmcp"
+version = "2.6.1"
+description = "The fast, Pythonic way to build MCP servers."
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "fastmcp-2.6.1-py3-none-any.whl", hash = "sha256:d83a2fcffa721cbb91b29c738d39de20b54e1b1ebef5be652d6a4956ecac7ad3"},
+    {file = "fastmcp-2.6.1.tar.gz", hash = "sha256:212f15a4edf8289e5c3c70796910dc612ef891f84df3257a277457bb761d1362"},
+]
+
+[package.dependencies]
+authlib = ">=1.5.2"
+exceptiongroup = ">=1.2.2"
+httpx = ">=0.28.1"
+mcp = ">=1.9.2,<2.0.0"
+openapi-pydantic = ">=0.5.1"
+python-dotenv = ">=1.1.0"
+rich = ">=13.9.4"
+typer = ">=0.15.2"
+websockets = ">=14.0"
+
+[[package]]
 name = "filelock"
 version = "3.18.0"
 description = "A platform independent file lock."
@@ -2970,6 +2994,22 @@ typing-extensions = ">=4.11,<5"
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 realtime = ["websockets (>=13,<16)"]
 voice-helpers = ["numpy (>=2.0.2)", "sounddevice (>=0.5.1)"]
+
+[[package]]
+name = "openapi-pydantic"
+version = "0.5.1"
+description = "Pydantic OpenAPI schema implementation"
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["dev"]
+markers = "python_version == \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "openapi_pydantic-0.5.1-py3-none-any.whl", hash = "sha256:a3a09ef4586f5bd760a8df7f43028b60cafb6d9f61de2acba9574766255ab146"},
+    {file = "openapi_pydantic-0.5.1.tar.gz", hash = "sha256:ff6835af6bde7a459fb93eb93bb92b8749b754fc6e51b2f1590a19dc3005ee0d"},
+]
+
+[package.dependencies]
+pydantic = ">=1.8"
 
 [[package]]
 name = "openinference-instrumentation"
