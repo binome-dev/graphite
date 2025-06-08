@@ -1,11 +1,10 @@
 import os
 from typing import Optional
-from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
-from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.assistants.stream_assistant import StreamAssistant
 from grafi.common.topics.stream_output_topic import agent_stream_output_topic
 from grafi.common.topics.topic import agent_input_topic
@@ -34,32 +33,10 @@ class SimpleStreamAssistant(StreamAssistant):
 
     workflow: EventDrivenWorkflow
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for SimpleStreamAssistant."""
-
-        _assistant: "SimpleStreamAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleStreamAssistant":
-            return SimpleStreamAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def system_message(self, system_message: str) -> Self:
-            self._assistant.system_message = system_message
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "SimpleStreamAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleStreamAssistantBuilder":
+        """Return a builder for SimpleStreamAssistant."""
+        return SimpleStreamAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleStreamAssistant":
         """
@@ -67,13 +44,13 @@ class SimpleStreamAssistant(StreamAssistant):
         """
         # Create an LLM node
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("LLMStreamNode")
             .subscribe(agent_input_topic)
             .command(
-                LLMStreamResponseCommand.Builder()
+                LLMStreamResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("OpenAITool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -88,9 +65,24 @@ class SimpleStreamAssistant(StreamAssistant):
 
         # Create a workflow and add the LLM node
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("SimpleLLMWorkflow")
             .node(llm_node)
             .build()
         )
+        return self
+
+
+class SimpleStreamAssistantBuilder(AssistantBaseBuilder[SimpleStreamAssistant]):
+
+    def api_key(self, api_key: str) -> "SimpleStreamAssistantBuilder":
+        self._obj.api_key = api_key
+        return self
+
+    def system_message(self, system_message: str) -> "SimpleStreamAssistantBuilder":
+        self._obj.system_message = system_message
+        return self
+
+    def model(self, model: str) -> "SimpleStreamAssistantBuilder":
+        self._obj.model = model
         return self

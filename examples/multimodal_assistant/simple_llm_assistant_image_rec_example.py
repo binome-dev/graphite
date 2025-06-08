@@ -37,7 +37,7 @@ def get_execution_context() -> ExecutionContext:
 def test_simple_image_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleLLMAssistant.Builder()
+        SimpleLLMAssistant.builder()
         .name("SimpleLLMImageAssistant")
         .api_key(api_key)
         .build()

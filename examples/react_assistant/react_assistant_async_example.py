@@ -47,7 +47,7 @@ async def test_react_assistant_async() -> None:
 
     # Set up the assistant with DuckDuckGoTool
     assistant = (
-        ReActAssistant.Builder()
+        ReActAssistant.builder()
         .name("ReActAssistant")
         .api_key(api_key)
         .observation_llm_system_message(observation_llm_system_message)
@@ -55,7 +55,7 @@ async def test_react_assistant_async() -> None:
         .action_llm_system_message(action_llm_system_message)
         .summary_llm_system_message(summary_llm_system_message)
         .search_tool(
-            TavilyTool.Builder()
+            TavilyTool.builder()
             .name("TavilyTestTool")
             .api_key(tavily_api_key)
             .max_tokens(6000)

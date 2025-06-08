@@ -5,6 +5,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
@@ -45,44 +46,10 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionCallTool
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleOllamaFunctionCallAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleOllamaFunctionCallAssistant":
-            return SimpleOllamaFunctionCallAssistant.model_construct()
-
-        def api_url(self, api_url: str) -> Self:
-            self._assistant.api_url = api_url
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def function_call_llm_system_message(
-            self, function_call_llm_system_message: str
-        ) -> Self:
-            self._assistant.function_call_llm_system_message = (
-                function_call_llm_system_message
-            )
-            return self
-
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
-            return self
-
-        def function_tool(self, function_tool: FunctionCallTool) -> Self:
-            self._assistant.function_tool = function_tool
-            return self
-
-        def build(self) -> "SimpleOllamaFunctionCallAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleOllamaFunctionCallAssistantBuilder":
+        """Return a builder for SimpleOllamaFunctionCallAssistant."""
+        return SimpleOllamaFunctionCallAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleOllamaFunctionCallAssistant":
         function_call_topic = Topic(
@@ -93,13 +60,13 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
 
         # Create an input LLM node
         llm_input_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OllamaInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OllamaTool.Builder()
+                    OllamaTool.builder()
                     .name("UserInputLLM")
                     .api_url(self.api_url)
                     .model(self.model)
@@ -123,11 +90,13 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallCommand.Builder().function_tool(self.function_tool).build()
+                FunctionCallCommand.builder()
+                .function_call_tool(self.function_tool)
+                .build()
             )
             .publish_to(function_result_topic)
             .build()
@@ -135,15 +104,15 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
 
         # Create an output LLM node
         llm_output_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OllamaOutputNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OllamaTool.Builder()
+                    OllamaTool.builder()
                     .name("UserOutputLLM")
                     .api_url(self.api_url)
                     .model(self.model)
@@ -158,7 +127,7 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_ollama_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
@@ -166,4 +135,35 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
             .build()
         )
 
+        return self
+
+
+class SimpleOllamaFunctionCallAssistantBuilder(
+    AssistantBaseBuilder[SimpleOllamaFunctionCallAssistant]
+):
+    """
+    Builder for SimpleOllamaFunctionCallAssistant.
+    This class provides methods to set the properties of the assistant and build it.
+    """
+
+    def api_url(self, api_url: str) -> Self:
+        self._obj.api_url = api_url
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def function_call_llm_system_message(
+        self, function_call_llm_system_message: str
+    ) -> Self:
+        self._obj.function_call_llm_system_message = function_call_llm_system_message
+        return self
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self._obj.summary_llm_system_message = summary_llm_system_message
+        return self
+
+    def function_tool(self, function_tool: FunctionCallTool) -> Self:
+        self._obj.function_tool = function_tool
         return self

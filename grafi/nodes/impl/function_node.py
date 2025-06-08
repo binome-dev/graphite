@@ -12,6 +12,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 from grafi.tools.functions.function_command import FunctionCommand
 
 
@@ -23,13 +24,10 @@ class FunctionNode(Node):
     type: str = "FunctionNode"
     command: FunctionCommand
 
-    class Builder(Node.Builder):
-        """Concrete builder for RagNode."""
-
-        _node: "FunctionNode"
-
-        def _init_node(self) -> "FunctionNode":
-            return FunctionNode.model_construct()
+    @classmethod
+    def builder(cls) -> NodeBuilder:
+        """Return a builder for LLMNode."""
+        return NodeBuilder(cls)
 
     @record_node_execution
     def execute(

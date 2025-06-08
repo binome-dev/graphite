@@ -14,7 +14,7 @@ from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 @pytest.fixture
 def google_search_tool() -> GoogleSearchTool:
     """Default instance with no fixed settings."""
-    return GoogleSearchTool.Builder().build()
+    return GoogleSearchTool.builder().build()
 
 
 @pytest.fixture
@@ -128,7 +128,7 @@ def test_execute_function(google_search_tool, mock_search):
 # --------------------------------------------------------------------------- #
 def test_builder_configuration():
     tool = (
-        GoogleSearchTool.Builder()
+        GoogleSearchTool.builder()
         .fixed_max_results(7)
         .proxy("http://proxy.local")
         .timeout(5)

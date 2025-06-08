@@ -1,10 +1,12 @@
 import os
-from typing import Optional, Self
+from typing import Optional
+from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_node import LLMNode
@@ -37,43 +39,21 @@ class SimpleLLMAssistant(Assistant):
 
     workflow: EventDrivenWorkflow
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleLLMAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleLLMAssistant":
-            return SimpleLLMAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def system_message(self, system_message: str) -> Self:
-            self._assistant.system_message = system_message
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "SimpleLLMAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleLLMAssistantBuilder":
+        """Return a builder for SimpleLLMAssistant."""
+        return SimpleLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleLLMAssistant":
         # Create an LLM node
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAINode")
             .subscribe(agent_input_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("OpenAITool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -88,10 +68,26 @@ class SimpleLLMAssistant(Assistant):
 
         # Create a workflow and add the LLM node
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("SimpleLLMWorkflow")
             .node(llm_node)
             .build()
         )
 
+        return self
+
+
+class SimpleLLMAssistantBuilder(AssistantBaseBuilder[SimpleLLMAssistant]):
+    """Concrete builder for SimpleLLMAssistant."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def system_message(self, system_message: str) -> Self:
+        self._obj.system_message = system_message
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
         return self

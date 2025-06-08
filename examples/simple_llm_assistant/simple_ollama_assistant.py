@@ -5,6 +5,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_node import LLMNode
@@ -35,43 +36,21 @@ class SimpleOllamaAssistant(Assistant):
     system_message: Optional[str] = Field(default=None)
     model: str = Field(default="qwen3")
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleOllamaAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleOllamaAssistant":
-            return SimpleOllamaAssistant.model_construct()
-
-        def api_url(self, api_url: str) -> Self:
-            self._assistant.api_url = api_url
-            return self
-
-        def system_message(self, system_message: str) -> Self:
-            self._assistant.system_message = system_message
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "SimpleOllamaAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleOllamaAssistantBuilder":
+        """Return a builder for LLMNode."""
+        return SimpleOllamaAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleOllamaAssistant":
         # Create an LLM node
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OllamaInputNode")
             .subscribe(agent_input_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OllamaTool.Builder()
+                    OllamaTool.builder()
                     .name("UserInputLLM")
                     .api_url(self.api_url)
                     .model(self.model)
@@ -86,10 +65,26 @@ class SimpleOllamaAssistant(Assistant):
 
         # Create a workflow with the input node and the LLM node
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_function_call_workflow")
             .node(llm_node)
             .build()
         )
 
+        return self
+
+
+class SimpleOllamaAssistantBuilder(AssistantBaseBuilder[SimpleOllamaAssistant]):
+    """Concrete builder for SimpleLLMAssistant."""
+
+    def api_url(self, api_url: str) -> Self:
+        self._obj.api_url = api_url
+        return self
+
+    def system_message(self, system_message: str) -> Self:
+        self._obj.system_message = system_message
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
         return self

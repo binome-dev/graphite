@@ -2,6 +2,7 @@ from typing import Any
 from typing import Self
 
 from grafi.common.models.command import Command
+from grafi.common.models.command import CommandBuilder
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -11,20 +12,14 @@ from grafi.tools.llms.llm import LLM
 class LLMResponseCommand(Command):
     llm: LLM
 
-    class Builder(Command.Builder):
-        """Concrete builder for LLMResponseCommand."""
+    @classmethod
+    def builder(cls) -> "LLMResponseCommandBuilder":
+        """
+        Return a builder for LLMResponseCommand.
 
-        _command: "LLMResponseCommand"
-
-        def __init__(self) -> None:
-            self._command = self._init_command()
-
-        def _init_command(self) -> "LLMResponseCommand":
-            return LLMResponseCommand.model_construct()
-
-        def llm(self, llm: LLM) -> Self:
-            self._command.llm = llm
-            return self
+        This method allows for the construction of an LLMResponseCommand instance with specified parameters.
+        """
+        return LLMResponseCommandBuilder(cls)
 
     def execute(
         self, execution_context: ExecutionContext, input_data: Messages
@@ -39,3 +34,16 @@ class LLMResponseCommand(Command):
 
     def to_dict(self) -> dict[str, Any]:
         return {"llm": self.llm.to_dict()}
+
+
+class LLMResponseCommandBuilder(CommandBuilder[LLMResponseCommand]):
+    """
+    Builder for LLMResponseCommand.
+    """
+
+    def llm(self, llm: LLM) -> Self:
+        self._obj.llm = llm
+        return self
+
+    def build(self) -> LLMResponseCommand:
+        return self._obj

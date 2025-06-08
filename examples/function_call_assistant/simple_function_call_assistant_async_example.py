@@ -44,7 +44,7 @@ async def test_simple_function_call_assistant_async() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))

@@ -112,14 +112,14 @@ class ReactAssistant(Assistant):
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
-        default=GoogleSearchTool.Builder()
+        default=GoogleSearchTool.builder()
         .name("GoogleSearchTool")
         .fixed_max_results(3)
         .build()
     )
     model: str = Field(default="gpt-4o-mini")
 
-    class Builder(Assistant.Builder):
+    class Builder(Assistant.builder):
         """Concrete builder for ReactAssistant."""
 
         _assistant: "ReactAssistant"
@@ -165,7 +165,7 @@ class ReactAssistant(Assistant):
         )
 
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -175,9 +175,9 @@ class ReactAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -193,12 +193,12 @@ class ReactAssistant(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallCommand.Builder()
-                .function_tool(self.function_call_tool)
+                FunctionCallCommand.builder()
+                .function_call_tool(self.function_call_tool)
                 .build()
             )
             .publish_to(function_result_topic)
@@ -207,7 +207,7 @@ class ReactAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_agent_workflow")
             .node(llm_node)
             .node(function_call_node)
@@ -233,7 +233,7 @@ from <your react assistant path> import ReactAssistant
 
 api_key = "<your openai api key>"
 
-react_assistant = ReactAssistant.Builder().api_key(api_key).build()
+react_assistant = ReactAssistant.builder().api_key(api_key).build()
 
 execution_context = ExecutionContext(
             conversation_id=uuid.uuid4().hex,

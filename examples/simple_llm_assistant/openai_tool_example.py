@@ -41,7 +41,7 @@ def get_execution_context() -> ExecutionContext:
 
 def test_openai_tool_stream() -> None:
     event_store.clear_events()
-    openai_tool = OpenAITool.Builder().api_key(api_key).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).build()
     content = ""
     for messages in openai_tool.stream(
         get_execution_context(),
@@ -60,7 +60,7 @@ def test_openai_tool_stream() -> None:
 
 async def test_openai_tool_a_stream() -> None:
     event_store.clear_events()
-    openai_tool = OpenAITool.Builder().api_key(api_key).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).build()
     content = ""
     async for messages in openai_tool.a_stream(
         get_execution_context(),
@@ -78,7 +78,7 @@ async def test_openai_tool_a_stream() -> None:
 
 
 def test_openai_tool() -> None:
-    openai_tool = OpenAITool.Builder().api_key(api_key).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).build()
     event_store.clear_events()
     messages = openai_tool.execute(
         get_execution_context(),
@@ -99,7 +99,7 @@ def test_openai_tool_with_chat_param() -> None:
         "temperature": 0.1,
         "max_tokens": 15,
     }
-    openai_tool = OpenAITool.Builder().api_key(api_key).chat_params(chat_param).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
     event_store.clear_events()
     messages = openai_tool.execute(
         get_execution_context(),
@@ -118,7 +118,7 @@ def test_openai_tool_with_chat_param() -> None:
 
 def test_openai_tool_with_structured_output() -> None:
     chat_param = {"response_format": UserForm}
-    openai_tool = OpenAITool.Builder().api_key(api_key).chat_params(chat_param).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
     event_store.clear_events()
     messages = openai_tool.execute(
         get_execution_context(),
@@ -135,7 +135,7 @@ def test_openai_tool_with_structured_output() -> None:
 
 
 async def test_openai_tool_async() -> None:
-    openai_tool = OpenAITool.Builder().api_key(api_key).build()
+    openai_tool = OpenAITool.builder().api_key(api_key).build()
     event_store.clear_events()
 
     content = ""
@@ -160,10 +160,10 @@ async def test_openai_tool_async() -> None:
 async def test_llm_a_stream_node() -> None:
     event_store.clear_events()
     llm_stream_node = (
-        LLMNode.Builder()
+        LLMNode.builder()
         .command(
-            LLMStreamResponseCommand.Builder()
-            .llm(OpenAITool.Builder().api_key(api_key).build())
+            LLMStreamResponseCommand.builder()
+            .llm(OpenAITool.builder().api_key(api_key).build())
             .build()
         )
         .build()

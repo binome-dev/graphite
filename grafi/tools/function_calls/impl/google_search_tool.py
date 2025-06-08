@@ -9,6 +9,7 @@ from loguru import logger
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
 
 try:
@@ -40,39 +41,13 @@ class GoogleSearchTool(FunctionCallTool):
     proxy: Optional[str] = None
     timeout: Optional[int] = 10
 
-    class Builder(FunctionCallTool.Builder):
-        """Concrete builder for GoogleSearchTool."""
-
-        _tool: "GoogleSearchTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "GoogleSearchTool":
-            return GoogleSearchTool.model_construct()
-
-        def fixed_max_results(self, fixed_max_results: Optional[int]) -> Self:
-            self._tool.fixed_max_results = fixed_max_results
-            return self
-
-        def fixed_language(self, fixed_language: Optional[str]) -> Self:
-            self._tool.fixed_language = fixed_language
-            return self
-
-        def headers(self, headers: Optional[Any]) -> Self:
-            self._tool.headers = headers
-            return self
-
-        def proxy(self, proxy: Optional[str]) -> Self:
-            self._tool.proxy = proxy
-            return self
-
-        def timeout(self, timeout: Optional[int]) -> Self:
-            self._tool.timeout = timeout
-            return self
-
-        def build(self) -> "GoogleSearchTool":
-            return self._tool
+    @classmethod
+    def builder(cls) -> "GoogleSearchToolBuilder":
+        """
+        Return a builder for GoogleSearchTool.
+        This method allows for the construction of a GoogleSearchTool instance with specified parameters.
+        """
+        return GoogleSearchToolBuilder(cls)
 
     @llm_function
     def google_search(
@@ -137,3 +112,27 @@ class GoogleSearchTool(FunctionCallTool):
             "proxy": self.proxy,
             "timeout": self.timeout,
         }
+
+
+class GoogleSearchToolBuilder(FunctionCallToolBuilder[GoogleSearchTool]):
+    """Builder for GoogleSearchTool instances."""
+
+    def fixed_max_results(self, fixed_max_results: Optional[int]) -> Self:
+        self._obj.fixed_max_results = fixed_max_results
+        return self
+
+    def fixed_language(self, fixed_language: Optional[str]) -> Self:
+        self._obj.fixed_language = fixed_language
+        return self
+
+    def headers(self, headers: Optional[Any]) -> Self:
+        self._obj.headers = headers
+        return self
+
+    def proxy(self, proxy: Optional[str]) -> Self:
+        self._obj.proxy = proxy
+        return self
+
+    def timeout(self, timeout: Optional[int]) -> Self:
+        self._obj.timeout = timeout
+        return self

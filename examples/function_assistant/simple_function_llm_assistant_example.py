@@ -71,7 +71,7 @@ def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleFunctionLLMAssistant.Builder()
+        SimpleFunctionLLMAssistant.builder()
         .name("SimpleFunctionLLMAssistant")
         .api_key(api_key)
         .function(print_user_form)

@@ -16,7 +16,7 @@ def mock_agent_call():
 @pytest.fixture
 def agent_calling_tool(mock_agent_call) -> AgentCallingTool:
     return (
-        AgentCallingTool.Builder()
+        AgentCallingTool.builder()
         .agent_name("test_agent")
         .agent_description("Test agent description")
         .argument_description("Test argument description")

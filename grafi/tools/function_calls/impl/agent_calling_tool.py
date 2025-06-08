@@ -16,6 +16,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
 
 class AgentCallingTool(FunctionCallTool):
@@ -27,50 +28,14 @@ class AgentCallingTool(FunctionCallTool):
     agent_call: Callable[[ExecutionContext, Message], Any]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    class Builder(FunctionCallTool.Builder):
+    @classmethod
+    def builder(cls) -> "AgentCallingToolBuilder":
+        """
+        Return a builder for AgentCallingTool.
 
-        _tool: "AgentCallingTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "AgentCallingTool":
-            return AgentCallingTool.model_construct()
-
-        def agent_name(self, agent_name: str) -> Self:
-            self._tool.agent_name = agent_name
-            self._tool.name = agent_name
-            return self
-
-        def agent_description(self, agent_description: str) -> Self:
-            self._tool.agent_description = agent_description
-            return self
-
-        def argument_description(self, argument_description: str) -> Self:
-            self._tool.argument_description = argument_description
-            return self
-
-        def agent_call(self, agent_call: Callable) -> Self:
-            self._tool.agent_call = agent_call
-            return self
-
-        def build(self) -> "AgentCallingTool":
-            self._tool.function_specs.append(
-                FunctionSpec(
-                    name=self._tool.agent_name,
-                    description=self._tool.agent_description,
-                    parameters=ParametersSchema(
-                        properties={
-                            "prompt": ParameterSchema(
-                                type="string",
-                                description=self._tool.argument_description,
-                            )
-                        },
-                        required=["prompt"],
-                    ),
-                )
-            )
-            return self._tool
+        This method allows for the construction of an AgentCallingTool instance with specified parameters.
+        """
+        return AgentCallingToolBuilder(cls)
 
     @record_tool_execution
     def execute(
@@ -189,3 +154,42 @@ class AgentCallingTool(FunctionCallTool):
             "agent_call": self.agent_call.__dict__,
             "oi_span_type": self.oi_span_type.value,
         }
+
+
+class AgentCallingToolBuilder(FunctionCallToolBuilder[AgentCallingTool]):
+    """Builder for AgentCallingTool instances."""
+
+    def agent_name(self, agent_name: str) -> Self:
+        self._obj.agent_name = agent_name
+        self._obj.name = agent_name
+        return self
+
+    def agent_description(self, agent_description: str) -> Self:
+        self._obj.agent_description = agent_description
+        return self
+
+    def argument_description(self, argument_description: str) -> Self:
+        self._obj.argument_description = argument_description
+        return self
+
+    def agent_call(self, agent_call: Callable) -> Self:
+        self._obj.agent_call = agent_call
+        return self
+
+    def build(self) -> AgentCallingTool:
+        self._obj.function_specs.append(
+            FunctionSpec(
+                name=self._obj.agent_name,
+                description=self._obj.agent_description,
+                parameters=ParametersSchema(
+                    properties={
+                        "prompt": ParameterSchema(
+                            type="string",
+                            description=self._obj.argument_description,
+                        )
+                    },
+                    required=["prompt"],
+                ),
+            )
+        )
+        return self._obj

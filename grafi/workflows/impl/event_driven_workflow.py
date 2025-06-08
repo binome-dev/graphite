@@ -34,6 +34,7 @@ from grafi.nodes.impl.llm_node import LLMNode
 from grafi.nodes.node import Node
 from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 from grafi.workflows.workflow import Workflow
+from grafi.workflows.workflow import WorkflowBuilder
 
 
 class EventDrivenWorkflow(Workflow):
@@ -66,108 +67,82 @@ class EventDrivenWorkflow(Workflow):
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
 
-    class Builder(Workflow.Builder):
-        """Concrete builder for EventDrivenWorkflow."""
+    @classmethod
+    def builder(cls) -> "EventDrivenWorkflowBuilder":
+        """
+        Return a builder for EventDrivenWorkflow.
+        This allows for a fluent interface to construct the workflow.
+        """
+        return EventDrivenWorkflowBuilder(cls)
 
-        _workflow: "EventDrivenWorkflow"
+    def _add_topics(self) -> None:
+        """
+        Construct and return the EventDrivenStreamWorkflow.
+        Sets up topic subscriptions and node-to-topic mappings.
+        """
 
-        def __init__(self) -> None:
-            self._workflow = self._init_workflow()
+        # 1) Gather all topics from node subscriptions/publishes
+        for node_name, node in self.nodes.items():
+            # For each subscription expression, parse out one or more topics
+            for expr in node.subscribed_expressions:
+                found_topics = extract_topics(expr)
+                for t in found_topics:
+                    self._add_topic(t)
+                    self.topic_nodes.setdefault(t.name, []).append(node_name)
 
-        def _init_workflow(self) -> "EventDrivenWorkflow":
-            return EventDrivenWorkflow.model_construct()
+            # For each publish topic, ensure it's registered
+            for topic in node.publish_to:
+                self._add_topic(topic)
 
-        def node(self, node: Node) -> Self:
-            """
-            Add a Node to this workflow.
+                # If the topic is for streaming, attach the specialized handler
+                if isinstance(topic, HumanRequestTopic):
+                    topic.publish_to_human_event_handler = self.on_event
 
-            Raises:
-                DuplicateNodeError: if a node with the same name is already registered.
-            """
-            if node.name in self._workflow.nodes:
-                raise DuplicateNodeError(node)
-            self._workflow.nodes[node.name] = node
-            return self
+        # 2) Verify there is an agent input topic
+        if (
+            AGENT_INPUT_TOPIC not in self.topics
+            and AGENT_OUTPUT_TOPIC not in self.topics
+        ):
+            raise ValueError("Agent input output topic not found in workflow topics.")
 
-        def build(self) -> "EventDrivenWorkflow":
-            """
-            Construct and return the EventDrivenStreamWorkflow.
-            Sets up topic subscriptions and node-to-topic mappings.
-            """
+    def _add_topic(self, topic: TopicBase) -> None:
+        """
+        Registers the topic within the workflow if it's not already present
+        and sets a default publish handler.
+        """
+        if topic.name not in self.topics:
+            # Default event handler
+            topic.publish_event_handler = self.on_event
+            self.topics[topic.name] = topic
 
-            # 1) Gather all topics from node subscriptions/publishes
-            for node_name, node in self._workflow.nodes.items():
-                # For each subscription expression, parse out one or more topics
-                for expr in node.subscribed_expressions:
-                    found_topics = extract_topics(expr)
-                    for t in found_topics:
-                        self._add_topic(t)
-                        self._workflow.topic_nodes.setdefault(t.name, []).append(
-                            node_name
-                        )
+    def _handle_function_calling_nodes(self) -> None:
+        """
+        If there are LLMFunctionCallNode(s), we link them with the LLMNode(s)
+        that publish to the same topic, so that the LLM can carry the function specs.
+        """
+        # Find all function-calling nodes
+        function_calling_nodes = [
+            node
+            for node in self.nodes.values()
+            if isinstance(node, LLMFunctionCallNode)
+        ]
 
-                # For each publish topic, ensure it's registered
-                for topic in node.publish_to:
-                    self._add_topic(topic)
+        # Map each topic -> the nodes that publish to it
+        published_topics_to_nodes: Dict[str, List[LLMNode]] = {}
 
-                    # If the topic is for streaming, attach the specialized handler
-                    if isinstance(topic, HumanRequestTopic):
-                        topic.publish_to_human_event_handler = self._workflow.on_event
+        published_topics_to_nodes = {
+            topic.name: [node]
+            for node in self.nodes.values()
+            if isinstance(node, LLMNode)
+            for topic in node.publish_to
+        }
 
-            # 2) Verify there is an agent input topic
-            if (
-                AGENT_INPUT_TOPIC not in self._workflow.topics
-                and AGENT_OUTPUT_TOPIC not in self._workflow.topics
-            ):
-                raise ValueError(
-                    "Agent input output topic not found in workflow topics."
-                )
-
-            # 3) For any function-calling nodes, link them with the LLM nodes that produce their inputs
-            self._handle_function_calling_nodes()
-
-            return self._workflow
-
-        def _add_topic(self, topic: TopicBase) -> None:
-            """
-            Registers the topic within the workflow if it's not already present
-            and sets a default publish handler.
-            """
-            if topic.name not in self._workflow.topics:
-                # Default event handler
-                topic.publish_event_handler = self._workflow.on_event
-                self._workflow.topics[topic.name] = topic
-
-        def _handle_function_calling_nodes(self) -> None:
-            """
-            If there are LLMFunctionCallNode(s), we link them with the LLMNode(s)
-            that publish to the same topic, so that the LLM can carry the function specs.
-            """
-            # Find all function-calling nodes
-            function_calling_nodes = [
-                node
-                for node in self._workflow.nodes.values()
-                if isinstance(node, LLMFunctionCallNode)
-            ]
-
-            # Map each topic -> the nodes that publish to it
-            published_topics_to_nodes: Dict[str, List[LLMNode]] = {}
-
-            published_topics_to_nodes = {
-                topic.name: [node]
-                for node in self._workflow.nodes.values()
-                if isinstance(node, LLMNode)
-                for topic in node.publish_to
-            }
-
-            # If a function node subscribes to a topic that an LLMNode publishes to,
-            # we add the function specs to the LLM node.
-            for function_node in function_calling_nodes:
-                for topic_name in function_node._subscribed_topics:
-                    for publisher_node in published_topics_to_nodes.get(topic_name, []):
-                        publisher_node.add_function_spec(
-                            function_node.get_function_specs()
-                        )
+        # If a function node subscribes to a topic that an LLMNode publishes to,
+        # we add the function specs to the LLM node.
+        for function_node in function_calling_nodes:
+            for topic_name in function_node._subscribed_topics:
+                for publisher_node in published_topics_to_nodes.get(topic_name, []):
+                    publisher_node.add_function_spec(function_node.get_function_specs())
 
     def _publish_events(
         self,
@@ -413,3 +388,25 @@ class EventDrivenWorkflow(Workflow):
             "topics": {name: topic.to_dict() for name, topic in self.topics.items()},
             "topic_nodes": self.topic_nodes,
         }
+
+
+class EventDrivenWorkflowBuilder(WorkflowBuilder[EventDrivenWorkflow]):
+    """Builder for EventDrivenWorkflow."""
+
+    def node(self, node: Node) -> Self:
+        """
+        Add a Node to this workflow.
+
+        Raises:
+            DuplicateNodeError: if a node with the same name is already registered.
+        """
+        if node.name in self._obj.nodes:
+            raise DuplicateNodeError(node)
+        self._obj.nodes[node.name] = node
+        return self
+
+    def build(self) -> EventDrivenWorkflow:
+        """Construct the workflow with all nodes and topics."""
+        self._obj._add_topics()
+        self._obj._handle_function_calling_nodes()
+        return self._obj

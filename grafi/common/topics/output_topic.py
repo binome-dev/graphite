@@ -15,6 +15,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 AGENT_OUTPUT_TOPIC = "agent_output_topic"
@@ -32,24 +33,12 @@ class OutputTopic(TopicBase):
     )
     consumption_offsets: Dict[str, int] = {}
 
-    class Builder(TopicBase.Builder):
-
-        _topic: "OutputTopic"
-
-        def __init__(self) -> None:
-            self._topic = self._init_topic()
-
-        def _init_topic(self) -> "OutputTopic":
-            return OutputTopic.model_construct()
-
-        def publish_event_handler(
-            self, publish_event_handler: Callable[[OutputTopicEvent], None]
-        ) -> Self:
-            self._topic.publish_event_handler = publish_event_handler
-            return self
-
-        def build(self) -> "OutputTopic":
-            return self._topic
+    @classmethod
+    def builder(cls) -> "OutputTopicBuilder":
+        """
+        Returns a builder for OutputTopic.
+        """
+        return OutputTopicBuilder(cls)
 
     def publish_data(
         self,
@@ -84,6 +73,18 @@ class OutputTopic(TopicBase):
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
+
+
+class OutputTopicBuilder(TopicBaseBuilder[OutputTopic]):
+    """
+    Builder for creating instances of Topic.
+    """
+
+    def publish_event_handler(
+        self, publish_event_handler: Callable[[OutputTopicEvent], None]
+    ) -> Self:
+        self._obj.publish_event_handler = publish_event_handler
+        return self
 
 
 agent_output_topic = OutputTopic(name=AGENT_OUTPUT_TOPIC)

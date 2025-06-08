@@ -15,6 +15,7 @@ from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 
 
 # --- Dummy Implementations for Testing ---
@@ -50,7 +51,7 @@ class DummyNode(Node):
         return [Message(role="assistant", content="command dummy")]
 
 
-class DummyNodeBuilder(Node.Builder):
+class DummyNodeBuilder(NodeBuilder):
     """
     Builder for DummyNode that implements the required _init_node() method.
     """
@@ -81,7 +82,7 @@ class DummyTopic(Topic):
 
 
 def test_node_builder_creates_node():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     node = builder.name("test_node").type("test_type").build()
     assert node.name == "test_node"
     assert node.type == "test_type"
@@ -90,7 +91,7 @@ def test_node_builder_creates_node():
 
 
 def test_subscribe_adds_topic_expr():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     dummy_topic = DummyTopic(name="dummy_topic")
     node = builder.name("test_node").type("test_type").subscribe(dummy_topic).build()
     # Check that a TopicExpr is added.
@@ -103,7 +104,7 @@ def test_subscribe_adds_topic_expr():
 
 
 def test_publish_to_adds_topic():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     dummy_topic = DummyTopic(name="publish_topic")
     node = builder.name("test_node").type("test_type").publish_to(dummy_topic).build()
     assert len(node.publish_to) == 1
@@ -111,14 +112,14 @@ def test_publish_to_adds_topic():
 
 
 def test_can_execute_no_subscription():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     node = builder.name("test_node").type("test_type").build()
     # With no subscriptions, can_execute() should return True.
     assert node.can_execute() is True
 
 
 def test_can_execute_with_subscription_true():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     # Create a dummy topic that reports new messages (can_consume returns True).
     dummy_topic = DummyTopic(name="sub_topic", can_consume_value=True)
     node = builder.name("test_node").type("test_type").subscribe(dummy_topic).build()
@@ -127,7 +128,7 @@ def test_can_execute_with_subscription_true():
 
 
 def test_can_execute_with_subscription_false():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     # Create a dummy topic that reports no new messages.
     dummy_topic = DummyTopic(name="sub_topic", can_consume_value=False)
     node = builder.name("test_node").type("test_type").subscribe(dummy_topic).build()
@@ -136,7 +137,7 @@ def test_can_execute_with_subscription_false():
 
 
 def test_to_dict_returns_correct_structure():
-    builder = DummyNodeBuilder()
+    builder = NodeBuilder(Node)
     dummy_topic = DummyTopic(name="dummy_topic")
     node = (
         builder.name("test_node")

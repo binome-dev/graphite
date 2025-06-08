@@ -12,6 +12,7 @@ from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
 
 try:
@@ -40,61 +41,40 @@ class MCPTool(FunctionCallTool):
     prompts: Optional[ListPromptsResult] = None
     resources: Optional[ListResourcesResult] = None
 
-    class Builder(FunctionCallTool.Builder):
-        """Concrete builder for MCPTool."""
+    @classmethod
+    def builder(cls) -> "MCPToolBuilder":
+        """
+        Return a builder for MCPTool.
+        """
+        return MCPToolBuilder(cls)
 
-        _tool: "MCPTool"
+    async def _a_get_function_specs(self) -> None:
 
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
+        if self.server_params is None:
+            raise ValueError("Server parameters are not set.")
 
-        def _init_tool(self) -> "MCPTool":
-            return MCPTool.model_construct()
+        async with stdio_client(self.server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize the connection
+                await session.initialize()
 
-        def server_params(
-            self, server_params: StdioServerParameters
-        ) -> "MCPTool.Builder":
-            self._tool.server_params = server_params
-            return self
+                # List available prompts
+                self.prompts = await session.list_prompts()
 
-        def build(self) -> None:
-            raise NotImplementedError(
-                "MCPTool does not support synchronous execution. Use a_build instead."
-            )
+                # List available resources
+                self.resources = await session.list_resources()
 
-        async def a_build(self) -> "MCPTool":
-            await self._a_build_function_specs()
-            return self._tool
+                # List available tools
+                tools_list = await session.list_tools()
 
-        async def _a_build_function_specs(self) -> None:
+                for tool in tools_list.tools:
+                    func_spec = {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.inputSchema,
+                    }
 
-            if self._tool.server_params is None:
-                raise ValueError("Server parameters are not set.")
-
-            async with stdio_client(self._tool.server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    # Initialize the connection
-                    await session.initialize()
-
-                    # List available prompts
-                    self.prompts = await session.list_prompts()
-
-                    # List available resources
-                    self.resources = await session.list_resources()
-
-                    # List available tools
-                    tools_list = await session.list_tools()
-
-                    for tool in tools_list.tools:
-                        func_spec = {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": tool.inputSchema,
-                        }
-
-                        self._tool.function_specs.append(
-                            FunctionSpec.model_validate(func_spec)
-                        )
+                    self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
     @record_tool_execution
     def execute(
@@ -180,3 +160,22 @@ class MCPTool(FunctionCallTool):
                         )
 
         yield messages
+
+
+class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
+    """
+    Builder for MCPTool.
+    """
+
+    def server_params(self, server_params: StdioServerParameters) -> "MCPToolBuilder":
+        self._obj.server_params = server_params
+        return self
+
+    def build(self) -> None:
+        raise NotImplementedError(
+            "MCPTool does not support synchronous execution. Use a_build instead."
+        )
+
+    async def a_build(self) -> "MCPTool":
+        await self._obj._a_get_function_specs()
+        return self._obj

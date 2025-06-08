@@ -5,7 +5,6 @@ from typing import Dict
 from typing import Generator
 from typing import List
 from typing import Optional
-from typing import Self
 from typing import Union
 from typing import cast
 
@@ -30,6 +29,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
+from grafi.tools.llms.llm import LLMBuilder
 
 
 class OpenAITool(LLM):
@@ -50,29 +50,14 @@ class OpenAITool(LLM):
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
-    class Builder(LLM.Builder):
-        """Concrete builder for OpenAITool."""
+    @classmethod
+    def builder(cls) -> "OpenAIToolBuilder":
+        """
+        Return a builder for OpenAITool.
 
-        _tool: "OpenAITool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "OpenAITool":
-            return OpenAITool.model_construct()
-
-        def api_key(self, api_key: Optional[str]) -> Self:
-            self._tool.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._tool.model = model
-            return self
-
-        def build(self) -> "OpenAITool":
-            if not self._tool.api_key:
-                raise ValueError("API key must be provided for OpenAITool.")
-            return self._tool
+        This method allows for the construction of an OpenAITool instance with specified parameters.
+        """
+        return OpenAIToolBuilder(cls)
 
     def prepare_api_input(
         self, input_data: Messages
@@ -291,3 +276,11 @@ class OpenAITool(LLM):
             "api_key": "****************",
             "model": self.model,
         }
+
+
+class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
+
+    def build(self) -> "OpenAITool":
+        if not self._obj.api_key:
+            raise ValueError("API key must be provided for OpenAITool.")
+        return self._obj

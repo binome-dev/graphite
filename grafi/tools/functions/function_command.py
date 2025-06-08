@@ -2,6 +2,7 @@ from typing import Any
 from typing import Self
 
 from grafi.common.models.command import Command
+from grafi.common.models.command import CommandBuilder
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -12,20 +13,14 @@ from grafi.tools.functions.function_tool import FunctionTool
 class FunctionCommand(Command):
     function_tool: FunctionTool
 
-    class Builder(Command.Builder):
-        """Concrete builder for EmbeddingResponseCommand."""
+    @classmethod
+    def builder(cls) -> "FunctionCommandBuilder":
+        """
+        Return a builder for FunctionCommand.
 
-        _command: "FunctionCommand"
-
-        def __init__(self) -> None:
-            self._command = self._init_command()
-
-        def _init_command(self) -> "FunctionCommand":
-            return FunctionCommand.model_construct()
-
-        def function_tool(self, function_tool: FunctionTool) -> Self:
-            self._command.function_tool = function_tool
-            return self
+        This method allows for the construction of a FunctionCommand instance with specified parameters.
+        """
+        return FunctionCommandBuilder(cls)
 
     def execute(
         self, execution_context: ExecutionContext, input_data: Messages
@@ -42,3 +37,16 @@ class FunctionCommand(Command):
 
     def to_dict(self) -> dict[str, Any]:
         return {"function_tool": self.function_tool.to_dict()}
+
+
+class FunctionCommandBuilder(CommandBuilder[FunctionCommand]):
+    """
+    Builder for FunctionCommand.
+    """
+
+    def function_tool(self, function_tool: FunctionTool) -> Self:
+        self._obj.function_tool = function_tool
+        return self
+
+    def build(self) -> FunctionCommand:
+        return self._obj

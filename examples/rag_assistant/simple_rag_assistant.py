@@ -1,11 +1,11 @@
 import os
 from typing import Optional
-from typing import Self
 
 from llama_index.core.indices.base import BaseIndex
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import model_validator
 
 from examples.rag_assistant.nodes.rag_node import RagNode
 from examples.rag_assistant.tools.rags.rag_response_command import RagResponseCommand
@@ -40,43 +40,15 @@ class SimpleRagAssistant(Assistant):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleRagAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleRagAssistant":
-            return SimpleRagAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def index(self, index: BaseIndex) -> Self:
-            self._assistant.index = index
-            return self
-
-        def build(self) -> "SimpleRagAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
-
+    @model_validator(mode="after")
     def _construct_workflow(self) -> "SimpleRagAssistant":
         # Create an LLM node
         rag_node = (
-            RagNode.Builder()
+            RagNode.builder()
             .name("RagNode")
             .subscribe(agent_input_topic)
             .command(
-                RagResponseCommand.Builder()
-                .rag_tool(RagTool.Builder().name("UserRag").index(self.index).build())
-                .build()
+                RagResponseCommand(rag_tool=RagTool(name="RagTool", index=self.index))
             )
             .publish_to(agent_output_topic)
             .build()
@@ -84,7 +56,7 @@ class SimpleRagAssistant(Assistant):
 
         # Create a workflow and add the LLM node
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_rag_workflow")
             .node(rag_node)
             .build()

@@ -4,6 +4,7 @@ from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
 
 try:
@@ -27,35 +28,13 @@ class DuckDuckGoTool(FunctionCallTool):
     proxy: str | None = None
     timeout: int = 10
 
-    class Builder(FunctionCallTool.Builder):
-        """Concrete builder for DuckDuckGoTool."""
-
-        _tool: "DuckDuckGoTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "DuckDuckGoTool":
-            return DuckDuckGoTool.model_construct()
-
-        def fixed_max_results(self, fixed_max_results: int) -> Self:
-            self._tool.fixed_max_results = fixed_max_results
-            return self
-
-        def headers(self, headers: Any) -> Self:
-            self._tool.headers = headers
-            return self
-
-        def proxy(self, proxy: str) -> Self:
-            self._tool.proxy = proxy
-            return self
-
-        def timeout(self, timeout: int) -> Self:
-            self._tool.timeout = timeout
-            return self
-
-        def build(self) -> "DuckDuckGoTool":
-            return self._tool
+    @classmethod
+    def builder(cls) -> "DuckDuckGoToolBuilder":
+        """
+        Return a builder for DuckDuckGoTool.
+        This method allows for the construction of a DuckDuckGoTool instance with specified parameters.
+        """
+        return DuckDuckGoToolBuilder(cls)
 
     @llm_function
     def web_search_using_duckduckgo(self, query: str, max_results: int = 5) -> str:
@@ -92,3 +71,23 @@ class DuckDuckGoTool(FunctionCallTool):
             "proxy": self.proxy,
             "timeout": self.timeout,
         }
+
+
+class DuckDuckGoToolBuilder(FunctionCallToolBuilder[DuckDuckGoTool]):
+    """Builder for DuckDuckGoTool instances."""
+
+    def fixed_max_results(self, fixed_max_results: int) -> Self:
+        self._obj.fixed_max_results = fixed_max_results
+        return self
+
+    def headers(self, headers: dict[str, str]) -> Self:
+        self._obj.headers = headers
+        return self
+
+    def proxy(self, proxy: str) -> Self:
+        self._obj.proxy = proxy
+        return self
+
+    def timeout(self, timeout: int) -> Self:
+        self._obj.timeout = timeout
+        return self

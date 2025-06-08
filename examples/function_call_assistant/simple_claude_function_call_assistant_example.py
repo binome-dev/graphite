@@ -43,7 +43,7 @@ def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleClaudeFunctionCallAssistant.Builder()
+        SimpleClaudeFunctionCallAssistant.builder()
         .name("SimpleClaudeFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))

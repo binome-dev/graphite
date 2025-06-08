@@ -110,15 +110,15 @@ class TestMCPTool:
 
     @pytest.mark.asyncio
     async def test_builder_initialization(self):
-        builder = MCPTool.Builder()
-        assert isinstance(builder._tool, MCPTool)
+        builder = MCPTool.builder()
+        assert isinstance(builder._obj, MCPTool)
 
     @pytest.mark.asyncio
     async def test_server_params_setting(self):
-        builder = MCPTool.Builder()
+        builder = MCPTool.builder()
         server_params = MagicMock()
         builder = builder.server_params(server_params)
-        assert builder._tool.server_params == server_params
+        assert builder._obj.server_params == server_params
 
     @pytest.mark.asyncio
     async def test_build_function_specs(
@@ -126,7 +126,7 @@ class TestMCPTool:
     ):
         mock_client_session.list_tools.return_value = mock_tool_list
 
-        builder = MCPTool.Builder()
+        builder = MCPTool.builder()
         builder = builder.server_params(MagicMock())
 
         tool = await builder.a_build()

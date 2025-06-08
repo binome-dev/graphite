@@ -38,10 +38,10 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
 
     # Set up the assistant with TavilyTool
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("MCPAssistant")
         .api_key(api_key)
-        .function_tool(await MCPTool.Builder().server_params(server_params).a_build())
+        .function_tool(await MCPTool.builder().server_params(server_params).a_build())
         .build()
     )
 

@@ -24,6 +24,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 from grafi.tools.llms.llm_response_command import LLMResponseCommand
 
 
@@ -36,13 +37,10 @@ class LLMNode(Node):
     command: LLMResponseCommand
     function_specs: FunctionSpecs = Field(default=[])
 
-    class Builder(Node.Builder):
-        """Concrete builder for LLMNode."""
-
-        _node: "LLMNode"
-
-        def _init_node(self) -> "LLMNode":
-            return LLMNode.model_construct()
+    @classmethod
+    def builder(cls) -> NodeBuilder:
+        """Return a builder for LLMNode."""
+        return NodeBuilder(cls)
 
     def add_function_spec(self, function_spec: FunctionSpecs) -> None:
         """Add a function specification to the node."""

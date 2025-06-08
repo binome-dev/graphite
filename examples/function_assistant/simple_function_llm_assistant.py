@@ -7,6 +7,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
@@ -49,48 +50,22 @@ class SimpleFunctionLLMAssistant(Assistant):
     output_format: OutputType
     function: Callable
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for SimpleFunctionLLMAssistant."""
-
-        _assistant: "SimpleFunctionLLMAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleFunctionLLMAssistant":
-            return SimpleFunctionLLMAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def output_format(self, output_format: OutputType) -> Self:
-            self._assistant.output_format = output_format
-            return self
-
-        def function(self, function: Callable) -> Self:
-            self._assistant.function = function
-            return self
-
-        def build(self) -> "SimpleFunctionLLMAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleFunctionLLMAssistantBuilder":
+        """Return a builder for SimpleFunctionLLMAssistant."""
+        return SimpleFunctionLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleFunctionLLMAssistant":
         function_topic = Topic(name="function_call_topic")
 
         llm_input_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -106,12 +81,12 @@ class SimpleFunctionLLMAssistant(Assistant):
         # Create a function node
 
         function_call_node = (
-            FunctionNode.Builder()
+            FunctionNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
             .command(
-                FunctionCommand.Builder()
-                .function_tool(FunctionTool.Builder().function(self.function).build())
+                FunctionCommand.builder()
+                .function_tool(FunctionTool.builder().function(self.function).build())
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -120,11 +95,37 @@ class SimpleFunctionLLMAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
             .build()
         )
 
+        return self
+
+
+class SimpleFunctionLLMAssistantBuilder(
+    AssistantBaseBuilder[SimpleFunctionLLMAssistant]
+):
+    """
+    Builder for SimpleFunctionLLMAssistant.
+
+    This class provides methods to set the API key, model, output format, and function for the assistant.
+    """
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def output_format(self, output_format: OutputType) -> Self:
+        self._obj.output_format = output_format
+        return self
+
+    def function(self, function: Callable) -> Self:
+        self._obj.function = function
         return self

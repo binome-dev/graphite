@@ -53,12 +53,10 @@ def initialize_index(
 def test_rag_tool() -> None:
     index = initialize_index()
     execution_context = get_execution_context()
-    simple_rag_assistant = (
-        SimpleRagAssistant.Builder()
-        .name("SimpleRagAssistant")
-        .index(index)
-        .api_key(api_key)
-        .build()
+    simple_rag_assistant = SimpleRagAssistant(
+        name="SimpleRagAssistant",
+        index=index,
+        api_key=api_key,
     )
 
     result: Messages = simple_rag_assistant.execute(

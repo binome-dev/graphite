@@ -128,7 +128,7 @@ Usage example:
 
 ```python
 tavily_tool = (
-    TavilyTool.Builder()
+    TavilyTool.builder()
     .api_key("YOUR_API_KEY")
     .search_depth("advanced")
     .max_tokens(6000)
@@ -198,7 +198,7 @@ Usage example:
 
 ```python
 rag_tool = (
-    RagTool.Builder()
+    RagTool.builder()
     .index(your_llama_index)  # Where your_llama_index is an instance of BaseIndex
     .build()
 )

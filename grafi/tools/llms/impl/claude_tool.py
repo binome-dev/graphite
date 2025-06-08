@@ -27,6 +27,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
+from grafi.tools.llms.llm import LLMBuilder
 
 
 try:
@@ -60,34 +61,13 @@ class ClaudeTool(LLM):
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
-    # ------------------------------------------------------------------ #
-    # Builder (fluent)                                                   #
-    # ------------------------------------------------------------------ #
-    class Builder(LLM.Builder):
-        _tool: "ClaudeTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "ClaudeTool":
-            return ClaudeTool.model_construct()
-
-        def api_key(self, api_key: Optional[str]) -> Self:
-            self._tool.api_key = api_key
-            return self
-
-        def max_tokens(self, max_tokens: int) -> Self:
-            self._tool.max_tokens = max_tokens
-            return self
-
-        def model(self, model: str) -> Self:
-            self._tool.model = model
-            return self
-
-        def build(self) -> "ClaudeTool":
-            if not self._tool.api_key:
-                raise ValueError("API key must be set for ClaudeTool.")
-            return self._tool
+    @classmethod
+    def builder(cls) -> "ClaudeToolBuilder":
+        """
+        Return a builder for ClaudeTool.
+        This method allows for the construction of a ClaudeTool instance with specified parameters.
+        """
+        return ClaudeToolBuilder(cls)
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
@@ -271,3 +251,19 @@ class ClaudeTool(LLM):
             "api_key": "****************",
             "model": self.model,
         }
+
+
+class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
+    """
+    Builder for ClaudeTool.
+    This is a convenience class to create instances of ClaudeTool using a fluent interface.
+    """
+
+    def max_tokens(self, max_tokens: int) -> Self:
+        self._obj.max_tokens = max_tokens
+        return self
+
+    def build(self) -> ClaudeTool:
+        if not self._obj.api_key:
+            raise ValueError("API key must be set for ClaudeTool.")
+        return self._obj

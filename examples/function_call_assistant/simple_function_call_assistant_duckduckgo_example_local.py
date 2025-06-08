@@ -28,10 +28,10 @@ def test_simple_function_call_assistant_with_duckduckgo() -> None:
 
     # Set up the assistant with DuckDuckGoTool
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("DuckduckgoAssistant")
         .api_key(api_key)
-        .function_tool(DuckDuckGoTool.Builder().build())
+        .function_tool(DuckDuckGoTool.builder().build())
         .build()
     )
 
