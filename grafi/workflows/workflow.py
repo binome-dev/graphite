@@ -85,6 +85,6 @@ class WorkflowBuilder(BaseBuilder[T_W]):
         self._obj.nodes[node.node_id] = node
         return self
 
-    def build(self) -> "Workflow":
+    def build(self) -> T_W:
         """Build the Workflow instance."""
         return self._obj

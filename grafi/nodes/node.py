@@ -146,7 +146,7 @@ class NodeBuilder(BaseBuilder[T_N]):
         self._obj.publish_to.append(topic)
         return self
 
-    def build(self) -> Node:
+    def build(self) -> T_N:
         """Finalize the node and return it."""
         # Get all topics from subscription expressions recursively
 

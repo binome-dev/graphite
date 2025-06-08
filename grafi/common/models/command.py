@@ -59,6 +59,6 @@ T_C = TypeVar("T_C", bound=Command)
 class CommandBuilder(BaseBuilder[T_C]):
     """Inner builder class for Assistant construction."""
 
-    def build(self) -> "Command":
+    def build(self) -> T_C:
         """Build the AssistantBase instance."""
         return self._obj

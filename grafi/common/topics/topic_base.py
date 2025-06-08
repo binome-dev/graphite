@@ -159,5 +159,5 @@ class TopicBaseBuilder(BaseBuilder[T_T]):
         self._obj.condition = condition
         return self
 
-    def build(self) -> "TopicBase":
+    def build(self) -> T_T:
         return self._obj
