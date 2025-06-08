@@ -27,8 +27,8 @@ from grafi.common.models.message import Messages
 
 
 def record_assistant_a_execution(
-    func: Callable[[T_A, ExecutionContext, Messages], Awaitable[Any]],
-) -> Callable[[T_A, ExecutionContext, Messages], Awaitable[Any]]:
+    func: Callable[[T_A, ExecutionContext, Messages], Awaitable[Messages]],
+) -> Callable[[T_A, ExecutionContext, Messages], Awaitable[Messages]]:
     """
     Decorator to record assistant execution events and add tracing.
 

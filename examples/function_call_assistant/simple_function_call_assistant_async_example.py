@@ -57,8 +57,8 @@ async def test_simple_function_call_assistant_async() -> None:
     output = await assistant.a_execute(execution_context, input_data)
     print(output)
     assert output is not None
-    assert "12345" in output[0].content
-    assert "bad" in output[0].content
+    assert "12345" in str(output[0].content)
+    assert "bad" in str(output[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 23
 

@@ -79,7 +79,7 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
         container.register_event_store(event_store_class, event_store)
         return self
 
-    def build(self) -> "AssistantBase":
-        """Build the AssistantBase instance."""
+    def build(self) -> T_A:
+        """Build the SimpleStreamAssistant instance."""
         self._obj._construct_workflow()
         return self._obj

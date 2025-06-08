@@ -61,7 +61,7 @@ async def test_simple_llm_assistant_async() -> None:
     output = await assistant.a_execute(get_execution_context(), input_data)
     print(output)
     assert output is not None
-    assert "Grafi" in output[0].content
+    assert "Grafi" in str(output[0].content)
     assert len(event_store.get_events()) == 22
 
 

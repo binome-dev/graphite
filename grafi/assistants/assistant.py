@@ -71,7 +71,7 @@ class Assistant(AssistantBase):
     @record_assistant_a_execution
     async def a_execute(
         self, execution_context: ExecutionContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:

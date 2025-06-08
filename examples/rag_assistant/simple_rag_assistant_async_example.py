@@ -68,8 +68,8 @@ async def test_rag_tool_async() -> None:
     )
 
     print(result)
-    assert "EC2" in result[0].content
-    assert "computing" in result[0].content
+    assert "EC2" in str(result[0].content)
+    assert "computing" in str(result[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 11
 
