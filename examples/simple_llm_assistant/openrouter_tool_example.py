@@ -30,7 +30,7 @@ def get_execution_context() -> ExecutionContext:
 # --------------------------------------------------------------------------- #
 def test_openrouter_tool_stream() -> None:
     event_store.clear_events()
-    or_tool = OpenRouterTool.Builder().api_key(api_key).build()
+    or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
     for msgs in or_tool.stream(
@@ -52,7 +52,7 @@ def test_openrouter_tool_stream() -> None:
 # --------------------------------------------------------------------------- #
 async def test_openrouter_tool_a_stream() -> None:
     event_store.clear_events()
-    or_tool = OpenRouterTool.Builder().api_key(api_key).build()
+    or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
     async for msgs in or_tool.a_stream(
@@ -74,7 +74,7 @@ async def test_openrouter_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 def test_openrouter_tool_execute() -> None:
     event_store.clear_events()
-    or_tool = OpenRouterTool.Builder().api_key(api_key).build()
+    or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     msgs = or_tool.execute(
         get_execution_context(),
@@ -96,7 +96,7 @@ def test_openrouter_tool_with_chat_param() -> None:
     chat_param = {"temperature": 0.1, "max_tokens": 15}
 
     event_store.clear_events()
-    or_tool = OpenRouterTool.Builder().api_key(api_key).chat_params(chat_param).build()
+    or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
 
     msgs = or_tool.execute(
         get_execution_context(),
@@ -117,7 +117,7 @@ def test_openrouter_tool_with_chat_param() -> None:
 # --------------------------------------------------------------------------- #
 async def test_openrouter_tool_async() -> None:
     event_store.clear_events()
-    or_tool = OpenRouterTool.Builder().api_key(api_key).build()
+    or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
     async for msgs in or_tool.a_execute(
@@ -141,10 +141,10 @@ async def test_llm_a_stream_node_openrouter() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.Builder()
+        LLMNode.builder()
         .command(
-            LLMStreamResponseCommand.Builder()
-            .llm(OpenRouterTool.Builder().api_key(api_key).build())
+            LLMStreamResponseCommand.builder()
+            .llm(OpenRouterTool.builder().api_key(api_key).build())
             .build()
         )
         .build()

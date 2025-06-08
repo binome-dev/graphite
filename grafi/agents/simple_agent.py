@@ -7,6 +7,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import agent_output_topic
@@ -43,43 +44,17 @@ class SimpleAgent(Assistant):
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
-        default=GoogleSearchTool.Builder()
+        default=GoogleSearchTool.builder()
         .name("GoogleSearchTool")
         .fixed_max_results(3)
         .build()
     )
     model: str = Field(default="gpt-4o-mini")
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for SimpleAgent."""
-
-        _assistant: "SimpleAgent"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleAgent":
-            return SimpleAgent.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def system_prompt(self, system_prompt: str) -> Self:
-            self._assistant.system_prompt = system_prompt
-            return self
-
-        def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
-            self._assistant.function_call_tool = function_call_tool
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "SimpleAgent":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleAgentBuilder":
+        """Return a builder for SimpleAgent."""
+        return SimpleAgentBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleAgent":
         function_call_topic = Topic(
@@ -96,7 +71,7 @@ class SimpleAgent(Assistant):
         )
 
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -106,9 +81,9 @@ class SimpleAgent(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -124,12 +99,12 @@ class SimpleAgent(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallCommand.Builder()
-                .function_tool(self.function_call_tool)
+                FunctionCallCommand.builder()
+                .function_call_tool(self.function_call_tool)
                 .build()
             )
             .publish_to(function_result_topic)
@@ -138,7 +113,7 @@ class SimpleAgent(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_agent_workflow")
             .node(llm_node)
             .node(function_call_node)
@@ -167,20 +142,40 @@ class SimpleAgent(Assistant):
         return output[0].content
 
 
+class SimpleAgentBuilder(AssistantBaseBuilder[SimpleAgent]):
+    """Concrete builder for SimpleAgent."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def system_prompt(self, system_prompt: str) -> Self:
+        self._obj.system_prompt = system_prompt
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
+        self._obj.function_call_tool = function_call_tool
+        return self
+
+
 def create_agent(
     system_prompt: Optional[str] = None,
     function_call_tool: Optional[FunctionCallTool] = None,
     model: Optional[str] = None,
     api_key: Optional[str] = None,
 ) -> SimpleAgent:
-    buider = SimpleAgent.Builder()
+    builder = SimpleAgent.builder()
 
     if system_prompt:
-        buider.system_prompt(system_prompt)
+        builder.system_prompt(system_prompt)
     if function_call_tool:
-        buider.function_call_tool(function_call_tool)
+        builder.function_call_tool(function_call_tool)
     if model:
-        buider.model(model)
+        builder.model(model)
     if api_key:
-        buider.api_key(api_key)
-    return buider.build()
+        builder.api_key(api_key)
+    return builder.build()

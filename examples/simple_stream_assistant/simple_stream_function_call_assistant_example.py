@@ -43,7 +43,7 @@ def get_execution_context() -> ExecutionContext:
 async def test_simple_function_call_assistant() -> None:
     event_store.clear_events()
     assistant = (
-        SimpleStreamFunctionCallAssistant.Builder()
+        SimpleStreamFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))

@@ -46,7 +46,7 @@ def get_execution_context() -> ExecutionContext:
 async def test_simple_function_call_assistant_async() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleOllamaFunctionCallAssistant.Builder()
+        SimpleOllamaFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_url("http://localhost:11434")
         .function_tool(WeatherMock(name="WeatherMock"))

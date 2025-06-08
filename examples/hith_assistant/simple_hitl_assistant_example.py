@@ -50,7 +50,7 @@ def test_simple_hitl_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleHITLAssistant.Builder()
+        SimpleHITLAssistant.builder()
         .name("SimpleHITLAssistant")
         .api_key(api_key)
         .hitl_llm_system_message(

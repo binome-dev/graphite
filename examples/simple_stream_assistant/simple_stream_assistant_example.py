@@ -27,7 +27,7 @@ def get_execution_context() -> ExecutionContext:
 
 async def test_simple_llm_assistant() -> None:
     assistant = (
-        SimpleStreamAssistant.Builder()
+        SimpleStreamAssistant.builder()
         .name("SimpleStreamAssistant")
         .system_message(
             """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers.

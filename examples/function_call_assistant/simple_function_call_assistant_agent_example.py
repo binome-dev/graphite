@@ -37,11 +37,11 @@ def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("SimpleAgentCallAssistant")
         .api_key(api_key)
         .function_tool(
-            AgentCallingTool.Builder()
+            AgentCallingTool.builder()
             .agent_name("weather_agent")
             .agent_description("Agent to get weather information")
             .argument_description("Question about the weather")

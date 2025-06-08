@@ -17,6 +17,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 AGENT_STREAM_OUTPUT_TOPIC = "agent_stream_output_topic"
@@ -34,24 +35,12 @@ class StreamOutputTopic(TopicBase):
     )
     consumption_offsets: Dict[str, int] = {}
 
-    class Builder(TopicBase.Builder):
-
-        _topic: "StreamOutputTopic"
-
-        def __init__(self) -> None:
-            self._topic = self._init_topic()
-
-        def _init_topic(self) -> "StreamOutputTopic":
-            return StreamOutputTopic.model_construct()
-
-        def publish_event_handler(
-            self, publish_event_handler: Callable[[StreamOutputTopicEvent], None]
-        ) -> Self:
-            self._topic.publish_event_handler = publish_event_handler
-            return self
-
-        def build(self) -> "StreamOutputTopic":
-            return self._topic
+    @classmethod
+    def builder(cls) -> "StreamOutputTopicBuilder":
+        """
+        Returns a builder for StreamOutputTopic.
+        """
+        return StreamOutputTopicBuilder(cls)
 
     def publish_data(
         self,
@@ -104,6 +93,18 @@ class StreamOutputTopic(TopicBase):
         self.consumption_offsets[consumer_name] = already_consumed + 1
 
         return new_event
+
+
+class StreamOutputTopicBuilder(TopicBaseBuilder[StreamOutputTopic]):
+    """
+    Builder for creating instances of Topic.
+    """
+
+    def publish_event_handler(
+        self, publish_event_handler: Callable[[StreamOutputTopicEvent], None]
+    ) -> Self:
+        self._obj.publish_event_handler = publish_event_handler
+        return self
 
 
 agent_stream_output_topic = StreamOutputTopic(name=AGENT_STREAM_OUTPUT_TOPIC)

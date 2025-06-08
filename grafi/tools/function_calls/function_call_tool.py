@@ -5,6 +5,7 @@ from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import Self
+from typing import TypeVar
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -20,6 +21,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.tool import Tool
+from grafi.tools.tool import ToolBuilder
 
 
 class FunctionCallTool(Tool):
@@ -43,26 +45,14 @@ class FunctionCallTool(Tool):
     functions: Dict[str, Callable] = Field(default={})
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    class Builder(Tool.Builder):
-        """Concrete builder for WorkflowDag."""
+    @classmethod
+    def builder(cls) -> ToolBuilder[Self]:
+        """
+        Return a builder for FunctionCallTool.
 
-        _tool: "FunctionCallTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "FunctionCallTool":
-            return FunctionCallTool.model_construct()
-
-        def function(self, function: Callable) -> Self:
-            if not hasattr(function, "_function_spec"):
-                function = llm_function(function)
-            self._tool.functions[function.__name__] = function
-            self._tool.function_specs.append(function._function_spec)
-            return self
-
-        def build(self) -> "FunctionCallTool":
-            return self._tool
+        This method allows for the construction of a FunctionCallTool instance with specified parameters.
+        """
+        return FunctionCallToolBuilder(cls)
 
     @classmethod
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -203,3 +193,25 @@ class FunctionCallTool(Tool):
             "function_specs": [spec.model_dump() for spec in self.function_specs],
             "function": list(self.functions.keys()),
         }
+
+
+T_F = TypeVar("T_F", bound=FunctionCallTool)
+
+
+class FunctionCallToolBuilder(ToolBuilder[FunctionCallTool | T_F]):
+    """
+    Builder for FunctionCallTool.
+
+    This class provides a fluent interface for constructing a FunctionCallTool instance.
+    It allows setting the function and building the tool.
+    """
+
+    def function(self, function: Callable) -> Self:
+        if not hasattr(function, "_function_spec"):
+            function = llm_function(function)
+        self._obj.functions[function.__name__] = function
+        self._obj.function_specs.append(function._function_spec)
+        return self
+
+    def build(self) -> FunctionCallTool:
+        return self._obj

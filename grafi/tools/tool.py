@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
@@ -29,30 +30,6 @@ class Tool(BaseModel):
     oi_span_type: OpenInferenceSpanKindValues
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    class Builder:
-        """Inner builder class for Tool construction."""
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "Tool":
-            return Tool.model_construct()
-
-        def name(self, name: str) -> Self:
-            self._tool.name = name
-            return self
-
-        def type(self, type_name: str) -> Self:
-            self._tool.type = type_name
-            return self
-
-        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-            self._tool.oi_span_type = oi_span_type
-            return self
-
-        def build(self) -> "Tool":
-            return self._tool
 
     def execute(
         self,
@@ -105,4 +82,20 @@ class Tool(BaseModel):
         }
 
 
-T = TypeVar("T", bound="Tool")  # the Tool subclass
+T_T = TypeVar("T_T", bound="Tool")  # the Tool subclass
+
+
+class ToolBuilder(BaseBuilder[Tool | T_T]):
+    """Inner builder class for Tool construction."""
+
+    def name(self, name: str) -> Self:
+        self._obj.name = name
+        return self
+
+    def type(self, type_name: str) -> Self:
+        self._obj.type = type_name
+        return self
+
+    def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        self._obj.oi_span_type = oi_span_type
+        return self

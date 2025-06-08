@@ -13,7 +13,7 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 event_store = container.event_store
 
-api_key = os.getenv("DEEPSEEK_API_KEY", "")
+api_key = os.getenv("DEEPSEEK_API_KEY", "sk-fad9b1ca2b4f47169579817ced9c8f47")
 
 
 class WeatherMock(FunctionCallTool):
@@ -43,7 +43,7 @@ def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleDeepseekFunctionCallAssistant.Builder()
+        SimpleDeepseekFunctionCallAssistant.builder()
         .name("SimpleDeepseekFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))

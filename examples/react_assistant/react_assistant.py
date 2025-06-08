@@ -12,6 +12,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
@@ -39,55 +40,13 @@ class ReActAssistant(Assistant):
     search_tool: FunctionCallTool
     model: str = Field(default="gpt-4o-mini")
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for ReActAssistant."""
-
-        _assistant: "ReActAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "ReActAssistant":
-            return ReActAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def thought_llm_system_message(self, thought_llm_system_message: str) -> Self:
-            self._assistant.thought_llm_system_message = thought_llm_system_message
-            return self
-
-        def action_llm_system_message(self, action_llm_system_message: str) -> Self:
-            self._assistant.action_llm_system_message = action_llm_system_message
-            return self
-
-        def observation_llm_system_message(
-            self, observation_llm_system_message: str
-        ) -> Self:
-            self._assistant.observation_llm_system_message = (
-                observation_llm_system_message
-            )
-            return self
-
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
-            return self
-
-        def search_tool(self, search_tool: FunctionCallTool) -> Self:
-            self._assistant.search_tool = search_tool
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "ReActAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "ReActAssistantBuilder":
+        """Return a builder for ReActAssistant."""
+        return ReActAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "ReActAssistant":
-        workflow_dag_builder = EventDrivenWorkflow.Builder().name(
+        workflow_dag_builder = EventDrivenWorkflow.builder().name(
             "ReActAssistantWorkflow"
         )
 
@@ -96,7 +55,7 @@ class ReActAssistant(Assistant):
         observation_result_topic = Topic(name="observation_result")
 
         thought_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("ThoughtNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -106,9 +65,9 @@ class ReActAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ThoughtLLMTool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -135,13 +94,13 @@ class ReActAssistant(Assistant):
         )
 
         action_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("ActionNode")
             .subscribe(thought_result_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ActionLLMTool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -160,11 +119,13 @@ class ReActAssistant(Assistant):
         search_function_result_topic = Topic(name="search_function_result")
 
         search_function_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("SearchFunctionNode")
             .subscribe(action_result_search_topic)
             .command(
-                FunctionCallCommand.Builder().function_tool(self.search_tool).build()
+                FunctionCallCommand.builder()
+                .function_call_tool(self.search_tool)
+                .build()
             )
             .publish_to(search_function_result_topic)
             .build()
@@ -173,13 +134,13 @@ class ReActAssistant(Assistant):
         workflow_dag_builder.node(search_function_node)
 
         observation_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("ObservationNode")
             .subscribe(search_function_result_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ObservationLLMTool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -195,13 +156,13 @@ class ReActAssistant(Assistant):
         workflow_dag_builder.node(observation_node)
 
         summaries_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("SummariesNode")
             .subscribe(action_result_finish_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("SummariesLLMTool")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -218,4 +179,38 @@ class ReActAssistant(Assistant):
 
         self.workflow = workflow_dag_builder.build()
 
+        return self
+
+
+class ReActAssistantBuilder(AssistantBaseBuilder[ReActAssistant]):
+    """Concrete builder for ReActAssistant."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def thought_llm_system_message(self, thought_llm_system_message: str) -> Self:
+        self._obj.thought_llm_system_message = thought_llm_system_message
+        return self
+
+    def action_llm_system_message(self, action_llm_system_message: str) -> Self:
+        self._obj.action_llm_system_message = action_llm_system_message
+        return self
+
+    def observation_llm_system_message(
+        self, observation_llm_system_message: str
+    ) -> Self:
+        self._obj.observation_llm_system_message = observation_llm_system_message
+        return self
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self._obj.summary_llm_system_message = summary_llm_system_message
+        return self
+
+    def search_tool(self, search_tool: FunctionCallTool) -> Self:
+        self._obj.search_tool = search_tool
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
         return self

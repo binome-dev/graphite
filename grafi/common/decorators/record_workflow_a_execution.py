@@ -23,15 +23,15 @@ from grafi.common.events.workflow_events.workflow_invoke_event import (
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
-from grafi.workflows.workflow import W
+from grafi.workflows.workflow import T_W
 
 
 CoroNone = Coroutine[Any, Any, None]  # shorthand
 
 
 def record_workflow_a_execution(
-    func: Callable[[W, ExecutionContext, Messages], CoroNone],
-) -> Callable[[W, ExecutionContext, Messages], CoroNone]:
+    func: Callable[[T_W, ExecutionContext, Messages], CoroNone],
+) -> Callable[[T_W, ExecutionContext, Messages], CoroNone]:
     """
     Decorator to record workflow execution events and add tracing.
 
@@ -44,7 +44,7 @@ def record_workflow_a_execution(
 
     @functools.wraps(func)
     async def wrapper(
-        self: W,
+        self: T_W,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> None:

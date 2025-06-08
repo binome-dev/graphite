@@ -29,11 +29,11 @@ def test_simple_function_call_assistant_with_tavily() -> None:
 
     # Set up the assistant with TavilyTool
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("TavilyAssistant")
         .api_key(api_key)
         .function_tool(
-            TavilyTool.Builder()
+            TavilyTool.builder()
             .name("TavilyTestTool")
             .api_key(tavily_api_key)
             .max_tokens(6000)

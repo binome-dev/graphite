@@ -6,6 +6,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.human_request_topic import human_request_topic
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -34,52 +35,10 @@ class KycAssistant(Assistant):
     hitl_request: FunctionCallTool
     register_request: FunctionCallTool
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for KycAssistant."""
-
-        _assistant: "KycAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "KycAssistant":
-            return KycAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def user_info_extract_system_message(
-            self, user_info_extract_system_message: str
-        ) -> Self:
-            self._assistant.user_info_extract_system_message = (
-                user_info_extract_system_message
-            )
-            return self
-
-        def action_llm_system_message(self, action_llm_system_message: str) -> Self:
-            self._assistant.action_llm_system_message = action_llm_system_message
-            return self
-
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
-            return self
-
-        def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
-            self._assistant.hitl_request = hitl_request
-            return self
-
-        def register_request(self, register_request: FunctionCallTool) -> Self:
-            self._assistant.register_request = register_request
-            return self
-
-        def build(self) -> "KycAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "KycAssistantBuilder":
+        """Return a builder for KycAssistant."""
+        return KycAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "KycAssistant":
         # Create thought node to process user input
@@ -87,7 +46,7 @@ class KycAssistant(Assistant):
         user_info_extract_topic = Topic(name="user_info_extract_topic")
 
         user_info_extract_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("ThoughtNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -97,9 +56,9 @@ class KycAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ThoughtLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -133,13 +92,13 @@ class KycAssistant(Assistant):
         )
 
         action_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("ActionNode")
             .subscribe(user_info_extract_topic)
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ActionLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -154,11 +113,13 @@ class KycAssistant(Assistant):
         )
 
         human_request_function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("HumanRequestNode")
             .subscribe(hitl_call_topic)
             .command(
-                FunctionCallCommand.Builder().function_tool(self.hitl_request).build()
+                FunctionCallCommand.builder()
+                .function_call_tool(self.hitl_request)
+                .build()
             )
             .publish_to(human_request_topic)
             .build()
@@ -168,12 +129,12 @@ class KycAssistant(Assistant):
 
         # Create an output LLM node
         register_user_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallRegisterNode")
             .subscribe(register_user_topic)
             .command(
-                FunctionCallCommand.Builder()
-                .function_tool(self.register_request)
+                FunctionCallCommand.builder()
+                .function_call_tool(self.register_request)
                 .build()
             )
             .publish_to(register_user_respond_topic)
@@ -181,15 +142,15 @@ class KycAssistant(Assistant):
         )
 
         user_reply_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("LLMResponseToUserNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(register_user_respond_topic).build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("ResponseToUserLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -204,7 +165,7 @@ class KycAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_function_call_workflow")
             .node(user_info_extract_node)
             .node(action_node)
@@ -214,4 +175,38 @@ class KycAssistant(Assistant):
             .build()
         )
 
+        return self
+
+
+class KycAssistantBuilder(AssistantBaseBuilder[KycAssistant]):
+    """Concrete builder for KycAssistant."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def user_info_extract_system_message(
+        self, user_info_extract_system_message: str
+    ) -> Self:
+        self._obj.user_info_extract_system_message = user_info_extract_system_message
+        return self
+
+    def action_llm_system_message(self, action_llm_system_message: str) -> Self:
+        self._obj.action_llm_system_message = action_llm_system_message
+        return self
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self._obj.summary_llm_system_message = summary_llm_system_message
+        return self
+
+    def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
+        self._obj.hitl_request = hitl_request
+        return self
+
+    def register_request(self, register_request: FunctionCallTool) -> Self:
+        self._obj.register_request = register_request
         return self

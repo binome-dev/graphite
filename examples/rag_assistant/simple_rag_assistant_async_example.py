@@ -56,12 +56,10 @@ def initialize_index(
 async def test_rag_tool_async() -> None:
     index = initialize_index()
     execution_context = get_execution_context()
-    simple_rag_assistant = (
-        SimpleRagAssistant.Builder()
-        .name("SimpleRagAssistant")
-        .index(index)
-        .api_key(api_key)
-        .build()
+    simple_rag_assistant = SimpleRagAssistant(
+        name="SimpleRagAssistant",
+        index=index,
+        api_key=api_key,
     )
 
     result = await simple_rag_assistant.a_execute(

@@ -35,6 +35,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
+from grafi.tools.llms.llm import LLMBuilder
 
 
 class OpenRouterTool(LLM):
@@ -56,42 +57,14 @@ class OpenRouterTool(LLM):
 
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
-    # ------------------------------------------------------------------ #
-    # Builder                                                            #
-    # ------------------------------------------------------------------ #
-    class Builder(LLM.Builder):
-        _tool: "OpenRouterTool"
+    @classmethod
+    def builder(cls) -> "OpenRouterToolBuilder":
+        """
+        Return a builder for OpenRouterTool.
 
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "OpenRouterTool":
-            return OpenRouterTool.model_construct()
-
-        def api_key(self, api_key: Optional[str]) -> Self:
-            self._tool.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._tool.model = model
-            return self
-
-        def base_url(self, base_url: str) -> Self:
-            self._tool.base_url = base_url.rstrip("/")
-            return self
-
-        def chat_params(self, params: Dict[str, Any]) -> Self:
-            self._tool.chat_params = params
-            return self
-
-        def extra_headers(self, headers: Dict[str, str]) -> Self:
-            self._tool.extra_headers = headers
-            return self
-
-        def build(self) -> "OpenRouterTool":
-            if not self._tool.api_key:
-                raise ValueError("API key must be set for OpenRouterTool")
-            return self._tool
+        This method allows for the construction of an OpenRouterTool instance with specified parameters.
+        """
+        return OpenRouterToolBuilder(cls)
 
     # ------------------------------------------------------------------ #
     # Request conversion helper                                          #
@@ -254,3 +227,22 @@ class OpenRouterTool(LLM):
             "base_url": self.base_url,
             "extra_headers": self.extra_headers,
         }
+
+
+class OpenRouterToolBuilder(LLMBuilder[OpenRouterTool]):
+    """
+    Builder for OpenRouterTool.
+    """
+
+    def base_url(self, base_url: str) -> Self:
+        self._obj.base_url = base_url.rstrip("/")
+        return self
+
+    def extra_headers(self, headers: Dict[str, str]) -> Self:
+        self._obj.extra_headers = headers
+        return self
+
+    def build(self) -> OpenRouterTool:
+        if not self._obj.api_key:
+            raise ValueError("API key must be provided for OpenRouterTool.")
+        return self._obj

@@ -10,7 +10,7 @@ from typing import Coroutine
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
-from grafi.assistants.assistant_base import A
+from grafi.assistants.assistant_base import T_A
 from grafi.common.containers.container import container
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_ID
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
@@ -32,13 +32,13 @@ from grafi.common.models.message import MsgsAGen
 
 
 def record_assistant_a_stream(
-    func: Callable[[A, ExecutionContext, Messages], Coroutine[Any, Any, MsgsAGen]],
-) -> Callable[[A, ExecutionContext, Messages], MsgsAGen]:
+    func: Callable[[T_A, ExecutionContext, Messages], Coroutine[Any, Any, MsgsAGen]],
+) -> Callable[[T_A, ExecutionContext, Messages], MsgsAGen]:
     """Decorator to record node execution events and tracing."""
 
     @functools.wraps(func)
     async def wrapper(
-        self: A,
+        self: T_A,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> AsyncGenerator:

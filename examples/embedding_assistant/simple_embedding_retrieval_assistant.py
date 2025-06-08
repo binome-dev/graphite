@@ -1,12 +1,12 @@
 import os
 from typing import Optional
-from typing import Self
 
 from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import model_validator
 
 from examples.embedding_assistant.nodes.embedding_retrieval_node import (
     EmbeddingRetrievalNode,
@@ -21,6 +21,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.workflow import Workflow
 
 
 class SimpleEmbeddingRetrievalAssistant(Assistant):
@@ -47,55 +48,29 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
 
     collection: Collection
 
+    workflow: Optional[Workflow] = Field(
+        default=None
+    )  # Make workflow optional with default None
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleEmbeddingRetrievalAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleEmbeddingRetrievalAssistant":
-            return SimpleEmbeddingRetrievalAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def embedding_model(self, embedding_model: OpenAIEmbedding) -> Self:
-            self._assistant.embedding_model = embedding_model
-            return self
-
-        def n_results(self, n_results: int) -> Self:
-            self._assistant.n_results = n_results
-            return self
-
-        def collection(self, collection: Collection) -> Self:
-            self._assistant.collection = collection
-            return self
-
-        def build(self) -> "SimpleEmbeddingRetrievalAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
-
+    @model_validator(mode="after")
     def _construct_workflow(self) -> "SimpleEmbeddingRetrievalAssistant":
         # Create an LLM node
         embedding_retrieval_node = (
-            EmbeddingRetrievalNode.Builder()
+            EmbeddingRetrievalNode.builder()
             .name("EmbeddingRetrievalNode")
             .subscribe(agent_input_topic)
             .command(
-                EmbeddingResponseCommand.Builder()
-                .retrieval_tool(
-                    ChromadbRetrievalTool.Builder()
-                    .collection(self.collection)
-                    .embedding_model(self.embedding_model)
-                    .n_results(self.n_results)
-                    .build()
+                EmbeddingResponseCommand(
+                    retrieval_tool=ChromadbRetrievalTool(
+                        name="ChromadbRetrievalTool",
+                        api_key=self.api_key,
+                        collection=self.collection,
+                        embedding_model=self.embedding_model,
+                        n_results=self.n_results,
+                    )
                 )
-                .build()
             )
             .publish_to(agent_output_topic)
             .build()
@@ -103,7 +78,7 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
 
         # Create a workflow and add the LLM node
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_rag_workflow")
             .node(embedding_retrieval_node)
             .build()

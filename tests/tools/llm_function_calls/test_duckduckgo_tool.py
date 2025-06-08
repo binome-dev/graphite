@@ -11,7 +11,7 @@ from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 
 @pytest.fixture
 def duckduckgo_tool() -> DuckDuckGoTool:
-    return DuckDuckGoTool.Builder().build()
+    return DuckDuckGoTool.builder().build()
 
 
 @pytest.fixture
@@ -81,7 +81,7 @@ def test_execute_function(duckduckgo_tool, mock_ddgs):
 
 def test_builder_configuration():
     tool = (
-        DuckDuckGoTool.Builder()
+        DuckDuckGoTool.builder()
         .fixed_max_results(5)
         .headers({"User-Agent": "test"})
         .proxy("http://proxy.test")

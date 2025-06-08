@@ -16,6 +16,7 @@ from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 AGENT_RESERVED_TOPICS.extend([HUMAN_REQUEST_TOPIC])
@@ -34,30 +35,12 @@ class HumanRequestTopic(TopicBase):
         default=None
     )
 
-    class Builder(TopicBase.Builder):
-
-        _topic: "HumanRequestTopic"
-
-        def __init__(self) -> None:
-            self._topic = self._init_topic()
-
-        def _init_topic(self) -> "HumanRequestTopic":
-            return HumanRequestTopic.model_construct()
-
-        def publish_event_handler(
-            self, publish_event_handler: Callable[[PublishToTopicEvent], None]
-        ) -> Self:
-            self._topic.publish_event_handler = publish_event_handler
-            return self
-
-        def publish_to_human_event_handler(
-            self, publish_event_handler: Callable[[OutputTopicEvent], None]
-        ) -> Self:
-            self._topic.publish_to_human_event_handler = publish_event_handler
-            return self
-
-        def build(self) -> "HumanRequestTopic":
-            return self._topic
+    @classmethod
+    def builder(cls) -> "HumanRequestTopicBuilder":
+        """
+        Returns a builder for HumanRequestTopic.
+        """
+        return HumanRequestTopicBuilder(cls)
 
     def can_append_user_input(
         self, consumer_name: str, event: PublishToTopicEvent | OutputTopicEvent
@@ -135,6 +118,24 @@ class HumanRequestTopic(TopicBase):
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
+
+
+class HumanRequestTopicBuilder(TopicBaseBuilder[HumanRequestTopic]):
+    """
+    Builder for creating instances of Topic.
+    """
+
+    def publish_event_handler(
+        self, publish_event_handler: Callable[[PublishToTopicEvent], None]
+    ) -> Self:
+        self._obj.publish_event_handler = publish_event_handler
+        return self
+
+    def publish_to_human_event_handler(
+        self, publish_event_handler: Callable[[OutputTopicEvent], None]
+    ) -> Self:
+        self._obj.publish_to_human_event_handler = publish_event_handler
+        return self
 
 
 human_request_topic = HumanRequestTopic(name=HUMAN_REQUEST_TOPIC)
