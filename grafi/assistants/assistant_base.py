@@ -80,6 +80,6 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
         return self
 
     def build(self) -> T_A:
-        """Build the SimpleStreamAssistant instance."""
+        """Build the Assistant instance."""
         self._obj._construct_workflow()
         return self._obj
