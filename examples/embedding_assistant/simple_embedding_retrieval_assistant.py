@@ -21,6 +21,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.workflow import Workflow
 
 
 class SimpleEmbeddingRetrievalAssistant(Assistant):
@@ -41,6 +42,7 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     )
     name: str = Field(default="SimpleEmbeddingRetrievalAssistant")
     type: str = Field(default="SimpleEmbeddingRetrievalAssistant")
+    workflow: Workflow = Field(default=EventDrivenWorkflow())
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     embedding_model: Optional[OpenAIEmbedding] = Field(default=None)
     n_results: int = Field(default=30)

@@ -14,6 +14,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.workflow import Workflow
 
 
 class SimpleRagAssistant(Assistant):
@@ -34,6 +35,7 @@ class SimpleRagAssistant(Assistant):
     )
     name: str = Field(default="SimpleRagAssistant")
     type: str = Field(default="SimpleRagAssistant")
+    workflow: Workflow = Field(default=EventDrivenWorkflow())
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: Optional[str] = Field(default="gpt-4o-mini")
     index: BaseIndex
