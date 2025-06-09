@@ -46,7 +46,7 @@ class FunctionCallTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @classmethod
-    def builder(cls) -> ToolBuilder[Self]:
+    def builder(cls) -> "FunctionCallToolBuilder":
         """
         Return a builder for FunctionCallTool.
 
