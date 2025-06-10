@@ -17,11 +17,15 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
 try:
-    from fastmcp import Client
-    from fastmcp.exceptions import McpError
+
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
     from mcp.types import TextContent
+except (ImportError, ModuleNotFoundError):
+    raise ImportError("`mcp` not installed. Please install using `pip install mpc`")
+try:
+    from fastmcp import Client
+    from fastmcp.exceptions import McpError
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
 
