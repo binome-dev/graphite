@@ -8,7 +8,6 @@ from typing import Optional
 from typing import Union
 from typing import cast
 
-from deprecated import deprecated
 from openai import NOT_GIVEN
 from openai import AsyncClient
 from openai import NotGiven
@@ -177,7 +176,6 @@ class OpenAITool(LLM):
         yield self.to_messages(response)
 
     @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
     def stream(
         self,
         execution_context: ExecutionContext,
