@@ -13,6 +13,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 
 
 class RagNode(Node):
@@ -23,11 +24,11 @@ class RagNode(Node):
     type: str = "RagNode"
     command: RagResponseCommand
 
-    class Builder(Node.Builder):
-        """Concrete builder for RagNode."""
+    @classmethod
+    def builder(cls) -> "NodeBuilder":
+        """Return a builder for RagNode."""
 
-        def _init_node(self) -> "RagNode":
-            return RagNode.model_construct()
+        return NodeBuilder(cls)
 
     @record_node_execution
     def execute(

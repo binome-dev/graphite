@@ -14,6 +14,7 @@ from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 
 
@@ -25,13 +26,10 @@ class LLMFunctionCallNode(Node):
     type: str = "LLMFunctionCallNode"
     command: FunctionCallCommand
 
-    class Builder(Node.Builder):
-        """Concrete builder for LLMFunctionCallNode."""
-
-        _node: "LLMFunctionCallNode"
-
-        def _init_node(self) -> "LLMFunctionCallNode":
-            return LLMFunctionCallNode.model_construct()
+    @classmethod
+    def builder(cls) -> NodeBuilder:
+        """Return a builder for LLMNode."""
+        return NodeBuilder(cls)
 
     @record_node_execution
     def execute(

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from grafi.common.events.event import Event
 from grafi.common.events.node_events.node_event import NodeEvent
+from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
 from grafi.common.models.execution_context import ExecutionContext
@@ -26,33 +27,6 @@ class Workflow(BaseModel):
     type: str
     nodes: Dict[str, Node] = {}
     state: Dict[str, Tuple[str, NodeEvent | None]] = {}
-
-    class Builder:
-        """Inner builder class for workflow construction."""
-
-        def __init__(self) -> None:
-            self._workflow = self._init_workflow()
-
-        def _init_workflow(self) -> "Workflow":
-            raise NotImplementedError
-
-        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-            self._workflow.oi_span_type = oi_span_type
-            return self
-
-        def name(self, name: str) -> Self:
-            self._workflow.name = name
-            return self
-
-        def type(self, type_name: str) -> Self:
-            self._workflow.type = type_name
-            return self
-
-        def node(self, node: Node) -> Self:
-            raise NotImplementedError
-
-        def build(self) -> "Workflow":
-            raise NotImplementedError
 
     def execute(self, execution_context: ExecutionContext, input: Messages) -> None:
         """Executes the workflow with the given initial inputs."""
@@ -89,4 +63,28 @@ class Workflow(BaseModel):
         }
 
 
-W = TypeVar("W", bound="Workflow")  # the Tool subclass
+T_W = TypeVar("T_W", bound="Workflow")  # the Tool subclass
+
+
+class WorkflowBuilder(BaseBuilder[T_W]):
+    """Inner builder class for Workflow construction."""
+
+    def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        self._obj.oi_span_type = oi_span_type
+        return self
+
+    def name(self, name: str) -> Self:
+        self._obj.name = name
+        return self
+
+    def type(self, type_name: str) -> Self:
+        self._obj.type = type_name
+        return self
+
+    def node(self, node: Node) -> Self:
+        self._obj.nodes[node.node_id] = node
+        return self
+
+    def build(self) -> T_W:
+        """Build the Workflow instance."""
+        return self._obj

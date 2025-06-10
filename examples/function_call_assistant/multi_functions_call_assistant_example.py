@@ -101,8 +101,15 @@ You are a friendly and helpful assistant with access to multiple tools. After ge
 
 
 def test_multi_functions_call_assistant() -> None:
+
+    builder = (
+        MultiFunctionsCallAssistant.builder()
+        .name("MultiFunctionsCallAssistant")
+        .api_key(api_key)
+    )
+    builder.function_tool(WeatherMock())
     assistant = (
-        MultiFunctionsCallAssistant.Builder()
+        MultiFunctionsCallAssistant.builder()
         .name("MultiFunctionsCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock())

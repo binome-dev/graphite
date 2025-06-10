@@ -15,6 +15,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 class Topic(TopicBase):
@@ -28,24 +29,12 @@ class Topic(TopicBase):
         default=None
     )
 
-    class Builder(TopicBase.Builder):
-
-        _topic: "Topic"
-
-        def __init__(self) -> None:
-            self._topic = self._init_topic()
-
-        def _init_topic(self) -> "Topic":
-            return Topic.model_construct()
-
-        def publish_event_handler(
-            self, publish_event_handler: Callable[[PublishToTopicEvent], None]
-        ) -> Self:
-            self._topic.publish_event_handler = publish_event_handler
-            return self
-
-        def build(self) -> "Topic":
-            return self._topic
+    @classmethod
+    def builder(cls) -> "TopicBuilder":
+        """
+        Returns a builder for Topic.
+        """
+        return TopicBuilder(cls)
 
     def publish_data(
         self,
@@ -80,6 +69,18 @@ class Topic(TopicBase):
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
+
+
+class TopicBuilder(TopicBaseBuilder[Topic]):
+    """
+    Builder for creating instances of Topic.
+    """
+
+    def publish_event_handler(
+        self, publish_event_handler: Callable[[PublishToTopicEvent], None]
+    ) -> Self:
+        self._obj.publish_event_handler = publish_event_handler
+        return self
 
 
 agent_input_topic = Topic(name=AGENT_INPUT_TOPIC)

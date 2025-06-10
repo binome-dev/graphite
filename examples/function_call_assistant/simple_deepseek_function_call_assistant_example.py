@@ -43,7 +43,7 @@ def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        SimpleDeepseekFunctionCallAssistant.Builder()
+        SimpleDeepseekFunctionCallAssistant.builder()
         .name("SimpleDeepseekFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="WeatherMock"))

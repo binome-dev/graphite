@@ -46,7 +46,7 @@ def get_execution_context() -> ExecutionContext:
 async def test_simple_function_call_assistant_async() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleOllamaFunctionCallAssistant.Builder()
+        SimpleOllamaFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_url("http://localhost:11434")
         .function_tool(WeatherMock(name="WeatherMock"))
@@ -61,8 +61,8 @@ async def test_simple_function_call_assistant_async() -> None:
     print(output)
     assert output is not None
     print(len(event_store.get_events()))
-    assert "12345" in output[0].content
-    assert "sunny" in output[0].content
+    assert "12345" in str(output[0].content)
+    assert "sunny" in str(output[0].content)
     assert len(event_store.get_events()) == 23
 
 

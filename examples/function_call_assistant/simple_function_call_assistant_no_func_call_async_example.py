@@ -43,7 +43,7 @@ def get_execution_context() -> ExecutionContext:
 async def test_simple_function_call_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(WeatherMock(name="mock_weather"))
@@ -56,7 +56,7 @@ async def test_simple_function_call_assistant() -> None:
     output = await assistant.a_execute(execution_context, input_data)
     print(output)
     assert output is not None
-    assert "EC2" in output[0].content
+    assert "EC2" in str(output[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 11
 

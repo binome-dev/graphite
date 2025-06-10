@@ -33,7 +33,7 @@ def get_execution_context() -> ExecutionContext:
 # --------------------------------------------------------------------------- #
 def test_claude_tool_stream() -> None:
     event_store.clear_events()
-    claude = ClaudeTool.Builder().api_key(api_key).build()
+    claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
     for messages in claude.stream(
@@ -57,7 +57,7 @@ def test_claude_tool_stream() -> None:
 # --------------------------------------------------------------------------- #
 async def test_claude_tool_a_stream() -> None:
     event_store.clear_events()
-    claude = ClaudeTool.Builder().api_key(api_key).build()
+    claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in claude.a_stream(
@@ -79,7 +79,7 @@ async def test_claude_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 def test_claude_tool_execute() -> None:
     event_store.clear_events()
-    claude = ClaudeTool.Builder().api_key(api_key).build()
+    claude = ClaudeTool.builder().api_key(api_key).build()
 
     messages = claude.execute(
         get_execution_context(),
@@ -103,7 +103,7 @@ def test_claude_tool_with_chat_param() -> None:
 
     event_store.clear_events()
     claude = (
-        ClaudeTool.Builder()
+        ClaudeTool.builder()
         .api_key(api_key)
         .max_tokens(50)
         .chat_params(chat_param)
@@ -130,7 +130,7 @@ def test_claude_tool_with_chat_param() -> None:
 # --------------------------------------------------------------------------- #
 async def test_claude_tool_async() -> None:
     event_store.clear_events()
-    claude = ClaudeTool.Builder().api_key(api_key).build()
+    claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in claude.a_execute(
@@ -154,10 +154,10 @@ async def test_llm_a_stream_node_claude() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.Builder()
+        LLMNode.builder()
         .command(
-            LLMStreamResponseCommand.Builder()
-            .llm(ClaudeTool.Builder().api_key(api_key).build())
+            LLMStreamResponseCommand.builder()
+            .llm(ClaudeTool.builder().api_key(api_key).build())
             .build()
         )
         .build()

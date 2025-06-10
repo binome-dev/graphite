@@ -73,6 +73,7 @@ from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
+from pydantic import model_validator
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.models.execution_context import ExecutionContext
@@ -112,44 +113,14 @@ class ReactAssistant(Assistant):
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
-        default=GoogleSearchTool.Builder()
+        default=GoogleSearchTool.builder()
         .name("GoogleSearchTool")
         .fixed_max_results(3)
         .build()
     )
     model: str = Field(default="gpt-4o-mini")
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for ReactAssistant."""
-
-        _assistant: "ReactAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "ReactAssistant":
-            return ReactAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def system_prompt(self, system_prompt: str) -> Self:
-            self._assistant.system_prompt = system_prompt
-            return self
-
-        def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
-            self._assistant.function_call_tool = function_call_tool
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def build(self) -> "ReactAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
-
+    @model_validator(mode="after")
     def _construct_workflow(self) -> "ReactAssistant":
         function_call_topic = Topic(
             name="function_call_topic",
@@ -165,7 +136,7 @@ class ReactAssistant(Assistant):
         )
 
         llm_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -175,9 +146,9 @@ class ReactAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -193,12 +164,12 @@ class ReactAssistant(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallCommand.Builder()
-                .function_tool(self.function_call_tool)
+                FunctionCallCommand.builder()
+                .function_call_tool(self.function_call_tool)
                 .build()
             )
             .publish_to(function_result_topic)
@@ -207,7 +178,7 @@ class ReactAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_agent_workflow")
             .node(llm_node)
             .node(function_call_node)
@@ -215,6 +186,44 @@ class ReactAssistant(Assistant):
         )
 
         return self
+```
+
+If you want to add builder pattern, add Builder class
+
+```python
+class ReactAssistantBuilder(AssistantBaseBuilder[ReactAssistant]):
+    """Concrete builder for ReactAssistant."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def system_prompt(self, system_prompt: str) -> Self:
+        self._obj.system_prompt = system_prompt
+        return self
+
+    def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
+        self._obj.function_call_tool = function_call_tool
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+```
+
+And add builder() method to ReactAssistant class
+
+```python
+class ReactAssistant(Assistant):
+    ...
+
+    @classmethod
+    def builder(cls) -> "ReactAssistantBuilder":
+        """Return a builder for ReactAssistant."""
+        return ReactAssistantBuilder(cls)
+
+    ...
 ```
 
 ---
@@ -233,7 +242,7 @@ from <your react assistant path> import ReactAssistant
 
 api_key = "<your openai api key>"
 
-react_assistant = ReactAssistant.Builder().api_key(api_key).build()
+react_assistant = ReactAssistant.builder().api_key(api_key).build()
 
 execution_context = ExecutionContext(
             conversation_id=uuid.uuid4().hex,

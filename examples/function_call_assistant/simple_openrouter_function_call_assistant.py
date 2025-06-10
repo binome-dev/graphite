@@ -6,6 +6,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
@@ -46,44 +47,10 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
     summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionCallTool
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _assistant: "SimpleOpenRouterFunctionCallAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleOpenRouterFunctionCallAssistant":
-            return SimpleOpenRouterFunctionCallAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def function_call_llm_system_message(
-            self, function_call_llm_system_message: str
-        ) -> Self:
-            self._assistant.function_call_llm_system_message = (
-                function_call_llm_system_message
-            )
-            return self
-
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
-            return self
-
-        def function_tool(self, function_tool: FunctionCallTool) -> Self:
-            self._assistant.function_tool = function_tool
-            return self
-
-        def build(self) -> "SimpleOpenRouterFunctionCallAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleOpenRouterFunctionCallAssistantBuilder":
+        """Return a builder for SimpleOpenRouterFunctionCallAssistant."""
+        return SimpleOpenRouterFunctionCallAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleOpenRouterFunctionCallAssistant":
         function_call_topic = Topic(
@@ -94,13 +61,13 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
 
         # Create an input LLM node
         llm_input_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenRouterInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenRouterTool.Builder()
+                    OpenRouterTool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -124,11 +91,13 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
-                FunctionCallCommand.Builder().function_tool(self.function_tool).build()
+                FunctionCallCommand.builder()
+                .function_call_tool(self.function_tool)
+                .build()
             )
             .publish_to(function_result_topic)
             .build()
@@ -136,15 +105,15 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
 
         # Create an output LLM node
         llm_output_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenRouterOutputNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenRouterTool.Builder()
+                    OpenRouterTool.builder()
                     .name("UserOutputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -159,7 +128,7 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_OpenRouter_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
@@ -167,4 +136,35 @@ class SimpleOpenRouterFunctionCallAssistant(Assistant):
             .build()
         )
 
+        return self
+
+
+class SimpleOpenRouterFunctionCallAssistantBuilder(
+    AssistantBaseBuilder[SimpleOpenRouterFunctionCallAssistant]
+):
+    """
+    Concrete builder for SimpleOpenRouterFunctionCallAssistant.
+    This builder allows setting the API key, model, system messages, and function tool.
+    """
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def function_call_llm_system_message(
+        self, function_call_llm_system_message: str
+    ) -> Self:
+        self._obj.function_call_llm_system_message = function_call_llm_system_message
+        return self
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self._obj.summary_llm_system_message = summary_llm_system_message
+        return self
+
+    def function_tool(self, function_tool: FunctionCallTool) -> Self:
+        self._obj.function_tool = function_tool
         return self

@@ -18,17 +18,17 @@ from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
-from grafi.tools.tool import T
+from grafi.tools.tool import T_T
 
 
 def record_tool_execution(
-    func: Callable[[T, ExecutionContext, Messages], Messages],
-) -> Callable[[T, ExecutionContext, Messages], Messages]:
+    func: Callable[[T_T, ExecutionContext, Messages], Messages],
+) -> Callable[[T_T, ExecutionContext, Messages], Messages]:
     """Decorator to record tool execution events and tracing."""
 
     @functools.wraps(func)
     def wrapper(
-        self: T,
+        self: T_T,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> Messages:

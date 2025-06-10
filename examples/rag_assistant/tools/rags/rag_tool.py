@@ -1,6 +1,5 @@
 from typing import Any
 from typing import Dict
-from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -29,24 +28,6 @@ class RagTool(Tool):
     type: str = "RagTool"
     index: BaseIndex
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
-
-    class Builder(Tool.Builder):
-        """Concrete builder for WorkflowDag."""
-
-        _tool: "RagTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "RagTool":
-            return RagTool.model_construct()
-
-        def index(self, index: BaseIndex) -> Self:
-            self._tool.index = index
-            return self
-
-        def build(self) -> "RagTool":
-            return self._tool
 
     @record_tool_execution
     def execute(

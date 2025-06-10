@@ -25,7 +25,7 @@ def get_execution_context() -> ExecutionContext:
 def test_simple_llm_assistant() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleLLMAssistant.Builder()
+        SimpleLLMAssistant.builder()
         .name("SimpleLLMAssistant")
         .system_message(
             """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers.

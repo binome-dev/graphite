@@ -56,12 +56,10 @@ def initialize_index(
 async def test_rag_tool_async() -> None:
     index = initialize_index()
     execution_context = get_execution_context()
-    simple_rag_assistant = (
-        SimpleRagAssistant.Builder()
-        .name("SimpleRagAssistant")
-        .index(index)
-        .api_key(api_key)
-        .build()
+    simple_rag_assistant = SimpleRagAssistant(
+        name="SimpleRagAssistant",
+        index=index,
+        api_key=api_key,
     )
 
     result = await simple_rag_assistant.a_execute(
@@ -70,8 +68,8 @@ async def test_rag_tool_async() -> None:
     )
 
     print(result)
-    assert "EC2" in result[0].content
-    assert "computing" in result[0].content
+    assert "EC2" in str(result[0].content)
+    assert "computing" in str(result[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 11
 

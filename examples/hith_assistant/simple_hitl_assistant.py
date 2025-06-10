@@ -6,6 +6,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.human_request_topic import human_request_topic
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -47,40 +48,10 @@ class SimpleHITLAssistant(Assistant):
     summary_llm_system_message: Optional[str] = Field(default=None)
     hitl_request: FunctionCallTool
 
-    class Builder(Assistant.Builder):
-        """Concrete builder for SimpleHITLAssistant."""
-
-        _assistant: "SimpleHITLAssistant"
-
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "SimpleHITLAssistant":
-            return SimpleHITLAssistant.model_construct()
-
-        def api_key(self, api_key: str) -> Self:
-            self._assistant.api_key = api_key
-            return self
-
-        def model(self, model: str) -> Self:
-            self._assistant.model = model
-            return self
-
-        def hitl_llm_system_message(self, hitl_llm_system_message: str) -> Self:
-            self._assistant.hitl_llm_system_message = hitl_llm_system_message
-            return self
-
-        def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-            self._assistant.summary_llm_system_message = summary_llm_system_message
-            return self
-
-        def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
-            self._assistant.hitl_request = hitl_request
-            return self
-
-        def build(self) -> "SimpleHITLAssistant":
-            self._assistant._construct_workflow()
-            return self._assistant
+    @classmethod
+    def builder(cls) -> "SimpleHITLAssistantBuilder":
+        """Return a builder for SimpleHITLAssistant."""
+        return SimpleHITLAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleHITLAssistant":
         hitl_call_topic = Topic(
@@ -94,7 +65,7 @@ class SimpleHITLAssistant(Assistant):
         )
 
         llm_input_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -104,9 +75,9 @@ class SimpleHITLAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -123,11 +94,13 @@ class SimpleHITLAssistant(Assistant):
         # Create a function call node
 
         function_call_node = (
-            LLMFunctionCallNode.Builder()
+            LLMFunctionCallNode.builder()
             .name("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
             .command(
-                FunctionCallCommand.Builder().function_tool(self.hitl_request).build()
+                FunctionCallCommand.builder()
+                .function_call_tool(self.hitl_request)
+                .build()
             )
             .publish_to(human_request_topic)
             .build()
@@ -135,13 +108,13 @@ class SimpleHITLAssistant(Assistant):
 
         # Create an output LLM node
         llm_output_node = (
-            LLMNode.Builder()
+            LLMNode.builder()
             .name("OpenAIOutputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(register_user_topic).build())
             .command(
-                LLMResponseCommand.Builder()
+                LLMResponseCommand.builder()
                 .llm(
-                    OpenAITool.Builder()
+                    OpenAITool.builder()
                     .name("UserOutputLLM")
                     .api_key(self.api_key)
                     .model(self.model)
@@ -156,7 +129,7 @@ class SimpleHITLAssistant(Assistant):
 
         # Create a workflow and add the nodes
         self.workflow = (
-            EventDrivenWorkflow.Builder()
+            EventDrivenWorkflow.builder()
             .name("simple_function_call_workflow")
             .node(llm_input_node)
             .node(function_call_node)
@@ -164,4 +137,28 @@ class SimpleHITLAssistant(Assistant):
             .build()
         )
 
+        return self
+
+
+class SimpleHITLAssistantBuilder(AssistantBaseBuilder[SimpleHITLAssistant]):
+    """Concrete builder for SimpleHITLAssistant."""
+
+    def api_key(self, api_key: str) -> Self:
+        self._obj.api_key = api_key
+        return self
+
+    def model(self, model: str) -> Self:
+        self._obj.model = model
+        return self
+
+    def hitl_llm_system_message(self, hitl_llm_system_message: str) -> Self:
+        self._obj.hitl_llm_system_message = hitl_llm_system_message
+        return self
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self._obj.summary_llm_system_message = summary_llm_system_message
+        return self
+
+    def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
+        self._obj.hitl_request = hitl_request
         return self

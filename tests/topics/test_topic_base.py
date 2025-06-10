@@ -8,6 +8,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 class MockTopic(TopicBase):
@@ -64,7 +65,7 @@ def test_reserved_topic_names():
         with pytest.raises(
             ValueError, match=f"Topic name '{name}' is reserved for the agent."
         ):
-            TopicBase.Builder().name(name).build()
+            TopicBaseBuilder(TopicBase).name(name).build()
 
 
 def test_reset(topic: TopicBase, execution_context: ExecutionContext):

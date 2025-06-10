@@ -23,17 +23,17 @@ from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.nodes.node import N
+from grafi.nodes.node import T_N
 
 
 def record_node_a_execution(
-    func: Callable[[N, ExecutionContext, List[ConsumeFromTopicEvent]], MsgsAGen],
-) -> Callable[[N, ExecutionContext, List[ConsumeFromTopicEvent]], MsgsAGen]:
+    func: Callable[[T_N, ExecutionContext, List[ConsumeFromTopicEvent]], MsgsAGen],
+) -> Callable[[T_N, ExecutionContext, List[ConsumeFromTopicEvent]], MsgsAGen]:
     """Decorator to record node execution events and tracing."""
 
     @functools.wraps(func)
     async def wrapper(
-        self: N,
+        self: T_N,
         execution_context: ExecutionContext,
         input_data: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:

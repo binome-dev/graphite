@@ -5,11 +5,8 @@ from arize.otel import Endpoint
 from arize.otel import register
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
-from openinference.semconv.resource import ResourceAttributes
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import Tracer
@@ -57,8 +54,10 @@ def setup_tracing() -> "Tracer":
     elif is_local_endpoint_available(
         "phoenix", 4317
     ):  # check if the local collector is available
-        resource = Resource.create({ResourceAttributes.PROJECT_NAME: "grafi-trace"})
-        tracer_provider = TracerProvider(resource=resource)
+        tracer_provider = register(
+            endpoint="phoenix:4317",
+            model_id="grafi-trace",
+        )
 
         # Use OTLPSpanExporter if the endpoint is available
         span_exporter = OTLPSpanExporter(endpoint="phoenix:4317", insecure=True)
@@ -73,8 +72,10 @@ def setup_tracing() -> "Tracer":
     elif is_local_endpoint_available(
         "localhost", 4317
     ):  # check if the local collector is available
-        resource = Resource.create({ResourceAttributes.PROJECT_NAME: "grafi-trace"})
-        tracer_provider = TracerProvider(resource=resource)
+        tracer_provider = register(
+            endpoint="localhost:4317",
+            model_id="grafi-trace",
+        )
 
         # Use OTLPSpanExporter if the endpoint is available
         span_exporter = OTLPSpanExporter(endpoint="localhost:4317", insecure=True)

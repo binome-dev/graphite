@@ -99,13 +99,11 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
 
 def test_simple_embedding_retrieval_tool() -> None:
     execution_context = get_execution_context()
-    simple_rag_assistant = (
-        SimpleEmbeddingRetrievalAssistant.Builder()
-        .name("SimpleEmbeddingRetrievalAssistant")
-        .api_key(api_key)
-        .embedding_model(get_embedding_model())
-        .collection(create_collection())
-        .build()
+    simple_rag_assistant = SimpleEmbeddingRetrievalAssistant(
+        name="SimpleEmbeddingRetrievalAssistant",
+        api_key=api_key,
+        embedding_model=get_embedding_model(),
+        collection=create_collection(),
     )
 
     result: Messages = simple_rag_assistant.execute(

@@ -17,6 +17,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.tool import Tool
+from grafi.tools.tool import ToolBuilder
 
 
 OutputType = Union[BaseModel, List[BaseModel]]
@@ -28,23 +29,14 @@ class FunctionTool(Tool):
     function: Callable[[Messages], OutputType]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    class Builder(Tool.Builder):
-        """Concrete builder for WorkflowDag."""
+    @classmethod
+    def builder(cls) -> "FunctionToolBuilder":
+        """
+        Return a builder for FunctionTool.
 
-        _tool: "FunctionTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "FunctionTool":
-            return FunctionTool.model_construct()
-
-        def function(self, function: Callable) -> Self:
-            self._tool.function = function
-            return self
-
-        def build(self) -> "FunctionTool":
-            return self._tool
+        This method allows for the construction of a FunctionTool instance with specified parameters.
+        """
+        return FunctionToolBuilder(cls)
 
     @record_tool_execution
     def execute(
@@ -94,3 +86,14 @@ class FunctionTool(Tool):
             "oi_span_type": self.oi_span_type.value,
             "function": self.function.__name__,
         }
+
+
+class FunctionToolBuilder(ToolBuilder[FunctionTool]):
+    """Builder for FunctionTool instances."""
+
+    def function(self, function: Callable[[Messages], OutputType]) -> Self:
+        self._obj.function = function
+        return self
+
+    def build(self) -> FunctionTool:
+        return self._obj

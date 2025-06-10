@@ -12,6 +12,7 @@ from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
+from grafi.nodes.node import NodeBuilder
 
 from ..tools.embeddings.embedding_response_command import EmbeddingResponseCommand
 
@@ -24,13 +25,10 @@ class EmbeddingRetrievalNode(Node):
     type: str = "EmbeddingRetrievalNode"
     command: EmbeddingResponseCommand
 
-    class Builder(Node.Builder):
-        """Concrete builder for RagNode."""
-
-        _node: "EmbeddingRetrievalNode"
-
-        def _init_node(self) -> "EmbeddingRetrievalNode":
-            return EmbeddingRetrievalNode.model_construct()
+    @classmethod
+    def builder(cls) -> NodeBuilder:
+        """Return a builder for EmbeddingRetrievalNode."""
+        return NodeBuilder(cls)
 
     @record_node_execution
     def execute(

@@ -99,13 +99,11 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
 
 async def test_simple_embedding_retrieval_tool_async() -> None:
     execution_context = get_execution_context()
-    simple_rag_assistant = (
-        SimpleEmbeddingRetrievalAssistant.Builder()
-        .name("SimpleEmbeddingRetrievalAssistant")
-        .api_key(api_key)
-        .embedding_model(get_embedding_model())
-        .collection(create_collection())
-        .build()
+    simple_rag_assistant = SimpleEmbeddingRetrievalAssistant(
+        name="SimpleEmbeddingRetrievalAssistant",
+        api_key=api_key,
+        embedding_model=get_embedding_model(),
+        collection=create_collection(),
     )
 
     result = await simple_rag_assistant.a_execute(
@@ -118,7 +116,7 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
         ],
     )
 
-    assert "Amazon EC2" in result[0].content
+    assert "Amazon EC2" in str(result[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 11
 

@@ -35,7 +35,7 @@ The `FunctionTool` uses a builder pattern for construction:
 
 ```python
 function_tool = (
-    FunctionTool.Builder()
+    FunctionTool.builder()
     .function(your_custom_function)
     .build()
 )

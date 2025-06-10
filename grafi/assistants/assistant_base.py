@@ -8,7 +8,11 @@ from pydantic import ConfigDict
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
+from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
+from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.workflows.workflow import Workflow
 
 
@@ -30,37 +34,52 @@ class AssistantBase(BaseModel):
 
     workflow: Workflow
 
-    class Builder:
-        """Inner builder class for Assistant construction."""
+    def _construct_workflow(self) -> "AssistantBase":
+        """Construct the workflow for the assistant."""
+        raise NotImplementedError("Subclasses must implement '_construct_workflow'.")
 
-        _assistant: "AssistantBase"
+    def execute(
+        self,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> Messages:
+        """Execute the assistant's workflow with the provided input data."""
+        raise NotImplementedError("Subclasses must implement 'execute'.")
 
-        def __init__(self) -> None:
-            self._assistant = self._init_assistant()
-
-        def _init_assistant(self) -> "AssistantBase":
-            return AssistantBase.model_construct()
-
-        def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-            self._assistant.oi_span_type = oi_span_type
-            return self
-
-        def name(self, name: str) -> Self:
-            self._assistant.name = name
-            return self
-
-        def type(self, type_name: str) -> Self:
-            self._assistant.type = type_name
-            return self
-
-        def event_store(
-            self, event_store_class: Type[EventStore], event_store: EventStore
-        ) -> Self:
-            container.register_event_store(event_store_class, event_store)
-            return self
-
-        def build(self) -> "AssistantBase":
-            raise NotImplementedError
+    async def a_execute(
+        self,
+        execution_context: ExecutionContext,
+        input_data: Messages,
+    ) -> MsgsAGen:
+        """Execute the assistant's workflow with the provided input data asynchronously."""
+        raise NotImplementedError("Subclasses must implement 'a_execute'.")
 
 
-A = TypeVar("A", bound="AssistantBase")  # the AssistantBase subclass
+T_A = TypeVar("T_A", bound=AssistantBase)
+
+
+class AssistantBaseBuilder(BaseBuilder[T_A]):
+    """Inner builder class for Assistant construction."""
+
+    def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        self._obj.oi_span_type = oi_span_type
+        return self
+
+    def name(self, name: str) -> Self:
+        self._obj.name = name
+        return self
+
+    def type(self, type_name: str) -> Self:
+        self._obj.type = type_name
+        return self
+
+    def event_store(
+        self, event_store_class: Type[EventStore], event_store: EventStore
+    ) -> Self:
+        container.register_event_store(event_store_class, event_store)
+        return self
+
+    def build(self) -> T_A:
+        """Build the Assistant instance."""
+        self._obj._construct_workflow()
+        return self._obj

@@ -5,6 +5,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Self
+from typing import TypeVar
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -15,6 +16,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 
@@ -44,29 +46,6 @@ class TopicBase(BaseModel):
     consumption_offsets: Dict[str, int] = {}
     topic_events: List[TopicEvent] = []
     publish_event_handler: Optional[Callable] = None
-
-    class Builder:
-
-        _topic: "TopicBase"
-
-        def __init__(self) -> None:
-            self._topic = self._init_tool()
-
-        def _init_tool(self) -> "TopicBase":
-            return TopicBase.model_construct()
-
-        def name(self, name: str) -> Self:
-            if name in AGENT_RESERVED_TOPICS:
-                raise ValueError(f"Topic name '{name}' is reserved for the agent.")
-            self._topic.name = name
-            return self
-
-        def condition(self, condition: Callable[[Messages], bool]) -> Self:
-            self._topic.condition = condition
-            return self
-
-        def build(self) -> "TopicBase":
-            return self._topic
 
     def publish_data(
         self,
@@ -163,3 +142,22 @@ class TopicBase(BaseModel):
                     "class_name": self.condition.__class__.__name__,
                 }
         return {"type": "unknown"}
+
+
+T_T = TypeVar("T_T", bound=TopicBase)
+
+
+class TopicBaseBuilder(BaseBuilder[T_T]):
+
+    def name(self, name: str) -> Self:
+        if name in AGENT_RESERVED_TOPICS:
+            raise ValueError(f"Topic name '{name}' is reserved for the agent.")
+        self._obj.name = name
+        return self
+
+    def condition(self, condition: Callable[[Messages], bool]) -> Self:
+        self._obj.condition = condition
+        return self
+
+    def build(self) -> T_T:
+        return self._obj

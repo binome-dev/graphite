@@ -23,6 +23,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
+from grafi.tools.llms.llm import LLMBuilder
 
 
 try:
@@ -45,27 +46,14 @@ class OllamaTool(LLM):
     api_url: str = Field(default="http://localhost:11434")
     model: str = Field(default="qwen3")
 
-    class Builder(LLM.Builder):
-        """Concrete builder for OllamaTool."""
+    @classmethod
+    def builder(cls) -> "OllamaToolBuilder":
+        """
+        Return a builder for OllamaTool.
 
-        _tool: "OllamaTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "OllamaTool":
-            return OllamaTool.model_construct()
-
-        def api_url(self, api_url: str) -> Self:
-            self._tool.api_url = api_url
-            return self
-
-        def model(self, model: str) -> Self:
-            self._tool.model = model
-            return self
-
-        def build(self) -> "OllamaTool":
-            return self._tool
+        This method allows for the construction of an OllamaTool instance with specified parameters.
+        """
+        return OllamaToolBuilder(cls)
 
     def prepare_api_input(
         self, input_data: Messages
@@ -293,3 +281,18 @@ class OllamaTool(LLM):
             "api_url": self.api_url,
             "model": self.model,
         }
+
+
+class OllamaToolBuilder(LLMBuilder[OllamaTool]):
+    """
+    Builder for OllamaTool.
+    """
+
+    def api_url(self, api_url: str) -> Self:
+        self._obj.api_url = api_url
+        return self
+
+    def build(self) -> OllamaTool:
+        if not self._obj.api_url:
+            raise ValueError("API URL must be provided for OllamaTool.")
+        return self._obj

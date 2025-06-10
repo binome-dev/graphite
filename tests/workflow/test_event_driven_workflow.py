@@ -130,7 +130,7 @@ class TestEventDrivenWorkflow:
 
     def test_builder_functionality(self, mock_input_topic, mock_output_topic) -> None:
         """Test the workflow builder functionality"""
-        builder = EventDrivenWorkflow.Builder()
+        builder = EventDrivenWorkflow.builder()
 
         # Create a test node
         mock_node = MockNode()

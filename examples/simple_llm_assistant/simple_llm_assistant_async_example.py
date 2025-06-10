@@ -26,7 +26,7 @@ def get_execution_context() -> ExecutionContext:
 async def test_simple_llm_assistant_async() -> None:
     execution_context = get_execution_context()
     assistant = (
-        SimpleLLMAssistant.Builder()
+        SimpleLLMAssistant.builder()
         .name("SimpleLLMAssistantAsync")
         .system_message(
             """You're a friendly and helpful assistant, always eager to make tasks easier and provide clear, supportive answers.
@@ -61,7 +61,7 @@ async def test_simple_llm_assistant_async() -> None:
     output = await assistant.a_execute(get_execution_context(), input_data)
     print(output)
     assert output is not None
-    assert "Grafi" in output[0].content
+    assert "Grafi" in str(output[0].content)
     assert len(event_store.get_events()) == 22
 
 

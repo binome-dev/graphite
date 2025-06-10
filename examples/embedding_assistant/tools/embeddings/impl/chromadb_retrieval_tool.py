@@ -1,6 +1,5 @@
 import json
 from typing import Any
-from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -37,32 +36,6 @@ class ChromadbRetrievalTool(RetrievalTool):
     embedding_model: OpenAIEmbedding
     n_results: int = Field(default=30)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
-
-    class Builder(RetrievalTool.Builder):
-        """Concrete builder for ChromadbRetrievalTool."""
-
-        _tool: "ChromadbRetrievalTool"
-
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
-
-        def _init_tool(self) -> "ChromadbRetrievalTool":
-            return ChromadbRetrievalTool.model_construct()
-
-        def embedding_model(self, embedding_model: OpenAIEmbedding) -> Self:
-            self._tool.embedding_model = embedding_model
-            return self
-
-        def n_results(self, n_results: int) -> Self:
-            self._tool.n_results = n_results
-            return self
-
-        def collection(self, collection: Collection) -> Self:
-            self._tool.collection = collection
-            return self
-
-        def build(self) -> "ChromadbRetrievalTool":
-            return self._tool
 
     @record_tool_execution
     def execute(

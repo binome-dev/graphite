@@ -28,11 +28,11 @@ def test_simple_function_call_assistant_with_tavily() -> None:
 
     # Set up the assistant with TavilyTool
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("GoogleSearchToolAssistant")
         .api_key(api_key)
         .function_tool(
-            GoogleSearchTool.Builder()
+            GoogleSearchTool.builder()
             .name("GoogleSearchTool")
             .fixed_max_results(1)
             .build()

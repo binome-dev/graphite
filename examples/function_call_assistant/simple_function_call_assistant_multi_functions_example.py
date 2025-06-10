@@ -55,7 +55,7 @@ def get_execution_context() -> ExecutionContext:
 def test_simple_function_call_assistant() -> None:
 
     assistant = (
-        SimpleFunctionCallAssistant.Builder()
+        SimpleFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
         .function_tool(LocalInfoMock(name="LocalInfoMock"))

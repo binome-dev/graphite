@@ -5,7 +5,7 @@ from typing import Callable
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
-from grafi.assistants.assistant_base import A
+from grafi.assistants.assistant_base import T_A
 from grafi.common.containers.container import container
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_ID
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
@@ -25,8 +25,8 @@ from grafi.common.models.message import Messages
 
 
 def record_assistant_execution(
-    func: Callable[[A, ExecutionContext, Messages], Messages],
-) -> Callable[[A, ExecutionContext, Messages], Messages]:
+    func: Callable[[T_A, ExecutionContext, Messages], Messages],
+) -> Callable[[T_A, ExecutionContext, Messages], Messages]:
     """
     Decorator to record assistant execution events and add tracing.
 
@@ -39,7 +39,7 @@ def record_assistant_execution(
 
     @functools.wraps(func)
     def wrapper(
-        self: A,
+        self: T_A,
         execution_context: ExecutionContext,
         input_data: Messages,
     ) -> Messages:

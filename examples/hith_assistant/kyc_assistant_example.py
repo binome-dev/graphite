@@ -84,7 +84,7 @@ def test_kyc_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
-        KycAssistant.Builder()
+        KycAssistant.builder()
         .name("SimpleHITLAssistant")
         .api_key(api_key)
         .user_info_extract_system_message(user_info_extract_system_message)

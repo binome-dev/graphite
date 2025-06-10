@@ -30,7 +30,7 @@ def get_execution_context() -> ExecutionContext:
 # --------------------------------------------------------------------------- #
 def test_gemini_tool_stream() -> None:
     event_store.clear_events()
-    gemini = GeminiTool.Builder().api_key(api_key).build()
+    gemini = GeminiTool.builder().api_key(api_key).build()
 
     content = ""
     for messages in gemini.stream(
@@ -52,7 +52,7 @@ def test_gemini_tool_stream() -> None:
 # --------------------------------------------------------------------------- #
 async def test_gemini_tool_a_stream() -> None:
     event_store.clear_events()
-    gemini = GeminiTool.Builder().api_key(api_key).build()
+    gemini = GeminiTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in gemini.a_stream(
@@ -74,7 +74,7 @@ async def test_gemini_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 def test_gemini_tool_execute() -> None:
     event_store.clear_events()
-    gemini = GeminiTool.Builder().api_key(api_key).build()
+    gemini = GeminiTool.builder().api_key(api_key).build()
 
     messages = gemini.execute(
         get_execution_context(),
@@ -100,7 +100,7 @@ def test_gemini_tool_with_chat_param() -> None:
     }
 
     event_store.clear_events()
-    gemini = GeminiTool.Builder().api_key(api_key).chat_params(chat_param).build()
+    gemini = GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
 
     messages = gemini.execute(
         get_execution_context(),
@@ -122,7 +122,7 @@ def test_gemini_tool_with_chat_param() -> None:
 # --------------------------------------------------------------------------- #
 async def test_gemini_tool_async() -> None:
     event_store.clear_events()
-    gemini = GeminiTool.Builder().api_key(api_key).build()
+    gemini = GeminiTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in gemini.a_execute(
@@ -146,10 +146,10 @@ async def test_llm_a_stream_node_gemini() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.Builder()
+        LLMNode.builder()
         .command(
-            LLMStreamResponseCommand.Builder()
-            .llm(GeminiTool.Builder().api_key(api_key).build())
+            LLMStreamResponseCommand.builder()
+            .llm(GeminiTool.builder().api_key(api_key).build())
             .build()
         )
         .build()

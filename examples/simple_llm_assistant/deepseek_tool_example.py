@@ -32,7 +32,7 @@ def get_execution_context() -> ExecutionContext:
 # --------------------------------------------------------------------------- #
 def test_deepseek_tool_stream() -> None:
     event_store.clear_events()
-    ds_tool = DeepseekTool.Builder().api_key(api_key).build()
+    ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     content = ""
     for messages in ds_tool.stream(
@@ -56,7 +56,7 @@ def test_deepseek_tool_stream() -> None:
 # --------------------------------------------------------------------------- #
 async def test_deepseek_tool_a_stream() -> None:
     event_store.clear_events()
-    ds_tool = DeepseekTool.Builder().api_key(api_key).build()
+    ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in ds_tool.a_stream(
@@ -79,7 +79,7 @@ async def test_deepseek_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 def test_deepseek_tool_execute() -> None:
     event_store.clear_events()
-    ds_tool = DeepseekTool.Builder().api_key(api_key).build()
+    ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     messages = ds_tool.execute(
         get_execution_context(),
@@ -102,7 +102,7 @@ def test_deepseek_tool_with_chat_param() -> None:
     chat_param = {"temperature": 0.1, "max_tokens": 15}
 
     event_store.clear_events()
-    ds_tool = DeepseekTool.Builder().api_key(api_key).chat_params(chat_param).build()
+    ds_tool = DeepseekTool.builder().api_key(api_key).chat_params(chat_param).build()
 
     messages = ds_tool.execute(
         get_execution_context(),
@@ -124,7 +124,7 @@ def test_deepseek_tool_with_chat_param() -> None:
 # --------------------------------------------------------------------------- #
 async def test_deepseek_tool_async() -> None:
     event_store.clear_events()
-    ds_tool = DeepseekTool.Builder().api_key(api_key).build()
+    ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     content = ""
     async for messages in ds_tool.a_execute(
@@ -148,10 +148,10 @@ async def test_llm_a_stream_node_deepseek() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.Builder()
+        LLMNode.builder()
         .command(
-            LLMStreamResponseCommand.Builder()
-            .llm(DeepseekTool.Builder().api_key(api_key).build())
+            LLMStreamResponseCommand.builder()
+            .llm(DeepseekTool.builder().api_key(api_key).build())
             .build()
         )
         .build()

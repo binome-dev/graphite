@@ -19,7 +19,7 @@ def dummy_function(messages: Messages):
 
 @pytest.fixture
 def function_tool():
-    builder = FunctionTool.Builder()
+    builder = FunctionTool.builder()
     tool = builder.function(dummy_function).build()
     return tool
 
