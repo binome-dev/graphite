@@ -1,3 +1,5 @@
+# OllamaTool
+
 Similar to OpenAI tool, `OllamaTool` is an implementation of the `LLM` interface designed to interface with Ollama’s language model API. It supports synchronous and asynchronous execution patterns, converting workflow `Message` objects into an Ollama-compatible format and translating API responses back into the workflow.
 
 Fields:
@@ -20,4 +22,3 @@ Methods:
 | `to_dict`          | Provides a dictionary representation of the `OllamaTool` configuration.                                           |
 
 This tool can be configured with its internal `Builder` class, allowing customization of fields such as the `api_url` or `model` before constructing an instance. By integrating `OllamaTool` into the workflow, developers can leverage local or remote Ollama services without altering the overarching event-driven logic. Messages from the workflow are passed to Ollama, and responses are returned in a consistent format, preserving a clear separation between orchestration and execution logic.
-

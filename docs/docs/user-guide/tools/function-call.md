@@ -1,10 +1,10 @@
-### FunctionCallTool
+# FunctionCallTool
 
 `FunctionCallTool` is designed to allow Language Models (LLMs) to invoke specific Python functions directly through JSON-formatted calls. When a message from the LLM references a particular function name along with arguments, `FunctionCallTool` checks if it has a function matching that name and, if so, invokes it.
 
 This design greatly reduces the complexity of integrating advanced logic: the LLM simply issues a request to invoke a function, and the tool handles the invocation details behind the scenes.
 
-#### Fields
+## Fields
 
 | Field               | Description                                                                                   |
 |---------------------|-----------------------------------------------------------------------------------------------|
@@ -14,7 +14,7 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `function`         | The actual callable that `FunctionCallTool` invokes when a function call matches `function_specs`.|
 | `oi_span_type`     | Semantic tracing attribute (`TOOL`) for observability.                                        |
 
-#### Methods
+## Methods
 
 | Method               | Description                                                                                                              |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------|
@@ -26,14 +26,14 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `to_message`         | Converts execution results into a `Message` object, preserving context like the `tool_call_id`.                          |
 | `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
 
-#### How It Works
+## How It Works
 
 1. **Function Registration**: A Python function is wrapped or decorated using `@llm_function`. This generates a schema (`function_specs`) describing its name, arguments, and docstring.
 2. **Invocation**: When a message arrives specifying a function call, `FunctionCallTool` checks whether it corresponds to the registered function’s name.
 3. **JSON Parsing**: The arguments are parsed from the `tool_call` field. If they match, the tool dispatches the function call with the given parameters.
 4. **Response**: After execution, the returned data is converted into a new `Message`, allowing the workflow to process the function’s output seamlessly.
 
-#### Usage and Customization
+## Usage and Customization
 
 - **Builder Pattern**: Use the builder’s `.function(...)` method to assign the function you want to expose. This ensures your function is properly decorated if not already.
 - **Flexible**: By simply swapping out the underlying callable, you can quickly adapt to new or updated logic without modifying the rest of the workflow.
@@ -41,7 +41,7 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 
 With `FunctionCallTool`, you can integrate specialized Python functions into an LLM-driven workflow with minimal extra overhead. As your system grows and evolves, it provides a clean way to add or modify functionality while retaining a uniform interaction pattern with the LLM.
 
-#### Agent Calling Tool
+## Agent Calling Tool
 
 `AgentCallingTool` extends the `FunctionCallTool` concept to enable multi-agent systems, allowing an LLM to call another agent by name, pass relevant arguments (as a message prompt), and return the agent’s response as part of the workflow.
 
@@ -81,7 +81,7 @@ The usage and customization are:
 
 By integrating `AgentCallingTool` into your event-driven workflow, you can build sophisticated multi-agent systems where each agent can be invoked seamlessly via structured function calls. This approach maintains a clear separation between the LLM’s orchestration and the agents’ execution details.
 
-#### Example - Weather Mock Tool
+## Example - Weather Mock Tool
 
 A simple mock implementation of a weather service tool that inherits from `FunctionCallTool`. This class provides a straightforward way to use `FunctionCallTool`. It is easy to use - just instantiate and call the method. And implements the `FunctionCallTool` interface for seamless integration. Uses `@llm_function` decorator for automatic registering function.
 
@@ -106,7 +106,7 @@ class WeatherMock(FunctionCallTool):
         return f"The weather of {postcode} is bad now."
 ```
 
-#### Example - Tavily Search Tool
+## Example - Tavily Search Tool
 
 [TavilyTool](https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/tavily_tool.py) extends FunctionCallTool to provide web search capabilities through the Tavily API. In general, when the tool will be reused and needs more complex construction, you can create a class with a builder pattern and apply `@llm_function` to the function that will be called by the LLM. By adding the `@llm_function` decorator to `web_search_using_tavily`, you can integrate web search logic into an LLM-driven workflow with minimal extra configuration.
 
@@ -141,13 +141,13 @@ tavily_tool = (
 
 You can customize TavilyTool by extending `web_search_using_tavily` with additional parameters or logic. This approach maintains a clean, unified interface for integrating search capabilities into an event-driven or node-based workflow.
 
-### Customized Tools
+## Customized Tools
 
 When your requirements exceed what `FunctionCallTool` can provide, you can implement a custom tool within the framework, ensuring your specialized logic and configuration remain fully integrated into the event-driven workflow.
 
 Here are two examples
 
-#### RetrievalTool
+### RetrievalTool
 
 [`RetrievalTool`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/retrieval_tool.py) defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from `Tool` and introduces an `embedding_model` field for custom embedding generation. By default, `RetrievalTool` provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass `RetrievalTool` for more specialized use cases.
 
@@ -175,7 +175,7 @@ ChromadbRetrievalTool fields:
 
 Typical usage involves creating an instance of either tool via its builder, providing any required models or indexes. When an input `Message` arrives, the tool encodes the message text using the configured embedding model, queries the retrieval backend (generic or ChromaDB), and returns a `Message` with the matched results. As part of an event-driven workflow, these matches can then be consumed by subsequent nodes or logic.
 
-#### RagTool
+### RagTool
 
 [`RagTool`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_tool.py) is used for `RagNode`, providing a specialized `Tool` for Retrieval-Augmented Generation (RAG) use cases. It integrates with [`llama_index`](https://www.llamaindex.ai/) via a `BaseIndex` instance, allowing your workflow to query stored data or documents and incorporate those results into a context-aware response. Ideal for knowledge-intensive tasks, `RagTool` seamlessly translates user queries into an index lookup, returning relevant information as a `Message`.
 
@@ -217,4 +217,3 @@ Methods:
 | `to_dict`    | Provides a dictionary representation of the tool, including its fields and the index class name.          |
 
 With `RagTool`, you can incorporate advanced document retrieval capabilities into your node-based workflows, providing context-rich responses sourced from external knowledge bases while maintaining a clean separation between data storage and LLM-driven logic.
-

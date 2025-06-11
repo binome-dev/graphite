@@ -1,6 +1,8 @@
+# FunctionTool
+
 The **FunctionTool** class is a specialized `Tool` designed to execute custom function-based operations within event-driven workflows. It provides a flexible framework for integrating arbitrary function logic, allowing developers to wrap any callable function and seamlessly integrate it into the workflow system. The tool handles both synchronous and asynchronous execution patterns while maintaining compatibility with the broader tool interface.
 
-#### Fields
+## Fields
 
 | Field          | Description                                                                                            |
 |----------------|--------------------------------------------------------------------------------------------------------|
@@ -10,7 +12,7 @@ The **FunctionTool** class is a specialized `Tool` designed to execute custom fu
 | `function`     | The callable function that processes input messages and returns output data.                           |
 | `oi_span_type` | Semantic attribute from OpenInference used for tracing, specifically set to `TOOL`.                   |
 
-#### Methods
+## Methods
 
 | Method              | Description                                                                                                  |
 |---------------------|--------------------------------------------------------------------------------------------------------------|
@@ -19,7 +21,7 @@ The **FunctionTool** class is a specialized `Tool` designed to execute custom fu
 | `to_messages`       | Converts the function's raw response into standardized `Message` objects with appropriate formatting.        |
 | `to_dict`           | Serializes the tool's configuration into a dictionary format for persistence or debugging.                  |
 
-#### Usage and Customization
+## Usage and Customization
 
 - **Function Integration**: The `FunctionTool` can wrap any callable that accepts a `Messages` list as input and returns various output types including `BaseModel`, `List[BaseModel]`, strings, or other serializable objects.
 - **Output Handling**: The tool automatically handles different response types:
@@ -29,7 +31,7 @@ The **FunctionTool** class is a specialized `Tool` designed to execute custom fu
   - Other types are encoded using `jsonpickle`
 - **Async Support**: The tool supports both synchronous and asynchronous functions, automatically detecting and handling awaitable responses.
 
-#### Builder Pattern
+## Builder Pattern
 
 The `FunctionTool` uses a builder pattern for construction:
 

@@ -1,6 +1,8 @@
+# Topics
+
 `TopicBase` and `Topic` represent logical message queues in the event-driven workflow. They temporarily store messages in a First-In-First-Out (FIFO) fashion and track how many messages each consumer has read using an offset system. This allows components—like Nodes, Assistants, or Tools—to communicate asynchronously by publishing and consuming messages.
 
-#### TopicBase
+## TopicBase
 
 `TopicBase` provides the core interface and data structures for managing published events, consumption offsets, and conditions used to filter which messages are accepted.
 
@@ -28,7 +30,7 @@ Methods:
 
 `TopicBase` also includes a builder pattern that simplifies creating and customizing topics (e.g., adding a `condition`). Subclasses extend `publish_data`, `can_consume`, and `consume` to store and retrieve messages in a more concrete manner.
 
-#### Topic
+## Topic
 
 `Topic` is a direct subclass of `TopicBase` that implements the required methods for a working FIFO message queue. Components publish via `publish_data`, and consumers read new messages via `consume`, each consumer having an independent offset.
 
@@ -46,7 +48,7 @@ A typical workflow involves creating a `Topic` instance (or more specialized sub
 
 This design ensures that each consumer reads messages in the correct order, preserving FIFO behavior while enabling asynchronous, distributed interactions across the event-driven workflow.
 
-#### Output Topic
+## Output Topic
 
 `OutputTopic` is a specialized subclass of `Topic` designed for user-facing events. When data is published to an `OutputTopic`, it uses `OutputTopicEvent` rather than a standard `PublishToTopicEvent`, indicating that these messages should ultimately be returned to the user.
 
@@ -70,7 +72,7 @@ Use Case:
 
 Typically, an assistant consumer will subscribe to the OutputTopic to retrieve user-facing results. By separating output into a dedicated topic, the system can more easily track final responses, funneling them back to the user through consistent workflows.
 
-#### Human Request Topic
+## Human Request Topic
 
 `HumanRequestTopic` is a specialized extension of `Topic` dedicated to handling requests that require human intervention or input. When the workflow needs user input, it publishes an `OutputTopicEvent` to `HumanRequestTopic`. On the user’s response, that input is appended back to the same topic, keeping the entire request-response cycle self-contained.
 
@@ -101,7 +103,7 @@ Rational:
 
 By splitting user interaction into distinct publish and append steps, the system provides a clear interface for capturing requests and responses, all under a single, specialized topic designed for human-driven workflows.
 
-#### Topic Expression
+## Topic Expression
 
 **Topic Expression** provides a mini DSL (Domain-Specific Language) for building complex subscription logic based on multiple topics. By combining topic references using logical operators (AND, OR), you can specify whether a node should wait for messages in all required topics (`AND`) or at least one of several possible topics (`OR`). This approach offers a flexible way to manage event-driven subscriptions.
 
@@ -151,7 +153,7 @@ Key Points:
 2. **Maintainability**: By separating subscription logic into DSL expressions, the system remains clear and easy to debug.
 3. **Integration**: Each `TopicExpr` references an actual `TopicBase`, ensuring that the DSL and the underlying queue system stay in sync.
 
-#### Subscription Builder
+## Subscription Builder
 
 `SubscriptionBuilder` streamlines the process of creating complex topic subscription expressions, allowing you to chain logical operations (`AND`, `OR`) and define whether a node requires messages from multiple topics or at least one. This builder pattern provides a concise DSL for specifying these conditions without manually constructing `TopicExpr` and `CombinedExpr` objects.
 
@@ -195,7 +197,7 @@ Key Points:
 2. **Operator Checks**: If `and_()` or `or_()` is called without a subsequent `subscribed_to(...)`, or vice versa, a `ValueError` is raised.
 3. **Integration**: Once created, the resulting `SubExpr` can be evaluated against incoming messages with `evaluate_subscription()` or used for introspection with `extract_topics()`. This provides flexible, powerful subscription logic for nodes in an event-driven system.
 
-#### Reserved Topics
+## Reserved Topics
 
 These topics are reserved for essential system operations in the event-driven workflow, ensuring consistent handling of inputs, outputs, and user-interactive events.
 
@@ -209,18 +211,18 @@ These topics are reserved for essential system operations in the event-driven wo
 
 Using these reserved topics helps maintain a clear, consistent architecture for input processing, output streaming, final responses, and human-driven request handling. They are key building blocks for standardizing communication across the workflow.
 
-### Event Graph
+## Event Graph
 
 `EventGraph` organizes events (particularly `ConsumeFromTopicEvent` and `PublishToTopicEvent`) into a directed graph structure. It traces how messages flow from published events through consumed ones, enabling advanced operations like retrieving a sorted sequence of all ancestor messages. This is especially important for Large Language Model (LLM) interactions, where the full conversation history (including intermediate nodes) must be serialized in a coherent, chronological order.
 
-#### Fields
+### Fields
 
 | Field        | Description                                                                                                  |
 |--------------|--------------------------------------------------------------------------------------------------------------|
 | `nodes`      | A dictionary mapping event IDs to `EventGraphNode` objects.                                                  |
 | `root_nodes` | A list of `EventGraphNode` objects representing the starting points (e.g., directly consumed events).        |
 
-#### Methods
+### Methods
 
 | Method                                | Description                                                                                                                                                                                |
 |---------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -231,7 +233,7 @@ Using these reserved topics helps maintain a clear, consistent architecture for 
 | `to_dict()`                           | Serializes the entire graph, including each node’s event and references.                                                                                                                   |
 | `from_dict(...)`                      | Deserializes the graph from a dictionary, recreating each `EventGraphNode`.                                                                                                                |
 
-#### Rationale for Topological and Timestamp Sorting
+### Rationale for Topological and Timestamp Sorting
 
 When feeding conversation or workflow history to an LLM, it’s crucial to maintain logical and temporal ordering of all ancestor events. By combining topological ordering with timestamp-based sorting, the `EventGraph` ensures:
 
@@ -240,4 +242,3 @@ When feeding conversation or workflow history to an LLM, it’s crucial to maint
 3. **Complete Context**: The LLM receives a fully serialized token sequence of all ancestor interactions, enabling more coherent responses.
 
 By leveraging the `EventGraph` class, developers can reliably trace the chain of message publications and consumptions, producing a robust representation of the workflow’s complete ancestry—critical for advanced LLM tasks or debugging complex distributed processes.
-

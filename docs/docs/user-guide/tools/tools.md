@@ -1,3 +1,5 @@
+# Tools Core
+
 In our platform, **Tools** represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic. Tools can encompass interactions with Language Models (LLMs), external API calls, or purely deterministic functions. Crucially, Tools operate independently of the workflow context—they are unaware of the invoking node or their position within the workflow graph. Each Tool strictly adheres to a defined schema, processing a list of `Message` objects as input and returning a list of `Message` objects as output.
 
 The following table describes each field within the Tool interface class
@@ -22,11 +24,11 @@ Developers can implement custom Tools tailored to specific business logic or ope
 
 Here we introduce some build in tools with corresponding command implementation.
 
-### LLMTool Interface and OpenAITool Implementation
+## LLMTool Interface and OpenAITool Implementation
 
 The **LLM** class is a specialized `Tool` designed to interface with Language Model (LLM) services such as OpenAI, Claude, or other third-party providers. It provides both synchronous and asynchronous streaming options, making it suitable for various real-time or batch processing scenarios. By adhering to the base `Tool` interface, it remains compatible with the broader event-driven workflow and command pattern used throughout the system.
 
-#### Fields
+### Fields
 
 | Field            | Description                                                                                            |
 |------------------|--------------------------------------------------------------------------------------------------------|
@@ -36,7 +38,7 @@ The **LLM** class is a specialized `Tool` designed to interface with Language Mo
 | `system_message` | An optional system or instructional message to guide the LLM’s behavior.                               |
 | `oi_span_type`   | Semantic attribute from OpenInference used for tracing, specifically set to `LLM`.                     |
 
-#### Methods
+### Methods
 
 | Method              | Description                                                                                                  |
 |---------------------|--------------------------------------------------------------------------------------------------------------|
@@ -47,7 +49,7 @@ The **LLM** class is a specialized `Tool` designed to interface with Language Mo
 | `prepare_api_input` | Prepares input data (list of messages) to match the expected format of the LLM API.                          |
 | `to_dict`           | Serializes the LLM tool’s current configuration into a dictionary format.                                    |
 
-#### Usage and Customization
+### Usage and Customization
 
 - **Subclasses**: To implement a concrete LLM tool, create a subclass of `LLM` and override `execute`, `a_execute`, `stream`, and `a_stream` methods. This allows for integration with various LLM providers (e.g., OpenAI, Claude) while following a consistent interface.
 - **System Message**: You can specify a `system_message` to influence the tone or purpose of the LLM’s responses. This is particularly useful for role-based messaging systems or specialized tasks.
@@ -55,7 +57,6 @@ The **LLM** class is a specialized `Tool` designed to interface with Language Mo
 
 By adhering to the `Tool` interface and focusing on LLM operations, the `LLM` class bridges message-based workflows with language model services, ensuring a clean separation of concerns and streamlined integration into the rest of the system.
 
-#### Streaming
+### Streaming
 
 We added two stream interface for LLM, adding the user friendly interaction with the agent. However, when we use the stream in assistant, we only use a_stream for async capability.
-

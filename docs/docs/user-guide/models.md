@@ -1,10 +1,12 @@
+# Models
+
 In the Graphite, varies models provide the fundamental data structures that underpin the event-driven workflow. Message represents the content exchanged between users, assistants, and language models, enabling consistent communication and processing. Event captures the various actions and state changes in the system, from workflow initiation to final outputs. Meanwhile, Topic defines the named channels where events are published and consumed, establishing a structured mechanism for coordinating data flow across the platform.
 
-### Message
+## Message
 
 `Message` extends OpenAI’s `ChatCompletionMessage`, serving as a standardized data structure for both incoming and outgoing content in the event-driven workflow. Each `Message` instance retains essential metadata such as timestamps, unique identifiers, and optional tool references, facilitating robust and traceable communication between users, assistants, and LLM tools.
 
-#### Fields
+### Fields
 
 | Field           | Description                                                                                               |
 |-----------------|-----------------------------------------------------------------------------------------------------------|
@@ -15,7 +17,7 @@ In the Graphite, varies models provide the fundamental data structures that unde
 | `tool_call_id`  | Associates the message with a particular tool invocation if relevant.                                     |
 | `tools`         | An optional list of OpenAI's `ChatCompletionToolParam` for referencing available tool calls.              |
 
-#### Usage Example
+### Usage Example
 
 ```python
 from grafi.common.models.message import Message
@@ -35,7 +37,7 @@ assistant_message = Message(
 
 In both cases, the `Message` class provides a consistent structure for storing conversation state, bridging the gap between OpenAI’s chat messages and the system’s event-driven architecture.
 
-### Event
+## Event
 
 `Event` is the foundational data model in the event driven architecture, capturing the common fields and logic shared by all event types. Each subclass of `Event` (e.g., Node events, Topic events) extends this base with specialized data. The core `Event` model also offers a standard interface for serialization (`to_dict`) and deserialization (`from_dict`), promoting consistency across the platform.
 
@@ -56,7 +58,7 @@ The benefits are:
 
 By leveraging this **Event** model, the system enforces uniform data handling for everything from node invocations to assistant responses, simplifying debugging and logging throughout the workflow lifecycle.
 
-#### Component activity event
+### Component activity event
 
 In the Graphite’s layered architecture, each principal component (Assistant, Node, Tool, and Workflow) can invoke, respond, or fail during execution. And there are events associate with each actions, such as invoke  event, respond event and failed event. For nodes specifically, these actions are tracked as three distinct event types:
 
@@ -132,7 +134,7 @@ and the `Node` base event methods
 
 Collectively, these **Node Activity Events** form a consistent pattern for tracking node lifecycle across invoke, respond, and fail states. The same concept applies to other components in the system (e.g., Assistant, Tool, Workflow), each featuring its respective invoke, respond, and failed events. This design ensures clear traceability and systematic error handling within the event-driven workflow architecture.
 
-#### Publish and Subscribe Event
+### Publish and Subscribe Event
 
 Publish and subscribe events capture data published to or consumed from specific channels - topics - in the system. They enable Nodes to communicate asynchronously by sending and receiving messages on named topics. The platform distinguishes three main types:
 
@@ -206,4 +208,3 @@ Publish and subscribe events capture data published to or consumed from specific
 | `from_dict(dict)` | Placeholder for data deserialization from a dictionary, to be implemented.                |
 
 These topic-based events enable decoupled communication within the system. **PublishToTopicEvent** moves data onto a topic, **ConsumeFromTopicEvent** retrieves it, and **OutputTopicEvent** designates final user-facing outputs. By standardizing how messages flow through topics, the platform ensures reliability, traceability, and straightforward integration among nodes, assistants, and tools.
-

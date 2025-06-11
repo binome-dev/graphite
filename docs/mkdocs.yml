@@ -7,14 +7,17 @@ theme:
     - navigation.sections
     #- content.action.edit
     #- content.action.view
+    - content.code.anotate
   name: material
   palette:
-    accent: blue grey
-    #scheme: default
-  logo: static/GRAPHITE_icon_Dark.png
+    primary: pink
+    scheme: slate
+    accent: pink
+  logo: static/GRAPHITE_Logotype.png
   favicon: static/GRAPHITE_Favico_Dark.png
   font:
-    code: Roboto Mono
+    text: Inter
+    code: Fira Code
 repo_name: binome-dev/graphite
 repo_url: https://github.com/binome-dev/graphite
 nav:
@@ -39,16 +42,25 @@ nav:
     - Topics: user-guide/topics.md
     - Conventional Rules: user-guide/conventional-rules.md
 
-
-site_name: graphite
+site_name: Graphite Documentation
 
 markdown_extensions:
   - codehilite:
       guess_lang: false
       linenums: false
+  - pymdownx.superfences
 
 #  - pymdownx.highlight
 #  - pymdownx.inlinehilite
 
+extra_css:
+  - stylesheets/custom.css
+
 plugins:
   - search
+  - git-revision-date-localized
+
+# extra:
+#   analytics:
+#     provider: google
+#     property: G-XXXXXXXXXX
