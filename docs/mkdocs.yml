@@ -10,9 +10,23 @@ theme:
     - content.code.anotate
   name: material
   palette:
-    primary: pink
-    scheme: slate
-    accent: pink
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: pink
+      accent: pink
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: pink
+      accent: pink
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   logo: static/GRAPHITE_Logotype.png
   favicon: static/GRAPHITE_Favico_Dark.png
   font:
