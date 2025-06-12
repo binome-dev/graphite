@@ -3,7 +3,9 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import Dict
 from typing import List
+from typing import Optional
 
+import httpx
 from loguru import logger
 from pydantic import Field
 
@@ -11,13 +13,18 @@ from grafi.common.decorators.record_tool_a_execution import record_tool_a_execut
 from grafi.common.decorators.record_tool_execution import record_tool_execution
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.mcp_tool_spec import MCPToolSpec
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
 
 try:
 
+    from mcp import ListPromptsResult
+    from mcp import ListResourcesResult
+    from mcp.types import CallToolResult
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
     from mcp.types import TextContent
@@ -32,85 +39,73 @@ except (ImportError, ModuleNotFoundError):
 
 class FastMCPClient(FunctionCallTool):
     """
-    FastMCPTool extends FunctionCallTool to provide HTTP Clienet Connections to Remote HTTP Servers.
+    FastMCPClient extends FunctionCallTool to provide web search functionality using the MCP API.
     """
 
     # Set up API key and MCP client
-    name: str = "FastMCPTool"
+    name: str = "FastMCPClient"
     type: str = "FastMCPClient"
+    # server_params: Optional[StdioServerParameters] = None
+    prompts: Optional[ListPromptsResult] = None
+    resources: Optional[ListResourcesResult] = None
     client_config: Dict[str, Any] = Field(default_factory=lambda: {})
 
-    class Builder(FunctionCallTool.Builder):
-        """Concrete builder for MCPTool."""
+    @classmethod
+    def builder(cls) -> "FastMCPClientBuilder":
+        """
+        Return a builder for FastMCPClient.
+        """
+        return FastMCPClientBuilder(cls)
 
-        _tool: "FastMCPClient"
+    async def _a_get_function_specs(self) -> None:
 
-        def __init__(self) -> None:
-            self._tool = self._init_tool()
+        client_config = self.client_config
+        if (
+            client_config is None
+            or client_config is {}
+            or client_config.get("mcpServers") is None
+        ):
+            raise ValueError("Client Config are not set.")
+        logger.info(f"Initializing FastMCPClient with config: {client_config}")
+        client = Client(self.client_config)  # Initialize the client with the config
 
-        def _init_tool(self) -> "FastMCPClient":
-            return FastMCPClient.model_construct()
+        try:
 
-        def client_config(
-            self, client_config: Dict[str, Any]
-        ) -> "FastMCPClient.Builder":
-            """
-            Set the client configuration for the MCP client.
-
-            Args:
-                client_config (Dict[str, Any]): The configuration dictionary for the MCP client.
-
-            Returns:
-                FastMCPClient.Builder: The builder instance for method chaining.
-            """
-            self._tool.client_config = client_config
-            return self
-
-        def build(self) -> None:
-            raise NotImplementedError(
-                "MCPTool does not support synchronous execution. Use a_build instead."
-            )
-
-        async def a_build(self) -> "FastMCPClient":
-            await self._a_build_function_specs()
-            return self._tool
-
-        async def _a_build_function_specs(self) -> None:
-            client_config = self._tool.client_config
-            if (
-                client_config is None
-                or client_config is {}
-                or client_config.get("mcpServers") is None
-            ):
-                raise ValueError("Client Config are not set.")
-
-            client = Client(
-                self._tool.client_config
-            )  # Initialize the client with the config
             async with client:
                 logger.info(f"Client connected: {client.is_connected()}")
-                tools_list = await client.list_tools()
+                tools = await client.list_tools()
+                logger.info(f"Current tools {tools}")
 
-                for tool in tools_list:
-                    func_spec = {
+                for tool in tools:
+                    mcp_tool_spec = {
                         "name": tool.name,
                         "description": tool.description,
                         "parameters": tool.inputSchema,
                     }
 
-                    self._tool.function_specs.append(
-                        FunctionSpec.model_validate(func_spec)
-                    )
+                    #self.function_specs.append(mcp_tool_spec)
+                    self.function_specs.append(FunctionSpec.model_validate(mcp_tool_spec))
 
                 self.resources = await client.list_resources()
                 self.prompts = await client.list_prompts()
+        except ConnectionError as e:
+            logger.error(f"Failed to connect to MCP server: {e}")
+
+        except httpx.ConnectError as e:
+            logger.error(f"Connection To MCP Server failed, is the server up?: {e}")
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error: {e.response.status_code} - {e}")
+
+        except httpx.RequestError as e:
+            logger.error(f"Request failed: {e}")
 
     @record_tool_execution
     def execute(
         self, execution_context: ExecutionContext, input_data: Messages
     ) -> Messages:
         raise NotImplementedError(
-            "MCPTool does not support synchronous execution. Use a_execute instead."
+            "FastMCPClient does not support synchronous execution. Use a_execute instead."
         )
 
     @record_tool_a_execution
@@ -183,3 +178,25 @@ class FastMCPClient(FunctionCallTool):
                         raise e
 
         yield messages
+
+
+class FastMCPClientBuilder(FunctionCallToolBuilder[FastMCPClient]):
+    """
+    Builder for FastMCPClient.
+    """
+
+    def client_config(self, config: Dict[str, Any]) -> "FastMCPClientBuilder":
+        """
+        Set the client configuration for the FastMCPClient.
+        """
+        self._obj.client_config = config
+        return self
+
+    def build(self) -> None:
+        raise NotImplementedError(
+            "FastMCPClient does not support synchronous execution. Use a_build instead."
+        )
+
+    async def a_build(self) -> "FastMCPClient":
+        await self._obj._a_get_function_specs()
+        return self._obj

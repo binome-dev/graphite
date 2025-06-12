@@ -1,3 +1,4 @@
+
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -19,9 +20,9 @@ class ParametersSchema(BaseModel):
     required: List[str] = Field(default_factory=list)
 
 
-class FunctionSpec(BaseModel):
+class MCPToolSpec(BaseModel):
     name: str
-    description: Optional[str]
+    description: str
     parameters: ParametersSchema
 
     def to_openai_tool(self) -> ChatCompletionToolParam:
@@ -34,5 +35,4 @@ class FunctionSpec(BaseModel):
             ),
         )
 
-
-FunctionSpecs = List[FunctionSpec]
+MCPToolSpecs = List[MCPToolSpec]
