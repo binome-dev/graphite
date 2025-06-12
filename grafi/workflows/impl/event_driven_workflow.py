@@ -1,8 +1,10 @@
+import asyncio
 from collections import deque
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Self
+from typing import Set
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -144,6 +146,7 @@ class EventDrivenWorkflow(Workflow):
                 for publisher_node in published_topics_to_nodes.get(topic_name, []):
                     publisher_node.add_function_spec(function_node.get_function_specs())
 
+    # Workflow execution methods
     def _publish_events(
         self,
         node: Node,
@@ -235,33 +238,90 @@ class EventDrivenWorkflow(Workflow):
     ) -> None:
         """
         Run the workflow until the execution queue is empty.
-        Publishes topic events as nodes finish.
+        Executes nodes in parallel when possible while respecting dependencies.
         """
-        # 1 – initial seeding
+        # 1 – initial seeding
         self.initial_workflow(execution_context, input)
 
-        # 2 – process nodes breadth‑first
-        while self.execution_queue:
-            node = self.execution_queue.popleft()
+        # Track nodes currently being executed to avoid duplicate execution
+        executing_nodes: Set[str] = set()
 
+        # 2 – process nodes with parallel execution where possible
+        while self.execution_queue or executing_nodes:
+            # Group nodes that can execute in parallel (no conflicting dependencies)
+            parallel_group = list(self.execution_queue)
+            self.execution_queue.clear()
+
+            if not parallel_group and not executing_nodes:
+                # No nodes ready and none executing - workflow complete
+                break
+
+            # Execute each group in parallel
+            tasks = []
+            if parallel_group:  # Only create tasks for non-empty groups
+                tasks = [
+                    asyncio.create_task(
+                        self._execute_single_node(execution_context, node)
+                    )
+                    for node in parallel_group
+                ]
+
+            # Mark nodes as executing
+            for node in parallel_group:
+                executing_nodes.add(node.name)
+
+            if tasks:
+                # Wait for all tasks to complete
+                try:
+                    await asyncio.gather(*tasks)
+                except Exception as e:
+                    logger.error(f"Error in node execution: {e}")
+                    raise
+                finally:
+                    # Remove nodes from executing set when complete
+                    for node in parallel_group:
+                        executing_nodes.discard(node.name)
+            else:
+                # If no tasks were created but we have executing nodes, wait briefly
+                if executing_nodes:
+                    await asyncio.sleep(0.01)  # Small delay to prevent busy waiting
+
+    async def _execute_single_node(
+        self, execution_context: ExecutionContext, node: Node
+    ) -> None:
+        """
+        Execute a single node asynchronously with proper stream handling.
+        """
+        try:
             node_input: List[ConsumeFromTopicEvent] = self.get_node_input(node)
             if not node_input:
-                continue
+                return
 
-            # Execute node with collected inputs
+            logger.debug(f"Executing node: {node.name}")
 
+            # Handle streaming nodes specially
             if isinstance(node.command, LLMStreamResponseCommand):
-                # Stream node usually would be the last node of the workflow which will return to user.
-                # In this case we return the async generator to the caller
+                # Stream node usually would be the last node of the workflow
                 stream_result = node.a_execute(execution_context, node_input)
 
                 self._publish_stream_event(
                     node, execution_context, stream_result, node_input
                 )
             else:
+                # Execute node and collect all results
+                results: Messages = []
                 async for messages in node.a_execute(execution_context, node_input):
-                    # if the node sometimes yields a single Message, normalise to list
-                    self._publish_events(node, execution_context, messages, node_input)
+                    results.extend(
+                        messages if isinstance(messages, list) else [messages]
+                    )
+
+                # Publish all results at once to maintain atomicity
+                if results:
+                    self._publish_events(node, execution_context, results, node_input)
+
+        except Exception as e:
+            logger.error(f"Error executing node {node.name}: {e}")
+            raise
 
     def get_node_input(self, node: Node) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []
@@ -326,7 +386,6 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         if len(events) == 0:
-
             # Initialize by publish input data to input topic
             input_topic = self.topics.get(AGENT_INPUT_TOPIC)
             if input_topic is None:

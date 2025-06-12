@@ -1,5 +1,6 @@
 import json
 from typing import Any
+from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 
@@ -65,3 +66,6 @@ class PublishToTopicEvent(TopicEvent):
             execution_context=execution_context,
             data=data_obj,
         )
+
+
+AGenPublishToTopicEvent = AsyncGenerator[PublishToTopicEvent, None]

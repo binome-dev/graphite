@@ -1,5 +1,6 @@
 import json
 from typing import Any
+from typing import AsyncGenerator
 from typing import Dict
 
 from pydantic import TypeAdapter
@@ -58,3 +59,6 @@ class ConsumeFromTopicEvent(TopicEvent):
             execution_context=execution_context,
             data=data_obj,
         )
+
+
+AGenConsumeFromTopicEvent = AsyncGenerator[ConsumeFromTopicEvent, None]
