@@ -1,3 +1,5 @@
+# OpenAITool
+
 `OpenAITool` is a concrete implementation of the `LLM` interface, integrating directly with OpenAI’s language model APIs. It supports synchronous and asynchronous interactions, as well as streaming responses for real-time experience.
 
 The OpenAI tool fields are
@@ -37,4 +39,3 @@ When create a openai tool, consider following
 - **Streaming**: For real-time or large-scale tasks, leverage `a_stream` to handle partial responses incrementally.
 
 By integrating `OpenAITool` into your node-based workflows, you can seamlessly introduce advanced language model capabilities powered by OpenAI, maintaining consistency and modularity throughout the system.
-

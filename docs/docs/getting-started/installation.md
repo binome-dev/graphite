@@ -5,7 +5,8 @@ This guide walks you through installing Graphite using pip.
 ## System Requirements
 
 **Prerequisites:**
-- Python 3.7+ 
+
+- Python 3.7+
 - pip (Python package installer)
 
 ## Installation
@@ -62,18 +63,21 @@ pip install --upgrade grafi
 
 **Permission Errors:**
 If you encounter permission errors, try installing with the `--user` flag:
+
 ```bash
 pip install --user grafi
 ```
 
 **Dependency Conflicts:**
 If you have dependency conflicts, consider using a virtual environment or:
+
 ```bash
 pip install --force-reinstall grafi
 ```
 
 **Python Version Issues:**
 Ensure you're using a supported Python version:
+
 ```bash
 python --version
 ```

@@ -64,6 +64,7 @@ In graphite an assistant is a specialized node that can handle events and perfor
 Create a file named `react_assistant.py` and add the code like following:
 
 ### Class `ReactAssistant`
+
 ```python
 # react assistant.py
 import os
@@ -263,7 +264,6 @@ output = react_assistant.execute(execution_context, input_data)
 print(output[0].content)
 ```
 
-
 ## 5. Run the Application
 
 Use Poetry to execute the script inside the virtual environment:
@@ -274,7 +274,7 @@ poetry run python main.py
 
 You should see the output result
 
-```
+```text
 Graphite is an open-source framework designed for building domain-specific AI agents using composable workflows. It features an event-driven architecture that allows developers to create customizable workflows. This framework is particularly focused on constructing AI assistants that can interact within specific domains effectively.
 
 For more detailed information, you can refer to the following resources:

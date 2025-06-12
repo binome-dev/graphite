@@ -1,3 +1,5 @@
+# Command
+
 In our platform, the **Command** implements the Command Pattern, effectively separating workflow orchestration (Nodes) from execution logic (Tools). Commands encapsulate the request or execution logic, allowing the orchestrator (Node) to delegate execution to the executor (Tool) without needing to know the internal details of the execution process.
 
 Using the Command Pattern brings several significant benefits:
@@ -20,7 +22,7 @@ Developers implement custom Commands tailored to specific logic or operational n
 
 The concrete implementation of `Command` interface should be with its associated tools. Here are some examples.
 
-### LLM Response Command and LLM Stream Command
+## LLM Response Command and LLM Stream Command
 
 [`LLMResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
 
@@ -40,7 +42,7 @@ Key methods are:
 
 The [`LLMStreamResponseCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMResponseCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_execute.
 
-### Function Calling Command
+## Function Calling Command
 
 [`FunctionCallCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/function_call_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionCallTool`. By assigning a `FunctionCallTool` to the command, the Node can trigger function execution without needing to know how arguments are parsed or how the function is actually invoked.
 
@@ -61,7 +63,7 @@ Methods:
 
 By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly integrate function-based logic into a Node’s orchestration without embedding execution details in the Node or the tool consumer. This separation keeps workflows flexible and easy to extend.
 
-### Embedding Response Command and RAG Response Command
+## Embedding Response Command and RAG Response Command
 
 [`EmbeddingResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/embedding_response_command.py) encapsulates a `RetrievalTool` for transforming input messages into embeddings, retrieving relevant content, and returning it as a `Message`. This command is used by `EmbeddingRetrievalNode`.
 
@@ -97,7 +99,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 Both commands enable a node to delegate specialized retrieval operations to their respective tools, without needing to manage the internal logic of how embeddings or RAG processes are performed.
 
-### Function Command
+## Function Command
 
 [`FunctionCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/functions/function_command.py) is a concrete implementation of the Command interface that allows a Node to execute general function-based operations through a `FunctionTool`. This command provides a flexible framework for integrating custom function logic into event-driven workflows, enabling nodes to perform various computational tasks without embedding execution details directly in the node logic.
 

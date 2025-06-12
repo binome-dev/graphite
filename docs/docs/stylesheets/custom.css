@@ -1,0 +1,18 @@
+/* Override header background */ 
+.md-header {
+    background-color: #000 !important;
+}
+
+@media screen and (max-width: 76.2344em) {
+    .md-nav--primary .md-nav__title[for="__drawer"] {
+        background-color: #000 !important;
+    }
+}
+
+img[alt="Graphite Logo"] {
+    display: block;
+    margin: auto;
+    width: 100%;
+    min-width: 200px;
+    max-width: 520px;
+}
