@@ -13,9 +13,12 @@ This guide walks you through installing Graphite using pip.
 
 Graphite can be installed with a single command using pip:
 
-```bash
+<!-- ```bash
 pip install grafi
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">pip</span> install grafi</code></pre></div>
 
 That's it! Graphite will be installed along with all its dependencies.
 
@@ -23,16 +26,20 @@ That's it! Graphite will be installed along with all its dependencies.
 
 After installation, verify that Graphite is installed correctly:
 
-```bash
+<!-- ```bash
 # Check if the installation was successful
 python -c "import grafi; print('Graphite installed successfully')"
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#959077"># Check if the installation was successful</span>
+<span style="color:#FF4689">python</span> -c <span style="color:#2fb170">"import grafi; print('Graphite installed successfully')"</span></code></pre></div>
 
 ## Virtual Environment (Recommended)
 
 For better dependency management, it's recommended to install Graphite in a virtual environment:
 
-```bash
+<!-- ```bash
 # Create a virtual environment
 python -m venv graphite-env
 
@@ -47,15 +54,34 @@ pip install grafi
 
 # When done, deactivate the virtual environment
 deactivate
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#959077"># Create a virtual environment</span>
+<span style="color:#FF4689">python</span> <span style="color:#AE81FF">--m</span> venv graphite-env
+
+<span style="color:#959077"># Activate the virtual environment</span>
+<span style="color:#959077"># On Linux/macOS</span>
+<span style="color:#FF4689">source</span> graphite-env/bin/activate
+<span style="color:#959077"># On Windows:</span>
+graphite-env\Scripts\activate
+
+<span style="color:#959077"># Install Graphite</span>
+<span style="color:#FF4689">pip</span> install grafi
+
+<span style="color:#959077"># When done, deactivate the virtual environment</span>
+<span style="color:#FF4689">deactivate</span></code></pre></div>
 
 ## Upgrading
 
 To upgrade to the latest version of Graphite:
 
-```bash
+<!-- ```bash
 pip install --upgrade grafi
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--upgrade</span> grafi</code></pre></div>
 
 ## Troubleshooting
 
@@ -64,23 +90,32 @@ pip install --upgrade grafi
 **Permission Errors:**
 If you encounter permission errors, try installing with the `--user` flag:
 
-```bash
+<!-- ```bash
 pip install --user grafi
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--user</span> grafi</code></pre></div>
 
 **Dependency Conflicts:**
 If you have dependency conflicts, consider using a virtual environment or:
 
-```bash
+<!-- ```bash
 pip install --force-reinstall grafi
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--force-reinstall</span> grafi</code></pre></div>
 
 **Python Version Issues:**
 Ensure you're using a supported Python version:
 
-```bash
+<!-- ```bash
 python --version
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">python</span> <span style="color:#AE81FF">--version</span></code></pre></div>
 
 ### Getting Help
 
@@ -97,9 +132,12 @@ If you encounter installation issues:
 
 Once Graphite is installed, you can start using it in your Python projects:
 
-```python
+<!-- ```python
 import grafi
 # Your Graphite code here
-```
+``` -->
+<div class="bash"><pre>
+<code><span style="color:#FF4689">import</span> grafi</span>
+<span style="color:#959077"># Your Graphite code here</span></code></pre></div>
 
 Check the project documentation for usage examples and API reference.
