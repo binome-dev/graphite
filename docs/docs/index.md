@@ -1,4 +1,4 @@
-# ![Graphite Logo](./static/graphite_logo.png)
+# ![Graphite Logo](./static/GRAPHITE_Logotype_Tagline_Binome.png)
 
 **Graphite** is an open-source framework for creating **domain-specific AI assistants** via composable, agentic workflows. It emphasizes loose coupling and well-defined interfaces, enabling developers to construct flexible, modular systems. Each major layer – **assistant, node, tool,** and **workflow** – has a clear role in orchestrating or executing tasks, with events serving as the single source of truth for every state change or data exchange.
 
