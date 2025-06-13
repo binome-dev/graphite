@@ -18,10 +18,15 @@ Make sure the following are installed:
 
 ## 1. Create a New Project Directory
 
-```bash
+<!-- ```bash
 mkdir graphite-react
 cd graphite-react
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">mkdir</span> graphite-react
+<span style="color:#FF4689">cd</span> graphite-react
+</code></pre></div>
 
 ---
 
@@ -29,9 +34,12 @@ cd graphite-react
 
 This will create the `pyproject.toml` file that Poetry needs. Be sure to specify a compatible Python version:
 
-```bash
+<!-- ```bash
 poetry init --name graphite-react -n
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">poetry</span> init <span style="color:#AE81FF">--name</span> graphite-react <span style="color:#AE81FF">--n</span></code></pre></div>
 
 Then open `pyproject.toml` and ensure it includes:
 
@@ -43,17 +51,22 @@ python = ">=3.11,<3.13"
 
 Now install the dependencies:
 
-```bash
+<!-- ```bash
 poetry install --no-root
-```
+``` -->
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">poetry</span> install <span style="color:#AE81FF">--no-root</span></code></pre></div>
 
 This will automatically create a virtual environment and install `grafi` with the appropriate Python version.
 
 > 💡 You can also create the virtual environment with the correct Python version explicitly:
 >
-> ```bash
+><div class="bash"><pre>
+><code><span style="color:#FF4689">poetry</span> env use python3.12</code></pre></div>
+<!-- > ```bash
 > poetry env use python3.12
-> ```
+> ``` -->
 
 ---
 
@@ -268,9 +281,11 @@ print(output[0].content)
 
 Use Poetry to execute the script inside the virtual environment:
 
-```bash
+<!-- ```bash
 poetry run python main.py
-```
+``` -->
+<div class="bash"><pre>
+<code><span style="color:#FF4689">poetry</span> run python main.py</code></pre></div>
 
 You should see the output result
 
