@@ -71,9 +71,6 @@ markdown_extensions:
 extra_css:
   - stylesheets/custom.css
 
-extra_css:
-  - stylesheets/custom.css
-
 plugins:
   - search
   - git-revision-date-localized
