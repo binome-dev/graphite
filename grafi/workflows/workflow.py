@@ -15,6 +15,7 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 
 
@@ -28,13 +29,13 @@ class Workflow(BaseModel):
     nodes: Dict[str, Node] = {}
     state: Dict[str, Tuple[str, NodeEvent | None]] = {}
 
-    def execute(self, execution_context: ExecutionContext, input: Messages) -> None:
+    def execute(self, execution_context: ExecutionContext, input: Messages) -> Messages:
         """Executes the workflow with the given initial inputs."""
         raise NotImplementedError
 
     async def a_execute(
         self, execution_context: ExecutionContext, input: Messages
-    ) -> None:
+    ) -> MsgsAGen:
         """Executes the workflow with the given initial inputs."""
         raise NotImplementedError
 

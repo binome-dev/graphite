@@ -269,7 +269,7 @@ question = "your question"
 input_data = [
             Message(
                 role="user",
-                content=qestion,
+                content=question,
             )
         ]
 

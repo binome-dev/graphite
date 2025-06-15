@@ -118,7 +118,7 @@ def test_simple_embedding_retrieval_tool() -> None:
 
     assert "Amazon EC2" in str(result[0].content)
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
 
 test_simple_embedding_retrieval_tool()

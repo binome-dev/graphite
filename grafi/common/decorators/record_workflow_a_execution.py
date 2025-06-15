@@ -20,9 +20,13 @@ from grafi.common.events.workflow_events.workflow_failed_event import (
 from grafi.common.events.workflow_events.workflow_invoke_event import (
     WorkflowInvokeEvent,
 )
+from grafi.common.events.workflow_events.workflow_respond_event import (
+    WorkflowRespondEvent,
+)
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.workflows.workflow import T_W
 
 
@@ -47,7 +51,7 @@ def record_workflow_a_execution(
         self: T_W,
         execution_context: ExecutionContext,
         input_data: Messages,
-    ) -> None:
+    ) -> MsgsAGen:
         workflow_id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
         workflow_name: str = self.name or ""
@@ -68,6 +72,7 @@ def record_workflow_a_execution(
             )
 
         # Execute the original function
+        result: Messages = []
         try:
             with tracer.start_as_current_span(f"{workflow_name}.execute") as span:
                 span.set_attribute(WORKFLOW_ID, workflow_id)
@@ -81,7 +86,12 @@ def record_workflow_a_execution(
                 )
 
                 # Execute the original function
-                await func(self, execution_context, input_data)
+                async for data in func(self, execution_context, input_data):
+                    result.extend(data)
+                    yield data
+
+                output_data_dict = json.dumps(result, default=to_jsonable_python)
+                span.set_attribute("output", output_data_dict)
 
         except Exception as e:
             # Exception occurred during execution
@@ -97,5 +107,18 @@ def record_workflow_a_execution(
                     )
                 )
             raise
+        else:
+            # Successful execution
+            if container.event_store:
+                container.event_store.record_event(
+                    WorkflowRespondEvent(
+                        workflow_id=workflow_id,
+                        execution_context=execution_context,
+                        workflow_type=workflow_type,
+                        workflow_name=workflow_name,
+                        input_data=input_data,
+                        output_data=result,
+                    )
+                )
 
     return wrapper

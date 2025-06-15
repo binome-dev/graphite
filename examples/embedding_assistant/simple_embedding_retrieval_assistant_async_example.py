@@ -106,7 +106,7 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
         collection=create_collection(),
     )
 
-    result = await simple_rag_assistant.a_execute(
+    async for output in simple_rag_assistant.a_execute(
         execution_context,
         [
             Message(
@@ -114,11 +114,11 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
                 content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
             )
         ],
-    )
+    ):
+        assert "Amazon EC2" in str(output[0].content)
 
-    assert "Amazon EC2" in str(result[0].content)
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
 
 asyncio.run(test_simple_embedding_retrieval_tool_async())

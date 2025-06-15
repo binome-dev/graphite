@@ -46,11 +46,10 @@ async def test_simple_llm_assistant_async() -> None:
             content="Hello, my name is Grafi, how are you?",
         )
     ]
-    output = await assistant.a_execute(execution_context, input_data)
-
-    print(output)
-    assert output is not None
-    assert len(event_store.get_events()) == 11
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
+    assert len(event_store.get_events()) == 12
 
     input_data = [
         Message(
@@ -58,11 +57,11 @@ async def test_simple_llm_assistant_async() -> None:
             content="I felt stressful today. Can you help me address my stress by saying my name? It is important to me.",
         )
     ]
-    output = await assistant.a_execute(get_execution_context(), input_data)
-    print(output)
-    assert output is not None
-    assert "Grafi" in str(output[0].content)
-    assert len(event_store.get_events()) == 22
+    async for output in assistant.a_execute(get_execution_context(), input_data):
+        print(output)
+        assert output is not None
+        assert "Grafi" in str(output[0].content)
+    assert len(event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant_async())

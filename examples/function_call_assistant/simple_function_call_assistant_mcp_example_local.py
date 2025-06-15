@@ -61,7 +61,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
 
     # Assert that the output is valid and check event count
     assert output is not None
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

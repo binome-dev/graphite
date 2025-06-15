@@ -47,7 +47,7 @@ def test_simple_function_call_assistant_with_duckduckgo() -> None:
         "Number of events recorded:",
         len(event_store.get_events()),
     )
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 24
 
 
 test_simple_function_call_assistant_with_duckduckgo()

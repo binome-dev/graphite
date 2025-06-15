@@ -50,15 +50,14 @@ async def test_simple_llm_assistant() -> None:
             assert message.role == "assistant"
             if message.content is not None:
                 content += str(message.content)
-                print(message.content, end="", flush=True)
+                print(message.content, end="_", flush=True)
 
     print(content)
     assert "Grafi" in content
     assert content is not None
 
     events = event_store.get_events()
-    print(len(events))
-    assert len(events) == 11
+    assert len(events) == 12
 
 
 asyncio.run(test_simple_llm_assistant())

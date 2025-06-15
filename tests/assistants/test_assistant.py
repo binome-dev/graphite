@@ -86,11 +86,13 @@ class TestAssistant:
             ),
         ):
             # Execute
-            result = await mock_assistant.a_execute(execution_context, input_messages)
+            async for messages in mock_assistant.a_execute(
+                execution_context, input_messages
+            ):
+                # Verify
+                assert len(messages) == 1
+                assert messages[0].content == "async response"
 
-            # Verify
-            assert len(result) == 1
-            assert result[0].content == "async response"
             mock_assistant.workflow.a_execute.assert_called_once_with(
                 execution_context, input_messages
             )

@@ -73,11 +73,12 @@ async def test_react_assistant_async() -> None:
     ]
 
     # Execute the assistant's function call
-    output = await assistant.a_execute(execution_context, input_data)
-    print("Assistant output:", output)
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
 
     # Assert that the output is valid and check event count
-    assert output is not None
+
     print(
         "Number of events recorded:",
         len(event_store.get_events()),

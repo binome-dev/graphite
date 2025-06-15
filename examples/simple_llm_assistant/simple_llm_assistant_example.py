@@ -45,7 +45,7 @@ def test_simple_llm_assistant() -> None:
 
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
     input_data = [
         Message(
@@ -57,7 +57,7 @@ def test_simple_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].content)
-    assert len(event_store.get_events()) == 22
+    assert len(event_store.get_events()) == 24
 
 
 test_simple_llm_assistant()

@@ -97,7 +97,7 @@ def test_simple_hitl_assistant() -> None:
 
     events = event_store.get_events()
     print(len(events))
-    assert len(events) == 53
+    assert len(events) == 56
 
 
 test_simple_hitl_assistant()
