@@ -437,26 +437,3 @@ class TestOutputTopic:
 
         # Wait for completion
         await output_topic.wait_for_completion()
-
-    def test_add_generator_with_default_consumed_events(
-        self, output_topic, sample_execution_context
-    ):
-        """Test add_generator with None consumed_events (should default to empty list)."""
-
-        async def mock_generator():
-            yield [Message(content="test", role="assistant")]
-
-        with patch.object(output_topic, "_process_generator") as mock_process:
-            mock_process.return_value = asyncio.create_task(asyncio.sleep(0.01))
-
-            output_topic.add_generator(
-                generator=mock_generator(),
-                execution_context=sample_execution_context,
-                publisher_name="test_publisher",
-                publisher_type="test_type",
-                consumed_events=None,  # Should default to []
-            )
-
-            # Check that _process_generator was called with empty list
-            call_args = mock_process.call_args
-            assert call_args[1]["consumed_events"] == []

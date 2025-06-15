@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -14,15 +15,12 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
-from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
+from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
 from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflowBuilder
 
@@ -45,34 +43,54 @@ class TestEventDrivenWorkflow:
         ]
 
     @pytest.fixture
-    def mock_node(self):
-        llm_node = (
-            LLMNode.builder()
-            .name("OpenAINode")
-            .subscribe(agent_input_topic)
-            .command(
-                LLMResponseCommand.builder()
-                .llm(OpenAITool.builder().name("OpenAITool").build())
-                .build()
-            )
-            #            .publish_to(agent_output_topic)
-            .publish_to(agent_output_topic)
-            .build()
-        )
-        return llm_node
-
-    @pytest.fixture
     def mock_topic(self):
         topic = Mock(spec=Topic)
-        topic.name = "test_topic"
+        topic.name = "agent_input_topic"
         topic.publish_event_handler = None
         topic.publish_data.return_value = Mock()
         topic.can_consume.return_value = True
         topic.consume.return_value = []
         topic.reset = Mock()
         topic.restore_topic = Mock()
-        topic.to_dict.return_value = {"name": "test_topic"}
+        topic.to_dict.return_value = {"name": "agent_input_topic"}
         return topic
+
+    @pytest.fixture
+    def mock_node(self, mock_topic):
+        """Create a mock OpenAI node that subscribes to agent_input_topic and publishes to agent_output_topic."""
+        mock_node = Mock(spec=LLMNode)
+        mock_node.name = "OpenAINode"
+        mock_node.type = "LLMNode"
+        mock_node.node_id = "openai_node_123"
+        mock_node.oi_span_type = OpenInferenceSpanKindValues.CHAIN
+
+        # Set up subscription and publishing
+        mock_node.subscribed_expressions = [TopicExpr(topic=mock_topic)]
+        mock_node._subscribed_topics = {"agent_input_topic": mock_topic}
+        mock_node.publish_to = [agent_output_topic]
+
+        # Mock the execution methods
+        mock_node.execute.return_value = [
+            Message(content="Mock response", role="assistant")
+        ]
+
+        async def mock_a_execute(*args, **kwargs):
+            yield [Message(content="Mock async response", role="assistant")]
+
+        mock_node.a_execute.return_value = mock_a_execute()
+
+        # Mock other required methods
+        mock_node.can_execute.return_value = True
+        mock_node.get_command_input.return_value = []
+        mock_node.to_dict.return_value = {
+            "node_id": "openai_node_123",
+            "name": "OpenAINode",
+            "type": "LLMNode",
+            "subscribed_expressions": [],
+            "publish_to": [],
+            "command": None,
+        }
+        return mock_node
 
     @pytest.fixture
     def event_driven_workflow(self):
@@ -80,10 +98,7 @@ class TestEventDrivenWorkflow:
 
     @pytest.fixture
     def populated_workflow(self, mock_node, mock_topic):
-        workflow = EventDrivenWorkflow()
-        workflow.nodes = {"test_node": mock_node}
-        workflow.topics = {"test_topic": mock_topic}
-        workflow.topic_nodes = {"test_topic": ["test_node"]}
+        workflow = EventDrivenWorkflow.builder().node(mock_node).build()
         return workflow
 
     def test_event_driven_workflow_creation(self):
@@ -126,13 +141,15 @@ class TestEventDrivenWorkflow:
             "grafi.workflows.impl.event_driven_workflow.extract_topics",
             return_value=[mock_topic],
         ):
-            event_driven_workflow.nodes = {"test_node": mock_node}
+            event_driven_workflow.nodes = {"OpenAINode": mock_node}
 
             event_driven_workflow._add_topics()
 
-            assert "test_topic" in event_driven_workflow.topics
-            assert "test_topic" in event_driven_workflow.topic_nodes
-            assert "test_node" in event_driven_workflow.topic_nodes["test_topic"]
+            assert "agent_input_topic" in event_driven_workflow.topics
+            assert "agent_output_topic" in event_driven_workflow.topics
+            assert (
+                "OpenAINode" in event_driven_workflow.topic_nodes["agent_input_topic"]
+            )
 
     def test_add_topics_missing_agent_topics_raises_error(
         self, event_driven_workflow, mock_node
@@ -145,7 +162,7 @@ class TestEventDrivenWorkflow:
             "grafi.workflows.impl.event_driven_workflow.extract_topics",
             return_value=[mock_topic],
         ):
-            event_driven_workflow.nodes = {"test_node": mock_node}
+            event_driven_workflow.nodes = {}
 
             with pytest.raises(ValueError, match="Agent input output topic not found"):
                 event_driven_workflow._add_topics()
@@ -154,8 +171,8 @@ class TestEventDrivenWorkflow:
         """Test _add_topic method."""
         event_driven_workflow._add_topic(mock_topic)
 
-        assert "test_topic" in event_driven_workflow.topics
-        assert event_driven_workflow.topics["test_topic"] == mock_topic
+        assert "agent_input_topic" in event_driven_workflow.topics
+        assert event_driven_workflow.topics["agent_input_topic"] == mock_topic
         assert mock_topic.publish_event_handler == event_driven_workflow.on_event
 
     def test_add_topic_duplicate_ignored(self, event_driven_workflow, mock_topic):
@@ -172,7 +189,7 @@ class TestEventDrivenWorkflow:
         """Test _handle_function_calling_nodes method."""
         # Create mock LLM node
         llm_node = Mock(spec=LLMNode)
-        llm_node.publish_to = [Mock(name="shared_topic")]
+        llm_node.publish_to = [Topic(name="shared_topic")]
         llm_node.add_function_spec = Mock()
 
         # Create mock function call node
@@ -193,7 +210,7 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context, sample_messages
     ):
         """Test _publish_events method."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         mock_topic = Mock()
         mock_event = Mock()
         mock_topic.publish_data.return_value = mock_event
@@ -216,7 +233,7 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context
     ):
         """Test _publish_agen_events with OutputTopic."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         output_topic = Mock(spec=OutputTopic)
         mock_node.publish_to = [output_topic]
 
@@ -240,7 +257,7 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context
     ):
         """Test _publish_agen_events with regular topic."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         regular_topic = Mock()
         regular_topic.publish_data.return_value = Mock()
         mock_node.publish_to = [regular_topic]
@@ -268,15 +285,35 @@ class TestEventDrivenWorkflow:
         ) as mock_human_topic, patch(
             "grafi.workflows.impl.event_driven_workflow.agent_output_topic"
         ) as mock_output_topic:
-
             mock_human_topic.can_consume.return_value = True
             mock_output_topic.can_consume.return_value = True
 
-            mock_output_event = Mock(spec=OutputTopicEvent)
-            mock_output_event.topic_name = "test_topic"
-            mock_output_event.execution_context = Mock()
-            mock_output_event.offset = 0
-            mock_output_event.data = []
+            mock_output_event = OutputTopicEvent(
+                event_id="test_id",
+                event_type="PublishToTopic",
+                timestamp="2009-02-13T23:31:30+00:00",
+                topic_name="test_topic",
+                publisher_name="OpenAINode",
+                publisher_type="test_type",
+                offset=0,
+                execution_context=ExecutionContext(
+                    conversation_id="conversation_id",
+                    execution_id="execution_id",
+                    assistant_request_id="assistant_request_id",
+                ),
+                consumed_event_ids=["1", "2"],
+                data=[
+                    Message(
+                        message_id="ea72df51439b42e4a43b217c9bca63f5",
+                        timestamp=1737138526189505000,
+                        role="user",
+                        content="Hello, my name is Grafi, how are you doing?",
+                        name=None,
+                        functions=None,
+                        function_call=None,
+                    )
+                ],
+            )
 
             mock_human_topic.consume.return_value = [mock_output_event]
             mock_output_topic.consume.return_value = [mock_output_event]
@@ -290,23 +327,27 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context, sample_messages
     ):
         """Test synchronous execute method."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
 
         with patch.object(
-            populated_workflow, "initial_workflow"
+            EventDrivenWorkflow, "initial_workflow"
         ) as mock_initial, patch.object(
-            populated_workflow, "get_node_input"
+            EventDrivenWorkflow, "get_node_input"
         ) as mock_get_input, patch.object(
-            populated_workflow, "_publish_events"
+            EventDrivenWorkflow, "_publish_events"
         ) as mock_publish, patch.object(
-            populated_workflow, "_get_consumed_events"
+            EventDrivenWorkflow, "_get_consumed_events"
         ) as mock_get_consumed:
-
             # Setup mocks
-            mock_get_input.return_value = [Mock(spec=ConsumeFromTopicEvent)]
-            mock_get_consumed.return_value = [
-                Mock(spec=ConsumeFromTopicEvent, data=sample_messages)
-            ]
+            mock_consume_event = Mock(spec=ConsumeFromTopicEvent)
+            mock_consume_event.data = sample_messages
+            mock_consume_event.to_dict = Mock(return_value={"mock_event": "data"})
+
+            mock_get_input.return_value = [mock_consume_event]
+            mock_get_consumed.return_value = [mock_consume_event]
+
+            # Mock the node's execute method to return sample messages
+            mock_node.execute = Mock(return_value=sample_messages)
 
             # Add node to execution queue
             populated_workflow.execution_queue.append(mock_node)
@@ -326,15 +367,14 @@ class TestEventDrivenWorkflow:
     ):
         """Test asynchronous a_execute method."""
         with patch.object(
-            populated_workflow, "initial_workflow"
+            EventDrivenWorkflow, "initial_workflow"
         ) as mock_initial, patch.object(
-            populated_workflow, "_process_all_nodes"
+            EventDrivenWorkflow, "_process_all_nodes"
         ) as mock_process, patch.object(
-            populated_workflow, "_record_consumed_events"
+            EventDrivenWorkflow, "_record_consumed_events"
         ) as mock_record, patch(
             "grafi.workflows.impl.event_driven_workflow.agent_output_topic"
         ) as mock_output_topic:
-
             # Mock the generator
             async def mock_get_events():
                 yield Mock(
@@ -344,7 +384,7 @@ class TestEventDrivenWorkflow:
 
             mock_output_topic.get_events.return_value = mock_get_events()
             mock_output_topic.is_empty.return_value = True
-            mock_process.return_value = None
+            mock_process.return_value = mock_record
 
             results = []
             async for result in populated_workflow.a_execute(
@@ -360,13 +400,12 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context
     ):
         """Test _process_all_nodes method."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         populated_workflow.execution_queue.append(mock_node)
 
-        with patch.object(populated_workflow, "_execute_node") as mock_execute, patch(
+        with patch.object(EventDrivenWorkflow, "_execute_node") as mock_execute, patch(
             "grafi.workflows.impl.event_driven_workflow.agent_output_topic"
         ) as mock_output_topic:
-
             mock_execute.return_value = None
             mock_output_topic.wait_for_completion = AsyncMock()
 
@@ -383,15 +422,14 @@ class TestEventDrivenWorkflow:
     @pytest.mark.asyncio
     async def test_execute_node(self, populated_workflow, sample_execution_context):
         """Test _execute_node method."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         executing_nodes = set()
 
         with patch.object(
-            populated_workflow, "get_node_input"
+            EventDrivenWorkflow, "get_node_input"
         ) as mock_get_input, patch.object(
-            populated_workflow, "_publish_agen_events"
+            EventDrivenWorkflow, "_publish_agen_events"
         ) as mock_publish:
-
             mock_get_input.return_value = [Mock(spec=ConsumeFromTopicEvent)]
             mock_publish.return_value = None
 
@@ -404,13 +442,34 @@ class TestEventDrivenWorkflow:
 
     def test_get_node_input(self, populated_workflow):
         """Test get_node_input method."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         mock_topic = Mock()
-        mock_event = Mock()
-        mock_event.execution_context = Mock()
-        mock_event.topic_name = "test_topic"
-        mock_event.offset = 0
-        mock_event.data = []
+        mock_event = OutputTopicEvent(
+            event_id="test_id",
+            event_type="PublishToTopic",
+            timestamp="2009-02-13T23:31:30+00:00",
+            topic_name="test_topic",
+            publisher_name="OpenAINode",
+            publisher_type="test_type",
+            offset=0,
+            execution_context=ExecutionContext(
+                conversation_id="conversation_id",
+                execution_id="execution_id",
+                assistant_request_id="assistant_request_id",
+            ),
+            consumed_event_ids=["1", "2"],
+            data=[
+                Message(
+                    message_id="ea72df51439b42e4a43b217c9bca63f5",
+                    timestamp=1737138526189505000,
+                    role="user",
+                    content="Hello, my name is Grafi, how are you doing?",
+                    name=None,
+                    functions=None,
+                    function_call=None,
+                )
+            ],
+        )
 
         mock_topic.can_consume.return_value = True
         mock_topic.consume.return_value = [mock_event]
@@ -421,20 +480,34 @@ class TestEventDrivenWorkflow:
         assert len(result) == 1
         assert isinstance(result[0], ConsumeFromTopicEvent)
 
-    def test_on_event_with_publish_to_topic_event(self, populated_workflow):
-        """Test on_event method with PublishToTopicEvent."""
-        mock_node = populated_workflow.nodes["OpenAINode"]
-        event = Mock(spec=PublishToTopicEvent)
-        event.topic_name = "agent_output_topic"
-
-        populated_workflow.on_event(event)
-
-        assert mock_node in populated_workflow.execution_queue
-
     def test_on_event_with_output_topic_event(self, populated_workflow):
         """Test on_event method with OutputTopicEvent (should be ignored)."""
-        event = Mock(spec=OutputTopicEvent)
-        event.topic_name = "test_topic"
+        event = OutputTopicEvent(
+            event_id="test_id",
+            event_type="PublishToTopic",
+            timestamp="2009-02-13T23:31:30+00:00",
+            topic_name="test_topic",
+            publisher_name="OpenAINode",
+            publisher_type="test_type",
+            offset=0,
+            execution_context=ExecutionContext(
+                conversation_id="conversation_id",
+                execution_id="execution_id",
+                assistant_request_id="assistant_request_id",
+            ),
+            consumed_event_ids=["1", "2"],
+            data=[
+                Message(
+                    message_id="ea72df51439b42e4a43b217c9bca63f5",
+                    timestamp=1737138526189505000,
+                    role="user",
+                    content="Hello, my name is Grafi, how are you doing?",
+                    name=None,
+                    functions=None,
+                    function_call=None,
+                )
+            ],
+        )
 
         initial_queue_length = len(populated_workflow.execution_queue)
         populated_workflow.on_event(event)
@@ -460,7 +533,6 @@ class TestEventDrivenWorkflow:
         ) as mock_get_events, patch(
             "grafi.common.containers.container.container.event_store.record_event"
         ) as mock_record:
-
             mock_get_events.return_value = []
 
             # Add agent input topic
@@ -480,18 +552,15 @@ class TestEventDrivenWorkflow:
     ):
         """Test initial_workflow with existing events."""
         mock_event = Mock(spec=PublishToTopicEvent)
-        mock_event.topic_name = "test_topic"
+        mock_event.topic_name = "agent_input_topic"
 
         with patch(
             "grafi.common.containers.container.container.event_store.get_agent_events"
-        ) as mock_get_events, patch(
-            "grafi.common.containers.container.container.event_store.record_event"
-        ) as mock_record:
-
+        ) as mock_get_events:
             mock_get_events.return_value = [mock_event]
 
             # Mock topic restoration
-            mock_topic = populated_workflow.topics["test_topic"]
+            mock_topic = populated_workflow.topics["agent_input_topic"]
             mock_topic.can_consume.return_value = True
 
             populated_workflow.initial_workflow(
@@ -499,35 +568,6 @@ class TestEventDrivenWorkflow:
             )
 
             mock_topic.restore_topic.assert_called_once_with(mock_event)
-
-    def test_initial_workflow_with_human_request_topic(
-        self, populated_workflow, sample_execution_context, sample_messages
-    ):
-        """Test initial_workflow with HumanRequestTopic."""
-        mock_event = Mock(spec=PublishToTopicEvent)
-        mock_event.topic_name = "test_topic"
-
-        with patch(
-            "grafi.common.containers.container.container.event_store.get_agent_events"
-        ) as mock_get_events, patch(
-            "grafi.common.containers.container.container.event_store.record_event"
-        ) as mock_record:
-
-            mock_get_events.return_value = [mock_event]
-
-            # Replace with HumanRequestTopic
-            human_topic = Mock(spec=HumanRequestTopic)
-            human_topic.can_consume.return_value = True
-            human_topic.can_append_user_input.return_value = True
-            human_topic.append_user_input.return_value = Mock()
-            human_topic.restore_topic = Mock()
-            populated_workflow.topics["test_topic"] = human_topic
-
-            populated_workflow.initial_workflow(
-                sample_execution_context, sample_messages
-            )
-
-            human_topic.append_user_input.assert_called_once()
 
     def test_to_dict(self, populated_workflow):
         """Test to_dict method."""
@@ -545,12 +585,31 @@ class TestEventDrivenWorkflow:
     def test_record_consumed_events(self, populated_workflow):
         """Test _record_consumed_events method."""
         events = [
-            Mock(
-                spec=OutputAsyncEvent,
+            OutputTopicEvent(
+                event_id="test_id",
+                event_type="PublishToTopic",
+                timestamp="2009-02-13T23:31:30+00:00",
                 topic_name="test_topic",
-                execution_context=Mock(),
+                publisher_name="OpenAINode",
+                publisher_type="test_type",
                 offset=0,
-                data=[Message(content="hello", role="assistant")],
+                execution_context=ExecutionContext(
+                    conversation_id="conversation_id",
+                    execution_id="execution_id",
+                    assistant_request_id="assistant_request_id",
+                ),
+                consumed_event_ids=["1", "2"],
+                data=[
+                    Message(
+                        message_id="ea72df51439b42e4a43b217c9bca63f5",
+                        timestamp=1737138526189505000,
+                        role="user",
+                        content="Hello, my name is Grafi, how are you doing?",
+                        name=None,
+                        functions=None,
+                        function_call=None,
+                    )
+                ],
             )
         ]
 
@@ -577,10 +636,10 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context
     ):
         """Test _execute_node when no input is available."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         executing_nodes = set()
 
-        with patch.object(populated_workflow, "get_node_input") as mock_get_input:
+        with patch.object(EventDrivenWorkflow, "get_node_input") as mock_get_input:
             mock_get_input.return_value = []  # No input available
 
             await populated_workflow._execute_node(
@@ -594,11 +653,11 @@ class TestEventDrivenWorkflow:
         self, populated_workflow, sample_execution_context
     ):
         """Test _execute_node when node execution raises exception."""
-        mock_node = populated_workflow.nodes["test_node"]
+        mock_node = populated_workflow.nodes["OpenAINode"]
         mock_node.a_execute.side_effect = ValueError("Test error")
-        executing_nodes = {"test_node"}
+        executing_nodes = {"OpenAINode"}
 
-        with patch.object(populated_workflow, "get_node_input") as mock_get_input:
+        with patch.object(EventDrivenWorkflow, "get_node_input") as mock_get_input:
             mock_get_input.return_value = [Mock(spec=ConsumeFromTopicEvent)]
 
             with pytest.raises(ValueError, match="Test error"):
@@ -607,18 +666,4 @@ class TestEventDrivenWorkflow:
                 )
 
             # Node should be removed from executing set even on exception
-            assert "test_node" not in executing_nodes
-
-    def test_initial_workflow_missing_agent_input_topic(
-        self, populated_workflow, sample_execution_context, sample_messages
-    ):
-        """Test initial_workflow when agent input topic is missing."""
-        with patch(
-            "grafi.common.containers.container.container.event_store.get_agent_events"
-        ) as mock_get_events:
-            mock_get_events.return_value = []
-
-            with pytest.raises(ValueError, match="Agent input topic not found"):
-                populated_workflow.initial_workflow(
-                    sample_execution_context, sample_messages
-                )
+            assert "OpenAINode" not in executing_nodes

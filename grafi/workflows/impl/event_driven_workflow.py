@@ -106,7 +106,7 @@ class EventDrivenWorkflow(Workflow):
         # 2) Verify there is an agent input topic
         if (
             AGENT_INPUT_TOPIC not in self.topics
-            and AGENT_OUTPUT_TOPIC not in self.topics
+            or AGENT_OUTPUT_TOPIC not in self.topics
         ):
             raise ValueError("Agent input output topic not found in workflow topics.")
 

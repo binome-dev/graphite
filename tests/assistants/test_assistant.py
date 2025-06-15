@@ -1,6 +1,5 @@
 import json
 import os
-from unittest.mock import AsyncMock
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -32,14 +31,16 @@ class TestAssistant:
 
     def test_execute_success(self, mock_assistant, execution_context, input_messages):
         # Setup
-        mock_assistant.workflow.execute = Mock()
+        mock_assistant.workflow.execute = Mock(
+            return_value=[Message(content="mocked response", role="assistant")]
+        )
 
         # Mock consumed events
         event = Mock()
         event.topic_name = "test_topic"
         event.execution_context = execution_context
         event.offset = 0
-        event.data = [Message(content="response", role="assistant", timestamp=1)]
+        event.data = [Message(content="response", role="assistant")]
 
         with (
             patch(
@@ -59,14 +60,17 @@ class TestAssistant:
                 execution_context, input_messages
             )
             assert len(result) == 1
-            assert result[0].content == "response"
+            assert result[0].content == "mocked response"
 
     @pytest.mark.asyncio
     async def test_a_execute_success(
         self, mock_assistant, execution_context, input_messages
     ):
         # Setup
-        mock_assistant.workflow.a_execute = AsyncMock(return_value=None)
+        async def mock_async_generator():
+            yield [Message(content="async response", role="assistant")]
+
+        mock_assistant.workflow.a_execute = Mock(return_value=mock_async_generator())
 
         # Mock consumed events
         event = Mock()
