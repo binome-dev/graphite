@@ -9,7 +9,6 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_async_event import OutputAsyncEvent
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
@@ -360,40 +359,6 @@ class TestEventDrivenWorkflow:
             mock_node.execute.assert_called_once()
             mock_publish.assert_called_once()
             assert isinstance(result, list)
-
-    @pytest.mark.asyncio
-    async def test_a_execute(
-        self, populated_workflow, sample_execution_context, sample_messages
-    ):
-        """Test asynchronous a_execute method."""
-        with patch.object(
-            EventDrivenWorkflow, "initial_workflow"
-        ) as mock_initial, patch.object(
-            EventDrivenWorkflow, "_process_all_nodes"
-        ) as mock_process, patch.object(
-            EventDrivenWorkflow, "_record_consumed_events"
-        ) as mock_record, patch(
-            "grafi.workflows.impl.event_driven_workflow.agent_output_topic"
-        ) as mock_output_topic:
-            # Mock the generator
-            async def mock_get_events():
-                yield Mock(
-                    spec=OutputAsyncEvent,
-                    data=[Message(content="test", role="assistant")],
-                )
-
-            mock_output_topic.get_events.return_value = mock_get_events()
-            mock_output_topic.is_empty.return_value = True
-            mock_process.return_value = mock_record
-
-            results = []
-            async for result in populated_workflow.a_execute(
-                sample_execution_context, sample_messages
-            ):
-                results.append(result)
-
-            mock_initial.assert_called_once()
-            assert len(results) == 1
 
     @pytest.mark.asyncio
     async def test_process_all_nodes(

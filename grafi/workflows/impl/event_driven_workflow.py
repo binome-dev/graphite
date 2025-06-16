@@ -183,34 +183,38 @@ class EventDrivenWorkflow(Workflow):
         consumed_events: List[ConsumeFromTopicEvent],
     ) -> None:
         published_events = []
+        consumed_messages: Messages = []
+        for topic in node.publish_to:
+            if not isinstance(topic, OutputTopic):
+                # Add the generator to the async topic
+                if not consumed_messages:
+                    async for messages in messages_agen:
+                        consumed_messages.extend(
+                            messages if isinstance(messages, list) else [messages]
+                        )
+
+                event = topic.publish_data(
+                    execution_context=execution_context,
+                    publisher_name=node.name,
+                    publisher_type=node.type,
+                    data=consumed_messages,
+                    consumed_events=consumed_events,
+                )
+                if event:
+                    published_events.append(event)
+
         for topic in node.publish_to:
             if isinstance(topic, OutputTopic):
-                # Add the generator to the async topic
+                # If it's an OutputTopic, we need to handle async generator
                 topic.add_generator(
                     generator=messages_agen,
+                    data=consumed_messages,
                     execution_context=execution_context,
                     publisher_name=node.name,
                     publisher_type=node.type,
                     consumed_events=consumed_events,
                 )
-            else:
-                results: Messages = []
-                async for messages in messages_agen:
-                    results.extend(
-                        messages if isinstance(messages, list) else [messages]
-                    )
-
-                # Publish all results at once to maintain atomicity
-                if results:
-                    event = topic.publish_data(
-                        execution_context=execution_context,
-                        publisher_name=node.name,
-                        publisher_type=node.type,
-                        data=results,
-                        consumed_events=consumed_events,
-                    )
-                    if event:
-                        published_events.append(event)
+                break
 
         all_events: List[Event] = []
         all_events.extend(consumed_events)
@@ -307,31 +311,58 @@ class EventDrivenWorkflow(Workflow):
         running_tasks: Set[asyncio.Task] = set()
         executing_nodes: Set[str] = set()
 
-        # Start a background task to process nodes
+        # Start a background task to process all nodes (including streaming generators)
         node_processing_task = asyncio.create_task(
             self._process_all_nodes(execution_context, running_tasks, executing_nodes)
         )
 
-        await asyncio.sleep(0.01)
-
-        # Stream events as they arrive (concurrent with node processing)
+        # Prepare to stream events as they arrive
         consumed_output_async_events: List[OutputAsyncEvent] = []
+        event_queue = agent_output_topic.event_queue
+        get_event_task = asyncio.create_task(event_queue.get())
 
         try:
-            async for output_event in agent_output_topic.get_events():
-                consumed_output_async_events.append(output_event)
-                yield output_event.data
+            # Race between new events and node processing completion
+            while True:
+                done, _ = await asyncio.wait(
+                    {node_processing_task, get_event_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
 
-                # Check if node processing is complete and no more events expected
-                if node_processing_task.done() and agent_output_topic.is_empty():
+                # If an output‐event arrived, yield it immediately
+                if get_event_task in done:
+                    ev = get_event_task.result()
+                    consumed_output_async_events.append(ev)
+                    yield ev.data
+                    # schedule next event retrieval
+                    get_event_task = asyncio.create_task(event_queue.get())
+                    continue
+
+                # Otherwise node processing must have finished
+                if node_processing_task in done:
+                    # If nothing ever arrived, that's an error
+                    if not consumed_output_async_events and event_queue.empty():
+                        get_event_task.cancel()
+                        raise RuntimeError(
+                            "Node processing completed without emitting any agent_output_topic events"
+                        )
+                    # Otherwise break to drain remaining events
                     break
 
+            # Drain any leftover events
+            async for ev in agent_output_topic.get_events():
+                consumed_output_async_events.append(ev)
+                yield ev.data
+
         finally:
-            # Ensure node processing completes
+            # Clean up the pending get_event_task
+            get_event_task.cancel()
+
+            # Ensure node processing fully completes
             if not node_processing_task.done():
                 await node_processing_task
 
-            # Record all consumed events
+            # Record all consumed output events
             if consumed_output_async_events:
                 self._record_consumed_events(consumed_output_async_events)
 

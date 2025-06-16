@@ -138,7 +138,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         assert output is not None
 
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 70
+    assert len(event_store.get_events()) == 68
 
     # Test the run method
     execution_context_3 = get_execution_context()
@@ -151,7 +151,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         assert output is not None
 
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 108
+    assert len(event_store.get_events()) == 102
 
 
 asyncio.run(test_multi_functions_call_assistant_async())

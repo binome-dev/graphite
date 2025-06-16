@@ -98,6 +98,7 @@ class OutputTopic(TopicBase):
     def add_generator(
         self,
         generator: MsgsAGen,
+        data: Messages,
         execution_context: ExecutionContext,
         publisher_name: str,
         publisher_type: str,
@@ -111,6 +112,7 @@ class OutputTopic(TopicBase):
         task = asyncio.create_task(
             self._process_generator(
                 generator=generator,
+                data=data,
                 execution_context=execution_context,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
@@ -123,6 +125,7 @@ class OutputTopic(TopicBase):
     async def _process_generator(
         self,
         generator: MsgsAGen,
+        data: Messages,
         execution_context: ExecutionContext,
         publisher_name: str,
         publisher_type: str,
@@ -130,42 +133,65 @@ class OutputTopic(TopicBase):
     ) -> None:
         """Process a Messages generator and put OutputAsyncEvents in the queue."""
         try:
-            result_content = ""
-            async for messages in generator:
-                event = OutputAsyncEvent(
+            result: Messages = data
+            if not data:
+                result_content = ""
+                async for messages in generator:
+                    if self.condition(messages):
+                        event = OutputAsyncEvent(
+                            execution_context=execution_context,
+                            topic_name=self.name,
+                            publisher_name=publisher_name,
+                            publisher_type=publisher_type,
+                            data=messages,
+                            consumed_event_ids=[
+                                consumed_event.event_id
+                                for consumed_event in consumed_events
+                            ],
+                            offset=0,
+                        )
+
+                        for message in messages:
+                            if message.content is not None and isinstance(
+                                message.content, str
+                            ):
+                                result_content += message.content
+
+                        await self.event_queue.put(event)
+                    # logger.debug(f"[{self.name}] Event queued from {publisher_name}")
+
+                result = [Message(role="assistant", content=result_content)]
+            else:
+                if self.condition(data):
+                    event = OutputAsyncEvent(
+                        execution_context=execution_context,
+                        topic_name=self.name,
+                        publisher_name=publisher_name,
+                        publisher_type=publisher_type,
+                        data=result,
+                        consumed_event_ids=[
+                            consumed_event.event_id
+                            for consumed_event in consumed_events
+                        ],
+                        offset=0,
+                    )
+
+                    await self.event_queue.put(event)
+
+            if self.condition(result):
+                output_topic_event = OutputTopicEvent(
                     execution_context=execution_context,
                     topic_name=self.name,
                     publisher_name=publisher_name,
                     publisher_type=publisher_type,
-                    data=messages,
+                    data=result,
                     consumed_event_ids=[
                         consumed_event.event_id for consumed_event in consumed_events
                     ],
                     offset=0,
                 )
 
-                for message in messages:
-                    if message.content is not None and isinstance(message.content, str):
-                        result_content += message.content
-
-                await self.event_queue.put(event)
-                # logger.debug(f"[{self.name}] Event queued from {publisher_name}")
-
-            result = Message(role="assistant", content=result_content)
-
-            output_topic_event = OutputTopicEvent(
-                execution_context=execution_context,
-                topic_name=self.name,
-                publisher_name=publisher_name,
-                publisher_type=publisher_type,
-                data=[result],
-                consumed_event_ids=[
-                    consumed_event.event_id for consumed_event in consumed_events
-                ],
-                offset=0,
-            )
-
-            container.event_store.record_event(output_topic_event)
+                container.event_store.record_event(output_topic_event)
 
         except asyncio.CancelledError:
             logger.info(f"[{self.name}] Generator {publisher_name} cancelled")

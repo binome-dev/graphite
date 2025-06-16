@@ -234,6 +234,7 @@ class TestOutputTopic:
 
             output_topic.add_generator(
                 generator=mock_generator(),
+                data=[],
                 execution_context=sample_execution_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -259,6 +260,7 @@ class TestOutputTopic:
         ) as mock_record:
             await output_topic._process_generator(
                 generator=mock_generator(),
+                data=[],
                 execution_context=sample_execution_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -293,6 +295,7 @@ class TestOutputTopic:
         task = asyncio.create_task(
             output_topic._process_generator(
                 generator=mock_generator(),
+                data=[],
                 execution_context=sample_execution_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -319,6 +322,7 @@ class TestOutputTopic:
         # Should not raise exception, but handle it internally
         await output_topic._process_generator(
             generator=failing_generator(),
+            data=[],
             execution_context=sample_execution_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -420,6 +424,7 @@ class TestOutputTopic:
         # Add generator
         output_topic.add_generator(
             generator=test_generator(),
+            data=[],
             execution_context=sample_execution_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
