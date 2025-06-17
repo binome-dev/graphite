@@ -158,7 +158,8 @@ class SimpleAgent(Assistant):
 
         result = ""
         async for output in super().a_execute(execution_context, input_data):
-            result += output[0].content
+            if isinstance(output[0].content, str):
+                result += output[0].content
 
         return result
 

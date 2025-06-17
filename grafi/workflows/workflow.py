@@ -37,6 +37,7 @@ class Workflow(BaseModel):
         self, execution_context: ExecutionContext, input: Messages
     ) -> MsgsAGen:
         """Executes the workflow with the given initial inputs."""
+        yield []  # Too keep mypy happy
         raise NotImplementedError
 
     def initial_workflow(self, assistant_request_id: str) -> Any:

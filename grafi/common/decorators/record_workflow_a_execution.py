@@ -2,9 +2,7 @@
 
 import functools
 import json
-from typing import Any
 from typing import Callable
-from typing import Coroutine
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from openinference.semconv.trace import SpanAttributes
@@ -30,12 +28,9 @@ from grafi.common.models.message import MsgsAGen
 from grafi.workflows.workflow import T_W
 
 
-CoroNone = Coroutine[Any, Any, None]  # shorthand
-
-
 def record_workflow_a_execution(
-    func: Callable[[T_W, ExecutionContext, Messages], CoroNone],
-) -> Callable[[T_W, ExecutionContext, Messages], CoroNone]:
+    func: Callable[[T_W, ExecutionContext, Messages], MsgsAGen],
+) -> Callable[[T_W, ExecutionContext, Messages], MsgsAGen]:
     """
     Decorator to record workflow execution events and add tracing.
 

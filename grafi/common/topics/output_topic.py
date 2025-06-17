@@ -35,7 +35,7 @@ class OutputTopic(TopicBase):
     """
 
     name: str = AGENT_OUTPUT_TOPIC
-    event_queue: asyncio.Queue[OutputTopicEvent] = Field(default_factory=asyncio.Queue)
+    event_queue: asyncio.Queue[OutputAsyncEvent] = Field(default_factory=asyncio.Queue)
     active_generators: List[asyncio.Task] = Field(default_factory=list)
     publish_event_handler: Optional[Callable[[OutputTopicEvent], None]] = Field(
         default=None

@@ -283,7 +283,7 @@ class EventDrivenWorkflow(Workflow):
 
             output: Messages = []
 
-            consumed_events: List[ConsumeFromTopicEvent] = self._get_consumed_events()
+            consumed_events = self._get_consumed_events()
 
             for event in consumed_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
@@ -295,7 +295,7 @@ class EventDrivenWorkflow(Workflow):
             return sorted_outputs
         finally:
             if consumed_events:
-                container.event_store.record_events(consumed_events)
+                container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
 
     @record_workflow_a_execution
     async def a_execute(
