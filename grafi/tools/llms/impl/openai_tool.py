@@ -243,6 +243,7 @@ class OpenAITool(LLM):
         data = message_data.model_dump()
         if data.get("role") is None:
             data["role"] = "assistant"
+        data["is_streaming"] = True
         return [Message.model_validate(data)]
 
     def to_messages(self, response: ChatCompletion) -> Messages:

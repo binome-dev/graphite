@@ -1,6 +1,5 @@
 import functools
 import json
-from typing import Awaitable
 from typing import Callable
 
 from openinference.semconv.trace import SpanAttributes
@@ -22,6 +21,7 @@ from grafi.common.events.assistant_events.assistant_respond_event import (
 )
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 
@@ -65,6 +65,7 @@ def record_assistant_a_execution(
             )
 
         # Execute the original function
+        result: Messages = []
         try:
             with tracer.start_as_current_span(f"{assistant_name}.run") as span:
                 # Set span attributes of the assistant
@@ -80,10 +81,22 @@ def record_assistant_a_execution(
                 span.set_attribute("model", model)
 
                 # Execute the original function
-                result: Messages = []
+                result_content = ""
+                is_streaming = False
                 async for data in func(self, execution_context, input_data):
-                    result.extend(data)
+                    for message in data:
+                        if message.is_streaming:
+                            if message.content is not None and isinstance(
+                                message.content, str
+                            ):
+                                result_content += message.content
+                            is_streaming = True
+                        else:
+                            result.append(message)
                     yield data
+
+                if is_streaming:
+                    result = [Message(role="assistant", content=result_content)]
 
                 # Record the output data
                 output_data_dict = json.dumps(result, default=to_jsonable_python)

@@ -59,5 +59,13 @@ async def test_simple_llm_assistant() -> None:
     events = event_store.get_events()
     assert len(events) == 12
 
+    # Save events to local json file
+    # import json
+
+    # events_data = [event.to_dict() for event in events]
+    # with open("events.json", "w") as f:
+    #     json.dump(events_data, f, indent=4)
+    # print(f"Saved {len(events)} events to events.json")
+
 
 asyncio.run(test_simple_llm_assistant())

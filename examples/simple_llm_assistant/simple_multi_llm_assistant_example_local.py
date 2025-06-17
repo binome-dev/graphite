@@ -94,7 +94,8 @@ async def test_simple_multi_llm_assistant_async() -> None:
     async for output in assistant.a_execute(execution_context, input_data):
         print(output)
         assert output is not None
-    assert len(event_store.get_events()) == 60
+    print(len(event_store.get_events()))
+    assert len(event_store.get_events()) == 57
 
 
 asyncio.run(test_simple_multi_llm_assistant_async())

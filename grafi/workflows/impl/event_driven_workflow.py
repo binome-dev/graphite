@@ -338,6 +338,25 @@ class EventDrivenWorkflow(Workflow):
                     get_event_task = asyncio.create_task(event_queue.get())
                     continue
 
+                consumed_events: List[OutputAsyncEvent] = []
+                if human_request_topic.can_consume(self.name):
+                    events = human_request_topic.consume(self.name)
+                    for event in events:
+                        if isinstance(event, OutputTopicEvent):
+                            yield event.data
+                            consumed_events.append(
+                                OutputAsyncEvent(
+                                    topic_name=event.topic_name,
+                                    publisher_name=self.name,
+                                    publisher_type=self.type,
+                                    execution_context=event.execution_context,
+                                    offset=event.offset,
+                                    data=event.data,
+                                )
+                            )
+
+                    consumed_output_async_events.extend(consumed_events)
+
                 # Otherwise node processing must have finished
                 if node_processing_task in done:
                     # If nothing ever arrived, that's an error
@@ -414,21 +433,38 @@ class EventDrivenWorkflow(Workflow):
         if not events:
             return
 
+        # TODO: Update for multimodel content
         result_content = ""
-        for event in events:
-            for message in event.data:
-                if message.content is not None and isinstance(message.content, str):
-                    result_content += message.content
 
-        consumed_event = ConsumeFromTopicEvent(
-            topic_name=events[0].topic_name,
-            consumer_name=self.name,
-            consumer_type=self.type,
-            execution_context=events[0].execution_context,
-            offset=events[0].offset,
-            data=[Message(role="assistant", content=result_content)],
-        )
-        container.event_store.record_event(consumed_event)
+        for event in events:
+            is_streaming = False
+            for message in event.data:
+                if message.is_streaming:
+                    if message.content is not None and isinstance(message.content, str):
+                        result_content += message.content
+                    is_streaming = True
+            if not is_streaming:
+                consumed_event = ConsumeFromTopicEvent(
+                    topic_name=event.topic_name,
+                    consumer_name=self.name,
+                    consumer_type=self.type,
+                    execution_context=event.execution_context,
+                    offset=event.offset,
+                    data=event.data,
+                )
+
+                container.event_store.record_event(consumed_event)
+
+        if is_streaming:
+            consumed_event = ConsumeFromTopicEvent(
+                topic_name=events[0].topic_name,
+                consumer_name=self.name,
+                consumer_type=self.type,
+                execution_context=events[0].execution_context,
+                offset=events[0].offset,
+                data=[Message(role="assistant", content=result_content)],
+            )
+            container.event_store.record_event(consumed_event)
 
     async def _execute_node(
         self, execution_context: ExecutionContext, node: Node, executing_nodes: Set[str]
