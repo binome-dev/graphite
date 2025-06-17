@@ -62,6 +62,7 @@ class SimpleLLMAssistant(Assistant):
                 )
                 .build()
             )
+            #            .publish_to(agent_output_topic)
             .publish_to(agent_output_topic)
             .build()
         )

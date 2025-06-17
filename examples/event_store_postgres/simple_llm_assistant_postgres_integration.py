@@ -73,7 +73,7 @@ def test_simple_llm_assistant() -> None:
     print(output)
     assert output is not None
     events = event_store.get_conversation_events(conversation_id)
-    assert len(events) == 11
+    assert len(events) == 12
 
     input_data = [
         Message(
@@ -85,7 +85,7 @@ def test_simple_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].content)
-    assert len(event_store.get_conversation_events(conversation_id)) == 22
+    assert len(event_store.get_conversation_events(conversation_id)) == 24
 
 
 test_simple_llm_assistant()

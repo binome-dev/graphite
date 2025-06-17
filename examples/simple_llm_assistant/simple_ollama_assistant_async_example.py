@@ -43,11 +43,11 @@ async def test_simple_llm_assistant_async() -> None:
         )
     ]
 
-    output = await assistant.a_execute(execution_context, input_data)
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
 
-    print(output)
-    assert output is not None
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
     input_data = [
         Message(
@@ -56,12 +56,11 @@ async def test_simple_llm_assistant_async() -> None:
         )
     ]
 
-    output = await assistant.a_execute(get_execution_context(), input_data)
-
-    print(output)
-    assert output is not None
-    assert "Grafi" in str(output[0].content)
-    assert len(event_store.get_events()) == 22
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
+        assert "Grafi" in str(output[0].content)
+    assert len(event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant_async())

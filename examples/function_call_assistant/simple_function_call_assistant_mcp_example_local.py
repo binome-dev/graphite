@@ -52,16 +52,11 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     ]
 
     # Execute the assistant's function call
-    output = await assistant.a_execute(execution_context, input_data)
-    print("Assistant output:", output)
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
 
-    events = []
-    for event in event_store.get_events():
-        events.append(event.to_dict())
-
-    # Assert that the output is valid and check event count
-    assert output is not None
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

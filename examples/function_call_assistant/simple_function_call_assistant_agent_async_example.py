@@ -55,12 +55,13 @@ async def test_simple_function_call_assistant_async() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
-    output = await assistant.a_execute(execution_context, input_data)
-    print(output)
-    assert output is not None
-    assert "12345" in str(output[0].content)
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
+        assert output is not None
+        assert "12345" in str(output[0].content)
+
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_async())

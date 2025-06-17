@@ -18,6 +18,9 @@ from grafi.common.events.workflow_events.workflow_failed_event import (
 from grafi.common.events.workflow_events.workflow_invoke_event import (
     WorkflowInvokeEvent,
 )
+from grafi.common.events.workflow_events.workflow_respond_event import (
+    WorkflowRespondEvent,
+)
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
@@ -25,8 +28,8 @@ from grafi.workflows.workflow import T_W
 
 
 def record_workflow_execution(
-    func: Callable[[T_W, ExecutionContext, Messages], None],
-) -> Callable[[T_W, ExecutionContext, Messages], None]:
+    func: Callable[[T_W, ExecutionContext, Messages], Messages],
+) -> Callable[[T_W, ExecutionContext, Messages], Messages]:
     """
     Decorator to record workflow execution events and add tracing.
 
@@ -42,7 +45,7 @@ def record_workflow_execution(
         self: T_W,
         execution_context: ExecutionContext,
         input_data: Messages,
-    ) -> None:
+    ) -> Messages:
         workflow_id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
         workflow_name: str = self.name or ""
@@ -75,7 +78,10 @@ def record_workflow_execution(
                 )
 
                 # Execute the original function
-                func(self, execution_context, input_data)
+                result: Messages = func(self, execution_context, input_data)
+
+                output_data_dict = json.dumps(result, default=to_jsonable_python)
+                span.set_attribute("output", output_data_dict)
 
         except Exception as e:
             # Exception occurred during execution
@@ -90,5 +96,19 @@ def record_workflow_execution(
                 )
                 container.event_store.record_event(failed_event)
             raise
+        else:
+            # Successful execution
+            if container.event_store:
+                container.event_store.record_event(
+                    WorkflowRespondEvent(
+                        workflow_id=workflow_id,
+                        execution_context=execution_context,
+                        workflow_type=workflow_type,
+                        workflow_name=workflow_name,
+                        input_data=input_data,
+                        output_data=result,
+                    )
+                )
+        return result
 
     return wrapper

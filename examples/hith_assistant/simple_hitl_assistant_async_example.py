@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import uuid
@@ -46,7 +47,7 @@ def get_execution_context() -> ExecutionContext:
     )
 
 
-def test_simple_hitl_assistant() -> None:
+async def test_simple_hitl_assistant() -> None:
     execution_context = get_execution_context()
 
     assistant = (
@@ -71,9 +72,8 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, input_data)
-
-    print(output)
+    async for output in assistant.a_execute(execution_context, input_data):
+        print(output)
 
     human_input = [
         Message(
@@ -82,7 +82,8 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, human_input)
+    async for output in assistant.a_execute(execution_context, human_input):
+        print(output)
 
     human_input = [
         Message(
@@ -91,13 +92,12 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, human_input)
-
-    print(output)
+    async for output in assistant.a_execute(execution_context, human_input):
+        print(output)
 
     events = event_store.get_events()
     print(len(events))
     assert len(events) == 56
 
 
-test_simple_hitl_assistant()
+asyncio.run(test_simple_hitl_assistant())

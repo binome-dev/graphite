@@ -1,28 +1,27 @@
 import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
+from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 
 
 @pytest.fixture
-def consume_from_topic_event() -> ConsumeFromTopicEvent:
-    return ConsumeFromTopicEvent(
+def output_topic_event() -> OutputTopicEvent:
+    return OutputTopicEvent(
         event_id="test_id",
-        event_type="ConsumeFromTopic",
+        event_type="PublishToTopic",
         timestamp="2009-02-13T23:31:30+00:00",
         topic_name="test_topic",
-        consumer_name="test_node",
-        consumer_type="test_type",
+        publisher_name="test_node",
+        publisher_type="test_type",
         offset=0,
         execution_context=ExecutionContext(
             conversation_id="conversation_id",
             execution_id="execution_id",
             assistant_request_id="assistant_request_id",
         ),
+        consumed_event_ids=["1", "2"],
         data=[
             Message(
                 message_id="ea72df51439b42e4a43b217c9bca63f5",
@@ -38,20 +37,21 @@ def consume_from_topic_event() -> ConsumeFromTopicEvent:
 
 
 @pytest.fixture
-def consume_from_topic_event_message() -> ConsumeFromTopicEvent:
-    return ConsumeFromTopicEvent(
+def output_topic_event_message() -> OutputTopicEvent:
+    return OutputTopicEvent(
         event_id="test_id",
-        event_type="ConsumeFromTopic",
+        event_type="PublishToTopic",
         timestamp="2009-02-13T23:31:30+00:00",
         topic_name="test_topic",
-        consumer_name="test_node",
-        consumer_type="test_type",
+        publisher_name="test_node",
+        publisher_type="test_type",
         offset=0,
         execution_context=ExecutionContext(
             conversation_id="conversation_id",
             execution_id="execution_id",
             assistant_request_id="assistant_request_id",
         ),
+        consumed_event_ids=["1", "2"],
         data=[
             Message(
                 message_id="ea72df51439b42e4a43b217c9bca63f5",
@@ -67,18 +67,19 @@ def consume_from_topic_event_message() -> ConsumeFromTopicEvent:
 
 
 @pytest.fixture
-def consume_from_topic_event_dict():
+def output_topic_event_dict():
     return {
         "event_version": "1.0",
         "event_id": "test_id",
-        "event_type": "ConsumeFromTopic",
+        "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
             "offset": 0,
-            "consumer_name": "test_node",
-            "consumer_type": "test_type",
+            "publisher_name": "test_node",
+            "publisher_type": "test_type",
+            "consumed_event_ids": ["1", "2"],
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "execution_id",
@@ -91,18 +92,19 @@ def consume_from_topic_event_dict():
 
 
 @pytest.fixture
-def consume_from_topic_event_dict_message():
+def output_topic_event_dict_message():
     return {
         "event_version": "1.0",
         "event_id": "test_id",
-        "event_type": "ConsumeFromTopic",
+        "event_type": "PublishToTopic",
         "assistant_request_id": "assistant_request_id",
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
             "offset": 0,
-            "consumer_name": "test_node",
-            "consumer_type": "test_type",
+            "publisher_name": "test_node",
+            "publisher_type": "test_type",
+            "consumed_event_ids": ["1", "2"],
             "execution_context": {
                 "conversation_id": "conversation_id",
                 "execution_id": "execution_id",
@@ -114,35 +116,27 @@ def consume_from_topic_event_dict_message():
     }
 
 
-def test_consume_from_topic_event_to_dict(
-    consume_from_topic_event: ConsumeFromTopicEvent, consume_from_topic_event_dict
+def test_output_topic_event_to_dict(
+    output_topic_event: OutputTopicEvent, output_topic_event_dict
 ):
-    assert consume_from_topic_event.to_dict() == consume_from_topic_event_dict
+    assert output_topic_event.to_dict() == output_topic_event_dict
 
 
-def test_consume_from_topic_event_from_dict(
-    consume_from_topic_event_dict, consume_from_topic_event
+def test_output_topic_event_from_dict(output_topic_event_dict, output_topic_event):
+    assert OutputTopicEvent.from_dict(output_topic_event_dict) == output_topic_event
+
+
+def test_output_topic_event_to_dict_message(
+    output_topic_event_message: OutputTopicEvent,
+    output_topic_event_dict_message,
 ):
-    assert (
-        ConsumeFromTopicEvent.from_dict(consume_from_topic_event_dict)
-        == consume_from_topic_event
-    )
+    assert output_topic_event_message.to_dict() == output_topic_event_dict_message
 
 
-def test_consume_from_topic_event_to_dict_message(
-    consume_from_topic_event_message: ConsumeFromTopicEvent,
-    consume_from_topic_event_dict_message,
-):
-    assert (
-        consume_from_topic_event_message.to_dict()
-        == consume_from_topic_event_dict_message
-    )
-
-
-def test_consume_from_topic_event_from_dict_message(
-    consume_from_topic_event_dict_message, consume_from_topic_event_message
+def test_output_topic_event_from_dict_message(
+    output_topic_event_dict_message, output_topic_event_message
 ):
     assert (
-        ConsumeFromTopicEvent.from_dict(consume_from_topic_event_dict_message)
-        == consume_from_topic_event_message
+        OutputTopicEvent.from_dict(output_topic_event_dict_message)
+        == output_topic_event_message
     )

@@ -62,16 +62,16 @@ async def test_rag_tool_async() -> None:
         api_key=api_key,
     )
 
-    result = await simple_rag_assistant.a_execute(
+    async for output in simple_rag_assistant.a_execute(
         execution_context,
         [Message(role="user", content="What is AWS EC2?")],
-    )
+    ):
+        print(output)
+        assert "EC2" in str(output[0].content)
+        assert "computing" in str(output[0].content)
 
-    print(result)
-    assert "EC2" in str(result[0].content)
-    assert "computing" in str(result[0].content)
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
     # Delete the PERSIST_DIR and all files in it
     if os.path.exists(PERSIST_DIR):

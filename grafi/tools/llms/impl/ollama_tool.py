@@ -225,7 +225,7 @@ class OllamaTool(LLM):
         if not content:
             return []
 
-        return [Message(role=safe_role, content=content)]
+        return [Message(role=safe_role, content=content, is_streaming=True)]
 
     def to_messages(self, response: ChatResponse) -> Messages:
         """

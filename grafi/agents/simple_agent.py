@@ -122,7 +122,7 @@ class SimpleAgent(Assistant):
 
         return self
 
-    def run(self, qestion: str) -> str:
+    def run(self, question: str) -> str:
         execution_context = ExecutionContext(
             conversation_id=uuid.uuid4().hex,
             execution_id=uuid.uuid4().hex,
@@ -133,13 +133,35 @@ class SimpleAgent(Assistant):
         input_data = [
             Message(
                 role="user",
-                content=qestion,
+                content=question,
             )
         ]
 
         output = super().execute(execution_context, input_data)
 
         return output[0].content
+
+    async def a_run(self, question: str) -> str:
+        execution_context = ExecutionContext(
+            conversation_id=uuid.uuid4().hex,
+            execution_id=uuid.uuid4().hex,
+            assistant_request_id=uuid.uuid4().hex,
+        )
+
+        # Test the run method
+        input_data = [
+            Message(
+                role="user",
+                content=question,
+            )
+        ]
+
+        result = ""
+        async for output in super().a_execute(execution_context, input_data):
+            if isinstance(output[0].content, str):
+                result += output[0].content
+
+        return result
 
 
 class SimpleAgentBuilder(AssistantBaseBuilder[SimpleAgent]):

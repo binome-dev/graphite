@@ -63,7 +63,7 @@ def test_simple_image_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "GRAPHITE" in str(output[0].content)
-    assert len(event_store.get_events()) == 11
+    assert len(event_store.get_events()) == 12
 
 
 test_simple_image_llm_assistant()

@@ -267,7 +267,7 @@ class GeminiTool(LLM):
         it in a single assistant message so grafi can assemble the full
         answer just like with OpenAI chunks.
         """
-        return [Message(role="assistant", content=chunk.text)]
+        return [Message(role="assistant", content=chunk.text, is_streaming=True)]
 
     def to_messages(self, response: GenerateContentResponse) -> Messages:
         """

@@ -50,15 +50,22 @@ async def test_simple_llm_assistant() -> None:
             assert message.role == "assistant"
             if message.content is not None:
                 content += str(message.content)
-                print(message.content, end="", flush=True)
+                print(message.content, end="_", flush=True)
 
     print(content)
     assert "Grafi" in content
     assert content is not None
 
     events = event_store.get_events()
-    print(len(events))
-    assert len(events) == 11
+    assert len(events) == 12
+
+    # Save events to local json file
+    # import json
+
+    # events_data = [event.to_dict() for event in events]
+    # with open("events.json", "w") as f:
+    #     json.dump(events_data, f, indent=4)
+    # print(f"Saved {len(events)} events to events.json")
 
 
 asyncio.run(test_simple_llm_assistant())

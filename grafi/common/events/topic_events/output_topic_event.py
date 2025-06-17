@@ -1,10 +1,7 @@
 import json
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
-from typing import Generator
 from typing import List
-from typing import Union
 
 from pydantic import ConfigDict
 from pydantic import TypeAdapter
@@ -16,7 +13,6 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 
 
 class OutputTopicEvent(TopicEvent):
@@ -26,12 +22,7 @@ class OutputTopicEvent(TopicEvent):
     publisher_name: str
     publisher_type: str
     event_type: EventType = EventType.OUTPUT_TOPIC
-    data: Union[
-        Message,
-        Messages,
-        Generator[Message, None, None],
-        MsgsAGen,
-    ]
+    data: Messages
 
     def to_dict(self) -> Dict[str, Any]:
         # TODO: Implement serialization for `data` field
@@ -44,18 +35,11 @@ class OutputTopicEvent(TopicEvent):
             "execution_context": self.execution_context.model_dump(),
         }
 
-        if isinstance(self.data, Generator) or isinstance(self.data, AsyncGenerator):
-            return {
-                **super().event_dict(),
-                EVENT_CONTEXT: event_context,
-                "data": None,
-            }
-        else:
-            return {
-                **super().event_dict(),
-                EVENT_CONTEXT: event_context,
-                "data": json.dumps(self.data, default=to_jsonable_python),
-            }
+        return {
+            **super().event_dict(),
+            EVENT_CONTEXT: event_context,
+            "data": json.dumps(self.data, default=to_jsonable_python),
+        }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OutputTopicEvent":

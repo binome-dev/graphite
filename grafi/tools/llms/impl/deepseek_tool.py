@@ -208,6 +208,7 @@ class DeepseekTool(LLM):
         data = delta.model_dump()
         if data.get("role") is None:
             data["role"] = "assistant"
+        data["is_streaming"] = True
         return [Message.model_validate(data)]
 
     def to_messages(self, resp: ChatCompletion) -> Messages:

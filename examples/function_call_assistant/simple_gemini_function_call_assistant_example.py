@@ -58,7 +58,7 @@ def test_simple_function_call_assistant() -> None:
     assert output is not None
     assert "weather" in str(output[0].content)
     print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 24
 
 
 test_simple_function_call_assistant()

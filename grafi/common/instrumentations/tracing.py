@@ -1,8 +1,9 @@
 import os
 import socket
 
+import arize.otel
+import phoenix.otel
 from arize.otel import Endpoint
-from arize.otel import register
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry import trace
@@ -39,7 +40,7 @@ def setup_tracing() -> "Tracer":
 
         collector_endpoint = Endpoint.ARIZE
 
-        register(
+        arize.otel.register(
             endpoint=collector_endpoint,
             space_id=arize_space_id,  # in app space settings page
             api_key=collector_api_key,  # in app space settings page
@@ -54,9 +55,9 @@ def setup_tracing() -> "Tracer":
     elif is_local_endpoint_available(
         "phoenix", 4317
     ):  # check if the local collector is available
-        tracer_provider = register(
+        tracer_provider = phoenix.otel.register(
             endpoint="phoenix:4317",
-            model_id="grafi-trace",
+            project_name="grafi-trace",
         )
 
         # Use OTLPSpanExporter if the endpoint is available
@@ -72,9 +73,9 @@ def setup_tracing() -> "Tracer":
     elif is_local_endpoint_available(
         "localhost", 4317
     ):  # check if the local collector is available
-        tracer_provider = register(
+        tracer_provider = phoenix.otel.register(
             endpoint="localhost:4317",
-            model_id="grafi-trace",
+            project_name="grafi-trace",
         )
 
         # Use OTLPSpanExporter if the endpoint is available

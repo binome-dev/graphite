@@ -21,6 +21,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import T_N
@@ -78,10 +79,22 @@ def record_node_a_execution(
                 )
 
                 # Execute the node function
-
+                result_content = ""
+                is_streaming = False
                 async for data in func(self, execution_context, input_data):
-                    result.extend(data)
+                    for message in data:
+                        if message.is_streaming:
+                            if message.content is not None and isinstance(
+                                message.content, str
+                            ):
+                                result_content += message.content
+                            is_streaming = True
+                        else:
+                            result.append(message)
                     yield data
+
+                if is_streaming:
+                    result = [Message(role="assistant", content=result_content)]
 
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
                 span.set_attribute("output", output_data_dict)

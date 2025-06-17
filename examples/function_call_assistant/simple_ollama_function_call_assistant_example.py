@@ -62,7 +62,7 @@ def test_simple_function_call_assistant() -> None:
     print(len(event_store.get_events()))
     assert "12345" in str(output[0].content)
     assert "sunny" in str(output[0].content)
-    assert len(event_store.get_events()) == 23
+    assert len(event_store.get_events()) == 27
 
 
 # Run the test function asynchronously

@@ -36,6 +36,7 @@ class EventType(Enum):
     CONSUME_FROM_TOPIC = "ConsumeFromTopic"
     OUTPUT_TOPIC = "OutputTopic"
     STREAM_OUTPUT_TOPIC = "StreamOutputTopic"
+    ASYNC_OUTPUT_TOPIC = "AsyncOutputTopic"
 
 
 EVENT_CONTEXT = "event_context"

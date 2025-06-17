@@ -4,9 +4,9 @@ from typing import Optional
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
+from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.assistants.stream_assistant import StreamAssistant
-from grafi.common.topics.stream_output_topic import agent_stream_output_topic
+from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -14,7 +14,7 @@ from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseComman
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
-class SimpleStreamAssistant(StreamAssistant):
+class SimpleStreamAssistant(Assistant):
     """
     A simple assistant class that uses OpenAI's language model to process input and generate responses.
 
@@ -59,7 +59,7 @@ class SimpleStreamAssistant(StreamAssistant):
                 )
                 .build()
             )
-            .publish_to(agent_stream_output_topic)
+            .publish_to(agent_output_topic)
             .build()
         )
 

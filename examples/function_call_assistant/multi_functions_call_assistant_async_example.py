@@ -121,11 +121,11 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the weather in 12345?")
     ]
 
-    output = await assistant.a_execute(execution_context_1, input_question_1)
+    async for output in assistant.a_execute(execution_context_1, input_question_1):
+        print(output)
+        assert output is not None
 
-    print(output)
-    assert output is not None
-    assert len(event_store.get_events()) == 33
+    assert len(event_store.get_events()) == 34
 
     # Test the run method
     execution_context_2 = get_execution_context()
@@ -133,11 +133,12 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the population in 12345?"),
     ]
 
-    output = await assistant.a_execute(execution_context_2, input_question_2)
+    async for output in assistant.a_execute(execution_context_2, input_question_2):
+        print(output)
+        assert output is not None
 
-    print(output)
-    assert output is not None
-    assert len(event_store.get_events()) == 66
+    print(len(event_store.get_events()))
+    assert len(event_store.get_events()) == 68
 
     # Test the run method
     execution_context_3 = get_execution_context()
@@ -145,12 +146,12 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the house price in 12345?"),
     ]
 
-    output = await assistant.a_execute(execution_context_3, input_question_3)
-    print(output)
-    assert output is not None
-    assert len(event_store.get_events()) == 99
+    async for output in assistant.a_execute(execution_context_3, input_question_3):
+        print(output)
+        assert output is not None
 
-    # assistant.generate_workflow_graph()
+    print(len(event_store.get_events()))
+    assert len(event_store.get_events()) == 102
 
 
 asyncio.run(test_multi_functions_call_assistant_async())

@@ -132,7 +132,7 @@ def test_multi_functions_call_assistant() -> None:
     print(output)
     print(len(event_store.get_events()))
     assert output is not None
-    assert len(event_store.get_events()) == 33
+    assert len(event_store.get_events()) == 34
 
     # Test the run method
     execution_context_2 = get_execution_context()
@@ -144,7 +144,7 @@ def test_multi_functions_call_assistant() -> None:
 
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 66
+    assert len(event_store.get_events()) == 68
 
     # Test the run method
     execution_context_3 = get_execution_context()
@@ -155,7 +155,7 @@ def test_multi_functions_call_assistant() -> None:
     output = assistant.execute(execution_context_3, input_question_3)
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 99
+    assert len(event_store.get_events()) == 102
 
     # assistant.generate_workflow_graph()
 

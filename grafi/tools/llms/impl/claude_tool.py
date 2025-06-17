@@ -210,7 +210,7 @@ class ClaudeTool(LLM):
     # ------------------------------------------------------------------ #
     def to_stream_messages(self, text: str) -> Messages:
         if text:
-            return [Message(role="assistant", content=text)]
+            return [Message(role="assistant", content=text, is_streaming=True)]
         return []
 
     def to_messages(self, resp: AnthropicMessage) -> Messages:

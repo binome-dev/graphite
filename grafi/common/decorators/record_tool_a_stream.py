@@ -16,6 +16,7 @@ from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
 from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
 from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.tool import T_T
@@ -73,6 +74,8 @@ def record_tool_a_stream(
                             result_content += message.content
                     yield data
                 # --------------------------------------------------
+
+                result = [Message(role="assistant", content=result_content)]
 
                 span.set_attribute(
                     "output", json.dumps(result, default=to_jsonable_python)
