@@ -66,15 +66,15 @@ class FastMCPClient(FunctionCallTool):
             or client_config.get("mcpServers") is None
         ):
             raise ValueError("Client Config are not set.")
-        logger.info(f"Initializing FastMCPClient with config: {client_config}")
+        logger.debug(f"Initializing FastMCPClient with config: {client_config}")
         client = Client(self.client_config)  # Initialize the client with the config
 
         try:
 
             async with client:
-                logger.info(f"Client connected: {client.is_connected()}")
+                logger.debug(f"Client connected: {client.is_connected()}")
                 tools = await client.list_tools()
-                logger.info(f"Current tools {tools}")
+                logger.debug(f"Current tools {tools}")
 
                 for tool in tools:
                     mcp_tool_spec = {
@@ -83,22 +83,40 @@ class FastMCPClient(FunctionCallTool):
                         "parameters": tool.inputSchema,
                     }
 
-                    #self.function_specs.append(mcp_tool_spec)
-                    self.function_specs.append(FunctionSpec.model_validate(mcp_tool_spec))
+                    # self.function_specs.append(mcp_tool_spec)
+                    self.function_specs.append(
+                        FunctionSpec.model_validate(mcp_tool_spec)
+                    )
 
                 self.resources = await client.list_resources()
+
                 self.prompts = await client.list_prompts()
+
+                logger.debug(f"Resources: {self.resources}")
+                logger.debug(f"Prompts: {self.prompts}")
         except ConnectionError as e:
             logger.error(f"Failed to connect to MCP server: {e}")
+            raise ConnectionError(
+                f"Failed to connect to MCP server. Please check your configuration: {e}"
+            )
 
         except httpx.ConnectError as e:
             logger.error(f"Connection To MCP Server failed, is the server up?: {e}")
+            raise ConnectionError(
+                f"Failed to connect to MCP server. Please check your configuration: {e}"
+            )
 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error: {e.response.status_code} - {e}")
+            raise ConnectionError(
+                f"HTTP error: {e.response.status_code} - {e.response.text}"
+            )
 
         except httpx.RequestError as e:
             logger.error(f"Request failed: {e}")
+            raise httpx.RequestError(
+                f"Request failed: {e}. Please check your MCP server configuration."
+            )
 
     @record_tool_execution
     def execute(
@@ -136,7 +154,7 @@ class FastMCPClient(FunctionCallTool):
 
         client = Client(self.client_config)
         async with client:
-            logger.info(f"Client connected: {client.is_connected()}")
+            logger.debug(f"Client connected: {client.is_connected()}")
             for tool_call in input_message.tool_calls:
                 if any(
                     spec.name == tool_call.function.name for spec in self.function_specs
@@ -144,7 +162,7 @@ class FastMCPClient(FunctionCallTool):
                     tool_name = tool_call.function.name
                     kwargs = json.loads(tool_call.function.arguments)
 
-                    logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
+                    logger.debug(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
                     try:
                         results = await client.call_tool(tool_name, kwargs)
                         response_str = ""
