@@ -51,6 +51,7 @@ def setup_tracing(
             space_id=arize_space_id,  # in app space settings page
             api_key=collector_api_key,  # in app space settings page
             model_id=arize_project_name,  # name this to whatever you would like
+            set_global_tracer_provider=False,
         )
 
         logger.info(
@@ -70,6 +71,7 @@ def setup_tracing(
         tracer_provider = phoenix.otel.register(
             endpoint=collector_endpoint_url,
             project_name=project_name,
+            set_global_tracer_provider=False,
         )
 
         # Use OTLPSpanExporter if the endpoint is available
@@ -90,6 +92,7 @@ def setup_tracing(
             tracer_provider = phoenix.otel.register(
                 endpoint=collector_endpoint_url,
                 project_name=project_name,
+                set_global_tracer_provider=False,
             )
 
             # Use OTLPSpanExporter if the endpoint is available
@@ -115,7 +118,7 @@ def setup_tracing(
         # Fallback to InMemorySpanExporter if the endpoint is not available
         span_exporter_im = InMemorySpanExporter()
         span_exporter_im.shutdown()
-        logger.debug("OTLP endpoint is not available. Using InMemorySpanExporter.")
+        logger.debug("Using InMemorySpanExporter.")
 
     else:
         raise ValueError(

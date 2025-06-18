@@ -4,6 +4,8 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.instrumentations.tracing import TracingOptions
+from grafi.common.instrumentations.tracing import setup_tracing
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_llm_assistant import (
@@ -11,6 +13,7 @@ from tests_integration.simple_llm_assistant.simple_llm_assistant import (
 )
 
 
+container.register_tracer(setup_tracing(tracing_options=TracingOptions.IN_MEMORY))
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
