@@ -35,7 +35,7 @@ postgres_event_store = EventStorePostgres(
     db_url="postgresql://user:password@localhost:5432/grafi_test_db",
 )
 
-container.register_event_store(EventStorePostgres, postgres_event_store)
+container.register_event_store(postgres_event_store)
 
 event_store = container.event_store
 

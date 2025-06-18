@@ -1,3 +1,5 @@
+# container.py
+import threading
 from typing import Optional
 
 from opentelemetry.trace import Tracer
@@ -8,42 +10,43 @@ from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
 
 
-class Container:
-    _instance = None
-    _event_store: Optional[EventStore] = None
+class SingletonMeta(type):
+    _instances: dict[type, object] = {}
+    _lock: threading.Lock = threading.Lock()
 
-    _tracer: Optional[Tracer] = None
+    def __call__(cls, *args, **kwargs):
+        # Ensure thread-safe singleton creation
+        with cls._lock:
+            if cls not in cls._instances:
+                cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
 
-    def __new__(cls) -> "Container":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+
+class Container(metaclass=SingletonMeta):
+    def __init__(self):
+        # Per-instance attributes:
+        self._event_store: Optional[EventStore] = None
+        self._tracer: Optional[Tracer] = None
 
     @classmethod
     def register_event_store(cls, event_store: EventStore) -> None:
-        """Register a different EventStore implementation"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        cls._instance._event_store = event_store
+        """Override the default EventStore implementation."""
+        cls()._event_store = event_store  # cls() always returns the singleton
 
     @classmethod
     def register_tracer(cls, tracer: Tracer) -> None:
-        """Register a different Tracer implementation"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        cls._instance._tracer = tracer
+        """Override the default Tracer implementation."""
+        cls()._tracer = tracer
 
     @property
     def event_store(self) -> EventStore:
         if self._event_store is None:
-            # Initialize the event store if not already set
             self._event_store = EventStoreInMemory()
         return self._event_store
 
     @property
     def tracer(self) -> Tracer:
         if self._tracer is None:
-            # Setup default tracer if not already set
             self._tracer = setup_tracing(
                 tracing_options=TracingOptions.AUTO,
                 collector_endpoint="localhost",
