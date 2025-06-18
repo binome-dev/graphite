@@ -45,19 +45,18 @@ def record_node_execution(
 
         subscribed_topics = [topic.name for topic in self._subscribed_topics.values()]
 
-        if container.event_store:
-            # Record the 'invoke' event
-            container.event_store.record_event(
-                NodeInvokeEvent(
-                    node_id=node_id,
-                    subscribed_topics=subscribed_topics,
-                    publish_to_topics=publish_to_topics,
-                    execution_context=execution_context,
-                    node_type=node_type,
-                    node_name=node_name,
-                    input_data=input_data,
-                )
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            NodeInvokeEvent(
+                node_id=node_id,
+                subscribed_topics=subscribed_topics,
+                publish_to_topics=publish_to_topics,
+                execution_context=execution_context,
+                node_type=node_type,
+                node_name=node_name,
+                input_data=input_data,
             )
+        )
 
         # Execute the original function
         try:
@@ -83,35 +82,34 @@ def record_node_execution(
 
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                container.event_store.record_event(
-                    NodeFailedEvent(
-                        node_id=node_id,
-                        subscribed_topics=subscribed_topics,
-                        publish_to_topics=publish_to_topics,
-                        execution_context=execution_context,
-                        node_type=node_type,
-                        node_name=node_name,
-                        input_data=input_data,
-                        error=str(e),
-                    )
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                NodeFailedEvent(
+                    node_id=node_id,
+                    subscribed_topics=subscribed_topics,
+                    publish_to_topics=publish_to_topics,
+                    execution_context=execution_context,
+                    node_type=node_type,
+                    node_name=node_name,
+                    input_data=input_data,
+                    error=str(e),
                 )
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                container.event_store.record_event(
-                    NodeRespondEvent(
-                        node_id=node_id,
-                        subscribed_topics=subscribed_topics,
-                        publish_to_topics=publish_to_topics,
-                        execution_context=execution_context,
-                        node_type=node_type,
-                        node_name=node_name,
-                        input_data=input_data,
-                        output_data=result,
-                    )
+            container.event_store.record_event(
+                NodeRespondEvent(
+                    node_id=node_id,
+                    subscribed_topics=subscribed_topics,
+                    publish_to_topics=publish_to_topics,
+                    execution_context=execution_context,
+                    node_type=node_type,
+                    node_name=node_name,
+                    input_data=input_data,
+                    output_data=result,
                 )
+            )
 
         return result
 

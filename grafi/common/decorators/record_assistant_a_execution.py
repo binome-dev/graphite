@@ -51,17 +51,16 @@ def record_assistant_a_execution(
 
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            # Record the 'invoke' event
-            container.event_store.record_event(
-                AssistantInvokeEvent(
-                    assistant_id=assistant_id,
-                    assistant_name=assistant_name,
-                    assistant_type=assistant_type,
-                    execution_context=execution_context,
-                    input_data=input_data,
-                )
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            AssistantInvokeEvent(
+                assistant_id=assistant_id,
+                assistant_name=assistant_name,
+                assistant_type=assistant_type,
+                execution_context=execution_context,
+                input_data=input_data,
             )
+        )
 
         # Execute the original function
         result: Messages = []
@@ -104,8 +103,9 @@ def record_assistant_a_execution(
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                failed_event = AssistantFailedEvent(
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                AssistantFailedEvent(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
@@ -113,13 +113,12 @@ def record_assistant_a_execution(
                     input_data=input_data,
                     error=str(e),
                 )
-                span.set_attribute("error", str(e))
-                container.event_store.record_event(failed_event)
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                respond_event = AssistantRespondEvent(
+            container.event_store.record_event(
+                AssistantRespondEvent(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
@@ -127,6 +126,6 @@ def record_assistant_a_execution(
                     input_data=input_data,
                     output_data=result,
                 )
-                container.event_store.record_event(respond_event)
+            )
 
     return wrapper

@@ -35,16 +35,15 @@ def record_tool_a_stream(
         tool_id, tool_name, tool_type = self.tool_id, self.name or "", self.type or ""
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            container.event_store.record_event(
-                ToolInvokeEvent(
-                    tool_id=tool_id,
-                    execution_context=execution_context,
-                    tool_type=tool_type,
-                    tool_name=tool_name,
-                    input_data=input_data,
-                )
+        container.event_store.record_event(
+            ToolInvokeEvent(
+                tool_id=tool_id,
+                execution_context=execution_context,
+                tool_type=tool_type,
+                tool_name=tool_name,
+                input_data=input_data,
             )
+        )
 
         result: Messages = []
 
@@ -81,8 +80,9 @@ def record_tool_a_stream(
                 )
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                failed_event = ToolFailedEvent(
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                ToolFailedEvent(
                     tool_id=tool_id,
                     execution_context=execution_context,
                     tool_type=tool_type,
@@ -90,12 +90,12 @@ def record_tool_a_stream(
                     input_data=input_data,
                     error=str(e),
                 )
-                container.event_store.record_event(failed_event)
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                respond_event = ToolRespondEvent(
+            container.event_store.record_event(
+                ToolRespondEvent(
                     tool_id=tool_id,
                     execution_context=execution_context,
                     tool_type=tool_type,
@@ -103,6 +103,6 @@ def record_tool_a_stream(
                     input_data=input_data,
                     output_data=result,
                 )
-                container.event_store.record_event(respond_event)
+            )
 
     return wrapper

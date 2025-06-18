@@ -108,6 +108,5 @@ class EventStore:
             EventType.CONSUME_FROM_TOPIC.value: ConsumeFromTopicEvent,
             EventType.PUBLISH_TO_TOPIC.value: PublishToTopicEvent,
             EventType.OUTPUT_TOPIC.value: OutputTopicEvent,
-            EventType.STREAM_TOPIC_EVENT.value: OutputTopicEvent,
         }
         return event_classes.get(event_type)

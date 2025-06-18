@@ -52,16 +52,16 @@ def record_workflow_execution(
 
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            # Record the 'invoke' event
-            invoke_event = WorkflowInvokeEvent(
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            WorkflowInvokeEvent(
                 workflow_id=workflow_id,
                 execution_context=execution_context,
                 workflow_type=workflow_type,
                 workflow_name=workflow_name,
                 input_data=input_data,
             )
-            container.event_store.record_event(invoke_event)
+        )
 
         # Execute the original function
         try:
@@ -86,8 +86,9 @@ def record_workflow_execution(
 
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                failed_event = WorkflowFailedEvent(
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                WorkflowFailedEvent(
                     workflow_id=workflow_id,
                     execution_context=execution_context,
                     workflow_type=workflow_type,
@@ -95,21 +96,20 @@ def record_workflow_execution(
                     input_data=input_data,
                     error=str(e),
                 )
-                container.event_store.record_event(failed_event)
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                container.event_store.record_event(
-                    WorkflowRespondEvent(
-                        workflow_id=workflow_id,
-                        execution_context=execution_context,
-                        workflow_type=workflow_type,
-                        workflow_name=workflow_name,
-                        input_data=input_data,
-                        output_data=result,
-                    )
+            container.event_store.record_event(
+                WorkflowRespondEvent(
+                    workflow_id=workflow_id,
+                    execution_context=execution_context,
+                    workflow_type=workflow_type,
+                    workflow_name=workflow_name,
+                    input_data=input_data,
+                    output_data=result,
                 )
+            )
         return result
 
     return wrapper

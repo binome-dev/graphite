@@ -63,4 +63,4 @@ class Container(metaclass=SingletonMeta):
         return self._tracer
 
 
-container = Container()
+container: Container = Container()

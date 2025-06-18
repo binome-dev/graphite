@@ -48,17 +48,16 @@ def record_assistant_execution(
         model = getattr(self, "model", "")
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            # Record the 'invoke' event
-            container.event_store.record_event(
-                AssistantInvokeEvent(
-                    assistant_id=assistant_id,
-                    assistant_name=assistant_name,
-                    assistant_type=assistant_type,
-                    execution_context=execution_context,
-                    input_data=input_data,
-                )
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            AssistantInvokeEvent(
+                assistant_id=assistant_id,
+                assistant_name=assistant_name,
+                assistant_type=assistant_type,
+                execution_context=execution_context,
+                input_data=input_data,
             )
+        )
 
         # Execute the original function
         try:
@@ -85,32 +84,30 @@ def record_assistant_execution(
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                span.set_attribute("error", str(e))
-                container.event_store.record_event(
-                    AssistantFailedEvent(
-                        assistant_id=assistant_id,
-                        assistant_name=assistant_name,
-                        assistant_type=assistant_type,
-                        execution_context=execution_context,
-                        input_data=input_data,
-                        error=str(e),
-                    )
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                AssistantFailedEvent(
+                    assistant_id=assistant_id,
+                    assistant_name=assistant_name,
+                    assistant_type=assistant_type,
+                    execution_context=execution_context,
+                    input_data=input_data,
+                    error=str(e),
                 )
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                container.event_store.record_event(
-                    AssistantRespondEvent(
-                        assistant_id=assistant_id,
-                        assistant_name=assistant_name,
-                        assistant_type=assistant_type,
-                        execution_context=execution_context,
-                        input_data=input_data,
-                        output_data=result,
-                    )
+            container.event_store.record_event(
+                AssistantRespondEvent(
+                    assistant_id=assistant_id,
+                    assistant_name=assistant_name,
+                    assistant_type=assistant_type,
+                    execution_context=execution_context,
+                    input_data=input_data,
+                    output_data=result,
                 )
+            )
         return result
 
     return wrapper
