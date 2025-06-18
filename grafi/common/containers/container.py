@@ -1,5 +1,6 @@
 # container.py
 import threading
+from typing import Any
 from typing import Optional
 
 from loguru import logger
@@ -15,7 +16,7 @@ class SingletonMeta(type):
     _instances: dict[type, object] = {}
     _lock: threading.Lock = threading.Lock()
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls: "SingletonMeta", *args: Any, **kwargs: Any) -> Any:
         # Ensure thread-safe singleton creation
         with cls._lock:
             if cls not in cls._instances:
@@ -24,24 +25,22 @@ class SingletonMeta(type):
 
 
 class Container(metaclass=SingletonMeta):
-    def __init__(self):
+    def __init__(self) -> None:
         # Per-instance attributes:
         self._event_store: Optional[EventStore] = None
         self._tracer: Optional[Tracer] = None
 
-    @classmethod
-    def register_event_store(cls, event_store: EventStore) -> None:
+    def register_event_store(self, event_store: EventStore) -> None:
         """Override the default EventStore implementation."""
         if isinstance(event_store, EventStoreInMemory):
             logger.warning(
                 "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
             )
-        cls()._event_store = event_store  # cls() always returns the singleton
+        self._event_store = event_store
 
-    @classmethod
-    def register_tracer(cls, tracer: Tracer) -> None:
+    def register_tracer(self, tracer: Tracer) -> None:
         """Override the default Tracer implementation."""
-        cls()._tracer = tracer
+        self._tracer = tracer
 
     @property
     def event_store(self) -> EventStore:

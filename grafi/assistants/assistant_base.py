@@ -1,5 +1,4 @@
 from typing import Self
-from typing import Type
 from typing import TypeVar
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -73,10 +72,8 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
         self._obj.type = type_name
         return self
 
-    def event_store(
-        self, event_store_class: Type[EventStore], event_store: EventStore
-    ) -> Self:
-        container.register_event_store(event_store_class, event_store)
+    def event_store(self, event_store: EventStore) -> Self:
+        container.register_event_store(event_store)
         return self
 
     def build(self) -> T_A:
