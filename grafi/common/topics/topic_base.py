@@ -148,7 +148,6 @@ T_T = TypeVar("T_T", bound=TopicBase)
 
 
 class TopicBaseBuilder(BaseBuilder[T_T]):
-
     def name(self, name: str) -> Self:
         if name in AGENT_RESERVED_TOPICS:
             raise ValueError(f"Topic name '{name}' is reserved for the agent.")

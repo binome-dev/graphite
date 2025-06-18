@@ -19,7 +19,7 @@ Graphite is a flexible, event-driven framework for building AI agents using modu
    By treating events as the single source of truth, Graphite automatically logs every state change and decision path. This level of detailed recordkeeping is indispensable for users working in regulated sectors or who need full traceability for debugging and compliance.
 
 4. **Restorability**  
-   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency ([Example](/examples/react_assistant/react_assistant_recovery_example.py)).
+   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency ([Example](/tests_integration/react_assistant/react_assistant_recovery_example.py)).
 
 Graphite is based on:
 

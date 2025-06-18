@@ -55,7 +55,6 @@ def mock_tool_list():
 
 @pytest.fixture
 def test_messages():
-
     messages = [
         Message(
             role="user",
@@ -107,7 +106,6 @@ def mock_embedded_resource():
 
 
 class TestMCPTool:
-
     @pytest.mark.asyncio
     async def test_builder_initialization(self):
         builder = MCPTool.builder()

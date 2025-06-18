@@ -14,7 +14,6 @@ from grafi.common.events.tool_events.tool_event import TOOL_TYPE
 from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
 from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -51,7 +50,7 @@ def record_tool_a_stream(
 
         # Execute the original function
         try:
-            with tracer.start_as_current_span(f"{tool_name}.execute") as span:
+            with container.tracer.start_as_current_span(f"{tool_name}.execute") as span:
                 span.set_attribute(TOOL_ID, tool_id)
                 span.set_attribute(TOOL_NAME, tool_name)
                 span.set_attribute(TOOL_TYPE, tool_type)

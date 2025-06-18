@@ -19,7 +19,6 @@ from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.nodes.node import T_N
@@ -62,7 +61,7 @@ def record_node_execution(
 
         # Execute the original function
         try:
-            with tracer.start_as_current_span(f"{node_name}.execute") as span:
+            with container.tracer.start_as_current_span(f"{node_name}.execute") as span:
                 span.set_attribute(NODE_ID, node_id)
                 span.set_attribute(NODE_NAME, node_name)
                 span.set_attribute(NODE_TYPE, node_type)

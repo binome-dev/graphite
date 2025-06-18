@@ -30,7 +30,6 @@ class LLMStreamResponseCommand(Command):
     async def a_execute(
         self, execution_context: ExecutionContext, input_data: Messages
     ) -> MsgsAGen:
-
         async for message in self.llm.a_stream(execution_context, input_data):
             yield message
 

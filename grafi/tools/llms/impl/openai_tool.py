@@ -280,7 +280,6 @@ class OpenAITool(LLM):
 
 
 class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
-
     def build(self) -> "OpenAITool":
         if not self._obj.api_key:
             raise ValueError("API key must be provided for OpenAITool.")

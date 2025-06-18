@@ -1,9 +1,9 @@
 import os
 import socket
+from enum import Enum
 
 import arize.otel
 import phoenix.otel
-from arize.otel import Endpoint
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry import trace
@@ -13,32 +13,38 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import Tracer
 
 
-phoenix_collector_host = os.getenv("PHOENIX_ENDPOINT", "127.0.0.1")
+class TracingOptions(Enum):
+    ARIZE = "arize"
+    PHOENIX = "phoenix"
+    AUTO = "auto"  # Default to auto-detecting
+    IN_MEMORY = "in_memory"  # use in-memory span
 
 
 def is_local_endpoint_available(host: str, port: int) -> bool:
     """Check if the OTLP endpoint is available."""
     try:
-        with socket.create_connection((host, port), timeout=2):
+        with socket.create_connection((host, port), timeout=0.1):
             return True
     except Exception as e:
         logger.debug(f"Endpoint check failed: {e}")
         return False
 
 
-env = os.getenv("ENV", "local")
-arize_api_key = os.getenv("ARIZE_API_KEY", "")
-arize_space_id = os.getenv("ARIZE_SPACE_ID", "")
-arize_project_name = os.getenv("ARIZE_PROJECT_NAME", "")
-
-
-def setup_tracing() -> "Tracer":
+def setup_tracing(
+    tracing_options: TracingOptions = TracingOptions.AUTO,
+    collector_endpoint: str = "localhost",
+    collector_port: int = 4317,
+    project_name: str = "grafi-trace",
+) -> "Tracer":
     # only use arize if the environment is production
-    if arize_api_key != "":
+    if tracing_options == TracingOptions.ARIZE:
+        arize_api_key = os.getenv("ARIZE_API_KEY", "")
+        arize_space_id = os.getenv("ARIZE_SPACE_ID", "")
+        arize_project_name = os.getenv("ARIZE_PROJECT_NAME", "")
         collector_api_key = arize_api_key
         os.environ["PHOENIX_CLIENT_HEADERS"] = f"api_key={collector_api_key}"
 
-        collector_endpoint = Endpoint.ARIZE
+        collector_endpoint = collector_endpoint  # Endpoint.ARIZE
 
         arize.otel.register(
             endpoint=collector_endpoint,
@@ -52,36 +58,24 @@ def setup_tracing() -> "Tracer":
         )
 
         OpenAIInstrumentor().instrument()
-    elif is_local_endpoint_available(
-        "phoenix", 4317
-    ):  # check if the local collector is available
+    elif tracing_options == TracingOptions.PHOENIX:
+        # check if the local collector is available
+        collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
+        if not is_local_endpoint_available(collector_endpoint, collector_port):
+            raise ValueError(
+                f"OTLP endpoint {collector_endpoint} is not available. "
+                "Please ensure the collector is running or check the endpoint configuration."
+            )
+
         tracer_provider = phoenix.otel.register(
-            endpoint="phoenix:4317",
-            project_name="grafi-trace",
+            endpoint=collector_endpoint_url,
+            project_name=project_name,
         )
 
         # Use OTLPSpanExporter if the endpoint is available
-        span_exporter = OTLPSpanExporter(endpoint="phoenix:4317", insecure=True)
-        logger.info("OTLP endpoint phoenix:4317 is available. Using OTLPSpanExporter.")
-
-        # Use SimpleSpanProcessor or BatchSpanProcessor as needed
-        span_processor = SimpleSpanProcessor(span_exporter)
-        tracer_provider.add_span_processor(span_processor)
-
-        OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-        trace.set_tracer_provider(tracer_provider)
-    elif is_local_endpoint_available(
-        "localhost", 4317
-    ):  # check if the local collector is available
-        tracer_provider = phoenix.otel.register(
-            endpoint="localhost:4317",
-            project_name="grafi-trace",
-        )
-
-        # Use OTLPSpanExporter if the endpoint is available
-        span_exporter = OTLPSpanExporter(endpoint="localhost:4317", insecure=True)
+        span_exporter = OTLPSpanExporter(endpoint=collector_endpoint_url, insecure=True)
         logger.info(
-            "OTLP endpoint localhost:4317 is available. Using OTLPSpanExporter."
+            f"OTLP endpoint {collector_endpoint_url} is available. Using OTLPSpanExporter."
         )
 
         # Use SimpleSpanProcessor or BatchSpanProcessor as needed
@@ -90,13 +84,43 @@ def setup_tracing() -> "Tracer":
 
         OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
         trace.set_tracer_provider(tracer_provider)
-    else:
+    elif tracing_options == TracingOptions.AUTO:
+        collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
+        if is_local_endpoint_available(collector_endpoint, collector_port):
+            tracer_provider = phoenix.otel.register(
+                endpoint=collector_endpoint_url,
+                project_name=project_name,
+            )
+
+            # Use OTLPSpanExporter if the endpoint is available
+            span_exporter = OTLPSpanExporter(
+                endpoint=collector_endpoint_url, insecure=True
+            )
+            logger.info(
+                f"OTLP endpoint {collector_endpoint_url} is available. Using OTLPSpanExporter."
+            )
+
+            # Use SimpleSpanProcessor or BatchSpanProcessor as needed
+            span_processor = SimpleSpanProcessor(span_exporter)
+            tracer_provider.add_span_processor(span_processor)
+
+            OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+            trace.set_tracer_provider(tracer_provider)
+        else:
+            # Fallback to InMemorySpanExporter if the endpoint is not available
+            span_exporter_im = InMemorySpanExporter()
+            span_exporter_im.shutdown()
+            logger.debug("OTLP endpoint is not available. Using InMemorySpanExporter.")
+    elif tracing_options == TracingOptions.IN_MEMORY:
         # Fallback to InMemorySpanExporter if the endpoint is not available
         span_exporter_im = InMemorySpanExporter()
         span_exporter_im.shutdown()
         logger.debug("OTLP endpoint is not available. Using InMemorySpanExporter.")
 
+    else:
+        raise ValueError(
+            f"Invalid tracing option: {tracing_options}. "
+            "Choose from ARIZE, PHOENIX, AUTO, or IN_MEMORY."
+        )
+
     return trace.get_tracer(__name__)
-
-
-tracer = setup_tracing()

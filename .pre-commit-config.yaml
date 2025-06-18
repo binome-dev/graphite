@@ -16,7 +16,7 @@ repos:
 
       - id: black
         name: Format example directory
-        files: ^examples/
+        files: ^tests_integration/
         args: ['--config=pyproject.toml']
 
       - id: black
@@ -35,8 +35,8 @@ repos:
         args: ['--toml-config=pyproject.toml']
 
       - id: flake8
-        name: Lint examples directory with flake8
-        files: ^examples/
+        name: Lint tests_integration directory with flake8
+        files: ^tests_integration/
         exclude: (__init__.py)$
         additional_dependencies: ['flake8-pyproject']
         args: ['--toml-config=pyproject.toml']
@@ -60,8 +60,8 @@ repos:
         args: ['--settings-file=pyproject.toml']
 
       - id: isort
-        name: Sort imports examples directory
-        files: ^examples/
+        name: Sort imports tests_integration directory
+        files: ^tests_integration/
         additional_dependencies: ['toml']
         exclude: (__init__.py)$
         args: ['--settings-file=pyproject.toml']

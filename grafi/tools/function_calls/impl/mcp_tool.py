@@ -49,7 +49,6 @@ class MCPTool(FunctionCallTool):
         return MCPToolBuilder(cls)
 
     async def _a_get_function_specs(self) -> None:
-
         if self.server_params is None:
             raise ValueError("Server parameters are not set.")
 
@@ -117,7 +116,6 @@ class MCPTool(FunctionCallTool):
                         spec.name == tool_call.function.name
                         for spec in self.function_specs
                     ):
-
                         tool_name = tool_call.function.name
                         kwargs = json.loads(tool_call.function.arguments)
 
@@ -141,7 +139,6 @@ class MCPTool(FunctionCallTool):
                             if isinstance(content_item, TextContent):
                                 response_str += content_item.text + "\n"
                             elif isinstance(content_item, ImageContent):
-
                                 response_str = getattr(content_item, "data", "")
 
                             elif isinstance(content_item, EmbeddedResource):

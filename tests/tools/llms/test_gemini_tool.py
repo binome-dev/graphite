@@ -124,7 +124,6 @@ def test_execute_function_call(monkeypatch, gemini_instance, execution_context):
 
     call_kwargs = mock_client.models.generate_content.call_args[1]
     # The GenerateContentConfig should contain our tool schema
-    cfg = call_kwargs["config"]
     assert call_kwargs is not None
 
 

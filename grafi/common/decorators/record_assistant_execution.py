@@ -19,7 +19,6 @@ from grafi.common.events.assistant_events.assistant_invoke_event import (
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 
@@ -63,7 +62,9 @@ def record_assistant_execution(
 
         # Execute the original function
         try:
-            with tracer.start_as_current_span(f"{assistant_name}.run") as span:
+            with container.tracer.start_as_current_span(
+                f"{assistant_name}.run"
+            ) as span:
                 # Set span attributes of the assistant
                 span.set_attribute(ASSISTANT_ID, assistant_id)
                 span.set_attribute(ASSISTANT_NAME, assistant_name)

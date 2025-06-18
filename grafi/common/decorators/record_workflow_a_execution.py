@@ -21,7 +21,6 @@ from grafi.common.events.workflow_events.workflow_invoke_event import (
 from grafi.common.events.workflow_events.workflow_respond_event import (
     WorkflowRespondEvent,
 )
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -70,7 +69,9 @@ def record_workflow_a_execution(
         # Execute the original function
         result: Messages = []
         try:
-            with tracer.start_as_current_span(f"{workflow_name}.execute") as span:
+            with container.tracer.start_as_current_span(
+                f"{workflow_name}.execute"
+            ) as span:
                 span.set_attribute(WORKFLOW_ID, workflow_id)
                 span.set_attribute(WORKFLOW_NAME, workflow_name)
                 span.set_attribute(WORKFLOW_TYPE, workflow_type)

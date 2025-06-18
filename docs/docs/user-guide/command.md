@@ -24,7 +24,7 @@ The concrete implementation of `Command` interface should be with its associated
 
 ## LLM Response Command and LLM Stream Command
 
-[`LLMResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
+[`LLMResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
 
 Fields:
 
@@ -65,7 +65,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 ## Embedding Response Command and RAG Response Command
 
-[`EmbeddingResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/embedding_assistant/tools/embeddings/embedding_response_command.py) encapsulates a `RetrievalTool` for transforming input messages into embeddings, retrieving relevant content, and returning it as a `Message`. This command is used by `EmbeddingRetrievalNode`.
+[`EmbeddingResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/embedding_assistant/tools/embeddings/embedding_response_command.py) encapsulates a `RetrievalTool` for transforming input messages into embeddings, retrieving relevant content, and returning it as a `Message`. This command is used by `EmbeddingRetrievalNode`.
 
 `EmbeddingResponseCommand` fields:
 
@@ -81,7 +81,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 | `a_execute(execution_context, input_data)`    | Asynchronously calls `retrieval_tool.a_execute`, yielding one or more `Message` objects.                       |
 | `to_dict()`                                   | Serializes the command’s state, including the `retrieval_tool` configuration.                                  |
 
-[`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/examples/rag_assistant/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
+[`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
 
 `RagResponseCommand` fields:
 
