@@ -2,6 +2,7 @@
 import threading
 from typing import Optional
 
+from loguru import logger
 from opentelemetry.trace import Tracer
 
 from grafi.common.event_stores.event_store import EventStore
@@ -31,6 +32,10 @@ class Container(metaclass=SingletonMeta):
     @classmethod
     def register_event_store(cls, event_store: EventStore) -> None:
         """Override the default EventStore implementation."""
+        if isinstance(event_store, EventStoreInMemory):
+            logger.warning(
+                "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
+            )
         cls()._event_store = event_store  # cls() always returns the singleton
 
     @classmethod
@@ -41,6 +46,9 @@ class Container(metaclass=SingletonMeta):
     @property
     def event_store(self) -> EventStore:
         if self._event_store is None:
+            logger.warning(
+                "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
+            )
             self._event_store = EventStoreInMemory()
         return self._event_store
 
