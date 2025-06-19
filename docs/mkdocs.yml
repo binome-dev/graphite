@@ -15,7 +15,7 @@ theme:
       primary: custom
       accent: custom
       toggle:
-        icon: material/brightness-7 
+        icon: material/brightness-7
         name: Switch to dark mode
 
     # Palette toggle for dark mode
@@ -40,12 +40,12 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
   - Core Concepts:
-    - Arhitecture Overview: user-guide/architecture.md 
+    - Arhitecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
     - Node: user-guide/node.md
     - Command: user-guide/command.md
-    - Tools: 
+    - Tools:
       - Tools Core: user-guide/tools/tools.md
       - OpenAI: user-guide/tools/openai.md
       - Ollama: user-guide/tools/ollama.md

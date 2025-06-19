@@ -37,6 +37,9 @@ from grafi.common.events.workflow_events.workflow_failed_event import (
 from grafi.common.events.workflow_events.workflow_invoke_event import (
     WorkflowInvokeEvent,
 )
+from grafi.common.events.workflow_events.workflow_respond_event import (
+    WorkflowRespondEvent,
+)
 
 
 class EventStore:
@@ -97,6 +100,7 @@ class EventStore:
             EventType.TOOL_RESPOND.value: ToolRespondEvent,
             EventType.WORKFLOW_FAILED.value: WorkflowFailedEvent,
             EventType.WORKFLOW_INVOKE.value: WorkflowInvokeEvent,
+            EventType.WORKFLOW_RESPOND.value: WorkflowRespondEvent,
             EventType.ASSISTANT_FAILED.value: AssistantFailedEvent,
             EventType.ASSISTANT_INVOKE.value: AssistantInvokeEvent,
             EventType.ASSISTANT_RESPOND.value: AssistantRespondEvent,
@@ -104,6 +108,5 @@ class EventStore:
             EventType.CONSUME_FROM_TOPIC.value: ConsumeFromTopicEvent,
             EventType.PUBLISH_TO_TOPIC.value: PublishToTopicEvent,
             EventType.OUTPUT_TOPIC.value: OutputTopicEvent,
-            EventType.STREAM_TOPIC_EVENT.value: OutputTopicEvent,
         }
         return event_classes.get(event_type)

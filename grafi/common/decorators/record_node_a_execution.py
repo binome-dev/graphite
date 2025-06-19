@@ -19,7 +19,6 @@ from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -48,24 +47,23 @@ def record_node_a_execution(
 
         subscribed_topics = [topic.name for topic in self._subscribed_topics.values()]
 
-        if container.event_store:
-            # Record the 'invoke' event
-            container.event_store.record_event(
-                NodeInvokeEvent(
-                    node_id=node_id,
-                    subscribed_topics=subscribed_topics,
-                    publish_to_topics=publish_to_topics,
-                    execution_context=execution_context,
-                    node_type=node_type,
-                    node_name=node_name,
-                    input_data=input_data,
-                )
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            NodeInvokeEvent(
+                node_id=node_id,
+                subscribed_topics=subscribed_topics,
+                publish_to_topics=publish_to_topics,
+                execution_context=execution_context,
+                node_type=node_type,
+                node_name=node_name,
+                input_data=input_data,
             )
+        )
 
         result: Messages = []
         # Execute the original function
         try:
-            with tracer.start_as_current_span(f"{node_name}.execute") as span:
+            with container.tracer.start_as_current_span(f"{node_name}.execute") as span:
                 span.set_attribute(NODE_ID, node_id)
                 span.set_attribute(NODE_NAME, node_name)
                 span.set_attribute(NODE_TYPE, node_type)
@@ -100,8 +98,9 @@ def record_node_a_execution(
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                failed_event = NodeFailedEvent(
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                NodeFailedEvent(
                     node_id=node_id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
@@ -111,12 +110,12 @@ def record_node_a_execution(
                     input_data=input_data,
                     error=str(e),
                 )
-                container.event_store.record_event(failed_event)
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                respond_event = NodeRespondEvent(
+            container.event_store.record_event(
+                NodeRespondEvent(
                     node_id=node_id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
@@ -126,6 +125,6 @@ def record_node_a_execution(
                     input_data=input_data,
                     output_data=result,
                 )
-                container.event_store.record_event(respond_event)
+            )
 
     return wrapper

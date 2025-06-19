@@ -28,7 +28,7 @@ def mock_ddgs():
 def test_duckduckgo_tool_initialization(duckduckgo_tool: DuckDuckGoTool):
     assert duckduckgo_tool.name == "DuckDuckGoTool"
     assert duckduckgo_tool.type == "DuckDuckGoTool"
-    assert duckduckgo_tool.fixed_max_results == None
+    assert duckduckgo_tool.fixed_max_results is None
     assert duckduckgo_tool.timeout == 10
 
 

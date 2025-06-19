@@ -21,7 +21,6 @@ from grafi.common.events.workflow_events.workflow_invoke_event import (
 from grafi.common.events.workflow_events.workflow_respond_event import (
     WorkflowRespondEvent,
 )
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -55,22 +54,23 @@ def record_workflow_a_execution(
 
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            # Record the 'invoke' event
-            container.event_store.record_event(
-                WorkflowInvokeEvent(
-                    workflow_id=workflow_id,
-                    execution_context=execution_context,
-                    workflow_type=workflow_type,
-                    workflow_name=workflow_name,
-                    input_data=input_data,
-                )
+        # Record the 'invoke' event
+        container.event_store.record_event(
+            WorkflowInvokeEvent(
+                workflow_id=workflow_id,
+                execution_context=execution_context,
+                workflow_type=workflow_type,
+                workflow_name=workflow_name,
+                input_data=input_data,
             )
+        )
 
         # Execute the original function
         result: Messages = []
         try:
-            with tracer.start_as_current_span(f"{workflow_name}.execute") as span:
+            with container.tracer.start_as_current_span(
+                f"{workflow_name}.execute"
+            ) as span:
                 span.set_attribute(WORKFLOW_ID, workflow_id)
                 span.set_attribute(WORKFLOW_NAME, workflow_name)
                 span.set_attribute(WORKFLOW_TYPE, workflow_type)
@@ -104,30 +104,29 @@ def record_workflow_a_execution(
 
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                container.event_store.record_event(
-                    WorkflowFailedEvent(
-                        workflow_id=workflow_id,
-                        execution_context=execution_context,
-                        workflow_type=workflow_type,
-                        workflow_name=workflow_name,
-                        input_data=input_data,
-                        error=str(e),
-                    )
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                WorkflowFailedEvent(
+                    workflow_id=workflow_id,
+                    execution_context=execution_context,
+                    workflow_type=workflow_type,
+                    workflow_name=workflow_name,
+                    input_data=input_data,
+                    error=str(e),
                 )
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                container.event_store.record_event(
-                    WorkflowRespondEvent(
-                        workflow_id=workflow_id,
-                        execution_context=execution_context,
-                        workflow_type=workflow_type,
-                        workflow_name=workflow_name,
-                        input_data=input_data,
-                        output_data=result,
-                    )
+            container.event_store.record_event(
+                WorkflowRespondEvent(
+                    workflow_id=workflow_id,
+                    execution_context=execution_context,
+                    workflow_type=workflow_type,
+                    workflow_name=workflow_name,
+                    input_data=input_data,
+                    output_data=result,
                 )
+            )
 
     return wrapper

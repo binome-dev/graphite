@@ -7,7 +7,7 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
-  
+
   workflow_dispatch:
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
-          path: .cache 
+          path: .cache
           restore-keys: |
             mkdocs-material-
 
@@ -51,5 +51,5 @@ jobs:
 
       - name: Deploy To Github Pages
         run: |
-          cd docs 
+          cd docs
           mkdocs gh-deploy --force

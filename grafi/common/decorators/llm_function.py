@@ -53,7 +53,7 @@ def llm_function(func: Callable[P, R]) -> Callable[P, R]:
     """
 
     type_hints = get_type_hints(func)
-    
+
     # Extract function name and docstring
     func_name = func.__name__
     docstring = inspect.getdoc(func) or ""
@@ -89,14 +89,14 @@ def llm_function(func: Callable[P, R]) -> Callable[P, R]:
 
     # Store the function spec as an attribute on the function
     setattr(func, "_function_spec", func_spec)
-    return func  
+    return func
 
 
 def _py2json(t: type) -> JsonType:
     return {
-        str:  "string",
-        int:  "integer",
-        float:"number",
+        str: "string",
+        int: "integer",
+        float: "number",
         bool: "boolean",
         list: "array",
         dict: "object",

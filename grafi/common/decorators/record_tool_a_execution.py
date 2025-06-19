@@ -14,7 +14,6 @@ from grafi.common.events.tool_events.tool_event import TOOL_TYPE
 from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
 from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
-from grafi.common.instrumentations.tracing import tracer
 from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -35,22 +34,21 @@ def record_tool_a_execution(
         tool_id, tool_name, tool_type = self.tool_id, self.name or "", self.type or ""
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
-        if container.event_store:
-            container.event_store.record_event(
-                ToolInvokeEvent(
-                    tool_id=tool_id,
-                    execution_context=execution_context,
-                    tool_type=tool_type,
-                    tool_name=tool_name,
-                    input_data=input_data,
-                )
+        container.event_store.record_event(
+            ToolInvokeEvent(
+                tool_id=tool_id,
+                execution_context=execution_context,
+                tool_type=tool_type,
+                tool_name=tool_name,
+                input_data=input_data,
             )
+        )
 
         result: Messages = []
 
         # Execute the original function
         try:
-            with tracer.start_as_current_span(f"{tool_name}.execute") as span:
+            with container.tracer.start_as_current_span(f"{tool_name}.execute") as span:
                 span.set_attribute(TOOL_ID, tool_id)
                 span.set_attribute(TOOL_NAME, tool_name)
                 span.set_attribute(TOOL_TYPE, tool_type)
@@ -74,8 +72,9 @@ def record_tool_a_execution(
                 )
         except Exception as e:
             # Exception occurred during execution
-            if container.event_store:
-                failed_event = ToolFailedEvent(
+            span.set_attribute("error", str(e))
+            container.event_store.record_event(
+                ToolFailedEvent(
                     tool_id=tool_id,
                     execution_context=execution_context,
                     tool_type=tool_type,
@@ -83,12 +82,12 @@ def record_tool_a_execution(
                     input_data=input_data,
                     error=str(e),
                 )
-                container.event_store.record_event(failed_event)
+            )
             raise
         else:
             # Successful execution
-            if container.event_store:
-                respond_event = ToolRespondEvent(
+            container.event_store.record_event(
+                ToolRespondEvent(
                     tool_id=tool_id,
                     execution_context=execution_context,
                     tool_type=tool_type,
@@ -96,6 +95,6 @@ def record_tool_a_execution(
                     input_data=input_data,
                     output_data=result,
                 )
-                container.event_store.record_event(respond_event)
+            )
 
     return wrapper
