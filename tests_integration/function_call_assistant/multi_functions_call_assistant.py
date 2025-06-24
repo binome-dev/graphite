@@ -41,7 +41,7 @@ class MultiFunctionsCallAssistant(Assistant):
         summary_llm_system_message (str): System message for the summary LLM
         model (str): The name of the OpenAI model to use, defaults to "gpt-4o-mini"
         function_tools (List[FunctionCallTool]): List of function tools to be called by the assistant
-        workflow (WorkflowDag): The workflow DAG managing the execution flow
+        workflow (WorkflowDag): The workflow DAG managing the invoke flow
     """
 
     oi_span_type: OpenInferenceSpanKindValues = Field(

@@ -4,7 +4,7 @@ from typing import Dict
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import Event
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 ASSISTANT_ID = "assistant_id"
@@ -22,7 +22,7 @@ class AssistantEvent(Event):
             ASSISTANT_ID: self.assistant_id,
             ASSISTANT_NAME: self.assistant_name,
             ASSISTANT_TYPE: self.assistant_type,
-            "execution_context": self.execution_context.model_dump(),
+            "invoke_context": self.invoke_context.model_dump(),
         }
         return {
             **self.event_dict(),
@@ -36,8 +36,8 @@ class AssistantEvent(Event):
         assistant_id = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_ID]
         assistant_name = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_NAME]
         assistant_type = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_TYPE]
-        execution_context = ExecutionContext.model_validate(
-            assistant_event_dict[EVENT_CONTEXT]["execution_context"]
+        invoke_context = InvokeContext.model_validate(
+            assistant_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
         event_base = cls.event_base(assistant_event_dict)
         return AssistantEvent(
@@ -47,5 +47,5 @@ class AssistantEvent(Event):
             assistant_id=assistant_id,
             assistant_name=assistant_name,
             assistant_type=assistant_type,
-            execution_context=execution_context,
+            invoke_context=invoke_context,
         )

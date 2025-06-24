@@ -7,7 +7,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.human_request_topic import HUMAN_REQUEST_TOPIC
 from grafi.common.topics.human_request_topic import HumanRequestTopic
@@ -17,11 +17,11 @@ from grafi.common.topics.human_request_topic import human_request_topic
 
 class TestHumanRequestTopic:
     @pytest.fixture
-    def sample_execution_context(self):
-        return ExecutionContext(
+    def sample_invoke_context(self):
+        return InvokeContext(
             user_id="test_user",
             conversation_id="test_conversation",
-            execution_id="test_execution",
+            invoke_id="test_invoke",
             assistant_request_id="test_assistant_request",
         )
 
@@ -33,7 +33,7 @@ class TestHumanRequestTopic:
         ]
 
     @pytest.fixture
-    def sample_consumed_events(self, sample_execution_context):
+    def sample_consumed_events(self, sample_invoke_context):
         return [
             ConsumeFromTopicEvent(
                 event_id="test_id_1",
@@ -43,10 +43,10 @@ class TestHumanRequestTopic:
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=0,
-                execution_context=ExecutionContext(
+                invoke_context=InvokeContext(
                     user_id="test_user",
                     conversation_id="test_conversation",
-                    execution_id="test_execution",
+                    invoke_id="test_invoke",
                     assistant_request_id="test_assistant_request",
                 ),
                 data=[
@@ -69,9 +69,9 @@ class TestHumanRequestTopic:
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=0,
-                execution_context=ExecutionContext(
+                invoke_context=InvokeContext(
                     conversation_id="conversation_id",
-                    execution_id="execution_id",
+                    invoke_id="invoke_id",
                     assistant_request_id="assistant_request_id",
                 ),
                 data=[
@@ -89,10 +89,10 @@ class TestHumanRequestTopic:
         ]
 
     @pytest.fixture
-    def sample_output_topic_event(self, sample_execution_context, sample_messages):
+    def sample_output_topic_event(self, sample_invoke_context, sample_messages):
         return OutputTopicEvent(
             event_id="output_event_1",
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             topic_name="test_topic",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -102,10 +102,10 @@ class TestHumanRequestTopic:
         )
 
     @pytest.fixture
-    def sample_publish_to_topic_event(self, sample_execution_context, sample_messages):
+    def sample_publish_to_topic_event(self, sample_invoke_context, sample_messages):
         return PublishToTopicEvent(
             event_id="publish_event_1",
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             topic_name="test_topic",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -221,7 +221,7 @@ class TestHumanRequestTopic:
         # Try to append an event with offset 0 (already consumed)
         old_event = OutputTopicEvent(
             event_id="old_event",
-            execution_context=sample_output_topic_event.execution_context,
+            invoke_context=sample_output_topic_event.invoke_context,
             topic_name="test_topic",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -248,7 +248,7 @@ class TestHumanRequestTopic:
         # New event with offset 1
         new_event = OutputTopicEvent(
             event_id="new_event",
-            execution_context=sample_output_topic_event.execution_context,
+            invoke_context=sample_output_topic_event.invoke_context,
             topic_name="test_topic",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -265,7 +265,7 @@ class TestHumanRequestTopic:
     def test_publish_data_with_condition_true(
         self,
         human_request_topic_instance,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -274,7 +274,7 @@ class TestHumanRequestTopic:
         human_request_topic_instance.condition = Mock(return_value=True)
 
         event = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -293,7 +293,7 @@ class TestHumanRequestTopic:
     def test_publish_data_with_condition_false(
         self,
         human_request_topic_instance,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -302,7 +302,7 @@ class TestHumanRequestTopic:
         human_request_topic_instance.condition = Mock(return_value=False)
 
         event = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -315,7 +315,7 @@ class TestHumanRequestTopic:
     def test_publish_data_with_human_event_handler(
         self,
         human_request_topic_instance,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -325,7 +325,7 @@ class TestHumanRequestTopic:
         human_request_topic_instance.condition = Mock(return_value=True)
 
         event = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -346,7 +346,7 @@ class TestHumanRequestTopic:
 
         assert event is not None
         assert isinstance(event, PublishToTopicEvent)
-        assert event.execution_context == sample_output_topic_event.execution_context
+        assert event.invoke_context == sample_output_topic_event.invoke_context
         assert event.publisher_name == sample_output_topic_event.publisher_name
         assert event.publisher_type == sample_output_topic_event.publisher_type
         assert event.data == sample_messages
@@ -369,9 +369,7 @@ class TestHumanRequestTopic:
 
         assert event is not None
         assert isinstance(event, PublishToTopicEvent)
-        assert (
-            event.execution_context == sample_publish_to_topic_event.execution_context
-        )
+        assert event.invoke_context == sample_publish_to_topic_event.invoke_context
         assert event.publisher_name == sample_publish_to_topic_event.publisher_name
         assert event.publisher_type == sample_publish_to_topic_event.publisher_type
         assert event.data == sample_messages
@@ -429,7 +427,7 @@ class TestHumanRequestTopic:
     def test_publish_data_offset_increments(
         self,
         human_request_topic_instance,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -438,7 +436,7 @@ class TestHumanRequestTopic:
 
         # Publish first event
         event1 = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="publisher1",
             publisher_type="type1",
             data=sample_messages,
@@ -447,7 +445,7 @@ class TestHumanRequestTopic:
 
         # Publish second event
         event2 = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="publisher2",
             publisher_type="type2",
             data=sample_messages,
@@ -466,7 +464,7 @@ class TestHumanRequestTopic:
     def test_mixed_event_types_in_topic(
         self,
         human_request_topic_instance,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
         sample_output_topic_event,
@@ -476,7 +474,7 @@ class TestHumanRequestTopic:
 
         # Publish an OutputTopicEvent
         output_event = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="publisher1",
             publisher_type="type1",
             data=sample_messages,
@@ -512,13 +510,13 @@ class TestHumanRequestTopic:
         assert result is True
 
     def test_empty_consumed_events_list(
-        self, human_request_topic_instance, sample_execution_context, sample_messages
+        self, human_request_topic_instance, sample_invoke_context, sample_messages
     ):
         """Test publishing data with empty consumed events list."""
         human_request_topic_instance.condition = Mock(return_value=True)
 
         event = human_request_topic_instance.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,

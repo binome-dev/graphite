@@ -4,7 +4,7 @@ import pytest
 from tavily import TavilyClient
 
 from grafi.common.event_stores import EventStoreInMemory
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 
 
@@ -20,14 +20,14 @@ def tavily_client():
 
 @pytest.fixture
 def tavily_tool(tavily_client):
-    execution_context = ExecutionContext(
+    invoke_context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )
     return TavilyTool(
         name="TavilyTestTool",
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         client=tavily_client,
         search=True,
         max_tokens=6000,
@@ -47,7 +47,7 @@ def test_function_registration(tavily_tool):
     assert "web_search_using_tavily" in tavily_tool.functions
 
 
-def test_execute_web_search_using_tavily(tavily_tool):
+def test_invoke_web_search_using_tavily(tavily_tool):
     with patch.object(
         tavily_tool.client,
         "search",
@@ -68,7 +68,7 @@ def test_execute_web_search_using_tavily(tavily_tool):
         assert "Result1" in result
 
 
-def test_execute_with_exceeding_token_limit(tavily_tool):
+def test_invoke_with_exceeding_token_limit(tavily_tool):
     with patch.object(
         tavily_tool.client,
         "search",
@@ -94,7 +94,7 @@ def test_execute_with_exceeding_token_limit(tavily_tool):
         assert "Result2" not in result  # Result2 should be excluded due to token limit
 
 
-def test_execute_with_format_json(tavily_tool):
+def test_invoke_with_format_json(tavily_tool):
     with patch.object(
         tavily_tool.client,
         "search",

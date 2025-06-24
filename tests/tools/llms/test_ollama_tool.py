@@ -3,19 +3,19 @@ from unittest.mock import Mock
 import pytest
 from ollama import ChatResponse
 
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
 
 
 @pytest.fixture
-def execution_context():
-    return ExecutionContext(
+def invoke_context():
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )
 
@@ -84,7 +84,7 @@ def test_prepare_api_input():
     }
 
 
-def test_execute(monkeypatch, execution_context, mock_ollama_client):
+def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
     tool = OllamaTool()
     input_data = [Message(role="user", content="Hello")]
 
@@ -98,7 +98,7 @@ def test_execute(monkeypatch, execution_context, mock_ollama_client):
     )
     mock_ollama_client.return_value.chat.return_value = mock_response
 
-    result = tool.execute(execution_context, input_data)
+    result = tool.invoke(invoke_context, input_data)
 
     assert result[0].role == "assistant"
     assert result[0].content == "Hi there!"

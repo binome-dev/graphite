@@ -5,7 +5,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.simple_hitl_assistant import SimpleHITLAssistant
@@ -39,16 +39,16 @@ class HumanInfo(FunctionCallTool):
         )
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 async def test_simple_hitl_assistant() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
 
     assistant = (
         SimpleHITLAssistant.builder()
@@ -72,7 +72,7 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    async for output in assistant.a_execute(execution_context, input_data):
+    async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
 
     human_input = [
@@ -82,7 +82,7 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    async for output in assistant.a_execute(execution_context, human_input):
+    async for output in assistant.a_invoke(invoke_context, human_input):
         print(output)
 
     human_input = [
@@ -92,7 +92,7 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    async for output in assistant.a_execute(execution_context, human_input):
+    async for output in assistant.a_invoke(invoke_context, human_input):
         print(output)
 
     events = event_store.get_events()

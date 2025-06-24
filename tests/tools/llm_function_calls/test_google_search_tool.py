@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 
@@ -83,12 +83,12 @@ def test_google_search_function(google_search_tool, mock_search):
 
 
 # --------------------------------------------------------------------------- #
-#  execute() dispatcher
+#  invoke() dispatcher
 # --------------------------------------------------------------------------- #
-def test_execute_function(google_search_tool, mock_search):
-    execution_context = ExecutionContext(
+def test_invoke_function(google_search_tool, mock_search):
+    invoke_context = InvokeContext(
         conversation_id="test_conv",
-        execution_id="test_execution_id",
+        invoke_id="test_invoke_id",
         assistant_request_id="test_req",
     )
     input_messages = [
@@ -110,7 +110,7 @@ def test_execute_function(google_search_tool, mock_search):
         )
     ]
 
-    out = google_search_tool.execute(execution_context, input_messages)
+    out = google_search_tool.invoke(invoke_context, input_messages)
 
     assert isinstance(out[0], Message)
     assert out[0].role == "tool"
@@ -143,10 +143,10 @@ def test_builder_configuration():
 # --------------------------------------------------------------------------- #
 #  Invalid function name
 # --------------------------------------------------------------------------- #
-def test_execute_with_invalid_function(google_search_tool):
-    execution_context = ExecutionContext(
+def test_invoke_with_invalid_function(google_search_tool):
+    invoke_context = InvokeContext(
         conversation_id="test_conv",
-        execution_id="test_execution_id",
+        invoke_id="test_invoke_id",
         assistant_request_id="test_req",
     )
     bad_call_message = [
@@ -163,8 +163,8 @@ def test_execute_with_invalid_function(google_search_tool):
         )
     ]
 
-    # FunctionCallTool.execute() should ignore unknown tools → empty reply list
-    result = google_search_tool.execute(execution_context, bad_call_message)
+    # FunctionCallTool.invoke() should ignore unknown tools → empty reply list
+    result = google_search_tool.invoke(invoke_context, bad_call_message)
     assert result == []
 
 
@@ -176,9 +176,9 @@ async def test_error_handling(google_search_tool):
     with patch("grafi.tools.function_calls.impl.google_search_tool.search") as mock:
         mock.side_effect = Exception("Search failed")
 
-        execution_context = ExecutionContext(
+        invoke_context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
         message_with_call = [
@@ -199,5 +199,5 @@ async def test_error_handling(google_search_tool):
         ]
 
         with pytest.raises(Exception) as excinfo:
-            google_search_tool.execute(execution_context, message_with_call)
+            google_search_tool.invoke(invoke_context, message_with_call)
         assert str(excinfo.value) == "Search failed"

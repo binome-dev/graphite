@@ -90,7 +90,7 @@ from pydantic import Field
 from pydantic import model_validator
 
 from grafi.assistants.assistant import Assistant
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -250,7 +250,7 @@ Create a `main.py` that will call the assistant created previously.
 import os
 import uuid
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from <your react assistant path> import ReactAssistant
 
@@ -258,9 +258,9 @@ api_key = "<your openai api key>"
 
 react_assistant = ReactAssistant.builder().api_key(api_key).build()
 
-execution_context = ExecutionContext(
+invoke_context = InvokeContext(
             conversation_id=uuid.uuid4().hex,
-            execution_id=uuid.uuid4().hex,
+            invoke_id=uuid.uuid4().hex,
             assistant_request_id=uuid.uuid4().hex,
         )
 
@@ -273,13 +273,13 @@ input_data = [
             )
         ]
 
-output = react_assistant.execute(execution_context, input_data)
+output = react_assistant.invoke(invoke_context, input_data)
 print(output[0].content)
 ```
 
 ## 5. Run the Application
 
-Use Poetry to execute the script inside the virtual environment:
+Use Poetry to invoke the script inside the virtual environment:
 
 <!-- ```bash
 poetry run python main.py

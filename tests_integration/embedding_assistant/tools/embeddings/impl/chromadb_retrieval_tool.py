@@ -4,9 +4,9 @@ from typing import Any
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -39,19 +39,17 @@ class ChromadbRetrievalTool(RetrievalTool):
     n_results: int = Field(default=30)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
         result: QueryResult = self.collection.query(
             query_embeddings=embeddings, n_results=self.n_results
         )
         return self.to_messages(result)
 
-    @record_tool_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    @record_tool_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
         result: QueryResult = self.collection.query(

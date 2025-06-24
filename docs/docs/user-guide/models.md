@@ -46,7 +46,7 @@ The `Event` fields are:
 | Field              | Description                                                                                         |
 |--------------------|-----------------------------------------------------------------------------------------------------|
 | `event_id`         | Unique identifier for the event, defaulting to a generated UUID.                                    |
-| `execution_context`| A reference to the workflow’s current state, including assistant request details and other metadata.|
+| `invoke_context`| A reference to the workflow’s current state, including assistant request details and other metadata.|
 | `event_type`       | An `EventType` enum value describing the kind of event (e.g., NodeInvoke, ToolRespond).             |
 | `timestamp`        | The UTC timestamp of event creation, used for ordering and auditing.                                |
 
@@ -54,17 +54,17 @@ The benefits are:
 
 - **Consistency**: All events adhere to the same schema for IDs, context, and timestamps.
 - **Extensibility**: Subclasses can introduce additional fields while still retaining base serialization logic.
-- **Traceability**: The shared timestamp and `execution_context` fields provide a reliable audit trail.
+- **Traceability**: The shared timestamp and `invoke_context` fields provide a reliable audit trail.
 
 By leveraging this **Event** model, the system enforces uniform data handling for everything from node invocations to assistant responses, simplifying debugging and logging throughout the workflow lifecycle.
 
 ### Component activity event
 
-In the Graphite’s layered architecture, each principal component (Assistant, Node, Tool, and Workflow) can invoke, respond, or fail during execution. And there are events associate with each actions, such as invoke  event, respond event and failed event. For nodes specifically, these actions are tracked as three distinct event types:
+In the Graphite’s layered architecture, each principal component (Assistant, Node, Tool, and Workflow) can invoke, respond, or fail during invoke. And there are events associate with each actions, such as invoke  event, respond event and failed event. For nodes specifically, these actions are tracked as three distinct event types:
 
 1. **NodeInvokeEvent**: The node is invoked with input data.
-2. **NodeRespondEvent**: The node completes execution and returns output data.
-3. **NodeFailedEvent**: The node encounters an error during execution.
+2. **NodeRespondEvent**: The node completes invoke and returns output data.
+3. **NodeFailedEvent**: The node encounters an error during invoke.
 
 These events capture the inputs, outputs, timestamps, and other metadata essential for observing and debugging node behavior.
 
@@ -77,7 +77,7 @@ Here is the `Node` base event `NodeEvent`:
 | `node_type`          | Describes the functional category of the node (e.g., "LLMNode").             |
 | `subscribed_topics`  | The list of event topics to which this node is subscribed.                   |
 | `publish_to_topics`  | The list of event topics where the node publishes output.                    |
-| `execution_context`  | Workflow metadata, including request details and IDs.                        |
+| `invoke_context`  | Workflow metadata, including request details and IDs.                        |
 | `event_type`         | The specific event variant: `NODE_INVOKE`, `NODE_RESPOND`, or `NODE_FAILED`. |
 | `timestamp`          | The UTC timestamp when the event was generated.                              |
 
@@ -87,7 +87,7 @@ and the `Node` base event methods
 |-----------------------------|---------------------------------------------------------------------------------------------------------------|
 | `node_event_dict()`         | Returns a dictionary merging base event data (`event_dict()`) with node-specific fields (e.g., ID, topics).   |
 | `node_event_base()`         | Class method that reconstructs node-specific fields (like `node_id` and `node_name`) from a dictionary.       |
-| `event_dict()`              | Inherited from `Event`; provides flattening of `execution_context` and standard event metadata.               |
+| `event_dict()`              | Inherited from `Event`; provides flattening of `invoke_context` and standard event metadata.               |
 | `event_base()`              | Inherited from `Event`; extracts `event_id`, `event_type`, and `timestamp` from a serialized event.           |
 | `to_dict()` / `from_dict()` | Implemented in subclasses, each adjusts data serialization or deserialization for the event’s unique fields.  |
 
@@ -109,7 +109,7 @@ and the `Node` base event methods
 | Field         | Description                                                                                     |
 |---------------|-------------------------------------------------------------------------------------------------|
 | `input_data`  | A list of `ConsumeFromTopicEvent` messages that the node consumed.                              |
-| `output_data` | The resulting message(s) (`Message` or list of `Message`) produced by the node’s execution.     |
+| `output_data` | The resulting message(s) (`Message` or list of `Message`) produced by the node’s invoke.     |
 
 `NodeRespondEvent` implemented the serialise and deserialise methods `to_dict()` and `from_dict(data)`.
 
@@ -152,7 +152,7 @@ Publish and subscribe events capture data published to or consumed from specific
 | `event_id`          | Inherited from `Event`; unique identifier for this event.                                       |
 | `event_type`        | Inherited from `Event`; marks it as a topic event variant (e.g., `PUBLISH_TO_TOPIC`).           |
 | `timestamp`         | Inherited from `Event`; records the time the event was created (UTC).                           |
-| `execution_context` | Inherited from `Event`; includes metadata such as `assistant_request_id` for tracing.           |
+| `invoke_context` | Inherited from `Event`; includes metadata such as `assistant_request_id` for tracing.           |
 
 `TopicEvent` has following methods:
 
@@ -160,7 +160,7 @@ Publish and subscribe events capture data published to or consumed from specific
 |---------------------------|-------------------------------------------------------------------------------------------------------------|
 | `topic_event_dict()`      | Combines base event data (`event_dict()`) with topic-specific fields and JSON-serialized `data`.            |
 | `topic_event_base(dict)`  | Class method that deserializes topic data (including `Message` objects) and merges with base event fields.  |
-| `event_dict()`            | From the `Event` class; flattens `execution_context` and includes standard metadata (event ID, type, etc.). |
+| `event_dict()`            | From the `Event` class; flattens `invoke_context` and includes standard metadata (event ID, type, etc.). |
 | `event_base(dict)`        | From the `Event` class; extracts `event_id`, `event_type`, and `timestamp`.                                 |
 | `to_dict() / from_dict()` | Implemented in each subclass, customizing how `data` or additional fields are serialized.                   |
 

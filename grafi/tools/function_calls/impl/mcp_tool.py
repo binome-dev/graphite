@@ -5,10 +5,10 @@ from typing import Optional
 
 from loguru import logger
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -75,29 +75,27 @@ class MCPTool(FunctionCallTool):
 
                     self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         raise NotImplementedError(
-            "MCPTool does not support synchronous execution. Use a_execute instead."
+            "MCPTool does not support synchronous invoke. Use a_invoke instead."
         )
 
-    @record_tool_a_execution
-    async def a_execute(
+    @record_tool_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> AsyncGenerator[Messages, None]:
         """
-        Execute the MCPTool with the provided input data.
+        Invoke the MCPTool with the provided input data.
 
         Args:
-            execution_context (ExecutionContext): The context for executing the function.
+            invoke_context (InvokeContext): The context for executing the function.
             input_data (Message): The input data for the function.
 
         Returns:
-            List[Message]: The output messages from the function execution.
+            List[Message]: The output messages from the function invoke.
         """
         input_message = input_data[0]
         if input_message.tool_calls is None:
@@ -170,7 +168,7 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
 
     def build(self) -> None:
         raise NotImplementedError(
-            "MCPTool does not support synchronous execution. Use a_build instead."
+            "MCPTool does not support synchronous invoke. Use a_build instead."
         )
 
     async def a_build(self) -> "MCPTool":

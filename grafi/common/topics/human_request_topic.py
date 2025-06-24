@@ -11,7 +11,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC
@@ -57,7 +57,7 @@ class HumanRequestTopic(TopicBase):
 
     def publish_data(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         data: Messages,
@@ -69,7 +69,7 @@ class HumanRequestTopic(TopicBase):
 
         if self.condition(data):
             event = OutputTopicEvent(
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 topic_name=self.name,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
@@ -100,7 +100,7 @@ class HumanRequestTopic(TopicBase):
         """
         if self.condition(data):
             event = PublishToTopicEvent(
-                execution_context=user_input_event.execution_context,
+                invoke_context=user_input_event.invoke_context,
                 topic_name=self.name,
                 publisher_name=user_input_event.publisher_name,
                 publisher_type=user_input_event.publisher_type,

@@ -21,9 +21,9 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `function` (Builder) | Builder method to register a function. Automatically applies `@llm_function` if not already decorated.                   |
 | `register_function`  | Assigns a function to this tool, generating function specs if missing.                                                   |
 | `get_function_specs` | Retrieves detailed metadata about the function (including parameter info), enabling structured LLM-based function calls. |
-| `execute`            | Evaluates whether incoming messages match the registered function’s name and, if so, calls it with the JSON arguments.  |
-| `a_execute`          | Asynchronous equivalent to `execute`, allowing concurrency if the function is a coroutine.                               |
-| `to_message`         | Converts execution results into a `Message` object, preserving context like the `tool_call_id`.                          |
+| `invoke`            | Evaluates whether incoming messages match the registered function’s name and, if so, calls it with the JSON arguments.  |
+| `a_invoke`          | Asynchronous equivalent to `invoke`, allowing concurrency if the function is a coroutine.                               |
+| `to_message`         | Converts invoke results into a `Message` object, preserving context like the `tool_call_id`.                          |
 | `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
 
 ## How It Works
@@ -31,13 +31,13 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 1. **Function Registration**: A Python function is wrapped or decorated using `@llm_function`. This generates a schema (`function_specs`) describing its name, arguments, and docstring.
 2. **Invocation**: When a message arrives specifying a function call, `FunctionCallTool` checks whether it corresponds to the registered function’s name.
 3. **JSON Parsing**: The arguments are parsed from the `tool_call` field. If they match, the tool dispatches the function call with the given parameters.
-4. **Response**: After execution, the returned data is converted into a new `Message`, allowing the workflow to process the function’s output seamlessly.
+4. **Response**: After invoke, the returned data is converted into a new `Message`, allowing the workflow to process the function’s output seamlessly.
 
 ## Usage and Customization
 
 - **Builder Pattern**: Use the builder’s `.function(...)` method to assign the function you want to expose. This ensures your function is properly decorated if not already.
 - **Flexible**: By simply swapping out the underlying callable, you can quickly adapt to new or updated logic without modifying the rest of the workflow.
-- **Observability**: Because `FunctionCallTool` implements the `Tool` interface and integrates with the event-driven architecture, all executions can be monitored and logged.
+- **Observability**: Because `FunctionCallTool` implements the `Tool` interface and integrates with the event-driven architecture, all invokes can be monitored and logged.
 
 With `FunctionCallTool`, you can integrate specialized Python functions into an LLM-driven workflow with minimal extra overhead. As your system grows and evolves, it provides a clean way to add or modify functionality while retaining a uniform interaction pattern with the LLM.
 
@@ -54,7 +54,7 @@ Fields:
 | `agent_name`          | Name of the agent to call; also used as the tool’s name.                                                            |
 | `agent_description`    | High-level explanation of what the agent does, used to generate function specs.                                    |
 | `argument_description` | Describes the argument required (e.g., `prompt`) for the agent call.                                               |
-| `agent_call`          | A callable that takes `(execution_context, Message)` and returns a dictionary (e.g., `{"content": ...}`).           |
+| `agent_call`          | A callable that takes `(invoke_context, Message)` and returns a dictionary (e.g., `{"content": ...}`).           |
 | `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
 
 Methods:
@@ -62,15 +62,15 @@ Methods:
 | Method           | Description                                                                                                                                                                                                 |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `get_function_specs` | Returns the function specification (name, description, parameters) for the agent call.                                                                                                                  |
-| `execute`        | Synchronously processes incoming tool calls that match `agent_name`, passing the `prompt` to the `agent_call` callable and returning a list of `Message` objects.                                           |
-| `a_execute`      | Asynchronous variant of `execute`; yields messages in an async generator for real-time or concurrent agent calls.                                                                                           |
+| `invoke`        | Synchronously processes incoming tool calls that match `agent_name`, passing the `prompt` to the `agent_call` callable and returning a list of `Message` objects.                                           |
+| `a_invoke`      | Asynchronous variant of `invoke`; yields messages in an async generator for real-time or concurrent agent calls.                                                                                           |
 | `to_message`     | Creates a `Message` object from the agent’s response, linking the output to `tool_call_id`.                                                                                                                 |
 | `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
 
 Here is the workflow example:
 
 1. **Tool Registration**: An `AgentCallingTool` is constructed with details about the agent (`agent_name`, `agent_description`, etc.) and the callable (`agent_call`).
-2. **Agent Invocation**: When an LLM includes a tool call referencing this agent’s name, `execute` or `a_execute` receives the `prompt` and calls the agent.
+2. **Agent Invocation**: When an LLM includes a tool call referencing this agent’s name, `invoke` or `a_invoke` receives the `prompt` and calls the agent.
 3. **Response Conversion**: The agent’s return value is formed into a new `Message`, which the workflow can then process or forward.
 
 The usage and customization are:
@@ -79,7 +79,7 @@ The usage and customization are:
 - **Runtime Flexibility**: Changing or updating the underlying `agent_call` logic requires no changes to the rest of the workflow.
 - **Parameter Schemas**: `argument_description` ensures the LLM knows which arguments are required and how they should be formatted.
 
-By integrating `AgentCallingTool` into your event-driven workflow, you can build sophisticated multi-agent systems where each agent can be invoked seamlessly via structured function calls. This approach maintains a clear separation between the LLM’s orchestration and the agents’ execution details.
+By integrating `AgentCallingTool` into your event-driven workflow, you can build sophisticated multi-agent systems where each agent can be invoked seamlessly via structured function calls. This approach maintains a clear separation between the LLM’s orchestration and the agents’ invoke details.
 
 ## Example - Weather Mock Tool
 
@@ -137,7 +137,7 @@ tavily_tool = (
 ```
 
 1. A node in your workflow references `TavilyTool` by name and calls `web_search_using_tavily` when requested by the LLM.
-2. The LLM sends a JSON function call containing `query` and `max_results`; TavilyTool executes the query and returns JSON-based results.
+2. The LLM sends a JSON function call containing `query` and `max_results`; TavilyTool invokes the query and returns JSON-based results.
 
 You can customize TavilyTool by extending `web_search_using_tavily` with additional parameters or logic. This approach maintains a clean, unified interface for integrating search capabilities into an event-driven or node-based workflow.
 
@@ -151,7 +151,7 @@ Here are two examples
 
 [`RetrievalTool`](https://github.com/binome-dev/graphite/blob/main/tests_integration/embedding_assistant/tools/embeddings/retrieval_tool.py) defines a base interface for embedding-based lookups in an event-driven workflow. It inherits from `Tool` and introduces an `embedding_model` field for custom embedding generation. By default, `RetrievalTool` provides a builder pattern so you can assign an embedding model before instantiation. When the required functionality surpasses this base retrieval capability, you can extend or subclass `RetrievalTool` for more specialized use cases.
 
-The [`ChromadbRetrievalTool`](https://github.com/binome-dev/graphite/blob/6e2e0b5bd2959e5a3a9402399df9d66e60490535/tests_integration/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py) is a concrete subclass of `RetrievalTool`, tailored for queries against a ChromaDB collection. It uses an `OpenAIEmbedding` model (or any suitable `OpenAIEmbedding` subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During `execute` or `a_execute`, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a `Message` object, making the data seamlessly available to the rest of the workflow. Because it inherits from `RetrievalTool`, you can still configure or replace the embedding model as needed.
+The [`ChromadbRetrievalTool`](https://github.com/binome-dev/graphite/blob/6e2e0b5bd2959e5a3a9402399df9d66e60490535/tests_integration/embedding_assistant/tools/embeddings/impl/chromadb_retrieval_tool.py) is a concrete subclass of `RetrievalTool`, tailored for queries against a ChromaDB collection. It uses an `OpenAIEmbedding` model (or any suitable `OpenAIEmbedding` subclass) to transform input text into vector embeddings, which are then passed to the ChromaDB collection for similarity matching. During `invoke` or `a_invoke`, the tool retrieves the most relevant documents by comparing the user’s query embedding against stored embeddings in ChromaDB. The resulting matches are serialized into a `Message` object, making the data seamlessly available to the rest of the workflow. Because it inherits from `RetrievalTool`, you can still configure or replace the embedding model as needed.
 
 RetrievalTool fields:
 
@@ -188,9 +188,9 @@ Fields:
 | `index`         | A `BaseIndex` instance from llama_index for retrieving relevant data.                                |
 | `oi_span_type`  | An OpenInference semantic attribute indicating the retriever type (`RETRIEVER`).                     |
 
-Execution flow:
+Invoke flow:
 
-1. `execute` or `a_execute` transforms incoming messages into queries against the assigned `BaseIndex`. For synchronous calls, `execute` returns results immediately; `a_execute` uses asynchronous logic.
+1. `invoke` or `a_invoke` transforms incoming messages into queries against the assigned `BaseIndex`. For synchronous calls, `invoke` returns results immediately; `a_invoke` uses asynchronous logic.
 2. `as_query_engine()` fetches the relevant documents from the index.
 3. `to_message` converts the query result into a `Message`, enabling the rest of the workflow to consume the retrieved information.
 
@@ -211,8 +211,8 @@ Methods:
 
 | Method       | Description                                                                                               |
 |-------------|------------------------------------------------------------------------------------------------------------|
-| `execute`    | Synchronously queries the index using the input message’s `content` as a query.                           |
-| `a_execute`  | Asynchronous version of `execute`; returns the result in an async generator.                              |
+| `invoke`    | Synchronously queries the index using the input message’s `content` as a query.                           |
+| `a_invoke`  | Asynchronous version of `invoke`; returns the result in an async generator.                              |
 | `to_message` | Converts the response from the query engine to a `Message` object, enabling uniform workflow consumption. |
 | `to_dict`    | Provides a dictionary representation of the tool, including its fields and the index class name.          |
 

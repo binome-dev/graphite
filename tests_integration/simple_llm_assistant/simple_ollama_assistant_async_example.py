@@ -4,7 +4,7 @@ import asyncio
 import uuid
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
     SimpleOllamaAssistant,
@@ -14,10 +14,10 @@ from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
 event_store = container.event_store
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -44,7 +44,7 @@ async def test_simple_llm_assistant_async() -> None:
         )
     ]
 
-    async for output in assistant.a_execute(get_execution_context(), input_data):
+    async for output in assistant.a_invoke(get_invoke_context(), input_data):
         print(output)
         assert output is not None
 
@@ -57,7 +57,7 @@ async def test_simple_llm_assistant_async() -> None:
         )
     ]
 
-    async for output in assistant.a_execute(get_execution_context(), input_data):
+    async for output in assistant.a_invoke(get_invoke_context(), input_data):
         print(output)
         assert output is not None
         assert "Grafi" in str(output[0].content)

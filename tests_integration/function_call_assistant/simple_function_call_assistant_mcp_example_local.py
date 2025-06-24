@@ -5,7 +5,7 @@ import uuid
 from mcp import StdioServerParameters
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
@@ -20,16 +20,16 @@ event_store = container.event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 async def test_simple_function_call_assistant_with_mcp() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
 
     server_params = StdioServerParameters(
         command="npx",
@@ -51,8 +51,8 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         )
     ]
 
-    # Execute the assistant's function call
-    async for output in assistant.a_execute(execution_context, input_data):
+    # Invoke the assistant's function call
+    async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
         assert output is not None
 

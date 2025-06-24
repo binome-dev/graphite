@@ -57,7 +57,7 @@ Fields:
 | Field                      | Description                                                                                                    |
 |----------------------------|----------------------------------------------------------------------------------------------------------------|
 | `name`                     | Defaults to `AGENT_OUTPUT_TOPIC`, representing the system’s standard output channel.                           |
-| `publish_event_handler`    | An optional callback that executes whenever an `OutputTopicEvent` is successfully published.                   |
+| `publish_event_handler`    | An optional callback that invokes whenever an `OutputTopicEvent` is successfully published.                   |
 | `topic_events`             | A list of `OutputTopicEvent` objects, maintaining the published output messages in FIFO order.                 |
 | `consumption_offsets`      | Maps consumer identifiers (e.g., assistant names) to the last read event offset, ensuring each reads in order. |
 

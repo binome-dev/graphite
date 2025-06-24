@@ -1,6 +1,6 @@
 # Tools Core
 
-In our platform, **Tools** represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic. Tools can encompass interactions with Language Models (LLMs), external API calls, or purely deterministic functions. Crucially, Tools operate independently of the workflow context—they are unaware of the invoking node or their position within the workflow graph. Each Tool strictly adheres to a defined schema, processing a list of `Message` objects as input and returning a list of `Message` objects as output.
+In our platform, **Tools** represent the invoke components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic. Tools can encompass interactions with Language Models (LLMs), external API calls, or purely deterministic functions. Crucially, Tools operate independently of the workflow context—they are unaware of the invoking node or their position within the workflow graph. Each Tool strictly adheres to a defined schema, processing a list of `Message` objects as input and returning a list of `Message` objects as output.
 
 The following table describes each field within the Tool interface class
 
@@ -15,8 +15,8 @@ The following table describes each method within the Tool interface class
 
 | Method           | Description                                                                                       |
 |------------------|---------------------------------------------------------------------------------------------------|
-| `execute`        | Synchronously processes input messages according to the Tool's logic and returns a result message.|
-| `a_execute`      | Asynchronously processes input messages, typically used for streaming or concurrent operations.   |
+| `invoke`        | Synchronously processes input messages according to the Tool's logic and returns a result message.|
+| `a_invoke`      | Asynchronously processes input messages, typically used for streaming or concurrent operations.   |
 | `to_message`     | Converts the Tool's raw response into a standardized `Message` object.                            |
 | `to_dict`        | Serializes the Tool instance into a dictionary format for persistence or debugging.               |
 
@@ -42,8 +42,8 @@ The **LLM** class is a specialized `Tool` designed to interface with Language Mo
 
 | Method              | Description                                                                                                  |
 |---------------------|--------------------------------------------------------------------------------------------------------------|
-| `execute`           | Implements the core logic for synchronous requests (inherited from `Tool`). Must be overridden by subclasses.|
-| `a_execute`         | Implements the core logic for asynchronous requests (inherited from `Tool`). Must be overridden.             |
+| `invoke`           | Implements the core logic for synchronous requests (inherited from `Tool`). Must be overridden by subclasses.|
+| `a_invoke`         | Implements the core logic for asynchronous requests (inherited from `Tool`). Must be overridden.             |
 | `stream`            | Provides synchronous streaming functionality, yielding LLM responses as they become available.               |
 | `a_stream`          | Provides asynchronous streaming functionality, useful for real-time or larger-scale deployments.             |
 | `prepare_api_input` | Prepares input data (list of messages) to match the expected format of the LLM API.                          |
@@ -51,7 +51,7 @@ The **LLM** class is a specialized `Tool` designed to interface with Language Mo
 
 ### Usage and Customization
 
-- **Subclasses**: To implement a concrete LLM tool, create a subclass of `LLM` and override `execute`, `a_execute`, `stream`, and `a_stream` methods. This allows for integration with various LLM providers (e.g., OpenAI, Claude) while following a consistent interface.
+- **Subclasses**: To implement a concrete LLM tool, create a subclass of `LLM` and override `invoke`, `a_invoke`, `stream`, and `a_stream` methods. This allows for integration with various LLM providers (e.g., OpenAI, Claude) while following a consistent interface.
 - **System Message**: You can specify a `system_message` to influence the tone or purpose of the LLM’s responses. This is particularly useful for role-based messaging systems or specialized tasks.
 - **API Input Preparation**: Use `prepare_api_input` to adapt your workflow messages into the required schema for each LLM provider’s endpoint, making integration with new or changing APIs more flexible.
 

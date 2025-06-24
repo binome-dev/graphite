@@ -15,7 +15,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_async_event import OutputAsyncEvent
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -63,7 +63,7 @@ class OutputTopic(TopicBase):
 
     def publish_data(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         data: Messages,
@@ -74,7 +74,7 @@ class OutputTopic(TopicBase):
         """
         if self.condition(data):
             event = OutputTopicEvent(
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 topic_name=self.name,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
@@ -99,7 +99,7 @@ class OutputTopic(TopicBase):
         self,
         generator: MsgsAGen,
         data: Messages,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         consumed_events: Optional[List[ConsumeFromTopicEvent]] = None,
@@ -113,7 +113,7 @@ class OutputTopic(TopicBase):
             self._process_generator(
                 generator=generator,
                 data=data,
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
                 consumed_events=consumed_events,
@@ -126,7 +126,7 @@ class OutputTopic(TopicBase):
         self,
         generator: MsgsAGen,
         data: Messages,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         consumed_events: List[ConsumeFromTopicEvent],
@@ -139,7 +139,7 @@ class OutputTopic(TopicBase):
                 async for messages in generator:
                     if self.condition(messages):
                         event = OutputAsyncEvent(
-                            execution_context=execution_context,
+                            invoke_context=invoke_context,
                             topic_name=self.name,
                             publisher_name=publisher_name,
                             publisher_type=publisher_type,
@@ -164,7 +164,7 @@ class OutputTopic(TopicBase):
             else:
                 if self.condition(data):
                     event = OutputAsyncEvent(
-                        execution_context=execution_context,
+                        invoke_context=invoke_context,
                         topic_name=self.name,
                         publisher_name=publisher_name,
                         publisher_type=publisher_type,
@@ -180,7 +180,7 @@ class OutputTopic(TopicBase):
 
             if self.condition(result):
                 output_topic_event = OutputTopicEvent(
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     topic_name=self.name,
                     publisher_name=publisher_name,
                     publisher_type=publisher_type,

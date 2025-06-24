@@ -8,8 +8,8 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_node_a_execution import record_node_a_execution
-from grafi.common.decorators.record_node_execution import record_node_execution
+from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
+from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
@@ -18,8 +18,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -46,49 +46,49 @@ class LLMNode(Node):
         """Add a function specification to the node."""
         self.function_specs.extend(function_spec)
 
-    @record_node_execution
-    def execute(
+    @record_node_invoke
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
         logger.debug(f"Executing LLMNode with inputs: {node_input}")
 
-        # Use the LLM's execute method to get the response
-        response = self.command.execute(
-            execution_context,
-            input_data=self.get_command_input(execution_context, node_input),
+        # Use the LLM's invoke method to get the response
+        response = self.command.invoke(
+            invoke_context,
+            input_data=self.get_command_input(invoke_context, node_input),
         )
 
         # Handle the response and update the output
         return response
 
-    @record_node_a_execution
-    async def a_execute(
+    @record_node_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
         logger.debug(f"Executing LLMNode with inputs: {node_input}")
 
-        # Use the LLM's execute method to get the response generator
-        async for messages in self.command.a_execute(
-            execution_context,
-            input_data=self.get_command_input(execution_context, node_input),
+        # Use the LLM's invoke method to get the response generator
+        async for messages in self.command.a_invoke(
+            invoke_context,
+            input_data=self.get_command_input(invoke_context, node_input),
         ):
             yield messages
 
     def get_command_input(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-        """Prepare the input for the LLM command based on the node input and execution context."""
+        """Prepare the input for the LLM command based on the node input and invoke context."""
 
         # Get conversation history messages from the event store
 
         conversation_events = container.event_store.get_conversation_events(
-            execution_context.conversation_id
+            invoke_context.conversation_id
         )
 
         assistant_respond_event_dict = {
@@ -101,8 +101,8 @@ class LLMNode(Node):
         all_messages: Messages = []
         for event in assistant_respond_event_dict.values():
             if (
-                event.execution_context.assistant_request_id
-                != execution_context.assistant_request_id
+                event.invoke_context.assistant_request_id
+                != invoke_context.assistant_request_id
             ):
                 all_messages.extend(event.input_data)
                 all_messages.extend(event.output_data)
@@ -114,7 +114,7 @@ class LLMNode(Node):
 
         # Retrieve agent events related to the current assistant request
         agent_events = container.event_store.get_agent_events(
-            execution_context.assistant_request_id
+            invoke_context.assistant_request_id
         )
         topic_events = {
             event.event_id: event

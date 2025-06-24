@@ -17,7 +17,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic_base import TopicBase
@@ -42,38 +42,38 @@ class Node(BaseModel):
 
     _subscribed_topics: Dict[str, TopicBase] = {}
 
-    def execute(
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-        """Execute the node's operation. (Override in subclass)"""
-        raise NotImplementedError("Subclasses must implement 'execute'.")
+        """Invoke the node's operation. (Override in subclass)"""
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
-    async def a_execute(
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        """Execute the node's operation. (Override in subclass)"""
+        """Invoke the node's operation. (Override in subclass)"""
         yield []  # Too keep mypy happy
-        raise NotImplementedError("Subclasses must implement 'execute'.")
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     async def a_stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        """Execute the node's operation. (Override in subclass)"""
-        raise NotImplementedError("Subclasses must implement 'execute'.")
+        """Invoke the node's operation. (Override in subclass)"""
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         """Combine inputs in a way that's suitable for this node. (Override in subclass)"""
         raise NotImplementedError("Subclasses must implement 'get_command_input'.")
 
-    def can_execute(self) -> bool:
+    def can_invoke(self) -> bool:
         """
-        Check if this node can execute given which topics currently have new data.
+        Check if this node can invoke given which topics currently have new data.
         If ALL of the node's subscribed_expressions is True, we return True.
         :return: Boolean indicating whether the node should run.
         """
@@ -82,7 +82,7 @@ class Node(BaseModel):
 
         topics_with_new_msgs = set()
 
-        # Evaluate each expression; if any is satisfied, we can execute.
+        # Evaluate each expression; if any is satisfied, we can invoke.
         for topic in self._subscribed_topics.values():
             if topic.can_consume(self.name):
                 topics_with_new_msgs.add(topic.name)

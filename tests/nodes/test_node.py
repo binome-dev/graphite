@@ -7,8 +7,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.command import Command
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -33,16 +33,16 @@ class DummyNode(Node):
     command: Command = Field(default=None)
     function_specs: FunctionSpecs = Field(default=[])
 
-    def execute(
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
         return [Message(role="assistant", content="sync dummy")]
 
-    async def a_execute(
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
         yield [Message(role="assistant", content="async dummy")]
@@ -111,29 +111,29 @@ def test_publish_to_adds_topic():
     assert node.publish_to[0].name == "publish_topic"
 
 
-def test_can_execute_no_subscription():
+def test_can_invoke_no_subscription():
     builder = NodeBuilder(Node)
     node = builder.name("test_node").type("test_type").build()
-    # With no subscriptions, can_execute() should return True.
-    assert node.can_execute() is True
+    # With no subscriptions, can_invoke() should return True.
+    assert node.can_invoke() is True
 
 
-def test_can_execute_with_subscription_true():
+def test_can_invoke_with_subscription_true():
     builder = NodeBuilder(Node)
     # Create a dummy topic that reports new messages (can_consume returns True).
     dummy_topic = DummyTopic(name="sub_topic", can_consume_value=True)
     node = builder.name("test_node").type("test_type").subscribe(dummy_topic).build()
     # The subscribed expression evaluates to True because "sub_topic" is in topics with new messages.
-    assert node.can_execute() is True
+    assert node.can_invoke() is True
 
 
-def test_can_execute_with_subscription_false():
+def test_can_invoke_with_subscription_false():
     builder = NodeBuilder(Node)
     # Create a dummy topic that reports no new messages.
     dummy_topic = DummyTopic(name="sub_topic", can_consume_value=False)
     node = builder.name("test_node").type("test_type").subscribe(dummy_topic).build()
-    # The subscribed expression evaluates to False, so can_execute() should return False.
-    assert node.can_execute() is False
+    # The subscribed expression evaluates to False, so can_invoke() should return False.
+    assert node.can_invoke() is False
 
 
 def test_to_dict_returns_correct_structure():

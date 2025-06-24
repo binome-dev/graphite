@@ -6,7 +6,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
@@ -23,10 +23,10 @@ api_key = os.getenv(
 )
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -40,7 +40,7 @@ async def test_claude_tool_a_stream() -> None:
 
     content = ""
     async for messages in claude.a_stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for msg in messages:
@@ -56,12 +56,12 @@ async def test_claude_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 #  3) synchronous one-shot                                                    #
 # --------------------------------------------------------------------------- #
-def test_claude_tool_execute() -> None:
+def test_claude_tool_invoke() -> None:
     event_store.clear_events()
     claude = ClaudeTool.builder().api_key(api_key).build()
 
-    messages = claude.execute(
-        get_execution_context(),
+    messages = claude.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -74,7 +74,7 @@ def test_claude_tool_execute() -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  4) execute with custom chat params                                         #
+#  4) invoke with custom chat params                                         #
 # --------------------------------------------------------------------------- #
 def test_claude_tool_with_chat_param() -> None:
     # Anthropic needs `max_tokens`; others are optional
@@ -89,8 +89,8 @@ def test_claude_tool_with_chat_param() -> None:
         .build()
     )
 
-    messages = claude.execute(
-        get_execution_context(),
+    messages = claude.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -112,8 +112,8 @@ async def test_claude_tool_async() -> None:
     claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in claude.a_execute(
-        get_execution_context(),
+    async for messages in claude.a_invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for msg in messages:
@@ -142,9 +142,9 @@ async def test_llm_a_stream_node_claude() -> None:
         .build()
     )
 
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     topic_event = ConsumeFromTopicEvent(
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         topic_name="test_topic",
         consumer_name="LLMNode",
         consumer_type="LLMNode",
@@ -155,7 +155,7 @@ async def test_llm_a_stream_node_claude() -> None:
     )
 
     content = ""
-    async for messages in llm_stream_node.a_execute(execution_context, [topic_event]):
+    async for messages in llm_stream_node.a_invoke(invoke_context, [topic_event]):
         for msg in messages:
             assert msg.role == "assistant"
             if isinstance(msg.content, str):
@@ -171,7 +171,7 @@ async def test_llm_a_stream_node_claude() -> None:
 #  Run directly                              #
 # --------------------------------------------------------------------------- #
 
-test_claude_tool_execute()
+test_claude_tool_invoke()
 test_claude_tool_with_chat_param()
 
 asyncio.run(test_claude_tool_a_stream())

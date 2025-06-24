@@ -4,13 +4,13 @@ from typing import List
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.decorators.record_node_a_execution import record_node_a_execution
-from grafi.common.decorators.record_node_execution import record_node_execution
+from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
+from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
@@ -31,10 +31,10 @@ class LLMFunctionCallNode(Node):
         """Return a builder for LLMNode."""
         return NodeBuilder(cls)
 
-    @record_node_execution
-    def execute(
+    @record_node_invoke
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
         # Parse the LLM response to extract function call details
@@ -42,9 +42,9 @@ class LLMFunctionCallNode(Node):
         tool_response_messages = []
         command_input = self.get_command_input(node_input)
         for tool_call_message in command_input:
-            # Execute the function using the tool (Function class)
-            function_response_message = self.command.execute(
-                execution_context, [tool_call_message]
+            # Invoke the function using the tool (Function class)
+            function_response_message = self.command.invoke(
+                invoke_context, [tool_call_message]
             )
 
             if len(function_response_message) > 0:
@@ -53,10 +53,10 @@ class LLMFunctionCallNode(Node):
         # Set the output messages
         return tool_response_messages
 
-    @record_node_a_execution
-    async def a_execute(
+    @record_node_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
         # Parse the LLM response to extract function call details
@@ -64,15 +64,15 @@ class LLMFunctionCallNode(Node):
         try:
             command_input = self.get_command_input(node_input)
 
-            # Execute all function calls concurrently
+            # Invoke all function calls concurrently
             for message in command_input:
-                async for function_response_message in self.command.a_execute(
-                    execution_context, [message]
+                async for function_response_message in self.command.a_invoke(
+                    invoke_context, [message]
                 ):
                     yield function_response_message
 
         except Exception as e:
-            logger.error(f"Error in async function execution: {str(e)}")
+            logger.error(f"Error in async function invoke: {str(e)}")
             raise
 
     def get_function_specs(self) -> FunctionSpecs:

@@ -7,7 +7,7 @@ from grafi.common.events.node_events.node_event import NodeEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 
 
@@ -19,9 +19,9 @@ def get_consumed_events(messages: Messages) -> List[ConsumeFromTopicEvent]:
             node_id="test_node_id",
             consumer_name="test_node",
             consumer_type="test_type",
-            execution_context=ExecutionContext(
+            invoke_context=InvokeContext(
                 conversation_id="conversation_id",
-                execution_id="execution_id",
+                invoke_id="invoke_id",
                 assistant_request_id="assistant_request_id",
             ),
             data=[message],
@@ -33,16 +33,16 @@ def get_consumed_events(messages: Messages) -> List[ConsumeFromTopicEvent]:
 
 
 @pytest.fixture
-def execution_context():
-    return ExecutionContext(
+def invoke_context():
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )
 
 
 @pytest.fixture
-def node_event(execution_context) -> NodeEvent:
+def node_event(invoke_context) -> NodeEvent:
     return NodeEvent(
         event_id="test_id",
         event_type=EventType.NODE_INVOKE,
@@ -51,7 +51,7 @@ def node_event(execution_context) -> NodeEvent:
         node_type="test_type",
         subscribed_topics=["test_topic_1", "test_topic_2"],
         publish_to_topics=["test_topic_3", "test_topic_4"],
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         timestamp="2009-02-13T23:31:30+00:00",
     )
 
@@ -70,9 +70,9 @@ def node_event_dict():
             "publish_to_topics": ["test_topic_3", "test_topic_4"],
             "node_name": "test_node",
             "node_type": "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

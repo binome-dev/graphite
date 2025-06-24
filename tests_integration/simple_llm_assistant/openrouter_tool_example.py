@@ -6,7 +6,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
@@ -17,10 +17,10 @@ event_store = container.event_store
 api_key = os.getenv("OPENROUTER_API_KEY", "")  # set your OpenRouter key
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -34,7 +34,7 @@ def test_openrouter_tool_stream() -> None:
 
     content = ""
     for msgs in or_tool.stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for m in msgs:
@@ -56,7 +56,7 @@ async def test_openrouter_tool_a_stream() -> None:
 
     content = ""
     async for msgs in or_tool.a_stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for m in msgs:
@@ -72,12 +72,12 @@ async def test_openrouter_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 # synchronous one-shot                                                        #
 # --------------------------------------------------------------------------- #
-def test_openrouter_tool_execute() -> None:
+def test_openrouter_tool_invoke() -> None:
     event_store.clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
-    msgs = or_tool.execute(
-        get_execution_context(),
+    msgs = or_tool.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -90,7 +90,7 @@ def test_openrouter_tool_execute() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# execute with custom chat params                                             #
+# invoke with custom chat params                                             #
 # --------------------------------------------------------------------------- #
 def test_openrouter_tool_with_chat_param() -> None:
     chat_param = {"temperature": 0.1, "max_tokens": 15}
@@ -98,8 +98,8 @@ def test_openrouter_tool_with_chat_param() -> None:
     event_store.clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    msgs = or_tool.execute(
-        get_execution_context(),
+    msgs = or_tool.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -120,8 +120,8 @@ async def test_openrouter_tool_async() -> None:
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
-    async for msgs in or_tool.a_execute(
-        get_execution_context(),
+    async for msgs in or_tool.a_invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for m in msgs:
@@ -150,9 +150,9 @@ async def test_llm_a_stream_node_openrouter() -> None:
         .build()
     )
 
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     topic_event = ConsumeFromTopicEvent(
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         topic_name="test_topic",
         consumer_name="LLMNode",
         consumer_type="LLMNode",
@@ -163,7 +163,7 @@ async def test_llm_a_stream_node_openrouter() -> None:
     )
 
     content = ""
-    async for msgs in llm_stream_node.a_execute(execution_context, [topic_event]):
+    async for msgs in llm_stream_node.a_invoke(invoke_context, [topic_event]):
         for m in msgs:
             assert m.role == "assistant"
             if isinstance(m.content, str):
@@ -177,7 +177,7 @@ async def test_llm_a_stream_node_openrouter() -> None:
 
 # sync
 test_openrouter_tool_stream()
-test_openrouter_tool_execute()
+test_openrouter_tool_invoke()
 test_openrouter_tool_with_chat_param()
 
 # async

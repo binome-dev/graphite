@@ -7,7 +7,7 @@ from grafi.common.events.workflow_events.workflow_event import WORKFLOW_TYPE
 from grafi.common.events.workflow_events.workflow_respond_event import (
     WorkflowRespondEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
@@ -20,9 +20,9 @@ def workflow_respond_event() -> WorkflowRespondEvent:
         workflow_id="test_id",
         workflow_name="test_workflow",
         workflow_type="test_type",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         input_data=[
@@ -59,9 +59,9 @@ def workflow_respond_event_message() -> WorkflowRespondEvent:
         workflow_id="test_id",
         workflow_name="test_workflow",
         workflow_type="test_type",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         input_data=[
@@ -101,9 +101,9 @@ def workflow_respond_event_dict():
             WORKFLOW_ID: "test_id",
             WORKFLOW_NAME: "test_workflow",
             WORKFLOW_TYPE: "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },
@@ -127,9 +127,9 @@ def workflow_respond_event_dict_message():
             WORKFLOW_ID: "test_id",
             WORKFLOW_NAME: "test_workflow",
             WORKFLOW_TYPE: "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

@@ -10,10 +10,8 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_workflow_a_execution import (
-    record_workflow_a_execution,
-)
-from grafi.common.decorators.record_workflow_execution import record_workflow_execution
+from grafi.common.decorators.record_workflow_a_invoke import record_workflow_a_invoke
+from grafi.common.decorators.record_workflow_invoke import record_workflow_invoke
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -23,7 +21,7 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -44,7 +42,7 @@ from grafi.workflows.workflow import WorkflowBuilder
 
 class EventDrivenWorkflow(Workflow):
     """
-    An event-driven workflow that executes a directed graph of Nodes in response to topic publish events.
+    An event-driven workflow that invokes a directed graph of Nodes in response to topic publish events.
 
     This workflow can handle streaming events via `StreamTopicEvent` and relay them to a custom
     `stream_event_handler`.
@@ -66,8 +64,8 @@ class EventDrivenWorkflow(Workflow):
     topic_nodes: Dict[str, List[str]] = {}
 
     # Event graph for this workflow
-    # Queue of nodes that are ready to execute (in response to published events)
-    execution_queue: deque[Node] = deque()
+    # Queue of nodes that are ready to invoke (in response to published events)
+    invoke_queue: deque[Node] = deque()
 
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
@@ -149,18 +147,18 @@ class EventDrivenWorkflow(Workflow):
                 for publisher_node in published_topics_to_nodes.get(topic_name, []):
                     publisher_node.add_function_spec(function_node.get_function_specs())
 
-    # Workflow execution methods
+    # Workflow invoke methods
     def _publish_events(
         self,
         node: Node,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         result: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
     ) -> None:
         published_events = []
         for topic in node.publish_to:
             event = topic.publish_data(
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 publisher_name=node.name,
                 publisher_type=node.type,
                 data=result,
@@ -178,7 +176,7 @@ class EventDrivenWorkflow(Workflow):
     async def _publish_agen_events(
         self,
         node: Node,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         messages_agen: MsgsAGen,
         consumed_events: List[ConsumeFromTopicEvent],
     ) -> None:
@@ -194,7 +192,7 @@ class EventDrivenWorkflow(Workflow):
                         )
 
                 event = topic.publish_data(
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     publisher_name=node.name,
                     publisher_type=node.type,
                     data=consumed_messages,
@@ -209,7 +207,7 @@ class EventDrivenWorkflow(Workflow):
                 topic.add_generator(
                     generator=messages_agen,
                     data=consumed_messages,
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     publisher_name=node.name,
                     publisher_type=node.type,
                     consumed_events=consumed_events,
@@ -232,7 +230,7 @@ class EventDrivenWorkflow(Workflow):
                         topic_name=event.topic_name,
                         consumer_name=self.name,
                         consumer_type=self.type,
-                        execution_context=event.execution_context,
+                        invoke_context=event.invoke_context,
                         offset=event.offset,
                         data=event.data,
                     )
@@ -245,7 +243,7 @@ class EventDrivenWorkflow(Workflow):
                     topic_name=event.topic_name,
                     consumer_name=self.name,
                     consumer_type=self.type,
-                    execution_context=event.execution_context,
+                    invoke_context=event.invoke_context,
                     offset=event.offset,
                     data=event.data,
                 )
@@ -253,19 +251,19 @@ class EventDrivenWorkflow(Workflow):
 
         return consumed_events
 
-    @record_workflow_execution
-    def execute(self, execution_context: ExecutionContext, input: Messages) -> Messages:
+    @record_workflow_invoke
+    def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
         """
-        Execute the workflow with the given context and input.
+        Invoke the workflow with the given context and input.
         Returns results when all nodes complete processing.
         """
         consumed_events: List[ConsumeFromTopicEvent] = []
         try:
-            self.initial_workflow(execution_context, input)
+            self.initial_workflow(invoke_context, input)
 
-            # Process nodes until execution queue is empty
-            while self.execution_queue:
-                node = self.execution_queue.popleft()
+            # Process nodes until invoke queue is empty
+            while self.invoke_queue:
+                node = self.invoke_queue.popleft()
 
                 # Given node, collect all the messages can be linked to it
 
@@ -273,12 +271,12 @@ class EventDrivenWorkflow(Workflow):
                     node
                 )
 
-                # Execute node with collected inputs
+                # Invoke node with collected inputs
                 if node_consumed_events:
-                    result = node.execute(execution_context, node_consumed_events)
+                    result = node.invoke(invoke_context, node_consumed_events)
 
                     self._publish_events(
-                        node, execution_context, result, node_consumed_events
+                        node, invoke_context, result, node_consumed_events
                     )
 
             output: Messages = []
@@ -297,15 +295,15 @@ class EventDrivenWorkflow(Workflow):
             if consumed_events:
                 container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
 
-    @record_workflow_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input: Messages
+    @record_workflow_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input: Messages
     ) -> MsgsAGen:
         """
         Run the workflow with streaming output.
         """
         # 1 – initial seeding
-        self.initial_workflow(execution_context, input)
+        self.initial_workflow(invoke_context, input)
 
         # Track running tasks and executing nodes
         running_tasks: Set[asyncio.Task] = set()
@@ -313,7 +311,7 @@ class EventDrivenWorkflow(Workflow):
 
         # Start a background task to process all nodes (including streaming generators)
         node_processing_task = asyncio.create_task(
-            self._process_all_nodes(execution_context, running_tasks, executing_nodes)
+            self._process_all_nodes(invoke_context, running_tasks, executing_nodes)
         )
 
         # Prepare to stream events as they arrive
@@ -349,7 +347,7 @@ class EventDrivenWorkflow(Workflow):
                                     topic_name=event.topic_name,
                                     publisher_name=self.name,
                                     publisher_type=self.type,
-                                    execution_context=event.execution_context,
+                                    invoke_context=event.invoke_context,
                                     offset=event.offset,
                                     data=event.data,
                                 )
@@ -387,22 +385,22 @@ class EventDrivenWorkflow(Workflow):
 
     async def _process_all_nodes(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         running_tasks: Set[asyncio.Task],
         executing_nodes: Set[str],
     ) -> None:
         """Process all nodes without blocking event streaming."""
-        while self.execution_queue or running_tasks:
+        while self.invoke_queue or running_tasks:
             # Start new tasks for all queued nodes
-            while self.execution_queue:
-                node = self.execution_queue.popleft()
+            while self.invoke_queue:
+                node = self.invoke_queue.popleft()
 
                 if node.name in executing_nodes:
                     continue
 
                 executing_nodes.add(node.name)
                 task = asyncio.create_task(
-                    self._execute_node(execution_context, node, executing_nodes)
+                    self._invoke_node(invoke_context, node, executing_nodes)
                 )
                 running_tasks.add(task)
 
@@ -420,7 +418,7 @@ class EventDrivenWorkflow(Workflow):
                 try:
                     await task
                 except Exception as e:
-                    logger.error(f"Error in node execution: {e}")
+                    logger.error(f"Error in node invoke: {e}")
                     for pending_task in running_tasks:
                         pending_task.cancel()
                     raise
@@ -448,7 +446,7 @@ class EventDrivenWorkflow(Workflow):
                     topic_name=event.topic_name,
                     consumer_name=self.name,
                     consumer_type=self.type,
-                    execution_context=event.execution_context,
+                    invoke_context=event.invoke_context,
                     offset=event.offset,
                     data=event.data,
                 )
@@ -460,17 +458,17 @@ class EventDrivenWorkflow(Workflow):
                 topic_name=events[0].topic_name,
                 consumer_name=self.name,
                 consumer_type=self.type,
-                execution_context=events[0].execution_context,
+                invoke_context=events[0].invoke_context,
                 offset=events[0].offset,
                 data=[Message(role="assistant", content=result_content)],
             )
             container.event_store.record_event(consumed_event)
 
-    async def _execute_node(
-        self, execution_context: ExecutionContext, node: Node, executing_nodes: Set[str]
+    async def _invoke_node(
+        self, invoke_context: InvokeContext, node: Node, executing_nodes: Set[str]
     ) -> None:
         """
-        Execute a single node asynchronously with proper stream handling.
+        Invoke a single node asynchronously with proper stream handling.
         """
         try:
             node_consumed_events: List[ConsumeFromTopicEvent] = self.get_node_input(
@@ -482,10 +480,10 @@ class EventDrivenWorkflow(Workflow):
             logger.debug(f"Executing node: {node.name}")
 
             # Handle streaming nodes specially
-            result = node.a_execute(execution_context, node_consumed_events)
+            result = node.a_invoke(invoke_context, node_consumed_events)
 
             await self._publish_agen_events(
-                node, execution_context, result, node_consumed_events
+                node, invoke_context, result, node_consumed_events
             )
 
         except Exception as e:
@@ -507,7 +505,7 @@ class EventDrivenWorkflow(Workflow):
                 node_consumed_events = subscribed_topic.consume(node.name)
                 for event in node_consumed_events:
                     consumed_event = ConsumeFromTopicEvent(
-                        execution_context=event.execution_context,
+                        invoke_context=event.invoke_context,
                         topic_name=event.topic_name,
                         consumer_name=node.name,
                         consumer_type=node.type,
@@ -519,7 +517,7 @@ class EventDrivenWorkflow(Workflow):
         return consumed_events
 
     def on_event(self, event: TopicEvent) -> None:
-        """Handle topic publish events and trigger node execution if conditions are met."""
+        """Handle topic publish events and trigger node invoke if conditions are met."""
         if not isinstance(event, PublishToTopicEvent):
             return
 
@@ -536,12 +534,10 @@ class EventDrivenWorkflow(Workflow):
         for node_name in subscribed_nodes:
             node = self.nodes[node_name]
             # Check if node has new messages to consume
-            if node.can_execute():
-                self.execution_queue.append(node)
+            if node.can_invoke():
+                self.invoke_queue.append(node)
 
-    def initial_workflow(
-        self, execution_context: ExecutionContext, input: Messages
-    ) -> Any:
+    def initial_workflow(self, invoke_context: InvokeContext, input: Messages) -> Any:
         """Restore the workflow state from stored events."""
 
         # Reset all the topics
@@ -552,7 +548,7 @@ class EventDrivenWorkflow(Workflow):
         events = [
             event
             for event in container.event_store.get_agent_events(
-                execution_context.assistant_request_id
+                invoke_context.assistant_request_id
             )
             if isinstance(event, TopicEvent)
         ]
@@ -564,7 +560,7 @@ class EventDrivenWorkflow(Workflow):
                 raise ValueError("Agent input topic not found in workflow topics.")
 
             event = input_topic.publish_data(
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 publisher_name=self.name,
                 publisher_type=self.type,
                 data=input,
@@ -596,8 +592,8 @@ class EventDrivenWorkflow(Workflow):
 
                 for node_name in subscribed_nodes:
                     node = self.nodes[node_name]
-                    # add unprocessed node to the execution queue
-                    if topic.can_consume(node_name) and node.can_execute():
+                    # add unprocessed node to the invoke queue
+                    if topic.can_consume(node_name) and node.can_invoke():
                         if isinstance(
                             topic, HumanRequestTopic
                         ) and topic.can_append_user_input(node_name, publish_event):
@@ -607,7 +603,7 @@ class EventDrivenWorkflow(Workflow):
                                 data=input,
                             )
                             container.event_store.record_event(event)
-                        self.execution_queue.append(node)
+                        self.invoke_queue.append(node)
 
     def to_dict(self) -> dict[str, Any]:
         return {

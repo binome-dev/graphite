@@ -11,7 +11,7 @@ from pydantic import Field
 
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 
@@ -31,9 +31,9 @@ class Tool(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def execute(
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
         """
@@ -47,9 +47,9 @@ class Tool(BaseModel):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    async def a_execute(
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         yield []  # Too keep mypy happy

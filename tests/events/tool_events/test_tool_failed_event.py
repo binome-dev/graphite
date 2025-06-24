@@ -5,7 +5,7 @@ from grafi.common.events.tool_events.tool_event import TOOL_ID
 from grafi.common.events.tool_events.tool_event import TOOL_NAME
 from grafi.common.events.tool_events.tool_event import TOOL_TYPE
 from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
@@ -18,9 +18,9 @@ def tool_failed_event() -> ToolFailedEvent:
         tool_id="test_id",
         tool_name="test_tool",
         tool_type="test_type",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         input_data=[
@@ -50,9 +50,9 @@ def tool_failed_event_dict():
             TOOL_ID: "test_id",
             TOOL_NAME: "test_tool",
             TOOL_TYPE: "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

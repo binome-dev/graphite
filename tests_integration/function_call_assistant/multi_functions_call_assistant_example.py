@@ -3,7 +3,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.function_call_assistant.multi_functions_call_assistant import (
@@ -67,10 +67,10 @@ class HousePriceMock(FunctionCallTool):
         return f"The house price of {postcode} is about 250,000 in this year."
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -121,12 +121,12 @@ def test_multi_functions_call_assistant() -> None:
 
     # Test the run method
 
-    execution_context_1 = get_execution_context()
+    invoke_context_1 = get_invoke_context()
     input_question_1 = [
         Message(role="user", content="Hello, how's the weather in 12345?")
     ]
 
-    output = assistant.execute(execution_context_1, input_question_1)
+    output = assistant.invoke(invoke_context_1, input_question_1)
 
     print(output)
     print(len(event_store.get_events()))
@@ -134,24 +134,24 @@ def test_multi_functions_call_assistant() -> None:
     assert len(event_store.get_events()) == 34
 
     # Test the run method
-    execution_context_2 = get_execution_context()
+    invoke_context_2 = get_invoke_context()
     input_question_2 = [
         Message(role="user", content="Hello, how's the population in 12345?"),
     ]
 
-    output = assistant.execute(execution_context_2, input_question_2)
+    output = assistant.invoke(invoke_context_2, input_question_2)
 
     print(output)
     assert output is not None
     assert len(event_store.get_events()) == 68
 
     # Test the run method
-    execution_context_3 = get_execution_context()
+    invoke_context_3 = get_invoke_context()
     input_question_3 = [
         Message(role="user", content="Hello, how's the house price in 12345?"),
     ]
 
-    output = assistant.execute(execution_context_3, input_question_3)
+    output = assistant.invoke(invoke_context_3, input_question_3)
     print(output)
     assert output is not None
     assert len(event_store.get_events()) == 102

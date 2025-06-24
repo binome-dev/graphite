@@ -4,7 +4,7 @@ from datetime import timezone
 import pytest
 
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 @pytest.fixture
@@ -13,9 +13,9 @@ def topic_event() -> TopicEvent:
         event_id="test_id",
         event_type="TopicEvent",
         timestamp="2009-02-13T23:31:30+00:00",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         topic_name="test_topic",
@@ -30,9 +30,9 @@ def topic_event_message() -> TopicEvent:
         event_id="test_id",
         event_type="TopicEvent",
         timestamp="2009-02-13T23:31:30+00:00",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         topic_name="test_topic",

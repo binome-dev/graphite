@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from tests_integration.rag_assistant.simple_rag_assistant import SimpleRagAssistant
@@ -28,10 +28,10 @@ CURRENT_DIR = Path(__file__).parent
 PERSIST_DIR = CURRENT_DIR / "storage"
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -52,15 +52,15 @@ def initialize_index(
 
 def test_rag_tool() -> None:
     index = initialize_index()
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     simple_rag_assistant = SimpleRagAssistant(
         name="SimpleRagAssistant",
         index=index,
         api_key=api_key,
     )
 
-    result: Messages = simple_rag_assistant.execute(
-        execution_context,
+    result: Messages = simple_rag_assistant.invoke(
+        invoke_context,
         [Message(role="user", content="What is AWS EC2?")],
     )
 

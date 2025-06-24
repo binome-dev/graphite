@@ -3,7 +3,7 @@ import uuid
 import pytest
 from pydantic import BaseModel
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.functions.function_tool import FunctionTool
@@ -24,14 +24,14 @@ def function_tool():
     return tool
 
 
-def test_execute_returns_message(function_tool):
-    context = ExecutionContext(
+def test_invoke_returns_message(function_tool):
+    context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
     input_messages = [Message(role="user", content="test")]
-    result = function_tool.execute(context, input_messages)
+    result = function_tool.invoke(context, input_messages)
     assert isinstance(result, list)
     assert isinstance(result[0], Message)
     assert result[0].role == "function"
@@ -39,14 +39,14 @@ def test_execute_returns_message(function_tool):
 
 
 @pytest.mark.asyncio
-async def test_a_execute_returns_message(function_tool):
-    context = ExecutionContext(
+async def test_a_invoke_returns_message(function_tool):
+    context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
     input_messages = [Message(role="user", content="test")]
-    agen = function_tool.a_execute(context, input_messages)
+    agen = function_tool.a_invoke(context, input_messages)
     messages = []
     async for msg in agen:
         messages.extend(msg)

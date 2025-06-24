@@ -6,7 +6,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
@@ -17,10 +17,10 @@ event_store = container.event_store
 api_key = os.getenv("GEMINI_API_KEY", "")  # set your Google AI Studio key here
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -34,7 +34,7 @@ def test_gemini_tool_stream() -> None:
 
     content = ""
     for messages in gemini.stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -56,7 +56,7 @@ async def test_gemini_tool_a_stream() -> None:
 
     content = ""
     async for messages in gemini.a_stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -72,12 +72,12 @@ async def test_gemini_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 #  synchronous one-shot                                                       #
 # --------------------------------------------------------------------------- #
-def test_gemini_tool_execute() -> None:
+def test_gemini_tool_invoke() -> None:
     event_store.clear_events()
     gemini = GeminiTool.builder().api_key(api_key).build()
 
-    messages = gemini.execute(
-        get_execution_context(),
+    messages = gemini.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -90,7 +90,7 @@ def test_gemini_tool_execute() -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  execute with custom chat params                                            #
+#  invoke with custom chat params                                            #
 # --------------------------------------------------------------------------- #
 def test_gemini_tool_with_chat_param() -> None:
     # Gemini SDK expects a GenerationConfig object – we can pass it as dict
@@ -102,8 +102,8 @@ def test_gemini_tool_with_chat_param() -> None:
     event_store.clear_events()
     gemini = GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    messages = gemini.execute(
-        get_execution_context(),
+    messages = gemini.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -125,8 +125,8 @@ async def test_gemini_tool_async() -> None:
     gemini = GeminiTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in gemini.a_execute(
-        get_execution_context(),
+    async for messages in gemini.a_invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -155,9 +155,9 @@ async def test_llm_a_stream_node_gemini() -> None:
         .build()
     )
 
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     topic_event = ConsumeFromTopicEvent(
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         topic_name="test_topic",
         consumer_name="LLMNode",
         consumer_type="LLMNode",
@@ -168,7 +168,7 @@ async def test_llm_a_stream_node_gemini() -> None:
     )
 
     content = ""
-    async for messages in llm_stream_node.a_execute(execution_context, [topic_event]):
+    async for messages in llm_stream_node.a_invoke(invoke_context, [topic_event]):
         for message in messages:
             assert message.role == "assistant"
             if isinstance(message.content, str):
@@ -182,7 +182,7 @@ async def test_llm_a_stream_node_gemini() -> None:
 
 # synchronous tests
 test_gemini_tool_stream()
-test_gemini_tool_execute()
+test_gemini_tool_invoke()
 test_gemini_tool_with_chat_param()
 
 # async tests

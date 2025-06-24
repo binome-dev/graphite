@@ -7,10 +7,10 @@ import pytest
 from mcp.types import ImageContent
 from mcp.types import TextContent
 
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
@@ -134,11 +134,11 @@ class TestMCPTool:
         assert tool.function_specs[0].description == "Test tool description"
 
     @pytest.mark.asyncio
-    async def test_a_execute_no_tool_calls(self):
+    async def test_a_invoke_no_tool_calls(self):
         mcp_tool = MCPTool()
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
         messages = [
@@ -149,11 +149,11 @@ class TestMCPTool:
         ]
 
         with pytest.raises(ValueError, match="Function call is None."):
-            async for _ in mcp_tool.a_execute(context, messages):
+            async for _ in mcp_tool.a_invoke(context, messages):
                 pass
 
     @pytest.mark.asyncio
-    async def test_a_execute_text_content(
+    async def test_a_invoke_text_content(
         self, mock_stdio_client, mock_client_session, test_messages, mock_text_content
     ):
         # Setup
@@ -173,9 +173,9 @@ class TestMCPTool:
             )
         ]
         mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -185,9 +185,9 @@ class TestMCPTool:
         call_result.content = [mock_text_content]
         mock_client_session.call_tool.return_value = call_result
 
-        # Execute and collect results
+        # Invoke and collect results
         results = []
-        async for result in mcp_tool.a_execute(context, test_messages):
+        async for result in mcp_tool.a_invoke(context, test_messages):
             results.append(result)
 
         # Assertions
@@ -197,7 +197,7 @@ class TestMCPTool:
         assert "Sample response text" in results[0][0].content
 
     @pytest.mark.asyncio
-    async def test_a_execute_image_content(
+    async def test_a_invoke_image_content(
         self, mock_stdio_client, mock_client_session, test_messages, mock_image_content
     ):
         # Setup
@@ -217,9 +217,9 @@ class TestMCPTool:
             )
         ]
         mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -229,16 +229,16 @@ class TestMCPTool:
         call_result.content = [mock_image_content]
         mock_client_session.call_tool.return_value = call_result
 
-        # Execute and collect results
+        # Invoke and collect results
         results = []
-        async for result in mcp_tool.a_execute(context, test_messages):
+        async for result in mcp_tool.a_invoke(context, test_messages):
             results.append(result)
 
         # Verify the image data is returned
         assert len(results) == 1
 
     @pytest.mark.asyncio
-    async def test_a_execute_error_response(
+    async def test_a_invoke_error_response(
         self, mock_stdio_client, mock_client_session, test_messages
     ):
         # Setup
@@ -258,9 +258,9 @@ class TestMCPTool:
             )
         ]
         mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -270,7 +270,7 @@ class TestMCPTool:
         call_result.content = "Error message"
         mock_client_session.call_tool.return_value = call_result
 
-        # Execute and verify error is raised
+        # Invoke and verify error is raised
         with pytest.raises(Exception, match="Error from MCP tool 'test_function'"):
-            async for _ in mcp_tool.a_execute(context, test_messages):
+            async for _ in mcp_tool.a_invoke(context, test_messages):
                 pass
