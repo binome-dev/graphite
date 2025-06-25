@@ -3,7 +3,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.function_call_assistant.simple_ollama_function_call_assistant import (
@@ -34,16 +34,16 @@ class WeatherMock(FunctionCallTool):
         )
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 def test_simple_function_call_assistant() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     assistant = (
         SimpleOllamaFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
@@ -56,7 +56,7 @@ def test_simple_function_call_assistant() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
-    output = assistant.execute(execution_context, input_data)
+    output = assistant.invoke(invoke_context, input_data)
     print(output)
     assert output is not None
     print(len(event_store.get_events()))

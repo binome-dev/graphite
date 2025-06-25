@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import TopicBase
@@ -16,7 +16,7 @@ class MockTopic(TopicBase):
 
     def publish_data(
         self,
-        execution_context,
+        invoke_context,
         publisher_name,
         publisher_type,
         data,
@@ -29,7 +29,7 @@ class MockTopic(TopicBase):
             publisher_name=publisher_name,
             publisher_type=publisher_type,
             consumed_event_ids=consumed_event_ids,
-            execution_context=execution_context,
+            invoke_context=invoke_context,
             data=data,
             timestamp=datetime(2023, 1, 1, 13, 0),
         )
@@ -68,18 +68,18 @@ def test_reserved_topic_names():
             TopicBaseBuilder(TopicBase).name(name).build()
 
 
-def test_reset(topic: TopicBase, execution_context: ExecutionContext):
+def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     """Ensure topic resets correctly."""
     message = Message(role="assistant", content="Test Message")
 
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
     topic.reset()
 
     assert len(topic.topic_events) == 0  # All messages should be cleared
     assert topic.consumption_offsets == {}  # Consumption offsets should be reset
 
 
-def test_restore_topic(topic: TopicBase, execution_context: ExecutionContext):
+def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
     """Ensure topic restores correctly from events."""
     event = PublishToTopicEvent(
         event_id="event_1",
@@ -87,7 +87,7 @@ def test_restore_topic(topic: TopicBase, execution_context: ExecutionContext):
         offset=0,
         publisher_name="publisher1",
         publisher_type="test",
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         data=[Message(role="assistant", content="Test Message")],
         timestamp=datetime(2023, 1, 1, 13, 0),
     )

@@ -13,7 +13,7 @@ from pydantic import Field
 
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 class EventType(Enum):
@@ -46,16 +46,16 @@ class Event(BaseModel):
 
     event_id: EventId = default_id
     event_version: str = "1.0"
-    execution_context: ExecutionContext
+    invoke_context: InvokeContext
     event_type: EventType
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def event_dict(self) -> Dict[str, Any]:
-        # Flatten `execution_context` fields into the root level
+        # Flatten `invoke_context` fields into the root level
         base_dict = {
             "event_id": self.event_id,
             "event_version": self.event_version,
-            "assistant_request_id": self.execution_context.assistant_request_id,
+            "assistant_request_id": self.invoke_context.assistant_request_id,
             "event_type": self.event_type.value,
             "timestamp": self.timestamp.isoformat(),
         }

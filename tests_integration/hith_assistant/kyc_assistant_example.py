@@ -3,7 +3,7 @@ import os
 import uuid
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.kyc_assistant import KycAssistant
@@ -72,16 +72,16 @@ Strictly follow these validation rules and do not assume missing details."
 """
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 def test_kyc_assistant() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
 
     assistant = (
         KycAssistant.builder()
@@ -105,7 +105,7 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, input_data)
+    output = assistant.invoke(invoke_context, input_data)
 
     print(output)
 
@@ -116,7 +116,7 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, human_input)
+    output = assistant.invoke(invoke_context, human_input)
 
     print(output)
 

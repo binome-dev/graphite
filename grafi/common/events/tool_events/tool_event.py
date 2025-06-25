@@ -4,7 +4,7 @@ from typing import Dict
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import Event
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 TOOL_ID = "tool_id"
@@ -22,7 +22,7 @@ class ToolEvent(Event):
             TOOL_ID: self.tool_id,
             TOOL_NAME: self.tool_name,
             TOOL_TYPE: self.tool_type,
-            "execution_context": self.execution_context.model_dump(),
+            "invoke_context": self.invoke_context.model_dump(),
         }
         return {
             **self.event_dict(),
@@ -34,8 +34,8 @@ class ToolEvent(Event):
         tool_id = tool_event_dict[EVENT_CONTEXT][TOOL_ID]
         tool_name = tool_event_dict[EVENT_CONTEXT][TOOL_NAME]
         tool_type = tool_event_dict[EVENT_CONTEXT][TOOL_TYPE]
-        execution_context = ExecutionContext.model_validate(
-            tool_event_dict[EVENT_CONTEXT]["execution_context"]
+        invoke_context = InvokeContext.model_validate(
+            tool_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
         event_base = cls.event_base(tool_event_dict)
         return ToolEvent(
@@ -45,5 +45,5 @@ class ToolEvent(Event):
             tool_id=tool_id,
             tool_name=tool_name,
             tool_type=tool_type,
-            execution_context=execution_context,
+            invoke_context=invoke_context,
         )

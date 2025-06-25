@@ -3,7 +3,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 
@@ -16,13 +16,13 @@ class Command(BaseModel):
     inherit from this class and implement its methods.
     """
 
-    def execute(
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
         """
-        Execute the command.
+        Invoke the command.
 
         This method should be implemented by all subclasses to define
         the specific behavior of each command.
@@ -32,13 +32,13 @@ class Command(BaseModel):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    async def a_execute(
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         """
-        Execute the command asynchronously.
+        Invoke the command asynchronously.
 
         This method should be implemented by all subclasses to define
         the specific behavior of each command.

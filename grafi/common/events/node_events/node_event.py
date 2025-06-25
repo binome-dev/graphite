@@ -7,7 +7,7 @@ from pydantic import Field
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import Event
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 NODE_ID = "node_id"
@@ -31,7 +31,7 @@ class NodeEvent(Event):
             PUBLISH_TO_TOPICS: self.publish_to_topics,
             NODE_NAME: self.node_name,
             NODE_TYPE: self.node_type,
-            "execution_context": self.execution_context.model_dump(),
+            "invoke_context": self.invoke_context.model_dump(),
         }
         return {
             **self.event_dict(),
@@ -45,8 +45,8 @@ class NodeEvent(Event):
         publish_to_topics = node_event_dict[EVENT_CONTEXT][PUBLISH_TO_TOPICS]
         node_name = node_event_dict[EVENT_CONTEXT][NODE_NAME]
         node_type = node_event_dict[EVENT_CONTEXT][NODE_TYPE]
-        execution_context = ExecutionContext.model_validate(
-            node_event_dict[EVENT_CONTEXT]["execution_context"]
+        invoke_context = InvokeContext.model_validate(
+            node_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
         event_base = cls.event_base(node_event_dict)
         return NodeEvent(
@@ -58,5 +58,5 @@ class NodeEvent(Event):
             publish_to_topics=publish_to_topics,
             node_name=node_name,
             node_type=node_type,
-            execution_context=execution_context,
+            invoke_context=invoke_context,
         )

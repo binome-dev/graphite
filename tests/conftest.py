@@ -1,12 +1,12 @@
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 @pytest.fixture
-def execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )

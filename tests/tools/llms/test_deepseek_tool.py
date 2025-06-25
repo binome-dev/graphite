@@ -7,10 +7,10 @@ from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
 from grafi.common.event_stores import EventStoreInMemory
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
 
@@ -24,10 +24,10 @@ def event_store():
 
 
 @pytest.fixture
-def execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )
 
@@ -52,9 +52,9 @@ def test_init(deepseek_instance):
 
 
 # --------------------------------------------------------------------------- #
-#  execute() – simple assistant response
+#  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
-def test_execute_simple_response(monkeypatch, deepseek_instance, execution_context):
+def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
     import grafi.tools.llms.impl.deepseek_tool as dst_module
 
     mock_response = Mock(spec=ChatCompletion)
@@ -70,7 +70,7 @@ def test_execute_simple_response(monkeypatch, deepseek_instance, execution_conte
     monkeypatch.setattr(dst_module, "OpenAI", mock_openai_cls)
 
     input_data = [Message(role="user", content="Say hello")]
-    result = deepseek_instance.execute(execution_context, input_data)
+    result = deepseek_instance.invoke(invoke_context, input_data)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
@@ -99,9 +99,9 @@ def test_execute_simple_response(monkeypatch, deepseek_instance, execution_conte
 
 
 # --------------------------------------------------------------------------- #
-#  execute() – function call path
+#  invoke() – function call path
 # --------------------------------------------------------------------------- #
-def test_execute_function_call(monkeypatch, deepseek_instance, execution_context):
+def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
     import grafi.tools.llms.impl.deepseek_tool as dst_module
 
     mock_response = Mock(spec=ChatCompletion)
@@ -142,7 +142,7 @@ def test_execute_function_call(monkeypatch, deepseek_instance, execution_context
     ]
     input_data[-1].tools = tools
 
-    result = deepseek_instance.execute(execution_context, input_data)
+    result = deepseek_instance.invoke(invoke_context, input_data)
 
     assert result[0].role == "assistant"
     assert result[0].content is None
@@ -157,7 +157,7 @@ def test_execute_function_call(monkeypatch, deepseek_instance, execution_context
 # --------------------------------------------------------------------------- #
 #  Error handling
 # --------------------------------------------------------------------------- #
-def test_execute_api_error(monkeypatch, deepseek_instance, execution_context):
+def test_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
     import grafi.tools.llms.impl.deepseek_tool as dst_module
 
     # Force constructor to raise – simulates any client error
@@ -167,9 +167,7 @@ def test_execute_api_error(monkeypatch, deepseek_instance, execution_context):
     monkeypatch.setattr(dst_module, "OpenAI", _raise)
 
     with pytest.raises(RuntimeError, match="DeepSeek API error: Error code"):
-        deepseek_instance.execute(
-            execution_context, [Message(role="user", content="Hi")]
-        )
+        deepseek_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 
 # --------------------------------------------------------------------------- #

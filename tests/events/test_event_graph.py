@@ -8,14 +8,14 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -23,9 +23,9 @@ def get_execution_context() -> ExecutionContext:
 @pytest.fixture
 def mock_events():
     """Creates mock consume and publish events for testing"""
-    # Create mock execution context and messages (minimally required for events)
+    # Create mock invoke context and messages (minimally required for events)
 
-    exec_context = get_execution_context()
+    exec_context = get_invoke_context()
     test_message = [Message(role="assistant", content="test content")]
 
     # Create consume events
@@ -35,7 +35,7 @@ def mock_events():
         offset=0,
         consumer_name="consumer1",
         consumer_type="test",
-        execution_context=exec_context,
+        invoke_context=exec_context,
         data=test_message,
         timestamp=datetime(2023, 1, 1, 12, 0),
     )
@@ -46,7 +46,7 @@ def mock_events():
         offset=0,
         consumer_name="consumer2",
         consumer_type="test",
-        execution_context=exec_context,
+        invoke_context=exec_context,
         data=test_message,
         timestamp=datetime(2023, 1, 1, 14, 0),
     )
@@ -59,7 +59,7 @@ def mock_events():
         publisher_name="publisher1",
         publisher_type="test",
         consumed_event_ids=["event_3"],
-        execution_context=exec_context,
+        invoke_context=exec_context,
         data=test_message,
         timestamp=datetime(2023, 1, 1, 13, 0),
     )

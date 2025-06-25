@@ -3,7 +3,7 @@ from typing import Self
 
 from grafi.common.models.command import Command
 from grafi.common.models.command import CommandBuilder
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -22,15 +22,13 @@ class LLMStreamResponseCommand(Command):
         """
         return LLMStreamResponseCommandBuilder(cls)
 
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Message:
-        raise NotImplementedError("Method 'execute' not implemented in stream command")
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message:
+        raise NotImplementedError("Method 'invoke' not implemented in stream command")
 
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
-        async for message in self.llm.a_stream(execution_context, input_data):
+        async for message in self.llm.a_stream(invoke_context, input_data):
             yield message
 
     def to_dict(self) -> dict[str, Any]:

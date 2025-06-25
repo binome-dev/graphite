@@ -17,8 +17,8 @@ The OpenAI tool methods are
 | Method          | Description                                                                                                                                               |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `prepare_api_input` | Adapts the list of `Message` objects to match the input schema expected by OpenAI’s API, optionally extracting function tools from the latest message.|
-| `execute`       | Synchronous method that calls the OpenAI API using the prepared input, returning a single `Message` as the response.                                      |
-| `a_execute`     | Asynchronous version of `execute`, returning responses using an async generator for concurrent or streaming workflows.                                    |
+| `invoke`       | Synchronous method that calls the OpenAI API using the prepared input, returning a single `Message` as the response.                                      |
+| `a_invoke`     | Asynchronous version of `invoke`, returning responses using an async generator for concurrent or streaming workflows.                                    |
 | `stream`        | Deprecated synchronous streaming method that yields partial token results as they become available.                                                       |
 | `a_stream`      | Asynchronous streaming method that yields partial token results, useful for real-time applications.                                                       |
 | `to_stream_message` | Converts partial response chunks (`ChatCompletionChunk`) from OpenAI’s streaming API into a `Message` object.                                         |
@@ -28,7 +28,7 @@ The OpenAI tool methods are
 It will take 3 main steps to finish a request. They are
 
 1. **Prepare Input**: Using `prepare_api_input`, the tool converts incoming messages and any associated function specifications into the OpenAI-compatible format.
-2. **Execute or Stream**: Depending on whether you call `execute`/`a_execute` or `stream`/`a_stream`, the tool invokes OpenAI’s API to generate a response, optionally streaming tokens.
+2. **Invoke or Stream**: Depending on whether you call `invoke`/`a_invoke` or `stream`/`a_stream`, the tool invokes OpenAI’s API to generate a response, optionally streaming tokens.
 3. **Response Conversion**: Partial or complete responses are converted into `Message` objects via `to_stream_message` or `to_message`, enabling uniform handling across the workflow.
 
 When create a openai tool, consider following

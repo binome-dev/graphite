@@ -9,7 +9,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.output_async_event import OutputAsyncEvent
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
 from grafi.common.topics.output_topic import OutputTopic
@@ -19,11 +19,11 @@ from grafi.common.topics.output_topic import agent_output_topic
 
 class TestOutputTopic:
     @pytest.fixture
-    def sample_execution_context(self):
-        return ExecutionContext(
+    def sample_invoke_context(self):
+        return InvokeContext(
             user_id="test_user",
             conversation_id="test_conversation",
-            execution_id="test_execution",
+            invoke_id="test_invoke",
             assistant_request_id="test_assistant_request",
         )
 
@@ -45,10 +45,10 @@ class TestOutputTopic:
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=0,
-                execution_context=ExecutionContext(
+                invoke_context=InvokeContext(
                     user_id="test_user",
                     conversation_id="test_conversation",
-                    execution_id="test_execution",
+                    invoke_id="test_invoke",
                     assistant_request_id="test_assistant_request",
                 ),
                 data=[
@@ -71,9 +71,9 @@ class TestOutputTopic:
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=0,
-                execution_context=ExecutionContext(
+                invoke_context=InvokeContext(
                     conversation_id="conversation_id",
-                    execution_id="execution_id",
+                    invoke_id="invoke_id",
                     assistant_request_id="assistant_request_id",
                 ),
                 data=[
@@ -153,7 +153,7 @@ class TestOutputTopic:
     def test_publish_data_with_condition_true(
         self,
         output_topic,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -162,7 +162,7 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=True)
 
         event = output_topic.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -181,7 +181,7 @@ class TestOutputTopic:
     def test_publish_data_with_condition_false(
         self,
         output_topic,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -190,7 +190,7 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=False)
 
         event = output_topic.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -203,7 +203,7 @@ class TestOutputTopic:
     def test_publish_data_with_event_handler(
         self,
         output_topic,
-        sample_execution_context,
+        sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
@@ -213,7 +213,7 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=True)
 
         event = output_topic.publish_data(
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=sample_messages,
@@ -223,7 +223,7 @@ class TestOutputTopic:
         handler.assert_called_once_with(event)
 
     @pytest.mark.asyncio
-    async def test_add_generator(self, output_topic, sample_execution_context):
+    async def test_add_generator(self, output_topic, sample_invoke_context):
         """Test adding a generator to the topic."""
 
         async def mock_generator():
@@ -235,7 +235,7 @@ class TestOutputTopic:
             output_topic.add_generator(
                 generator=mock_generator(),
                 data=[],
-                execution_context=sample_execution_context,
+                invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
             )
@@ -244,9 +244,7 @@ class TestOutputTopic:
             assert isinstance(output_topic.active_generators[0], asyncio.Task)
 
     @pytest.mark.asyncio
-    async def test_process_generator_success(
-        self, output_topic, sample_execution_context
-    ):
+    async def test_process_generator_success(self, output_topic, sample_invoke_context):
         """Test successful processing of a generator."""
         messages1 = [Message(content="Hello", role="assistant")]
         messages2 = [Message(content=" World", role="assistant")]
@@ -261,7 +259,7 @@ class TestOutputTopic:
             await output_topic._process_generator(
                 generator=mock_generator(),
                 data=[],
-                execution_context=sample_execution_context,
+                invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
                 consumed_events=[],
@@ -283,7 +281,7 @@ class TestOutputTopic:
 
     @pytest.mark.asyncio
     async def test_process_generator_cancelled(
-        self, output_topic, sample_execution_context
+        self, output_topic, sample_invoke_context
     ):
         """Test generator processing when cancelled."""
 
@@ -296,7 +294,7 @@ class TestOutputTopic:
             output_topic._process_generator(
                 generator=mock_generator(),
                 data=[],
-                execution_context=sample_execution_context,
+                invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
                 consumed_events=[],
@@ -311,7 +309,7 @@ class TestOutputTopic:
 
     @pytest.mark.asyncio
     async def test_process_generator_exception(
-        self, output_topic, sample_execution_context
+        self, output_topic, sample_invoke_context
     ):
         """Test generator processing when an exception occurs."""
 
@@ -323,7 +321,7 @@ class TestOutputTopic:
         await output_topic._process_generator(
             generator=failing_generator(),
             data=[],
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
             consumed_events=[],
@@ -413,7 +411,7 @@ class TestOutputTopic:
 
     @pytest.mark.asyncio
     async def test_integration_add_generator_and_get_events(
-        self, output_topic, sample_execution_context
+        self, output_topic, sample_invoke_context
     ):
         """Integration test: add generator and consume events."""
 
@@ -425,7 +423,7 @@ class TestOutputTopic:
         output_topic.add_generator(
             generator=test_generator(),
             data=[],
-            execution_context=sample_execution_context,
+            invoke_context=sample_invoke_context,
             publisher_name="test_publisher",
             publisher_type="test_type",
         )

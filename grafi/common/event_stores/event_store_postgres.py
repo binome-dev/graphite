@@ -74,7 +74,7 @@ class EventStorePostgres(EventStore):
             # Create SQLAlchemy model instance
             model = EventModel(
                 event_id=event_dict["event_id"],
-                conversation_id=event_dict["event_context"]["execution_context"][
+                conversation_id=event_dict["event_context"]["invoke_context"][
                     "conversation_id"
                 ],
                 assistant_request_id=event_dict["assistant_request_id"],
@@ -102,9 +102,9 @@ class EventStorePostgres(EventStore):
                 models.append(
                     EventModel(
                         event_id=event_dict["event_id"],
-                        conversation_id=event_dict["event_context"][
-                            "execution_context"
-                        ]["conversation_id"],
+                        conversation_id=event_dict["event_context"]["invoke_context"][
+                            "conversation_id"
+                        ],
                         assistant_request_id=event_dict["assistant_request_id"],
                         event_type=event_dict["event_type"],
                         event_context=event_dict["event_context"],

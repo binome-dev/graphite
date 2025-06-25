@@ -14,11 +14,11 @@ from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
 from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
-from grafi.common.decorators.record_tool_execution import record_tool_execution
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.decorators.record_tool_stream import record_tool_stream
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -86,14 +86,14 @@ class OllamaTool(LLM):
 
         return api_messages, api_functions
 
-    @record_tool_execution
-    def execute(
+    @record_tool_invoke
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
         """
-        Execute a request to the Ollama API asynchronously.
+        Invoke a request to the Ollama API asynchronously.
         """
         logger.debug("Input data: %s", input_data)
 
@@ -112,14 +112,14 @@ class OllamaTool(LLM):
             logger.error("Ollama API error: %s", e)
             raise RuntimeError(f"Ollama API error: {e}") from e
 
-    @record_tool_a_execution
-    async def a_execute(
+    @record_tool_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         """
-        Execute a request to the Ollama API asynchronously.
+        Invoke a request to the Ollama API asynchronously.
         """
         logger.debug("Input data: %s", input_data)
 
@@ -142,7 +142,7 @@ class OllamaTool(LLM):
     @deprecated("Use a_stream() instead for streaming functionality")
     def stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Generator[Messages, None, None]:
         """
@@ -169,7 +169,7 @@ class OllamaTool(LLM):
     @record_tool_a_stream
     async def a_stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         """

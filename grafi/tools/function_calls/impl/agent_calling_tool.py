@@ -6,12 +6,12 @@ from typing import Self
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -25,7 +25,7 @@ class AgentCallingTool(FunctionCallTool):
     agent_name: str = ""
     agent_description: str = ""
     argument_description: str = ""
-    agent_call: Callable[[ExecutionContext, Message], Any]
+    agent_call: Callable[[InvokeContext, Message], Any]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @classmethod
@@ -37,21 +37,19 @@ class AgentCallingTool(FunctionCallTool):
         """
         return AgentCallingToolBuilder(cls)
 
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         """
-        Execute the registered function with the given arguments.
+        Invoke the registered function with the given arguments.
 
-        This method is decorated with @record_tool_execution to log its execution.
+        This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to execute.
+            function_name (str): The name of the function to invoke.
             arguments (Dict[str, Any]): The arguments to pass to the function.
 
         Returns:
-            Any: The result of the function execution.
+            Any: The result of the function invoke.
 
         Raises:
             ValueError: If the provided function_name doesn't match the registered function.
@@ -70,7 +68,7 @@ class AgentCallingTool(FunctionCallTool):
                     role="assistant",
                     content=prompt,
                 )
-                response = func(execution_context, message)
+                response = func(invoke_context, message)
 
                 messages.extend(
                     self.to_messages(
@@ -87,21 +85,21 @@ class AgentCallingTool(FunctionCallTool):
 
         return messages
 
-    @record_tool_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    @record_tool_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
-        Execute the registered function with the given arguments.
+        Invoke the registered function with the given arguments.
 
-        This method is decorated with @record_tool_execution to log its execution.
+        This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to execute.
+            function_name (str): The name of the function to invoke.
             arguments (Dict[str, Any]): The arguments to pass to the function.
 
         Returns:
-            Any: The result of the function execution.
+            Any: The result of the function invoke.
 
         Raises:
             ValueError: If the provided function_name doesn't match the registered function.
@@ -120,7 +118,7 @@ class AgentCallingTool(FunctionCallTool):
                     role="assistant",
                     content=prompt,
                 )
-                response = await func(execution_context, message)
+                response = await func(invoke_context, message)
 
                 messages.extend(
                     self.to_messages(

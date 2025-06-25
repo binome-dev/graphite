@@ -44,7 +44,7 @@ class EventStoreInMemory(EventStore):
         return [
             event
             for event in self.events
-            if event.execution_context.assistant_request_id == assistant_request_id
+            if event.invoke_context.assistant_request_id == assistant_request_id
         ]
 
     def get_conversation_events(self, conversation_id: str) -> List[Event]:
@@ -52,5 +52,5 @@ class EventStoreInMemory(EventStore):
         return [
             event
             for event in self.events
-            if event.execution_context.conversation_id == conversation_id
+            if event.invoke_context.conversation_id == conversation_id
         ]

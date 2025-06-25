@@ -1,276 +1,211 @@
-import json
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+from mcp.types import EmbeddedResource
 from mcp.types import ImageContent
+from mcp.types import Prompt
+from mcp.types import Resource
 from mcp.types import TextContent
+from mcp.types import TextResourceContents
 
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 
 @pytest.fixture
-def mock_stdio_client():
-    with patch("grafi.tools.function_calls.impl.mcp_tool.stdio_client") as mock:
-        context_manager = AsyncMock()
-        mock.return_value = context_manager
-        context_manager.__aenter__.return_value = (AsyncMock(), AsyncMock())
-        yield mock
+def dummy_connections():
+    # Use SSEConnection type for the dummy connection
+    return {
+        "default": {
+            "transport": "sse",
+            "url": "http://localhost:1234",
+            "headers": None,
+            "timeout": 10.0,
+            "sse_read_timeout": 10.0,
+            "session_kwargs": None,
+            "httpx_client_factory": None,
+        }
+    }
 
 
 @pytest.fixture
-def mock_client_session():
-    with patch("grafi.tools.function_calls.impl.mcp_tool.ClientSession") as mock:
-        session = AsyncMock()
-        mock.return_value = session
-        session.__aenter__.return_value = session
-
-        # Configure session methods
-        session.initialize = AsyncMock()
-        session.list_prompts = AsyncMock()
-        session.list_resources = AsyncMock()
-        session.list_tools = AsyncMock()
-        session.call_tool = AsyncMock()
-
-        yield session
+def dummy_function_spec():
+    return FunctionSpec(
+        name="get_weather",
+        description="Get weather",
+        parameters=ParametersSchema(
+            type="object",
+            properties={"location": ParameterSchema(type="string")},
+        ),
+    )
 
 
 @pytest.fixture
-def mock_tool_list():
-    tool = MagicMock()
-    tool.name = "test_tool"
-    tool.description = "Test tool description"
-    tool.inputSchema = {"type": "object", "properties": {}}
-
-    tools_list = MagicMock()
-    tools_list.tools = [tool]
-    return tools_list
+def dummy_invoke_context():
+    return InvokeContext(
+        conversation_id="test_conversation",
+        invoke_id="test_invoke",
+        assistant_request_id="test_request_id",
+    )
 
 
 @pytest.fixture
-def test_messages():
-    messages = [
+def dummy_input_message():
+
+    return [
         Message(
             role="user",
-            content=None,
+            content="What is the weather in New York?",
             tool_calls=[
                 {
-                    "id": "test_call_id",
+                    "id": "test_id",
                     "type": "function",
                     "function": {
-                        "name": "test_function",
-                        "arguments": json.dumps({"arg1": "hello"}),
+                        "name": "get_weather",
+                        "arguments": '{"location": "London"}',
                     },
                 }
             ],
         )
     ]
-    return messages
 
 
-@pytest.fixture
-def mock_text_content():
-    content = TextContent(
-        type="text",
-        text="Sample response text",
-    )
+@pytest.mark.asyncio
+async def test_a_get_function_specs_adds_specs(dummy_connections):
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
 
-    return content
-
-
-@pytest.fixture
-def mock_image_content():
-    content = ImageContent(
-        type="image",
-        data="base64_image_data",
-        mimeType="text/plain",
-    )
-
-    return content
+        tool = await MCPTool.builder().connections(dummy_connections).a_build()
+        tool.function_specs = []
+        mock_tool = MagicMock()
+        mock_tool.name = "test_tool"
+        mock_tool.description = "desc"
+        mock_tool.inputSchema = {}
+        instance.list_tools = AsyncMock(return_value=[mock_tool])
+        instance.list_resources = AsyncMock(return_value=[])
+        instance.list_prompts = AsyncMock(return_value=[])
+        await tool._a_get_function_specs()
+        assert any(fs.name == "test_tool" for fs in tool.function_specs)
 
 
-@pytest.fixture
-def mock_embedded_resource():
-    content = MagicMock()
-    content.type = "embedded_resource"
-    content.__class__.__name__ = "EmbeddedResource"
-    content.resource = MagicMock()
-    content.resource.model_dump_json.return_value = '{"resource_id": "123"}'
-    return content
+@pytest.mark.asyncio
+async def test_a_invoke_text_content(
+    dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
+):
+    tool = MCPTool(connections=dummy_connections)
+    tool.function_specs = [dummy_function_spec]
 
-
-class TestMCPTool:
-    @pytest.mark.asyncio
-    async def test_builder_initialization(self):
-        builder = MCPTool.builder()
-        assert isinstance(builder._obj, MCPTool)
-
-    @pytest.mark.asyncio
-    async def test_server_params_setting(self):
-        builder = MCPTool.builder()
-        server_params = MagicMock()
-        builder = builder.server_params(server_params)
-        assert builder._obj.server_params == server_params
-
-    @pytest.mark.asyncio
-    async def test_build_function_specs(
-        self, mock_stdio_client, mock_client_session, mock_tool_list
-    ):
-        mock_client_session.list_tools.return_value = mock_tool_list
-
-        builder = MCPTool.builder()
-        builder = builder.server_params(MagicMock())
-
-        tool = await builder.a_build()
-
-        assert len(tool.function_specs) == 1
-        assert tool.function_specs[0].name == "test_tool"
-        assert tool.function_specs[0].description == "Test tool description"
-
-    @pytest.mark.asyncio
-    async def test_a_execute_no_tool_calls(self):
-        mcp_tool = MCPTool()
-        context = ExecutionContext(
-            conversation_id="test_conv",
-            execution_id="test_execution_id",
-            assistant_request_id="test_req",
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.call_tool = AsyncMock(
+            return_value=[TextContent(type="text", text="hello")]
         )
-        messages = [
-            Message(
-                role="user",
-                content="No tool calls here.",
-            )
+        result = [
+            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
+        assert "hello" in result[0][0].content
 
-        with pytest.raises(ValueError, match="Function call is None."):
-            async for _ in mcp_tool.a_execute(context, messages):
-                pass
 
-    @pytest.mark.asyncio
-    async def test_a_execute_text_content(
-        self, mock_stdio_client, mock_client_session, test_messages, mock_text_content
-    ):
-        # Setup
-        mcp_tool = MCPTool()
-        mcp_tool.function_specs = [
-            FunctionSpec(
-                name="test_function",
-                description="A test function",
-                parameters=ParametersSchema(
-                    properties={
-                        "arg1": ParameterSchema(
-                            type="string", description="A test argument"
-                        )
-                    },
-                    required=["arg1"],
-                ),
-            )
-        ]
-        mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
-            conversation_id="test_conv",
-            execution_id="test_execution_id",
-            assistant_request_id="test_req",
+@pytest.mark.asyncio
+async def test_a_invoke_image_content(
+    dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
+):
+    tool = MCPTool(connections=dummy_connections)
+    tool.function_specs = [dummy_function_spec]
+
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.call_tool = AsyncMock(
+            return_value=[
+                ImageContent(type="image", data="imgdata", mimeType="image/png")
+            ],
         )
-
-        # Mock call_tool response
-        call_result = MagicMock()
-        call_result.isError = False
-        call_result.content = [mock_text_content]
-        mock_client_session.call_tool.return_value = call_result
-
-        # Execute and collect results
-        results = []
-        async for result in mcp_tool.a_execute(context, test_messages):
-            results.append(result)
-
-        # Assertions
-        assert len(results) == 1
-        assert len(results[0]) == 1
-        assert results[0][0].tool_call_id == "test_call_id"
-        assert "Sample response text" in results[0][0].content
-
-    @pytest.mark.asyncio
-    async def test_a_execute_image_content(
-        self, mock_stdio_client, mock_client_session, test_messages, mock_image_content
-    ):
-        # Setup
-        mcp_tool = MCPTool()
-        mcp_tool.function_specs = [
-            FunctionSpec(
-                name="test_function",
-                description="A test function",
-                parameters=ParametersSchema(
-                    properties={
-                        "arg1": ParameterSchema(
-                            type="string", description="A test argument"
-                        )
-                    },
-                    required=["arg1"],
-                ),
-            )
+        result = [
+            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
-        mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
-            conversation_id="test_conv",
-            execution_id="test_execution_id",
-            assistant_request_id="test_req",
+        assert result[0][0].content == "imgdata"
+
+
+@pytest.mark.asyncio
+async def test_a_invoke_embedded_resource(
+    dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
+):
+    tool = MCPTool(connections=dummy_connections)
+    tool.function_specs = [dummy_function_spec]
+
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.call_tool = AsyncMock(
+            return_value=[
+                EmbeddedResource(
+                    type="resource",
+                    resource=TextResourceContents(
+                        uri="user://resource/123",
+                        text="Embedded resource content",
+                        mimeType="text/plain",
+                    ),
+                )
+            ]
         )
-
-        # Mock call_tool response
-        call_result = MagicMock()
-        call_result.isError = False
-        call_result.content = [mock_image_content]
-        mock_client_session.call_tool.return_value = call_result
-
-        # Execute and collect results
-        results = []
-        async for result in mcp_tool.a_execute(context, test_messages):
-            results.append(result)
-
-        # Verify the image data is returned
-        assert len(results) == 1
-
-    @pytest.mark.asyncio
-    async def test_a_execute_error_response(
-        self, mock_stdio_client, mock_client_session, test_messages
-    ):
-        # Setup
-        mcp_tool = MCPTool()
-        mcp_tool.function_specs = [
-            FunctionSpec(
-                name="test_function",
-                description="A test function",
-                parameters=ParametersSchema(
-                    properties={
-                        "arg1": ParameterSchema(
-                            type="string", description="A test argument"
-                        )
-                    },
-                    required=["arg1"],
-                ),
-            )
+        result = [
+            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
-        mcp_tool.server_params = MagicMock()
-        context = ExecutionContext(
-            conversation_id="test_conv",
-            execution_id="test_execution_id",
-            assistant_request_id="test_req",
+        assert "Embedded resource" in result[0][0].content
+
+
+@pytest.mark.asyncio
+async def test_a_invoke_unsupported_content(
+    dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
+):
+    tool = MCPTool(connections=dummy_connections)
+    tool.function_specs = [dummy_function_spec]
+
+    class DummyOtherContent:
+        type = "other"
+
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.call_tool = AsyncMock(return_value=[DummyOtherContent()])
+
+        result = [
+            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
+        ]
+        assert "Unsupported content type" in result[0][0].content
+
+
+@pytest.mark.asyncio
+async def test_a_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
+    tool = MCPTool(connections=dummy_connections)
+
+    class DummyInputMessage:
+        tool_calls = None
+
+    with pytest.raises(ValueError):
+        async for _ in tool.a_invoke(dummy_invoke_context, [DummyInputMessage()]):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_get_prompt_and_resources(dummy_connections):
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.get_prompt = AsyncMock(
+            return_value=MagicMock(messages=[Message(role="user", content="hi")])
         )
+        instance.read_resource = AsyncMock(return_value=["res1"])
 
-        # Mock error response
-        call_result = MagicMock()
-        call_result.isError = True
-        call_result.content = "Error message"
-        mock_client_session.call_tool.return_value = call_result
+        tool = await MCPTool.builder().connections(dummy_connections).a_build()
+        tool.prompts = [Prompt(name="prompt1", description="Test prompt")]
+        tool.resources = [Resource(uri="user://resource/uri1", name="res1")]
 
-        # Execute and verify error is raised
-        with pytest.raises(Exception, match="Error from MCP tool 'test_function'"):
-            async for _ in mcp_tool.a_execute(context, test_messages):
-                pass
+        prompt_msgs = await tool.get_prompt("prompt1")
+        assert prompt_msgs[0].content == "hi"
+        print(tool.resources)
+        res = await tool.get_resources("user://resource/uri1")
+        assert res == ["res1"]

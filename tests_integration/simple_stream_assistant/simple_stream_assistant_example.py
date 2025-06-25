@@ -5,7 +5,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_stream_assistant.simple_stream_assistant import (
     SimpleStreamAssistant,
@@ -17,10 +17,10 @@ event_store = container.event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -42,8 +42,8 @@ async def test_simple_llm_assistant() -> None:
 
     content = ""
 
-    async for messages in assistant.a_execute(
-        get_execution_context(),
+    async for messages in assistant.a_invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:

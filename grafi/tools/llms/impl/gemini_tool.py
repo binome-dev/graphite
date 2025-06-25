@@ -21,11 +21,11 @@ from deprecated import deprecated
 from google.genai import types
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
 from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
-from grafi.common.decorators.record_tool_execution import record_tool_execution
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.decorators.record_tool_stream import record_tool_stream
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -145,10 +145,10 @@ class GeminiTool(LLM):
     # --------------------------------------------------------------------- #
     # Synchronous (blocking) one‑shot call
     # --------------------------------------------------------------------- #
-    @record_tool_execution
-    def execute(
+    @record_tool_invoke
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
         contents, tools = self.prepare_api_input(input_data)
@@ -173,10 +173,10 @@ class GeminiTool(LLM):
     # --------------------------------------------------------------------- #
     # Asynchronous (async/await) one‑shot call
     # --------------------------------------------------------------------- #
-    @record_tool_a_execution
-    async def a_execute(
+    @record_tool_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:  # → async generator just like OpenAITool
         contents, tools = self.prepare_api_input(input_data)
@@ -212,7 +212,7 @@ class GeminiTool(LLM):
     @deprecated("Use a_stream() instead for streaming functionality")
     def stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Generator[Messages, None, None]:
         contents, tools = self.prepare_api_input(input_data)
@@ -237,7 +237,7 @@ class GeminiTool(LLM):
     @record_tool_a_stream
     async def a_stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         contents, tools = self.prepare_api_input(input_data)

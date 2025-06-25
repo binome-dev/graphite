@@ -6,8 +6,8 @@ import pytest
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.event_stores import EventStoreInMemory
-from grafi.common.models.execution_context import ExecutionContext
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
@@ -35,10 +35,10 @@ def event_store():
 
 
 @pytest.fixture
-def execution_context(event_store):
-    return ExecutionContext(
+def invoke_context(event_store):
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id="execution_id",
+        invoke_id="invoke_id",
         assistant_request_id="assistant_request_id",
     )
 
@@ -68,7 +68,7 @@ def test_get_function_specs(function_instance):
     assert "arg2" in specs[0].parameters.properties
 
 
-def test_execute(function_instance, execution_context):
+def test_invoke(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -85,11 +85,11 @@ def test_execute(function_instance, execution_context):
             ],
         )
     ]
-    result = function_instance.execute(execution_context, input_data)
+    result = function_instance.invoke(invoke_context, input_data)
     assert result[0].content == "hello - 42"
 
 
-def test_execute_wrong_function_name(function_instance, execution_context):
+def test_invoke_wrong_function_name(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -106,7 +106,7 @@ def test_execute_wrong_function_name(function_instance, execution_context):
             ],
         )
     ]
-    result = function_instance.execute(execution_context, input_data)
+    result = function_instance.invoke(invoke_context, input_data)
     assert len(result) == 0
 
 
@@ -128,9 +128,7 @@ def test_to_dict(function_instance):
         ({"arg1": "test", "arg2": 0}, "test - 0"),
     ],
 )
-def test_execute_with_different_args(
-    function_instance, execution_context, args, expected
-):
+def test_invoke_with_different_args(function_instance, invoke_context, args, expected):
     input_data = [
         Message(
             role="assistant",
@@ -144,11 +142,11 @@ def test_execute_with_different_args(
             ],
         )
     ]
-    result = function_instance.execute(execution_context, input_data)
+    result = function_instance.invoke(invoke_context, input_data)
     assert result[0].content == expected
 
 
-def test_execute_with_missing_args(function_instance, execution_context):
+def test_invoke_with_missing_args(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -166,7 +164,7 @@ def test_execute_with_missing_args(function_instance, execution_context):
         )
     ]
     with pytest.raises(TypeError):
-        function_instance.execute(execution_context, input_data)
+        function_instance.invoke(invoke_context, input_data)
 
 
 def test_function_without_llm_decorator():

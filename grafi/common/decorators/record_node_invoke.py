@@ -1,4 +1,4 @@
-"""Decorator for recording node execution events and tracing."""
+"""Decorator for recording node invoke events and tracing."""
 
 import functools
 import json
@@ -19,20 +19,20 @@ from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.nodes.node import T_N
 
 
-def record_node_execution(
-    func: Callable[[T_N, ExecutionContext, List[ConsumeFromTopicEvent]], Messages],
-) -> Callable[[T_N, ExecutionContext, List[ConsumeFromTopicEvent]], Messages]:
-    """Decorator to record node execution events and tracing."""
+def record_node_invoke(
+    func: Callable[[T_N, InvokeContext, List[ConsumeFromTopicEvent]], Messages],
+) -> Callable[[T_N, InvokeContext, List[ConsumeFromTopicEvent]], Messages]:
+    """Decorator to record node invoke events and tracing."""
 
     @functools.wraps(func)
     def wrapper(
         self: T_N,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: List[ConsumeFromTopicEvent],
     ) -> Messages:
         node_id: str = self.node_id
@@ -51,20 +51,20 @@ def record_node_execution(
                 node_id=node_id,
                 subscribed_topics=subscribed_topics,
                 publish_to_topics=publish_to_topics,
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 node_type=node_type,
                 node_name=node_name,
                 input_data=input_data,
             )
         )
 
-        # Execute the original function
+        # Invoke the original function
         try:
-            with container.tracer.start_as_current_span(f"{node_name}.execute") as span:
+            with container.tracer.start_as_current_span(f"{node_name}.invoke") as span:
                 span.set_attribute(NODE_ID, node_id)
                 span.set_attribute(NODE_NAME, node_name)
                 span.set_attribute(NODE_TYPE, node_type)
-                span.set_attributes(execution_context.model_dump())
+                span.set_attributes(invoke_context.model_dump())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     oi_span_type.value,
@@ -73,22 +73,22 @@ def record_node_execution(
                     "input", json.dumps(input_data_dict, default=to_jsonable_python)
                 )
 
-                # Execute the node function
-                result = func(self, execution_context, input_data)
+                # Invoke the node function
+                result = func(self, invoke_context, input_data)
 
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
 
                 span.set_attribute("output", output_data_dict)
 
         except Exception as e:
-            # Exception occurred during execution
+            # Exception occurred during invoke
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 NodeFailedEvent(
                     node_id=node_id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     node_type=node_type,
                     node_name=node_name,
                     input_data=input_data,
@@ -97,13 +97,13 @@ def record_node_execution(
             )
             raise
         else:
-            # Successful execution
+            # Successful invoke
             container.event_store.record_event(
                 NodeRespondEvent(
                     node_id=node_id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     node_type=node_type,
                     node_name=node_name,
                     input_data=input_data,

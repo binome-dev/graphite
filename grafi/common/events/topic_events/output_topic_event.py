@@ -10,7 +10,7 @@ from pydantic_core import to_jsonable_python
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 
@@ -32,7 +32,7 @@ class OutputTopicEvent(TopicEvent):
             "publisher_type": self.publisher_type,
             "topic_name": self.topic_name,
             "offset": self.offset,
-            "execution_context": self.execution_context.model_dump(),
+            "invoke_context": self.invoke_context.model_dump(),
         }
 
         return {
@@ -43,8 +43,8 @@ class OutputTopicEvent(TopicEvent):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OutputTopicEvent":
-        execution_context = ExecutionContext.model_validate(
-            data[EVENT_CONTEXT]["execution_context"]
+        invoke_context = InvokeContext.model_validate(
+            data[EVENT_CONTEXT]["invoke_context"]
         )
 
         data_dict = json.loads(data["data"])
@@ -65,6 +65,6 @@ class OutputTopicEvent(TopicEvent):
             publisher_type=data[EVENT_CONTEXT]["publisher_type"],
             topic_name=data[EVENT_CONTEXT]["topic_name"],
             offset=data[EVENT_CONTEXT]["offset"],
-            execution_context=execution_context,
+            invoke_context=invoke_context,
             data=data_obj,
         )

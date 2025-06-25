@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic import (
     AGENT_INPUT_TOPIC,  # Replace `your_module` with the actual module
@@ -18,12 +18,12 @@ def topic() -> Topic:
     return topic
 
 
-def test_publish_message(topic: Topic, execution_context: ExecutionContext):
+def test_publish_message(topic: Topic, invoke_context: InvokeContext):
     """Test publishing a message to the topic."""
     message = Message(role="assistant", content="Test Message")
 
     event = topic.publish_data(
-        execution_context, "test_publisher", "test_type", [message], []
+        invoke_context, "test_publisher", "test_type", [message], []
     )
 
     assert len(topic.topic_events) == 1  # Ensure the message was published
@@ -34,7 +34,7 @@ def test_publish_message(topic: Topic, execution_context: ExecutionContext):
     assert event.offset == 0
 
 
-def test_can_consume(topic: Topic, execution_context: ExecutionContext):
+def test_can_consume(topic: Topic, invoke_context: InvokeContext):
     """Test checking if a consumer can consume messages."""
     message = Message(role="assistant", content="Test Message")
 
@@ -42,19 +42,19 @@ def test_can_consume(topic: Topic, execution_context: ExecutionContext):
     assert not topic.can_consume("consumer_1")
 
     # Publish a message
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
 
     # Now the consumer should be able to consume
     assert topic.can_consume("consumer_1")
 
 
-def test_consume_messages(topic: Topic, execution_context: ExecutionContext):
+def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     """Test consuming messages from the topic."""
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message1], [])
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message2], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message1], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message2], [])
 
     consumed_messages = topic.consume("consumer_1")
 
@@ -64,11 +64,11 @@ def test_consume_messages(topic: Topic, execution_context: ExecutionContext):
     assert topic.consumption_offsets["consumer_1"] == 2  # Offset should be updated
 
 
-def test_consume_no_new_messages(topic: Topic, execution_context: ExecutionContext):
+def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeContext):
     """Ensure no messages are consumed when there are no new ones."""
     message = Message(role="assistant", content="Test Message")
 
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
 
     # First consume
     topic.consume("consumer_1")
@@ -78,13 +78,13 @@ def test_consume_no_new_messages(topic: Topic, execution_context: ExecutionConte
     assert len(consumed_messages) == 0  # Should return an empty list
 
 
-def test_offset_updates_correctly(topic: Topic, execution_context: ExecutionContext):
+def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     """Ensure the offset updates correctly for multiple consumers."""
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message1], [])
-    topic.publish_data(execution_context, "test_publisher", "test_type", [message2], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message1], [])
+    topic.publish_data(invoke_context, "test_publisher", "test_type", [message2], [])
 
     # Consumer 1 consumes
     topic.consume("consumer_1")

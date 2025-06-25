@@ -3,7 +3,7 @@ import pytest
 from grafi.common.events.assistant_events.assistant_failed_event import (
     AssistantFailedEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
@@ -25,9 +25,9 @@ def assistant_failed_event() -> AssistantFailedEvent:
             )
         ],
         error="error",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
     )
@@ -45,9 +45,9 @@ def assistant_failed_event_dict():
             "assistant_id": "test_id",
             "assistant_name": "test_assistant",
             "assistant_type": "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

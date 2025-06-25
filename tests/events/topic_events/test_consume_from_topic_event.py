@@ -4,7 +4,7 @@ from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
@@ -18,9 +18,9 @@ def consume_from_topic_event() -> ConsumeFromTopicEvent:
         consumer_name="test_node",
         consumer_type="test_type",
         offset=0,
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         data=[
@@ -47,9 +47,9 @@ def consume_from_topic_event_message() -> ConsumeFromTopicEvent:
         consumer_name="test_node",
         consumer_type="test_type",
         offset=0,
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         data=[
@@ -79,9 +79,9 @@ def consume_from_topic_event_dict():
             "offset": 0,
             "consumer_name": "test_node",
             "consumer_type": "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },
@@ -103,9 +103,9 @@ def consume_from_topic_event_dict_message():
             "offset": 0,
             "consumer_name": "test_node",
             "consumer_type": "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

@@ -6,7 +6,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.impl.llm_node import LLMNode
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
@@ -19,10 +19,10 @@ event_store = container.event_store
 api_key = os.getenv("DEEPSEEK_API_KEY", "")
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -36,7 +36,7 @@ def test_deepseek_tool_stream() -> None:
 
     content = ""
     for messages in ds_tool.stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -47,7 +47,7 @@ def test_deepseek_tool_stream() -> None:
 
     assert content  # not empty
     assert "Grafi" in content
-    # decorators record_tool_stream + record_tool_execution → 2 events
+    # decorators record_tool_stream + record_tool_invoke → 2 events
     assert len(event_store.get_events()) == 2
 
 
@@ -60,7 +60,7 @@ async def test_deepseek_tool_a_stream() -> None:
 
     content = ""
     async for messages in ds_tool.a_stream(
-        get_execution_context(),
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -77,12 +77,12 @@ async def test_deepseek_tool_a_stream() -> None:
 # --------------------------------------------------------------------------- #
 #  synchronous one-shot                                                       #
 # --------------------------------------------------------------------------- #
-def test_deepseek_tool_execute() -> None:
+def test_deepseek_tool_invoke() -> None:
     event_store.clear_events()
     ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
-    messages = ds_tool.execute(
-        get_execution_context(),
+    messages = ds_tool.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -96,7 +96,7 @@ def test_deepseek_tool_execute() -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  execute with custom chat params                                            #
+#  invoke with custom chat params                                            #
 # --------------------------------------------------------------------------- #
 def test_deepseek_tool_with_chat_param() -> None:
     chat_param = {"temperature": 0.1, "max_tokens": 15}
@@ -104,8 +104,8 @@ def test_deepseek_tool_with_chat_param() -> None:
     event_store.clear_events()
     ds_tool = DeepseekTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    messages = ds_tool.execute(
-        get_execution_context(),
+    messages = ds_tool.invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     )
 
@@ -127,8 +127,8 @@ async def test_deepseek_tool_async() -> None:
     ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in ds_tool.a_execute(
-        get_execution_context(),
+    async for messages in ds_tool.a_invoke(
+        get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for message in messages:
@@ -157,9 +157,9 @@ async def test_llm_a_stream_node_deepseek() -> None:
         .build()
     )
 
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     topic_event = ConsumeFromTopicEvent(
-        execution_context=execution_context,
+        invoke_context=invoke_context,
         topic_name="test_topic",
         consumer_name="LLMNode",
         consumer_type="LLMNode",
@@ -170,7 +170,7 @@ async def test_llm_a_stream_node_deepseek() -> None:
     )
 
     content = ""
-    async for messages in llm_stream_node.a_execute(execution_context, [topic_event]):
+    async for messages in llm_stream_node.a_invoke(invoke_context, [topic_event]):
         for message in messages:
             assert message.role == "assistant"
             if message.content and isinstance(message.content, str):
@@ -185,7 +185,7 @@ async def test_llm_a_stream_node_deepseek() -> None:
 
 # synchronous tests
 test_deepseek_tool_stream()
-test_deepseek_tool_execute()
+test_deepseek_tool_invoke()
 test_deepseek_tool_with_chat_param()
 
 # async tests
