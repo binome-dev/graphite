@@ -57,7 +57,6 @@ def dummy_invoke_context():
 
 @pytest.fixture
 def dummy_input_message():
-
     return [
         Message(
             role="user",

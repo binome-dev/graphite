@@ -64,7 +64,6 @@ class MCPTool(FunctionCallTool):
         all_tools: list[Tool] = []
 
         async with Client(self.mcp_config) as client:
-
             all_tools.extend(await client.list_tools())
             self.resources = await client.list_resources()
             self.prompts = await client.list_prompts()
@@ -115,7 +114,6 @@ class MCPTool(FunctionCallTool):
                 kwargs = json.loads(tool_call.function.arguments)
 
                 async with Client(self.mcp_config) as client:
-
                     logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
 
                     result: list[MCPContent] = await client.call_tool(tool_name, kwargs)
