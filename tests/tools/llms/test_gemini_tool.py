@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
 
@@ -13,10 +13,10 @@ from grafi.tools.llms.impl.gemini_tool import GeminiTool
 #  Fixtures
 # --------------------------------------------------------------------------- #
 @pytest.fixture
-def execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conv_id",
-        execution_id="exec_id",
+        invoke_id="exec_id",
         assistant_request_id="req_id",
     )
 
@@ -41,9 +41,9 @@ def test_init(gemini_instance):
 
 
 # --------------------------------------------------------------------------- #
-#  execute() — simple reply
+#  invoke() — simple reply
 # --------------------------------------------------------------------------- #
-def test_execute_simple_response(monkeypatch, gemini_instance, execution_context):
+def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     # Fake GenerateContentResponse object – only `.text` is accessed
@@ -61,7 +61,7 @@ def test_execute_simple_response(monkeypatch, gemini_instance, execution_context
     )
 
     input_data = [Message(role="user", content="Say hello")]
-    result = gemini_instance.execute(execution_context, input_data)
+    result = gemini_instance.invoke(invoke_context, input_data)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
@@ -78,9 +78,9 @@ def test_execute_simple_response(monkeypatch, gemini_instance, execution_context
 
 
 # --------------------------------------------------------------------------- #
-#  execute() — tool / function call path
+#  invoke() — tool / function call path
 # --------------------------------------------------------------------------- #
-def test_execute_function_call(monkeypatch, gemini_instance, execution_context):
+def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     # TODO: improve this unit tests
@@ -120,7 +120,7 @@ def test_execute_function_call(monkeypatch, gemini_instance, execution_context):
     ]
     input_data = [Message(role="user", content="Weather?", tools=tools)]
 
-    gemini_instance.execute(execution_context, input_data)
+    gemini_instance.invoke(invoke_context, input_data)
 
     call_kwargs = mock_client.models.generate_content.call_args[1]
     # The GenerateContentConfig should contain our tool schema
@@ -130,7 +130,7 @@ def test_execute_function_call(monkeypatch, gemini_instance, execution_context):
 # --------------------------------------------------------------------------- #
 #  Error propagation
 # --------------------------------------------------------------------------- #
-def test_execute_api_error(monkeypatch, gemini_instance, execution_context):
+def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     def _raise(*_a, **_kw):  # pragma: no cover
@@ -143,7 +143,7 @@ def test_execute_api_error(monkeypatch, gemini_instance, execution_context):
     )
 
     with pytest.raises(RuntimeError, match="Gemini API error: Failure"):
-        gemini_instance.execute(execution_context, [Message(role="user", content="Hi")])
+        gemini_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 
 # --------------------------------------------------------------------------- #

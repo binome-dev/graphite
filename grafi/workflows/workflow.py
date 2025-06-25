@@ -13,7 +13,7 @@ from grafi.common.events.node_events.node_event import NodeEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
@@ -29,23 +29,23 @@ class Workflow(BaseModel):
     nodes: Dict[str, Node] = {}
     state: Dict[str, Tuple[str, NodeEvent | None]] = {}
 
-    def execute(self, execution_context: ExecutionContext, input: Messages) -> Messages:
-        """Executes the workflow with the given initial inputs."""
+    def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
+        """Invokes the workflow with the given initial inputs."""
         raise NotImplementedError
 
-    async def a_execute(
-        self, execution_context: ExecutionContext, input: Messages
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input: Messages
     ) -> MsgsAGen:
-        """Executes the workflow with the given initial inputs."""
+        """Invokes the workflow with the given initial inputs."""
         yield []  # Too keep mypy happy
         raise NotImplementedError
 
     def initial_workflow(self, assistant_request_id: str) -> Any:
-        """Initial workflow state, and replays events from an unfinished request to resume execution."""
+        """Initial workflow state, and replays events from an unfinished request to resume invoke."""
         raise NotImplementedError
 
     def get_node_input(
-        self, node: Node, execution_context: ExecutionContext
+        self, node: Node, invoke_context: InvokeContext
     ) -> Tuple[List[EventId], Messages]:
         """Get input messages for a node from its subscribed topics."""
         raise NotImplementedError

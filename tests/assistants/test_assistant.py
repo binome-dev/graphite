@@ -29,16 +29,16 @@ class TestAssistant:
     def input_messages(self):
         return [Message(content="test message", role="user")]
 
-    def test_execute_success(self, mock_assistant, execution_context, input_messages):
+    def test_invoke_success(self, mock_assistant, invoke_context, input_messages):
         # Setup
-        mock_assistant.workflow.execute = Mock(
+        mock_assistant.workflow.invoke = Mock(
             return_value=[Message(content="mocked response", role="assistant")]
         )
 
         # Mock consumed events
         event = Mock()
         event.topic_name = "test_topic"
-        event.execution_context = execution_context
+        event.invoke_context = invoke_context
         event.offset = 0
         event.data = [Message(content="response", role="assistant")]
 
@@ -52,30 +52,30 @@ class TestAssistant:
                 return_value=[event],
             ),
         ):
-            # Execute
-            result = mock_assistant.execute(execution_context, input_messages)
+            # Invoke
+            result = mock_assistant.invoke(invoke_context, input_messages)
 
             # Verify
-            mock_assistant.workflow.execute.assert_called_once_with(
-                execution_context, input_messages
+            mock_assistant.workflow.invoke.assert_called_once_with(
+                invoke_context, input_messages
             )
             assert len(result) == 1
             assert result[0].content == "mocked response"
 
     @pytest.mark.asyncio
-    async def test_a_execute_success(
-        self, mock_assistant, execution_context, input_messages
+    async def test_a_invoke_success(
+        self, mock_assistant, invoke_context, input_messages
     ):
         # Setup
         async def mock_async_generator():
             yield [Message(content="async response", role="assistant")]
 
-        mock_assistant.workflow.a_execute = Mock(return_value=mock_async_generator())
+        mock_assistant.workflow.a_invoke = Mock(return_value=mock_async_generator())
 
         # Mock consumed events
         event = Mock()
         event.topic_name = "test_topic"
-        event.execution_context = execution_context
+        event.invoke_context = invoke_context
         event.offset = 0
         event.data = [Message(content="async response", role="assistant")]
 
@@ -89,23 +89,23 @@ class TestAssistant:
                 return_value=[event],
             ),
         ):
-            # Execute
-            async for messages in mock_assistant.a_execute(
-                execution_context, input_messages
+            # Invoke
+            async for messages in mock_assistant.a_invoke(
+                invoke_context, input_messages
             ):
                 # Verify
                 assert len(messages) == 1
                 assert messages[0].content == "async response"
 
-            mock_assistant.workflow.a_execute.assert_called_once_with(
-                execution_context, input_messages
+            mock_assistant.workflow.a_invoke.assert_called_once_with(
+                invoke_context, input_messages
             )
 
     def test_to_dict(self, mock_assistant):
         # Setup
         mock_assistant.workflow.to_dict.return_value = {"key": "value"}
 
-        # Execute
+        # Invoke
         result = mock_assistant.to_dict()
 
         # Verify
@@ -119,7 +119,7 @@ class TestAssistant:
         print(tmp_path)
         path = tmp_path / "test"
         path.mkdir()
-        # Execute
+        # Invoke
         mock_assistant.generate_manifest(str(path))
 
         manifest_path = path / "test_assistant_manifest.json"

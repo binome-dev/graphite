@@ -1,6 +1,6 @@
 # FunctionTool
 
-The **FunctionTool** class is a specialized `Tool` designed to execute custom function-based operations within event-driven workflows. It provides a flexible framework for integrating arbitrary function logic, allowing developers to wrap any callable function and seamlessly integrate it into the workflow system. The tool handles both synchronous and asynchronous execution patterns while maintaining compatibility with the broader tool interface.
+The **FunctionTool** class is a specialized `Tool` designed to invoke custom function-based operations within event-driven workflows. It provides a flexible framework for integrating arbitrary function logic, allowing developers to wrap any callable function and seamlessly integrate it into the workflow system. The tool handles both synchronous and asynchronous invoke patterns while maintaining compatibility with the broader tool interface.
 
 ## Fields
 
@@ -16,8 +16,8 @@ The **FunctionTool** class is a specialized `Tool` designed to execute custom fu
 
 | Method              | Description                                                                                                  |
 |---------------------|--------------------------------------------------------------------------------------------------------------|
-| `execute`           | Synchronously executes the wrapped function with input messages and returns the result as messages.         |
-| `a_execute`         | Asynchronously executes the function, supporting both regular and awaitable functions.                       |
+| `invoke`           | Synchronously invokes the wrapped function with input messages and returns the result as messages.         |
+| `a_invoke`         | Asynchronously invokes the function, supporting both regular and awaitable functions.                       |
 | `to_messages`       | Converts the function's raw response into standardized `Message` objects with appropriate formatting.        |
 | `to_dict`           | Serializes the tool's configuration into a dictionary format for persistence or debugging.                  |
 
@@ -43,4 +43,4 @@ function_tool = (
 )
 ```
 
-By providing a consistent interface for function execution, the `FunctionTool` enables developers to integrate custom computational logic into event-driven workflows while maintaining clean separation between workflow orchestration and business logic implementation.
+By providing a consistent interface for function invoke, the `FunctionTool` enables developers to integrate custom computational logic into event-driven workflows while maintaining clean separation between workflow orchestration and business logic implementation.

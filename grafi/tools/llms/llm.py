@@ -9,7 +9,7 @@ from typing import TypeVar
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -37,7 +37,7 @@ class LLM(Tool):
     @abstractmethod
     def stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Generator[Message, None, None]:
         raise NotImplementedError("Subclasses must implement this method.")
@@ -45,7 +45,7 @@ class LLM(Tool):
     @abstractmethod
     async def a_stream(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         yield []  # Too keep mypy happy

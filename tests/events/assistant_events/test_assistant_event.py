@@ -5,7 +5,7 @@ from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
 from grafi.common.events.assistant_events.assistant_event import ASSISTANT_TYPE
 from grafi.common.events.assistant_events.assistant_event import AssistantEvent
 from grafi.common.events.event import EVENT_CONTEXT
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 
 
 @pytest.fixture
@@ -17,9 +17,9 @@ def assistant_event() -> AssistantEvent:
         assistant_id="test_id",
         assistant_name="test_assistant",
         assistant_type="test_type",
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
     )
@@ -37,9 +37,9 @@ def assistant_event_dict():
             ASSISTANT_ID: "test_id",
             ASSISTANT_NAME: "test_assistant",
             ASSISTANT_TYPE: "test_type",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

@@ -18,14 +18,14 @@ The `AssistantBase` class provides an abstract base interface defining the found
 
 ## Assistant Class
 
-The concrete `Assistant` class extends `AssistantBase`, implementing workflow execution and managing the interactions between user inputs and the agent’s workflow components.
+The concrete `Assistant` class extends `AssistantBase`, implementing workflow invoke and managing the interactions between user inputs and the agent’s workflow components.
 
 ### Assistant Class Methods
 
 | Method                | Description                                                                                                  |
 |-----------------------|--------------------------------------------------------------------------------------------------------------|
-| `execute`             | Processes input messages synchronously through the workflow and returns sorted response messages.            |
-| `a_execute`           | Processes input messages asynchronously through the workflow, suitable for streaming or concurrent use cases.|
+| `invoke`             | Processes input messages synchronously through the workflow and returns sorted response messages.            |
+| `a_invoke`           | Processes input messages asynchronously through the workflow, suitable for streaming or concurrent use cases.|
 | `_get_consumed_events`| Internally retrieves and processes consumed events from workflow topics.                                     |
 | `to_dict`             | Serializes the assistant's workflow state and configuration into a dictionary.                               |
 | `generate_manifest`   | Generates a manifest file representing the assistant’s configuration and workflow state.                     |

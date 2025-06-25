@@ -11,7 +11,7 @@ from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant import (
@@ -35,10 +35,10 @@ if os.path.exists(PERSIST_DIR):
     print(f"Deleted {PERSIST_DIR} and all its contents")
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -98,7 +98,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
 
 
 def test_simple_embedding_retrieval_tool() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
     simple_rag_assistant = SimpleEmbeddingRetrievalAssistant(
         name="SimpleEmbeddingRetrievalAssistant",
         api_key=api_key,
@@ -106,8 +106,8 @@ def test_simple_embedding_retrieval_tool() -> None:
         collection=create_collection(),
     )
 
-    result: Messages = simple_rag_assistant.execute(
-        execution_context,
+    result: Messages = simple_rag_assistant.invoke(
+        invoke_context,
         [
             Message(
                 role="user",

@@ -10,9 +10,9 @@ import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -38,17 +38,15 @@ class FunctionTool(Tool):
         """
         return FunctionToolBuilder(cls)
 
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         response = self.function(input_data)
 
         return self.to_messages(response=response)
 
-    @record_tool_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    @record_tool_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         response = self.function(input_data)
         if inspect.isawaitable(response):

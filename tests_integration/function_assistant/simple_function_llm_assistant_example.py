@@ -5,7 +5,7 @@ from typing import List
 from pydantic import BaseModel
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from tests_integration.function_assistant.simple_function_llm_assistant import (
@@ -59,16 +59,16 @@ def print_user_form(input_messages: Messages) -> List[str]:
     return user_details
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 def test_simple_function_call_assistant() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
 
     assistant = (
         SimpleFunctionLLMAssistant.builder()
@@ -87,7 +87,7 @@ def test_simple_function_call_assistant() -> None:
         )
     ]
 
-    output = assistant.execute(execution_context, input_data)
+    output = assistant.invoke(invoke_context, input_data)
     print(output)
     assert output is not None
     assert "first_name" in str(output[0].content)

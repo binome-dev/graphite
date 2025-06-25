@@ -2,7 +2,7 @@ import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 
@@ -16,9 +16,9 @@ def publish_to_topic_event() -> PublishToTopicEvent:
         publisher_name="test_node",
         publisher_type="test_type",
         offset=0,
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         consumed_event_ids=["1", "2"],
@@ -46,9 +46,9 @@ def publish_to_topic_event_message() -> PublishToTopicEvent:
         publisher_name="test_node",
         publisher_type="test_type",
         offset=0,
-        execution_context=ExecutionContext(
+        invoke_context=InvokeContext(
             conversation_id="conversation_id",
-            execution_id="execution_id",
+            invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
         consumed_event_ids=["1", "2"],
@@ -80,9 +80,9 @@ def publish_to_topic_event_dict():
             "publisher_name": "test_node",
             "publisher_type": "test_type",
             "consumed_event_ids": ["1", "2"],
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },
@@ -105,9 +105,9 @@ def publish_to_topic_event_dict_message():
             "publisher_name": "test_node",
             "publisher_type": "test_type",
             "consumed_event_ids": ["1", "2"],
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "execution_id",
+                "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
                 "user_id": "",
             },

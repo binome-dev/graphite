@@ -17,7 +17,7 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 
 
@@ -49,7 +49,7 @@ class TopicBase(BaseModel):
 
     def publish_data(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         data: Messages,

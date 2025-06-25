@@ -4,7 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.simple_stream_assistant.simple_stream_function_call_assistant import (
@@ -32,10 +32,10 @@ class WeatherMock(FunctionCallTool):
         return f"The weather of {postcode} is bad now."
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -55,8 +55,8 @@ async def test_simple_function_call_assistant_no_function_call() -> None:
 
     content = ""
 
-    async for messages in assistant.a_execute(
-        get_execution_context(),
+    async for messages in assistant.a_invoke(
+        get_invoke_context(),
         input_data,
     ):
         for message in messages:

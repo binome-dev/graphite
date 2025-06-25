@@ -19,7 +19,7 @@ Graphite is a flexible, event-driven framework for building AI agents using modu
    By treating events as the single source of truth, Graphite automatically logs every state change and decision path. This level of detailed recordkeeping is indispensable for users working in regulated sectors or who need full traceability for debugging and compliance.
 
 4. **Restorability**  
-   Long-running AI tasks risk substantial rework if they fail mid-execution. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency ([Example](/tests_integration/react_assistant/react_assistant_recovery_example.py)).
+   Long-running AI tasks risk substantial rework if they fail mid-invoke. In Graphite, checkpoints and event-based playback enable workflows to resume from the precise point of interruption, minimizing downtime and maximizing resource efficiency ([Example](/tests_integration/react_assistant/react_assistant_recovery_example.py)).
 
 Graphite is based on:
 
@@ -43,7 +43,7 @@ Graphite is structured into three conceptual layers — *Assistants*, *Nodes*, a
 
 - **Assistants**: High-level orchestration layer that manages AI agent workflows and user interactions. Assistants handle the complete lifecycle of requests, from initial input to final response.
 - **Nodes**: A node is a discrete component in a graph-based agent system that operates under an event-driven model. Its primary role is to represent its position within a workflow graph, manage event subscriptions, and designate topics for publishing.
-- **Tools**:  In our platform, tools represent the execution components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic.
+- **Tools**:  In our platform, tools represent the invoke components within a workflow. A Tool is essentially a function designed to transform input data into output based on specified rules or logic.
 - **Workflow**: Orchestrates interactions among nodes using a Pub/Sub pattern with in-memory message queuing.
 
 ![graphite_architecture](/assets/graphite_architecture.png)
@@ -53,11 +53,11 @@ Additionally, Graphite offers modules that support essential architectural patte
 - **Event**: Core to Graphite’s event-driven architecture. Events represent every state change, stored in a durable event store, serving as the single source of truth for downstream processing, auditing, workflow restoration, and more.
 - **Topic**: Implements lightweight FIFO message queuing, essential for Pub/Sub interactions.
 - **Command**: Implements the Command pattern, clearly separating request initiators from executors through defined Command objects and handlers. Commands carry all necessary context, allowing nodes to invoke tools independently and cleanly.
-- **Decorators**: Automatically capture execution details (inputs, outputs, and errors) as events without altering core business logic, facilitating auditability and traceability.
-- **Execution Context**: Manages identifiers across message life cycles:
-  - `conversation_id`: Manages conversations, which may include multiple executions.
+- **Decorators**: Automatically capture invoke details (inputs, outputs, and errors) as events without altering core business logic, facilitating auditability and traceability.
+- **Invoke Context**: Manages identifiers across message life cycles:
+  - `conversation_id`: Manages conversations, which may include multiple invokes.
   - `assistant_request_id`: Tracks requests at the assistant level, facilitating complex multi-node workflows.
-  - `execution_id`: Handles individual user requests, potentially involving multiple assistants in complex scenarios.
+  - `invoke_id`: Handles individual user requests, potentially involving multiple assistants in complex scenarios.
   - `user_id`: Identifies individual users, supporting multiple conversations per user.
 
 For more details, visit the Graphite [documentation](https://binome-dev.github.io/graphite/).

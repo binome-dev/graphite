@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
@@ -17,7 +17,7 @@ tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 
 observation_llm_system_message = """
-You are an AI assistant that records and reports the results obtained from executed actions.
+You are an AI assistant that records and reports the results obtained from invoked actions.
 After performing an action, provide a clear and concise summary of the findings relevant to the user's question.
 """
 thought_llm_system_message = """
@@ -36,16 +36,16 @@ Ensure the summary directly addresses the query based on the information gathere
 """
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
 
 # mock events
-def load_events_from_json() -> ExecutionContext:
+def load_events_from_json() -> InvokeContext:
     # Load events from JSON file
     with open(Path(__file__).parent / "react_events_unfinished.json", "r") as f:
         events_data = json.load(f)
@@ -59,13 +59,13 @@ def load_events_from_json() -> ExecutionContext:
         if event is None:
             raise ValueError(f"Failed to create event from dict: {event_dict}")
         event_store.record_event(event)
-        execution_context = event.execution_context
+        invoke_context = event.invoke_context
 
-    return execution_context
+    return invoke_context
 
 
 def test_react_assistant() -> None:
-    execution_context = load_events_from_json()
+    invoke_context = load_events_from_json()
 
     # Set up the assistant with DuckDuckGoTool
     assistant = (
@@ -94,8 +94,8 @@ def test_react_assistant() -> None:
         )
     ]
 
-    # Execute the assistant's function call
-    output = assistant.execute(execution_context, input_data)
+    # Invoke the assistant's function call
+    output = assistant.invoke(invoke_context, input_data)
     print("Assistant output:", output)
 
 

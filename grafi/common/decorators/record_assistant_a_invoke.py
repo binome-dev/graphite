@@ -19,17 +19,17 @@ from grafi.common.events.assistant_events.assistant_invoke_event import (
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 
 
-def record_assistant_a_execution(
-    func: Callable[[T_A, ExecutionContext, Messages], MsgsAGen],
-) -> Callable[[T_A, ExecutionContext, Messages], MsgsAGen]:
+def record_assistant_a_invoke(
+    func: Callable[[T_A, InvokeContext, Messages], MsgsAGen],
+) -> Callable[[T_A, InvokeContext, Messages], MsgsAGen]:
     """
-    Decorator to record assistant execution events and add tracing.
+    Decorator to record assistant invoke events and add tracing.
 
     Args:
         func: The assistant function to be decorated.
@@ -41,7 +41,7 @@ def record_assistant_a_execution(
     @functools.wraps(func)
     async def wrapper(
         self: T_A,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
         assistant_id = self.assistant_id
@@ -57,12 +57,12 @@ def record_assistant_a_execution(
                 assistant_id=assistant_id,
                 assistant_name=assistant_name,
                 assistant_type=assistant_type,
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 input_data=input_data,
             )
         )
 
-        # Execute the original function
+        # Invoke the original function
         result: Messages = []
         try:
             with container.tracer.start_as_current_span(
@@ -72,7 +72,7 @@ def record_assistant_a_execution(
                 span.set_attribute(ASSISTANT_ID, assistant_id)
                 span.set_attribute(ASSISTANT_NAME, assistant_name)
                 span.set_attribute(ASSISTANT_TYPE, assistant_type)
-                span.set_attributes(execution_context.model_dump())
+                span.set_attributes(invoke_context.model_dump())
                 span.set_attribute("input", input_data_dict)
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
@@ -80,10 +80,10 @@ def record_assistant_a_execution(
                 )
                 span.set_attribute("model", model)
 
-                # Execute the original function
+                # Invoke the original function
                 result_content = ""
                 is_streaming = False
-                async for data in func(self, execution_context, input_data):
+                async for data in func(self, invoke_context, input_data):
                     for message in data:
                         if message.is_streaming:
                             if message.content is not None and isinstance(
@@ -102,27 +102,27 @@ def record_assistant_a_execution(
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
                 span.set_attribute("output", output_data_dict)
         except Exception as e:
-            # Exception occurred during execution
+            # Exception occurred during invoke
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 AssistantFailedEvent(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     input_data=input_data,
                     error=str(e),
                 )
             )
             raise
         else:
-            # Successful execution
+            # Successful invoke
             container.event_store.record_event(
                 AssistantRespondEvent(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
-                    execution_context=execution_context,
+                    invoke_context=invoke_context,
                     input_data=input_data,
                     output_data=result,
                 )

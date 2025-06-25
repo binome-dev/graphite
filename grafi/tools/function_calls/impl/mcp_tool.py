@@ -1,14 +1,18 @@
 import json
+from typing import Any
 from typing import AsyncGenerator
+from typing import Dict
 from typing import List
-from typing import Optional
 
+from fastmcp import Client
 from loguru import logger
+from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.mcp_connections import Connection
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -16,17 +20,19 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilde
 
 
 try:
-    from mcp import ClientSession
-    from mcp import ListPromptsResult
-    from mcp import ListResourcesResult
-    from mcp import StdioServerParameters
-    from mcp.client.stdio import stdio_client
-    from mcp.types import CallToolResult
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
+    from mcp.types import Prompt
+    from mcp.types import Resource
     from mcp.types import TextContent
+    from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
+
+try:
+    from fastmcp.utilities.types import MCPContent
+except (ImportError, ModuleNotFoundError):
+    raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
 
 
 class MCPTool(FunctionCallTool):
@@ -37,9 +43,12 @@ class MCPTool(FunctionCallTool):
     # Set up API key and MCP client
     name: str = "MCPTool"
     type: str = "MCPTool"
-    server_params: Optional[StdioServerParameters] = None
-    prompts: Optional[ListPromptsResult] = None
-    resources: Optional[ListResourcesResult] = None
+
+    connections: Dict[str, Connection] = Field(default_factory=dict)
+
+    mcp_config: Dict[str, Any] = Field(default_factory=dict)
+    resources: List[Resource] = Field(default_factory=list)
+    prompts: List[Prompt] = Field(default_factory=list)
 
     @classmethod
     def builder(cls) -> "MCPToolBuilder":
@@ -49,55 +58,46 @@ class MCPTool(FunctionCallTool):
         return MCPToolBuilder(cls)
 
     async def _a_get_function_specs(self) -> None:
-        if self.server_params is None:
-            raise ValueError("Server parameters are not set.")
+        if not self.connections:
+            raise ValueError("Connections are not set.")
 
-        async with stdio_client(self.server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                # Initialize the connection
-                await session.initialize()
+        all_tools: list[Tool] = []
 
-                # List available prompts
-                self.prompts = await session.list_prompts()
+        async with Client(self.mcp_config) as client:
+            all_tools.extend(await client.list_tools())
+            self.resources = await client.list_resources()
+            self.prompts = await client.list_prompts()
 
-                # List available resources
-                self.resources = await session.list_resources()
+        for tool in all_tools:
+            func_spec = {
+                "name": tool.name,
+                "description": tool.description or "",
+                "parameters": tool.inputSchema,
+            }
 
-                # List available tools
-                tools_list = await session.list_tools()
+            self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
-                for tool in tools_list.tools:
-                    func_spec = {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.inputSchema,
-                    }
-
-                    self.function_specs.append(FunctionSpec.model_validate(func_spec))
-
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         raise NotImplementedError(
-            "MCPTool does not support synchronous execution. Use a_execute instead."
+            "MCPTool does not support synchronous invoke. Use a_invoke instead."
         )
 
-    @record_tool_a_execution
-    async def a_execute(
+    @record_tool_a_invoke
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> AsyncGenerator[Messages, None]:
         """
-        Execute the MCPTool with the provided input data.
+        Invoke the MCPTool with the provided input data.
 
         Args:
-            execution_context (ExecutionContext): The context for executing the function.
+            invoke_context (InvokeContext): The context for executing the function.
             input_data (Message): The input data for the function.
 
         Returns:
-            List[Message]: The output messages from the function execution.
+            List[Message]: The output messages from the function invoke.
         """
         input_message = input_data[0]
         if input_message.tool_calls is None:
@@ -106,57 +106,68 @@ class MCPTool(FunctionCallTool):
 
         messages: List[Message] = []
 
-        if self.server_params is None:
-            raise ValueError("Server parameters are not set.")
+        for tool_call in input_message.tool_calls:
+            if any(
+                tool_call.function.name == spec.name for spec in self.function_specs
+            ):
+                tool_name = tool_call.function.name
+                kwargs = json.loads(tool_call.function.arguments)
 
-        async with stdio_client(self.server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                for tool_call in input_message.tool_calls:
-                    if any(
-                        spec.name == tool_call.function.name
-                        for spec in self.function_specs
-                    ):
-                        tool_name = tool_call.function.name
-                        kwargs = json.loads(tool_call.function.arguments)
+                async with Client(self.mcp_config) as client:
+                    logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
 
-                        logger.info(
-                            f"Calling MCP Tool '{tool_name}' with args: {kwargs}"
-                        )
+                    result: list[MCPContent] = await client.call_tool(tool_name, kwargs)
 
-                        result: CallToolResult = await session.call_tool(
-                            tool_name, kwargs
-                        )
+                    # Process the result content
+                    response_str = ""
+                    for content in result:
+                        if isinstance(content, TextContent):
+                            response_str += content.text + "\n"
+                        elif isinstance(content, ImageContent):
+                            response_str = getattr(content, "data", "")
 
-                        # Return an error if the tool call failed
-                        if result.isError:
-                            raise Exception(
-                                f"Error from MCP tool '{tool_name}': {result.content}"
+                        elif isinstance(content, EmbeddedResource):
+                            # Handle embedded resources
+                            response_str += f"[Embedded resource: {content.resource.model_dump_json()}]\n"
+                        else:
+                            # Handle other content types
+                            response_str += (
+                                f"[Unsupported content type: {content.type}]\n"
                             )
 
-                        # Process the result content
-                        response_str = ""
-                        for content_item in result.content:
-                            if isinstance(content_item, TextContent):
-                                response_str += content_item.text + "\n"
-                            elif isinstance(content_item, ImageContent):
-                                response_str = getattr(content_item, "data", "")
-
-                            elif isinstance(content_item, EmbeddedResource):
-                                # Handle embedded resources
-                                response_str += f"[Embedded resource: {content_item.resource.model_dump_json()}]\n"
-                            else:
-                                # Handle other content types
-                                response_str += (
-                                    f"[Unsupported content type: {content_item.type}]\n"
-                                )
-
-                        messages.extend(
-                            self.to_messages(
-                                response=response_str, tool_call_id=tool_call.id
-                            )
+                    messages.extend(
+                        self.to_messages(
+                            response=response_str, tool_call_id=tool_call.id
                         )
+                    )
 
         yield messages
+
+    async def get_prompt(
+        self,
+        prompt_name: str,
+        *,
+        arguments: Dict[str, Any] | None = None,
+    ) -> Messages:
+        if not any(prompt.name == prompt_name for prompt in self.prompts):
+            raise ValueError(f"Prompt '{prompt_name}' not found")
+
+        async with Client(self.mcp_config) as client:
+            prompt = await client.get_prompt(prompt_name, arguments=arguments)
+            return [
+                Message(
+                    role=message.role,
+                    content=message.content,
+                )
+                for message in prompt.messages
+            ]
+
+    async def get_resources(self, uri: str) -> List:
+        if not any(resource.uri.encoded_string() == uri for resource in self.resources):
+            raise ValueError(f"Resource with URI '{uri}' not found")
+
+        async with Client(self.mcp_config) as client:
+            return await client.read_resource(uri)
 
 
 class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
@@ -164,13 +175,16 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     Builder for MCPTool.
     """
 
-    def server_params(self, server_params: StdioServerParameters) -> "MCPToolBuilder":
-        self._obj.server_params = server_params
+    def connections(self, connections: Dict[str, Connection]) -> "MCPToolBuilder":
+        self._obj.connections = connections
+        self._obj.mcp_config = {
+            "mcpServers": connections,
+        }
         return self
 
     def build(self) -> None:
         raise NotImplementedError(
-            "MCPTool does not support synchronous execution. Use a_build instead."
+            "MCPTool does not support synchronous invoke. Use a_build instead."
         )
 
     async def a_build(self) -> "MCPTool":

@@ -11,7 +11,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
 from grafi.common.topics.topic_base import TopicBase
@@ -38,7 +38,7 @@ class Topic(TopicBase):
 
     def publish_data(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         publisher_name: str,
         publisher_type: str,
         data: Messages,
@@ -49,7 +49,7 @@ class Topic(TopicBase):
         """
         if self.condition(data):
             event = PublishToTopicEvent(
-                execution_context=execution_context,
+                invoke_context=invoke_context,
                 topic_name=self.name,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,

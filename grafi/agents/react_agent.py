@@ -9,7 +9,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -124,9 +124,9 @@ class ReActAgent(Assistant):
         return self
 
     def run(self, question: str) -> str:
-        execution_context = ExecutionContext(
+        invoke_context = InvokeContext(
             conversation_id=uuid.uuid4().hex,
-            execution_id=uuid.uuid4().hex,
+            invoke_id=uuid.uuid4().hex,
             assistant_request_id=uuid.uuid4().hex,
         )
 
@@ -138,14 +138,14 @@ class ReActAgent(Assistant):
             )
         ]
 
-        output = super().execute(execution_context, input_data)
+        output = super().invoke(invoke_context, input_data)
 
         return output[0].content
 
     async def a_run(self, question: str) -> AsyncGenerator[Message, None]:
-        execution_context = ExecutionContext(
+        invoke_context = InvokeContext(
             conversation_id=uuid.uuid4().hex,
-            execution_id=uuid.uuid4().hex,
+            invoke_id=uuid.uuid4().hex,
             assistant_request_id=uuid.uuid4().hex,
         )
 
@@ -157,7 +157,7 @@ class ReActAgent(Assistant):
             )
         ]
 
-        async for output in super().a_execute(execution_context, input_data):
+        async for output in super().a_invoke(invoke_context, input_data):
             for message in output:
                 yield message
 

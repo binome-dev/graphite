@@ -6,7 +6,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from tests_integration.simple_llm_assistant.simple_multi_llm_assistant import (
@@ -17,10 +17,10 @@ from tests_integration.simple_llm_assistant.simple_multi_llm_assistant import (
 event_store = container.event_store
 
 
-def get_execution_context() -> ExecutionContext:
-    return ExecutionContext(
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
 
@@ -71,7 +71,7 @@ def human_request_process_function(input_data: Messages) -> str:
 
 
 async def test_simple_multi_llm_assistant_async() -> None:
-    execution_context = get_execution_context()
+    invoke_context = get_invoke_context()
 
     assistant = SimpleMultiLLMAssistant(
         name="SimpleMultiLLMAssistant",
@@ -91,7 +91,7 @@ async def test_simple_multi_llm_assistant_async() -> None:
             role="user",
         )
     ]
-    async for output in assistant.a_execute(execution_context, input_data):
+    async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
         assert output is not None
     print(len(event_store.get_events()))

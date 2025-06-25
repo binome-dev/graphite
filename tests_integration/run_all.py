@@ -23,7 +23,7 @@ def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> N
             for _, _, files in os.walk(current_directory / folder):
                 for f in files:
                     if f.endswith("_example.py"):
-                        # Store the relative path to maintain proper execution context
+                        # Store the relative path to maintain proper invoke context
                         rel_path = current_directory / folder / f
 
                         if folder not in file_list:
@@ -63,8 +63,8 @@ def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> N
                 print(f"Error running {file}:\n{e.stderr}")
                 failed_scripts[file] = e.stderr
 
-    # Summary of execution
-    print("\nSummary of execution:")
+    # Summary of invoke
+    print("\nSummary of invoke:")
     print("Passed scripts:")
     for script in passed_scripts:
         print(f" - {script}")

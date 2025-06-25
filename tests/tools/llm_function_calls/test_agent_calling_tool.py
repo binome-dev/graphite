@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
 
@@ -43,10 +43,10 @@ def test_get_function_specs(agent_calling_tool):
     assert specs[0].parameters.required == ["prompt"]
 
 
-def test_execute_successful(agent_calling_tool):
-    execution_context = ExecutionContext(
+def test_invoke_successful(agent_calling_tool):
+    invoke_context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
     input_data = [
@@ -65,7 +65,7 @@ def test_execute_successful(agent_calling_tool):
         )
     ]
 
-    result = agent_calling_tool.execute(execution_context, input_data)
+    result = agent_calling_tool.invoke(invoke_context, input_data)
     print(result)
 
     assert result[0].role == "tool"
@@ -73,10 +73,10 @@ def test_execute_successful(agent_calling_tool):
     assert result[0].tool_call_id == "test_id"
 
 
-def test_execute_invalid_function_name(agent_calling_tool):
-    execution_context = ExecutionContext(
+def test_invoke_invalid_function_name(agent_calling_tool):
+    invoke_context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
     input_data = [
@@ -95,21 +95,21 @@ def test_execute_invalid_function_name(agent_calling_tool):
         )
     ]
 
-    result = agent_calling_tool.execute(execution_context, input_data)
+    result = agent_calling_tool.invoke(invoke_context, input_data)
 
     assert result[0].content is None
 
 
-def test_execute_none_function_call(agent_calling_tool):
-    execution_context = ExecutionContext(
+def test_invoke_none_function_call(agent_calling_tool):
+    invoke_context = InvokeContext(
         conversation_id="conversation_id",
-        execution_id=uuid.uuid4().hex,
+        invoke_id=uuid.uuid4().hex,
         assistant_request_id=uuid.uuid4().hex,
     )
     input_data = [Message(role="assistant")]
 
     with pytest.raises(ValueError, match="Agent call is None."):
-        agent_calling_tool.execute(execution_context, input_data)
+        agent_calling_tool.invoke(invoke_context, input_data)
 
 
 def test_to_messages(agent_calling_tool):

@@ -9,9 +9,9 @@
             "assistant_id": "710a83dbe278464d9321e9020bf78089",
             "assistant_name": "ReActAssistant",
             "assistant_type": "ReActAssistant",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -30,9 +30,9 @@
             "workflow_id": "4be742f4113e43c29fa697727e186f54",
             "workflow_name": "ReActAssistantWorkflow",
             "workflow_type": "EventDrivenWorkflow",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -48,9 +48,9 @@
             "publisher_type": "EventDrivenWorkflow",
             "topic_name": "agent_input_topic",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -79,9 +79,9 @@
             ],
             "node_name": "ThoughtNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -94,9 +94,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "agent_input_topic",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -121,9 +121,9 @@
             "tool_id": "8999556db0b1476d8057377e9e5ad2bd",
             "tool_name": "ThoughtLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -142,9 +142,9 @@
             "tool_id": "8999556db0b1476d8057377e9e5ad2bd",
             "tool_name": "ThoughtLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -171,9 +171,9 @@
             ],
             "node_name": "ThoughtNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -186,9 +186,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "agent_input_topic",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -210,9 +210,9 @@
             "consumer_type": "LLMNode",
             "topic_name": "agent_input_topic",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -233,9 +233,9 @@
             "publisher_type": "LLMNode",
             "topic_name": "thought_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -264,9 +264,9 @@
             ],
             "node_name": "ActionNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -279,9 +279,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "thought_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -306,9 +306,9 @@
             "tool_id": "586857eefd074a80a6e22b3c160b8aba",
             "tool_name": "ActionLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -327,9 +327,9 @@
             "tool_id": "586857eefd074a80a6e22b3c160b8aba",
             "tool_name": "ActionLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -356,9 +356,9 @@
             ],
             "node_name": "ActionNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -371,9 +371,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "thought_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -395,9 +395,9 @@
             "consumer_type": "LLMNode",
             "topic_name": "thought_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -418,9 +418,9 @@
             "publisher_type": "LLMNode",
             "topic_name": "action_search_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -448,9 +448,9 @@
             ],
             "node_name": "SearchFunctionNode",
             "node_type": "LLMFunctionCallNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -463,9 +463,9 @@
                         "consumer_type": "LLMFunctionCallNode",
                         "topic_name": "action_search_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -490,9 +490,9 @@
             "tool_id": "bd3f6070f3724a9e9ddb99d1d3c198a7",
             "tool_name": "TavilyTestTool",
             "tool_type": "TavilyTool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -511,9 +511,9 @@
             "tool_id": "bd3f6070f3724a9e9ddb99d1d3c198a7",
             "tool_name": "TavilyTestTool",
             "tool_type": "TavilyTool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -539,9 +539,9 @@
             ],
             "node_name": "SearchFunctionNode",
             "node_type": "LLMFunctionCallNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -554,9 +554,9 @@
                         "consumer_type": "LLMFunctionCallNode",
                         "topic_name": "action_search_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -578,9 +578,9 @@
             "consumer_type": "LLMFunctionCallNode",
             "topic_name": "action_search_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -601,9 +601,9 @@
             "publisher_type": "LLMFunctionCallNode",
             "topic_name": "search_function_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -631,9 +631,9 @@
             ],
             "node_name": "ObservationNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -646,9 +646,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "search_function_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -673,9 +673,9 @@
             "tool_id": "2a5802f0e26c42a4853adb121837e0fe",
             "tool_name": "ObservationLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -694,9 +694,9 @@
             "tool_id": "2a5802f0e26c42a4853adb121837e0fe",
             "tool_name": "ObservationLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -722,9 +722,9 @@
             ],
             "node_name": "ObservationNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -737,9 +737,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "search_function_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -761,9 +761,9 @@
             "consumer_type": "LLMNode",
             "topic_name": "search_function_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -784,9 +784,9 @@
             "publisher_type": "LLMNode",
             "topic_name": "observation_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -815,9 +815,9 @@
             ],
             "node_name": "ThoughtNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -830,9 +830,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "observation_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -857,9 +857,9 @@
             "tool_id": "8999556db0b1476d8057377e9e5ad2bd",
             "tool_name": "ThoughtLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -878,9 +878,9 @@
             "tool_id": "8999556db0b1476d8057377e9e5ad2bd",
             "tool_name": "ThoughtLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -907,9 +907,9 @@
             ],
             "node_name": "ThoughtNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -922,9 +922,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "observation_result",
                         "offset": 0,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -946,9 +946,9 @@
             "consumer_type": "LLMNode",
             "topic_name": "observation_result",
             "offset": 0,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -969,9 +969,9 @@
             "publisher_type": "LLMNode",
             "topic_name": "thought_result",
             "offset": 1,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1000,9 +1000,9 @@
             ],
             "node_name": "ActionNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1015,9 +1015,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "thought_result",
                         "offset": 1,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -1042,9 +1042,9 @@
             "tool_id": "586857eefd074a80a6e22b3c160b8aba",
             "tool_name": "ActionLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1063,9 +1063,9 @@
             "tool_id": "586857eefd074a80a6e22b3c160b8aba",
             "tool_name": "ActionLLMTool",
             "tool_type": "OpenAITool",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1092,9 +1092,9 @@
             ],
             "node_name": "ActionNode",
             "node_type": "LLMNode",
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1107,9 +1107,9 @@
                         "consumer_type": "LLMNode",
                         "topic_name": "thought_result",
                         "offset": 1,
-                        "execution_context": {
+                        "invoke_context": {
                             "conversation_id": "conversation_id",
-                            "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                            "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                             "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                             "user_id": ""
                         }
@@ -1131,9 +1131,9 @@
             "consumer_type": "LLMNode",
             "topic_name": "thought_result",
             "offset": 1,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }
@@ -1154,9 +1154,9 @@
             "publisher_type": "LLMNode",
             "topic_name": "action_search_result",
             "offset": 1,
-            "execution_context": {
+            "invoke_context": {
                 "conversation_id": "conversation_id",
-                "execution_id": "a2a2f9db6e9c491f9003d64e3418c420",
+                "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
                 "assistant_request_id": "39a1db889a6f415cb287a5da8835d686",
                 "user_id": ""
             }

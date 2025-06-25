@@ -15,7 +15,7 @@ class ParameterSchema(BaseModel):
 
 class ParametersSchema(BaseModel):
     type: str = "object"
-    properties: Dict[str, ParameterSchema]
+    properties: Dict[str, ParameterSchema] = Field(default_factory=dict)
     required: List[str] = Field(default_factory=list)
 
 

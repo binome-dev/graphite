@@ -12,11 +12,11 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -93,21 +93,19 @@ class FunctionCallTool(Tool):
         """
         return self.function_specs
 
-    @record_tool_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_tool_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         """
-        Execute the registered function with the given arguments.
+        Invoke the registered function with the given arguments.
 
-        This method is decorated with @record_tool_execution to log its execution.
+        This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to execute.
+            function_name (str): The name of the function to invoke.
             arguments (Dict[str, Any]): The arguments to pass to the function.
 
         Returns:
-            Any: The result of the function execution.
+            Any: The result of the function invoke.
 
         Raises:
             ValueError: If the provided function_name doesn't match the registered function.
@@ -132,21 +130,21 @@ class FunctionCallTool(Tool):
 
         return messages
 
-    @record_tool_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    @record_tool_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
-        Execute the registered function with the given arguments.
+        Invoke the registered function with the given arguments.
 
-        This method is decorated with @record_tool_execution to log its execution.
+        This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to execute.
+            function_name (str): The name of the function to invoke.
             arguments (Dict[str, Any]): The arguments to pass to the function.
 
         Returns:
-            Any: The result of the function execution.
+            Any: The result of the function invoke.
 
         Raises:
             ValueError: If the provided function_name doesn't match the registered function.

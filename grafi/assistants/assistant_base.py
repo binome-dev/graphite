@@ -9,7 +9,7 @@ from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.workflows.workflow import Workflow
@@ -37,21 +37,21 @@ class AssistantBase(BaseModel):
         """Construct the workflow for the assistant."""
         raise NotImplementedError("Subclasses must implement '_construct_workflow'.")
 
-    def execute(
+    def invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
-        """Execute the assistant's workflow with the provided input data."""
-        raise NotImplementedError("Subclasses must implement 'execute'.")
+        """Invoke the assistant's workflow with the provided input data."""
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
-    async def a_execute(
+    async def a_invoke(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
-        """Execute the assistant's workflow with the provided input data asynchronously."""
-        raise NotImplementedError("Subclasses must implement 'a_execute'.")
+        """Invoke the assistant's workflow with the provided input data asynchronously."""
+        raise NotImplementedError("Subclasses must implement 'a_invoke'.")
 
 
 T_A = TypeVar("T_A", bound=AssistantBase)

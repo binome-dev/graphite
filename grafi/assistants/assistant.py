@@ -3,13 +3,9 @@ import os
 from typing import Any
 
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.decorators.record_assistant_a_execution import (
-    record_assistant_a_execution,
-)
-from grafi.common.decorators.record_assistant_execution import (
-    record_assistant_execution,
-)
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.decorators.record_assistant_a_invoke import record_assistant_a_invoke
+from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 
@@ -23,14 +19,12 @@ class Assistant(AssistantBase):
         event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
     """
 
-    @record_assistant_execution
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Messages:
+    @record_assistant_invoke
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
-            execution_context (ExecutionContext): Context containing execution information
+            invoke_context (InvokeContext): Context containing invoke information
             input_data (Messages): List of input messages to be processed
 
         Returns:
@@ -40,19 +34,19 @@ class Assistant(AssistantBase):
             ValueError: If the OpenAI API key is not provided and not found in environment variables
         """
 
-        # Execute the workflow with the input data
-        sorted_outputs = self.workflow.execute(execution_context, input_data)
+        # Invoke the workflow with the input data
+        sorted_outputs = self.workflow.invoke(invoke_context, input_data)
 
         return sorted_outputs
 
-    @record_assistant_a_execution
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    @record_assistant_a_invoke
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
-            execution_context (ExecutionContext): Context containing execution information
+            invoke_context (InvokeContext): Context containing invoke information
             input_data (Messages): List of input messages to be processed
 
         Returns:
@@ -62,8 +56,8 @@ class Assistant(AssistantBase):
             ValueError: If the OpenAI API key is not provided and not found in environment variables
         """
 
-        # Execute the workflow with the input data
-        async for output in self.workflow.a_execute(execution_context, input_data):
+        # Invoke the workflow with the input data
+        async for output in self.workflow.a_invoke(invoke_context, input_data):
             yield output
 
     def to_dict(self) -> dict[str, Any]:

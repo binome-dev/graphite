@@ -1,14 +1,17 @@
+import asyncio
 import os
 import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
 )
 
+
+# Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
 
 event_store = container.event_store
 
@@ -23,36 +26,33 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_simple_function_call_assistant_with_tavily() -> None:
+async def test_simple_function_call_assistant_with_mcp() -> None:
     invoke_context = get_invoke_context()
+
+    server_params = {
+        "hello": {
+            "url": "http://localhost:8000/mcp/",
+            "transport": "http",
+        }
+    }
 
     # Set up the assistant with TavilyTool
     assistant = (
         SimpleFunctionCallAssistant.builder()
-        .name("GoogleSearchToolAssistant")
+        .name("MCPAssistant")
         .api_key(api_key)
-        .function_tool(
-            GoogleSearchTool.builder()
-            .name("GoogleSearchTool")
-            .fixed_max_results(1)
-            .build()
-        )
+        .function_tool(await MCPTool.builder().connections(server_params).a_build())
         .build()
     )
 
-    input_data = [Message(role="user", content="What are the current AI trends?")]
+    input_data = [Message(role="user", content="Hi my name is Graphite.")]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(invoke_context, input_data)
-    print("Assistant output:", output)
+    async for output in assistant.a_invoke(invoke_context, input_data):
+        print(output)
+        assert output is not None
 
-    # Assert that the output is valid and check event count
-    assert output is not None
-    print(
-        "Number of events recorded:",
-        len(event_store.get_events()),
-    )
     assert len(event_store.get_events()) == 24
 
 
-test_simple_function_call_assistant_with_tavily()
+asyncio.run(test_simple_function_call_assistant_with_mcp())

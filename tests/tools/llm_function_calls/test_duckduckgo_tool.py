@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 
@@ -45,10 +45,10 @@ def test_web_search_using_duckduckgo(duckduckgo_tool, mock_ddgs):
     assert json.loads(result) == [{"title": "Test Result", "link": "http://test.com"}]
 
 
-def test_execute_function(duckduckgo_tool, mock_ddgs):
-    execution_context = ExecutionContext(
+def test_invoke_function(duckduckgo_tool, mock_ddgs):
+    invoke_context = InvokeContext(
         conversation_id="test_conv",
-        execution_id="test_execution_id",
+        invoke_id="test_invoke_id",
         assistant_request_id="test_req",
     )
     input_message = [
@@ -68,7 +68,7 @@ def test_execute_function(duckduckgo_tool, mock_ddgs):
         )
     ]
 
-    result = duckduckgo_tool.execute(execution_context, input_message)
+    result = duckduckgo_tool.invoke(invoke_context, input_message)
 
     print(result)
 
@@ -93,10 +93,10 @@ def test_builder_configuration():
     assert tool.proxy == "http://proxy.test"
 
 
-def test_execute_with_invalid_function_name(duckduckgo_tool):
-    execution_context = ExecutionContext(
+def test_invoke_with_invalid_function_name(duckduckgo_tool):
+    invoke_context = InvokeContext(
         conversation_id="test_conv",
-        execution_id="test_execution_id",
+        invoke_id="test_invoke_id",
         assistant_request_id="test_req",
     )
     input_message = [
@@ -116,7 +116,7 @@ def test_execute_with_invalid_function_name(duckduckgo_tool):
         )
     ]
 
-    result = duckduckgo_tool.execute(execution_context, input_message)
+    result = duckduckgo_tool.invoke(invoke_context, input_message)
     assert len(result) == 0
 
 
@@ -127,9 +127,9 @@ async def test_error_handling(duckduckgo_tool):
         mock.return_value = mock_instance
         mock_instance.text.side_effect = Exception("Search failed")
 
-        execution_context = ExecutionContext(
+        invoke_context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
         input_message = [
@@ -150,5 +150,5 @@ async def test_error_handling(duckduckgo_tool):
         ]
 
         with pytest.raises(Exception) as excinfo:
-            duckduckgo_tool.execute(execution_context, input_message)
+            duckduckgo_tool.invoke(invoke_context, input_message)
         assert str(excinfo.value) == "Search failed"

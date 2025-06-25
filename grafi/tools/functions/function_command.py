@@ -3,7 +3,7 @@ from typing import Self
 
 from grafi.common.models.command import Command
 from grafi.common.models.command import CommandBuilder
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -22,17 +22,13 @@ class FunctionCommand(Command):
         """
         return FunctionCommandBuilder(cls)
 
-    def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
-    ) -> Message:
-        return self.function_tool.execute(execution_context, input_data)
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message:
+        return self.function_tool.invoke(invoke_context, input_data)
 
-    async def a_execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+    async def a_invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
-        async for message in self.function_tool.a_execute(
-            execution_context, input_data
-        ):
+        async for message in self.function_tool.a_invoke(invoke_context, input_data):
             yield message
 
     def to_dict(self) -> dict[str, Any]:
