@@ -27,11 +27,14 @@ class AssistantBase(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     assistant_id: str = default_id
-    name: str
-    type: str
-    oi_span_type: OpenInferenceSpanKindValues
+    name: str = "Assistant"
+    type: str = "assistant"
+    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
 
-    workflow: Workflow
+    workflow: Workflow = Workflow()
+
+    def model_post_init(self, _context) -> None:
+        self._construct_workflow()
 
     def _construct_workflow(self) -> "AssistantBase":
         """Construct the workflow for the assistant."""
@@ -61,22 +64,17 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
     """Inner builder class for Assistant construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-        self._obj.oi_span_type = oi_span_type
+        self.kwargs["oi_span_type"] = oi_span_type
         return self
 
     def name(self, name: str) -> Self:
-        self._obj.name = name
+        self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
-        self._obj.type = type_name
+        self.kwargs["type"] = type_name
         return self
 
     def event_store(self, event_store: EventStore) -> Self:
         container.register_event_store(event_store)
         return self
-
-    def build(self) -> T_A:
-        """Build the Assistant instance."""
-        self._obj._construct_workflow()
-        return self._obj

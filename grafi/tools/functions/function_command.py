@@ -1,6 +1,10 @@
 from typing import Any
+from typing import List
 from typing import Self
 
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.models.command import Command
 from grafi.common.models.command import CommandBuilder
 from grafi.common.models.invoke_context import InvokeContext
@@ -22,14 +26,26 @@ class FunctionCommand(Command):
         """
         return FunctionCommandBuilder(cls)
 
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message:
-        return self.function_tool.invoke(invoke_context, input_data)
+    def invoke(
+        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
+    ) -> Message:
+        return self.function_tool.invoke(
+            invoke_context, self.get_tool_input(input_data)
+        )
 
     async def a_invoke(
-        self, invoke_context: InvokeContext, input_data: Messages
+        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
-        async for message in self.function_tool.a_invoke(invoke_context, input_data):
+        async for message in self.function_tool.a_invoke(
+            invoke_context, self.get_tool_input(input_data)
+        ):
             yield message
+
+    def get_tool_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
+        all_messages = []
+        for event in node_input:
+            all_messages.extend(event.data)
+        return all_messages
 
     def to_dict(self) -> dict[str, Any]:
         return {"function_tool": self.function_tool.to_dict()}
@@ -41,8 +57,5 @@ class FunctionCommandBuilder(CommandBuilder[FunctionCommand]):
     """
 
     def function_tool(self, function_tool: FunctionTool) -> Self:
-        self._obj.function_tool = function_tool
+        self.kwargs["function_tool"] = function_tool
         return self
-
-    def build(self) -> FunctionCommand:
-        return self._obj

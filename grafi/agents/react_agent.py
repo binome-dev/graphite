@@ -15,13 +15,12 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
+from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -72,8 +71,9 @@ class ReActAgent(Assistant):
         )
 
         llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
@@ -82,8 +82,8 @@ class ReActAgent(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
@@ -99,17 +99,15 @@ class ReActAgent(Assistant):
         )
 
         # Create a function call node
-        function_call_node = (
-            LLMFunctionCallNode.builder()
-            .name("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_call_tool)
-                .build()
-            )
-            .publish_to(function_result_topic)
-            .build()
+
+        function_call_node = Node(
+            name="Node",
+            type="Node",
+            command=FunctionCallCommand(function_call_tool=self.function_call_tool),
+            subscribed_expressions=[
+                SubscriptionBuilder().subscribed_to(function_call_topic).build()
+            ],
+            publish_to=[function_result_topic],
         )
 
         # Create a workflow and add the nodes
@@ -166,19 +164,19 @@ class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):
     """Concrete builder for ReActAgent."""
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def system_prompt(self, system_prompt: str) -> Self:
-        self._obj.system_prompt = system_prompt
+        self.kwargs["system_prompt"] = system_prompt
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
-        self._obj.function_call_tool = function_call_tool
+        self.kwargs["function_call_tool"] = function_call_tool
         return self
 
 

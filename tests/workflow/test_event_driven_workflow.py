@@ -18,10 +18,9 @@ from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_expression import TopicExpr
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflowBuilder
+from grafi.workflows.workflow import WorkflowBuilder
 
 
 class TestEventDrivenWorkflow:
@@ -57,9 +56,9 @@ class TestEventDrivenWorkflow:
     @pytest.fixture
     def mock_node(self, mock_topic):
         """Create a mock OpenAI node that subscribes to agent_input_topic and publishes to agent_output_topic."""
-        mock_node = Mock(spec=LLMNode)
+        mock_node = Mock(spec=Node)
         mock_node.name = "OpenAINode"
-        mock_node.type = "LLMNode"
+        mock_node.type = "Node"
         mock_node.node_id = "openai_node_123"
         mock_node.oi_span_type = OpenInferenceSpanKindValues.CHAIN
 
@@ -84,7 +83,7 @@ class TestEventDrivenWorkflow:
         mock_node.to_dict.return_value = {
             "node_id": "openai_node_123",
             "name": "OpenAINode",
-            "type": "LLMNode",
+            "type": "Node",
             "subscribed_expressions": [],
             "publish_to": [],
             "command": None,
@@ -114,7 +113,7 @@ class TestEventDrivenWorkflow:
     def test_builder_pattern(self, mock_node):
         """Test using the builder pattern to create EventDrivenWorkflow."""
         builder = EventDrivenWorkflow.builder()
-        assert isinstance(builder, EventDrivenWorkflowBuilder)
+        assert isinstance(builder, WorkflowBuilder)
 
         workflow = builder.node(mock_node).build()
         assert isinstance(workflow, EventDrivenWorkflow)
@@ -187,12 +186,12 @@ class TestEventDrivenWorkflow:
     def test_handle_function_calling_nodes(self, event_driven_workflow):
         """Test _handle_function_calling_nodes method."""
         # Create mock LLM node
-        llm_node = Mock(spec=LLMNode)
+        llm_node = Mock(spec=Node)
         llm_node.publish_to = [Topic(name="shared_topic")]
         llm_node.add_function_spec = Mock()
 
         # Create mock function call node
-        function_node = Mock(spec=LLMFunctionCallNode)
+        function_node = Mock(spec=LLMNode)
         function_node._subscribed_topics = ["shared_topic"]
         function_node.get_function_specs.return_value = {"test_function": {}}
 

@@ -9,7 +9,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
 from grafi.common.events.event import Event
-from grafi.common.events.node_events.node_event import NodeEvent
+from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
@@ -22,12 +22,11 @@ from grafi.nodes.node import Node
 class Workflow(BaseModel):
     """Abstract base class for workflows in a graph-based agent system."""
 
-    oi_span_type: OpenInferenceSpanKindValues
+    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
     workflow_id: str = default_id
-    name: str
-    type: str
+    name: str = "Workflow"
+    type: str = "Workflow"
     nodes: Dict[str, Node] = {}
-    state: Dict[str, Tuple[str, NodeEvent | None]] = {}
 
     def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
         """Invokes the workflow with the given initial inputs."""
@@ -72,21 +71,21 @@ class WorkflowBuilder(BaseBuilder[T_W]):
     """Inner builder class for Workflow construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-        self._obj.oi_span_type = oi_span_type
+        self.kwargs["oi_span_type"] = oi_span_type
         return self
 
     def name(self, name: str) -> Self:
-        self._obj.name = name
+        self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
-        self._obj.type = type_name
+        self.kwargs["type"] = type_name
         return self
 
     def node(self, node: Node) -> Self:
-        self._obj.nodes[node.node_id] = node
+        if "nodes" not in self.kwargs:
+            self.kwargs["nodes"] = {}
+        if node.name in self.kwargs["nodes"]:
+            raise DuplicateNodeError(node)
+        self.kwargs["nodes"][node.name] = node
         return self
-
-    def build(self) -> T_W:
-        """Build the Workflow instance."""
-        return self._obj

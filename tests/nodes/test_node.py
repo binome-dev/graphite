@@ -28,8 +28,8 @@ class DummyNode(Node):
     """
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
-    name: str = "LLMNode"
-    type: str = "LLMNode"
+    name: str = "Node"
+    type: str = "Node"
     command: Command = Field(default=None)
     function_specs: FunctionSpecs = Field(default=[])
 

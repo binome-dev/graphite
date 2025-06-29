@@ -247,9 +247,9 @@ class OllamaTool(LLM):
             raw_tool_calls = message_data.tool_calls
 
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:
@@ -289,10 +289,5 @@ class OllamaToolBuilder(LLMBuilder[OllamaTool]):
     """
 
     def api_url(self, api_url: str) -> Self:
-        self._obj.api_url = api_url
+        self.kwargs["api_url"] = api_url
         return self
-
-    def build(self) -> OllamaTool:
-        if not self._obj.api_url:
-            raise ValueError("API URL must be provided for OllamaTool.")
-        return self._obj

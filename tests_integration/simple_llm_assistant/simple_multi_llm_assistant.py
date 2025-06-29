@@ -11,12 +11,11 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.function_node import FunctionNode
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.functions.function_command import FunctionCommand
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
+from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import Workflow
 
@@ -48,12 +47,13 @@ class SimpleMultiLLMAssistant(Assistant):
 
         # Create input LLM nodes
         openai_llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenRouterTool.builder()
                     .name("OpenAIInputLLM")
                     .api_key(self.api_key)
@@ -67,12 +67,13 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         deepseek_llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("DeepSeekInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenRouterTool.builder()
                     .name("DeepSeekInputLLM")
                     .api_key(self.api_key)
@@ -86,12 +87,13 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         gemini_llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("GeminiInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenRouterTool.builder()
                     .name("GeminiInputLLM")
                     .api_key(self.api_key)
@@ -105,12 +107,13 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         qwen_llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("QwenInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenRouterTool.builder()
                     .name("QwenInputLLM")
                     .api_key(self.api_key)
@@ -125,8 +128,9 @@ class SimpleMultiLLMAssistant(Assistant):
 
         # Create function call nodes
         openai_function_node = (
-            FunctionNode.builder()
-            .name("OpenAIFunctionNode")
+            Node.builder()
+            .name("OpenAINode")
+            .type("FunctionNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(openai_function_call_topic).build()
             )
@@ -145,8 +149,9 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         deepseek_function_node = (
-            FunctionNode.builder()
-            .name("DeepSeekFunctionNode")
+            Node.builder()
+            .name("DeepSeekNode")
+            .type("FunctionNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(deepseek_function_call_topic)
@@ -167,8 +172,9 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         gemini_function_node = (
-            FunctionNode.builder()
-            .name("GeminiFunctionNode")
+            Node.builder()
+            .name("GeminiNode")
+            .type("FunctionNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(gemini_function_call_topic).build()
             )
@@ -187,8 +193,9 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         qwen_function_node = (
-            FunctionNode.builder()
-            .name("QwenFunctionNode")
+            Node.builder()
+            .name("QwenNode")
+            .type("FunctionNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(qwen_function_call_topic).build()
             )
@@ -207,8 +214,9 @@ class SimpleMultiLLMAssistant(Assistant):
         )
 
         human_request_process_node = (
-            FunctionNode.builder()
+            Node.builder()
             .name("HumanRequestProcessNode")
+            .type("FunctionNode")
             .subscribe(SubscriptionBuilder().subscribed_to(human_request_topic).build())
             .command(
                 FunctionCommand.builder()

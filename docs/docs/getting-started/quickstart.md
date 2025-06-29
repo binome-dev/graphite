@@ -96,13 +96,13 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
+from grafi.tools.llms.llm_response_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -150,7 +150,7 @@ class ReactAssistant(Assistant):
         )
 
         llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
@@ -160,8 +160,8 @@ class ReactAssistant(Assistant):
                 .build()
             )
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
@@ -178,8 +178,8 @@ class ReactAssistant(Assistant):
 
         # Create a function call node
         function_call_node = (
-            LLMFunctionCallNode.builder()
-            .name("FunctionCallNode")
+            Node.builder()
+            .name("Node")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .command(
                 FunctionCallCommand.builder()

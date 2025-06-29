@@ -74,7 +74,7 @@ Here is the `Node` base event `NodeEvent`:
 |----------------------|------------------------------------------------------------------------------|
 | `node_id`            | Unique identifier for the node. Defaults to a generated UUID.                |
 | `node_name`          | Human-readable name of the node.                                             |
-| `node_type`          | Describes the functional category of the node (e.g., "LLMNode").             |
+| `node_type`          | Describes the functional category of the node (e.g., "Node").             |
 | `subscribed_topics`  | The list of event topics to which this node is subscribed.                   |
 | `publish_to_topics`  | The list of event topics where the node publishes output.                    |
 | `invoke_context`  | Workflow metadata, including request details and IDs.                        |

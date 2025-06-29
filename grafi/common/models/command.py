@@ -1,7 +1,11 @@
+from typing import List
 from typing import TypeVar
 
 from pydantic import BaseModel
 
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
@@ -19,7 +23,7 @@ class Command(BaseModel):
     def invoke(
         self,
         invoke_context: InvokeContext,
-        input_data: Messages,
+        input_data: List[ConsumeFromTopicEvent],
     ) -> Messages:
         """
         Invoke the command.
@@ -35,13 +39,28 @@ class Command(BaseModel):
     async def a_invoke(
         self,
         invoke_context: InvokeContext,
-        input_data: Messages,
+        input_data: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
         """
         Invoke the command asynchronously.
 
         This method should be implemented by all subclasses to define
         the specific behavior of each command.
+
+        Raises:
+            NotImplementedError: If the method is not implemented by a subclass.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def get_tool_input(
+        self,
+        node_input: List[ConsumeFromTopicEvent],
+    ) -> Messages:
+        """
+        Prepare the input for the command based on the node input and invoke context.
+
+        This method should be implemented by all subclasses to define
+        how to extract the input data for the command.
 
         Raises:
             NotImplementedError: If the method is not implemented by a subclass.
@@ -59,6 +78,4 @@ T_C = TypeVar("T_C", bound=Command)
 class CommandBuilder(BaseBuilder[T_C]):
     """Inner builder class for Assistant construction."""
 
-    def build(self) -> T_C:
-        """Build the AssistantBase instance."""
-        return self._obj
+    pass

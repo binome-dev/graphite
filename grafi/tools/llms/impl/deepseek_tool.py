@@ -232,10 +232,9 @@ class DeepseekToolBuilder(LLMBuilder[DeepseekTool]):
     """Builder for DeepseekTool instances."""
 
     def base_url(self, base_url: str) -> Self:
-        self._obj.base_url = base_url.rstrip("/")
+        self.kwargs["base_url"] = base_url.rstrip("/")
         return self
 
-    def build(self) -> DeepseekTool:
-        if not self._obj.api_key:
-            raise ValueError("API key must be set for DeepseekTool")
-        return self._obj
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
+        return self

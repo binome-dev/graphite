@@ -13,12 +13,11 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
+from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -79,12 +78,13 @@ class MultiFunctionsCallAssistant(Assistant):
 
         # Create an input LLM node
         llm_input_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("OpenAIInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenAITool.builder()
                     .name("UserInputLLM")
                     .api_key(self.api_key)
@@ -113,8 +113,9 @@ class MultiFunctionsCallAssistant(Assistant):
         for function_tool in self.function_tools:
             logger.info(f"Function: {function_tool}")
             function_call_node = (
-                LLMFunctionCallNode.builder()
-                .name(f"FunctionCallNode_{function_tool.name}")
+                Node.builder()
+                .name(f"Node_{function_tool.name}")
+                .type("FunctionCallNode")
                 .subscribe(
                     SubscriptionBuilder().subscribed_to(function_call_topic).build()
                 )
@@ -130,14 +131,14 @@ class MultiFunctionsCallAssistant(Assistant):
 
         # Create an output LLM node
         llm_output_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIOutputNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
             .command(
-                LLMResponseCommand.builder()
-                .llm(
+                LLMCommand.builder()
+                .llm_tool(
                     OpenAITool.builder()
                     .name("UserOutputLLM")
                     .api_key(self.api_key)
@@ -166,23 +167,27 @@ class MultiFunctionsCallAssistantBuilder(
     """
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self._obj.function_call_llm_system_message = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-        self._obj.summary_llm_system_message = summary_llm_system_message
+        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:
-        self._obj.function_tools.append(function_tool)
+        if "function_tools" not in self.kwargs:
+            self.kwargs["function_tools"] = []
+        self.kwargs["function_tools"].append(function_tool)
         return self

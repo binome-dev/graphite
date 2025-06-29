@@ -10,9 +10,9 @@ from pydantic import model_validator
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
+from grafi.nodes.node import Node
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import Workflow
-from tests_integration.rag_assistant.nodes.rag_node import RagNode
 from tests_integration.rag_assistant.tools.rags.rag_response_command import (
     RagResponseCommand,
 )
@@ -48,8 +48,9 @@ class SimpleRagAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleRagAssistant":
         # Create an LLM node
         rag_node = (
-            RagNode.builder()
+            Node.builder()
             .name("RagNode")
+            .type("RagNode")
             .subscribe(agent_input_topic)
             .command(
                 RagResponseCommand(rag_tool=RagTool(name="RagTool", index=self.index))

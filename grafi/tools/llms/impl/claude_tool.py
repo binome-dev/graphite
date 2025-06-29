@@ -259,11 +259,10 @@ class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
     This is a convenience class to create instances of ClaudeTool using a fluent interface.
     """
 
-    def max_tokens(self, max_tokens: int) -> Self:
-        self._obj.max_tokens = max_tokens
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
         return self
 
-    def build(self) -> ClaudeTool:
-        if not self._obj.api_key:
-            raise ValueError("API key must be set for ClaudeTool.")
-        return self._obj
+    def max_tokens(self, max_tokens: int) -> Self:
+        self.kwargs["max_tokens"] = max_tokens
+        return self

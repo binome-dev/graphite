@@ -74,12 +74,12 @@ Run a build in ReAct agent:
 
 ```mermaid
 graph TD;
-    Input[[agent_input_topic]]-->LLMNode;
-    LLMNode--"call function"-->FunctionCallTopic[[function_call_topic]];
+    Input[[agent_input_topic]]-->Node;
+    Node--"call function"-->FunctionCallTopic[[function_call_topic]];
     FunctionCallTopic-->Function;
     Function-->FunctionResultTopic[[function_result_topic]]
-    FunctionResultTopic-->LLMNode;
-    LLMNode--"final output"-->Output[[agent_output_topic]];
+    FunctionResultTopic-->Node;
+    Node--"final output"-->Output[[agent_output_topic]];
 ```
 
 ```python

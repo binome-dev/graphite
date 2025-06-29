@@ -207,9 +207,12 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
     def function(self, function: Callable) -> Self:
         if not hasattr(function, "_function_spec"):
             function = llm_function(function)
-        self._obj.functions[function.__name__] = function
-        self._obj.function_specs.append(function._function_spec)  # type: ignore[attr-defined]
-        return self
 
-    def build(self) -> FunctionCallTool:
-        return self._obj
+        if "functions" not in self.kwargs:
+            self.kwargs["functions"] = {}
+        if "function_specs" not in self.kwargs:
+            self.kwargs["function_specs"] = []
+
+        self.kwargs["functions"][function.__name__] = function
+        self.kwargs["function_specs"].append(function._function_spec)  # type: ignore[attr-defined]
+        return self

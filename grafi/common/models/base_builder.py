@@ -1,6 +1,7 @@
 # grafi/builder_core.py
 from __future__ import annotations
 
+from typing import Any
 from typing import Generic
 from typing import TypeVar
 
@@ -13,13 +14,14 @@ T = TypeVar("T", bound=BaseModel)
 class BaseBuilder(Generic[T]):
     """Generic builder that can build *any* Pydantic model."""
 
-    _obj: T
+    kwargs: dict[str, Any] = {}
+    _cls: type[T]
 
     def __init__(self, cls: type[T]) -> None:
-        self._obj = cls.model_construct()
+        self._cls = cls
 
     # ── generic helpers ────────────────────────────────────────────
 
     def build(self) -> T:
         """Return the fully configured product."""
-        return self._obj
+        return self._cls(**self.kwargs)

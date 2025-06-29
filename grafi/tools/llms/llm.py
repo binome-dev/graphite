@@ -69,20 +69,16 @@ T_L = TypeVar("T_L", bound=LLM)
 class LLMBuilder(ToolBuilder[T_L]):
     """Builder for LLM instances."""
 
-    def api_key(self, api_key: Optional[str]) -> Self:
-        self._obj.api_key = api_key
-        return self
-
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def chat_params(self, params: Dict[str, Any]) -> Self:
-        self._obj.chat_params = params
+        self.kwargs["chat_params"] = params
         if "response_format" in params:
-            self._obj.structured_output = True
+            self.kwargs["structured_output"] = True
         return self
 
     def system_message(self, system_message: Optional[str]) -> Self:
-        self._obj.system_message = system_message
+        self.kwargs["system_message"] = system_message
         return self

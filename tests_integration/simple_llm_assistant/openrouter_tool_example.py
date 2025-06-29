@@ -8,7 +8,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 
@@ -135,16 +135,16 @@ async def test_openrouter_tool_async() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# end-to-end: LLMNode streaming path                                          #
+# end-to-end: Node streaming path                                          #
 # --------------------------------------------------------------------------- #
 async def test_llm_a_stream_node_openrouter() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.builder()
+        Node.builder()
         .command(
             LLMStreamResponseCommand.builder()
-            .llm(OpenRouterTool.builder().api_key(api_key).build())
+            .llm_tool(OpenRouterTool.builder().api_key(api_key).build())
             .build()
         )
         .build()
@@ -154,8 +154,8 @@ async def test_llm_a_stream_node_openrouter() -> None:
     topic_event = ConsumeFromTopicEvent(
         invoke_context=invoke_context,
         topic_name="test_topic",
-        consumer_name="LLMNode",
-        consumer_type="LLMNode",
+        consumer_name="Node",
+        consumer_type="Node",
         offset=-1,
         data=[
             Message(role="user", content="Hello, my name is Grafi, how are you doing?")

@@ -89,13 +89,13 @@ class ToolBuilder(BaseBuilder[T_T]):
     """Inner builder class for Tool construction."""
 
     def name(self, name: str) -> Self:
-        self._obj.name = name
+        self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
-        self._obj.type = type_name
+        self.kwargs["type"] = type_name
         return self
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-        self._obj.oi_span_type = oi_span_type
+        self.kwargs["oi_span_type"] = oi_span_type
         return self

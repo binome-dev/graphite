@@ -5,6 +5,7 @@ from typing import Dict
 from typing import Generator
 from typing import List
 from typing import Optional
+from typing import Self
 from typing import Union
 from typing import cast
 
@@ -280,7 +281,7 @@ class OpenAITool(LLM):
 
 
 class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
-    def build(self) -> "OpenAITool":
-        if not self._obj.api_key:
-            raise ValueError("API key must be provided for OpenAITool.")
-        return self._obj
+
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
+        return self

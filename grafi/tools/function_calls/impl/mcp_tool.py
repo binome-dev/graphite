@@ -51,6 +51,16 @@ class MCPTool(FunctionCallTool):
     prompts: List[Prompt] = Field(default_factory=list)
 
     @classmethod
+    async def initialize(cls, **kwargs: Any) -> "MCPTool":
+        """
+        Initialize the MCPTool with the given keyword arguments.
+        """
+        mcp_tool = cls(**kwargs)
+        await mcp_tool._a_get_function_specs()
+
+        return mcp_tool
+
+    @classmethod
     def builder(cls) -> "MCPToolBuilder":
         """
         Return a builder for MCPTool.
@@ -176,8 +186,8 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     """
 
     def connections(self, connections: Dict[str, Connection]) -> "MCPToolBuilder":
-        self._obj.connections = connections
-        self._obj.mcp_config = {
+        self.kwargs["connections"] = connections
+        self.kwargs["mcp_config"] = {
             "mcpServers": connections,
         }
         return self
@@ -188,5 +198,6 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
         )
 
     async def a_build(self) -> "MCPTool":
-        await self._obj._a_get_function_specs()
-        return self._obj
+        mcp_tool = self._cls(**self.kwargs)
+        await mcp_tool._a_get_function_specs()
+        return mcp_tool

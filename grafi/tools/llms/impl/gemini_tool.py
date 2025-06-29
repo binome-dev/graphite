@@ -16,6 +16,7 @@ from typing import Dict
 from typing import Generator
 from typing import List
 from typing import Optional
+from typing import Self
 
 from deprecated import deprecated
 from google.genai import types
@@ -287,9 +288,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided
@@ -325,7 +326,6 @@ class GeminiToolBuilder(LLMBuilder[GeminiTool]):
     Builder for GeminiTool, allowing fluent configuration of the tool.
     """
 
-    def build(self) -> GeminiTool:
-        if not self._obj.api_key:
-            raise ValueError("API key must be provided for GeminiTool")
-        return self._obj
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
+        return self

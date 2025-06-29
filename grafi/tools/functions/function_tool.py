@@ -90,8 +90,5 @@ class FunctionToolBuilder(ToolBuilder[FunctionTool]):
     """Builder for FunctionTool instances."""
 
     def function(self, function: Callable[[Messages], OutputType]) -> Self:
-        self._obj.function = function
+        self.kwargs["function"] = function
         return self
-
-    def build(self) -> FunctionTool:
-        return self._obj

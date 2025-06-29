@@ -24,7 +24,7 @@ The concrete implementation of `Command` interface should be with its associated
 
 ## LLM Response Command and LLM Stream Command
 
-[`LLMResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
+[`LLMCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
 
 Fields:
 
@@ -40,7 +40,7 @@ Key methods are:
 | `a_invoke(invoke_context, input_data)`    | Asynchronously streams generated messages from the LLM.                                              |
 | `to_dict()`                                   | Serializes the command’s state, including its associated LLM configuration.                          |
 
-The [`LLMStreamResponseCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMResponseCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_invoke.
+The [`LLMStreamResponseCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_invoke.
 
 ## Function Calling Command
 

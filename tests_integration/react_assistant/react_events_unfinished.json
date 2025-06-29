@@ -78,7 +78,7 @@
                 "thought_result"
             ],
             "node_name": "ThoughtNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -91,7 +91,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ThoughtNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "agent_input_topic",
                         "offset": 0,
                         "invoke_context": {
@@ -170,7 +170,7 @@
                 "thought_result"
             ],
             "node_name": "ThoughtNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -183,7 +183,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ThoughtNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "agent_input_topic",
                         "offset": 0,
                         "invoke_context": {
@@ -207,7 +207,7 @@
     {
         "event_context": {
             "consumer_name": "ThoughtNode",
-            "consumer_type": "LLMNode",
+            "consumer_type": "Node",
             "topic_name": "agent_input_topic",
             "offset": 0,
             "invoke_context": {
@@ -230,7 +230,7 @@
                 "794d15d04ad74a69985836f80eeb9f1e"
             ],
             "publisher_name": "ThoughtNode",
-            "publisher_type": "LLMNode",
+            "publisher_type": "Node",
             "topic_name": "thought_result",
             "offset": 0,
             "invoke_context": {
@@ -263,7 +263,7 @@
                 "action_finish_result"
             ],
             "node_name": "ActionNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -276,7 +276,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ActionNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "thought_result",
                         "offset": 0,
                         "invoke_context": {
@@ -355,7 +355,7 @@
                 "action_finish_result"
             ],
             "node_name": "ActionNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -368,7 +368,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ActionNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "thought_result",
                         "offset": 0,
                         "invoke_context": {
@@ -392,7 +392,7 @@
     {
         "event_context": {
             "consumer_name": "ActionNode",
-            "consumer_type": "LLMNode",
+            "consumer_type": "Node",
             "topic_name": "thought_result",
             "offset": 0,
             "invoke_context": {
@@ -415,7 +415,7 @@
                 "752f06f40e924547aef77cc477001c35"
             ],
             "publisher_name": "ActionNode",
-            "publisher_type": "LLMNode",
+            "publisher_type": "Node",
             "topic_name": "action_search_result",
             "offset": 0,
             "invoke_context": {
@@ -446,8 +446,8 @@
             "publish_to_topics": [
                 "search_function_result"
             ],
-            "node_name": "SearchFunctionNode",
-            "node_type": "LLMFunctionCallNode",
+            "node_name": "SearchNode",
+            "node_type": "LLMNode",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -459,8 +459,8 @@
             "input_data": [
                 {
                     "event_context": {
-                        "consumer_name": "SearchFunctionNode",
-                        "consumer_type": "LLMFunctionCallNode",
+                        "consumer_name": "SearchNode",
+                        "consumer_type": "LLMNode",
                         "topic_name": "action_search_result",
                         "offset": 0,
                         "invoke_context": {
@@ -537,8 +537,8 @@
             "publish_to_topics": [
                 "search_function_result"
             ],
-            "node_name": "SearchFunctionNode",
-            "node_type": "LLMFunctionCallNode",
+            "node_name": "SearchNode",
+            "node_type": "LLMNode",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -550,8 +550,8 @@
             "input_data": [
                 {
                     "event_context": {
-                        "consumer_name": "SearchFunctionNode",
-                        "consumer_type": "LLMFunctionCallNode",
+                        "consumer_name": "SearchNode",
+                        "consumer_type": "LLMNode",
                         "topic_name": "action_search_result",
                         "offset": 0,
                         "invoke_context": {
@@ -574,8 +574,8 @@
     },
     {
         "event_context": {
-            "consumer_name": "SearchFunctionNode",
-            "consumer_type": "LLMFunctionCallNode",
+            "consumer_name": "SearchNode",
+            "consumer_type": "LLMNode",
             "topic_name": "action_search_result",
             "offset": 0,
             "invoke_context": {
@@ -597,8 +597,8 @@
             "consumed_event_ids": [
                 "5b2d9b6630854daebddfeabe2dbf3391"
             ],
-            "publisher_name": "SearchFunctionNode",
-            "publisher_type": "LLMFunctionCallNode",
+            "publisher_name": "SearchNode",
+            "publisher_type": "LLMNode",
             "topic_name": "search_function_result",
             "offset": 0,
             "invoke_context": {
@@ -630,7 +630,7 @@
                 "observation_result"
             ],
             "node_name": "ObservationNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -643,7 +643,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ObservationNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "search_function_result",
                         "offset": 0,
                         "invoke_context": {
@@ -721,7 +721,7 @@
                 "observation_result"
             ],
             "node_name": "ObservationNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -734,7 +734,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ObservationNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "search_function_result",
                         "offset": 0,
                         "invoke_context": {
@@ -758,7 +758,7 @@
     {
         "event_context": {
             "consumer_name": "ObservationNode",
-            "consumer_type": "LLMNode",
+            "consumer_type": "Node",
             "topic_name": "search_function_result",
             "offset": 0,
             "invoke_context": {
@@ -781,7 +781,7 @@
                 "813f50c8347f46b6b9fcb86f9cfd6c3f"
             ],
             "publisher_name": "ObservationNode",
-            "publisher_type": "LLMNode",
+            "publisher_type": "Node",
             "topic_name": "observation_result",
             "offset": 0,
             "invoke_context": {
@@ -814,7 +814,7 @@
                 "thought_result"
             ],
             "node_name": "ThoughtNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -827,7 +827,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ThoughtNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "observation_result",
                         "offset": 0,
                         "invoke_context": {
@@ -906,7 +906,7 @@
                 "thought_result"
             ],
             "node_name": "ThoughtNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -919,7 +919,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ThoughtNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "observation_result",
                         "offset": 0,
                         "invoke_context": {
@@ -943,7 +943,7 @@
     {
         "event_context": {
             "consumer_name": "ThoughtNode",
-            "consumer_type": "LLMNode",
+            "consumer_type": "Node",
             "topic_name": "observation_result",
             "offset": 0,
             "invoke_context": {
@@ -966,7 +966,7 @@
                 "e45ecef997ee4f62aac8ee702540423c"
             ],
             "publisher_name": "ThoughtNode",
-            "publisher_type": "LLMNode",
+            "publisher_type": "Node",
             "topic_name": "thought_result",
             "offset": 1,
             "invoke_context": {
@@ -999,7 +999,7 @@
                 "action_finish_result"
             ],
             "node_name": "ActionNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -1012,7 +1012,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ActionNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "thought_result",
                         "offset": 1,
                         "invoke_context": {
@@ -1091,7 +1091,7 @@
                 "action_finish_result"
             ],
             "node_name": "ActionNode",
-            "node_type": "LLMNode",
+            "node_type": "Node",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "a2a2f9db6e9c491f9003d64e3418c420",
@@ -1104,7 +1104,7 @@
                 {
                     "event_context": {
                         "consumer_name": "ActionNode",
-                        "consumer_type": "LLMNode",
+                        "consumer_type": "Node",
                         "topic_name": "thought_result",
                         "offset": 1,
                         "invoke_context": {
@@ -1128,7 +1128,7 @@
     {
         "event_context": {
             "consumer_name": "ActionNode",
-            "consumer_type": "LLMNode",
+            "consumer_type": "Node",
             "topic_name": "thought_result",
             "offset": 1,
             "invoke_context": {
@@ -1151,7 +1151,7 @@
                 "454de848acaa447a8a49f435db31883a"
             ],
             "publisher_name": "ActionNode",
-            "publisher_type": "LLMNode",
+            "publisher_type": "Node",
             "topic_name": "action_search_result",
             "offset": 1,
             "invoke_context": {

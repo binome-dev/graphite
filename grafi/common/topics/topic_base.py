@@ -151,12 +151,9 @@ class TopicBaseBuilder(BaseBuilder[T_T]):
     def name(self, name: str) -> Self:
         if name in AGENT_RESERVED_TOPICS:
             raise ValueError(f"Topic name '{name}' is reserved for the agent.")
-        self._obj.name = name
+        self.kwargs["name"] = name
         return self
 
     def condition(self, condition: Callable[[Messages], bool]) -> Self:
-        self._obj.condition = condition
+        self.kwargs["condition"] = condition
         return self
-
-    def build(self) -> T_T:
-        return self._obj
