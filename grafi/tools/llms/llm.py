@@ -29,6 +29,8 @@ class LLM(Tool):
     )
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
+    is_streaming: bool = Field(default=False)
+
     structured_output: bool = Field(
         default=False,
         description="Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text).",
@@ -77,6 +79,10 @@ class LLMBuilder(ToolBuilder[T_L]):
         self.kwargs["chat_params"] = params
         if "response_format" in params:
             self.kwargs["structured_output"] = True
+        return self
+
+    def is_streaming(self, is_streaming: bool) -> Self:
+        self.kwargs["is_streaming"] = is_streaming
         return self
 
     def system_message(self, system_message: Optional[str]) -> Self:

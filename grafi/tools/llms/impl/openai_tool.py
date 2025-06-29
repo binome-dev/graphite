@@ -154,9 +154,19 @@ class OpenAITool(LLM):
         input_data: Messages,
     ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
+        try:
+            client = AsyncClient(api_key=self.api_key)
 
-        async with AsyncClient(api_key=self.api_key) as client:
-            try:
+            if self.is_streaming:
+                async for chunk in await client.chat.completions.create(
+                    model=self.model,
+                    messages=api_messages,
+                    tools=api_tools,
+                    stream=True,
+                    **self.chat_params,
+                ):
+                    yield self.to_stream_messages(chunk)
+            else:
                 req_func = (
                     client.chat.completions.create
                     if not self.structured_output
@@ -168,14 +178,13 @@ class OpenAITool(LLM):
                     tools=api_tools,
                     **self.chat_params,
                 )
-            except asyncio.CancelledError:
-                raise  # let caller handle
-            except OpenAIError as exc:
-                # turn client‑specific exceptions into your domain error
-                raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
-        # Convert once we are outside the `async with`, so network resources are freed
-        yield self.to_messages(response)
+                yield self.to_messages(response)
+        except asyncio.CancelledError:
+            raise  # let caller handle
+        except OpenAIError as exc:
+            # turn client‑specific exceptions into your domain error
+            raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
     @record_tool_stream
     @deprecated("Use a_stream() instead for streaming functionality")

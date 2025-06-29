@@ -3,7 +3,6 @@ from typing import Callable
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
-from pydantic import model_validator
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.human_request_topic import human_request_topic
@@ -17,7 +16,6 @@ from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.workflow import Workflow
 
 
 class SimpleMultiLLMAssistant(Assistant):
@@ -36,9 +34,7 @@ class SimpleMultiLLMAssistant(Assistant):
     gemini_function: Callable
     qwen_function: Callable
     human_request_process_function: Callable
-    workflow: Workflow = Field(default=EventDrivenWorkflow())
 
-    @model_validator(mode="after")
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
         openai_function_call_topic = Topic(name="openai_function_call_topic")
         deepseek_function_call_topic = Topic(name="deepseek_function_call_topic")

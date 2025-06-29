@@ -8,6 +8,7 @@ from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -29,6 +30,10 @@ class Node(NodeBase):
         }
 
         self._subscribed_topics = topics
+
+        # Setup the command if it is not already set
+        if self.tool and not self._command:
+            self._command = Command.for_tool(self.tool)
 
     @classmethod
     def builder(cls) -> NodeBaseBuilder:

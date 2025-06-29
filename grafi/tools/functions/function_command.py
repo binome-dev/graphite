@@ -7,6 +7,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.command import Command
 from grafi.common.models.command import CommandBuilder
+from grafi.common.models.command import register_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -14,8 +15,9 @@ from grafi.common.models.message import MsgsAGen
 from grafi.tools.functions.function_tool import FunctionTool
 
 
+@register_command(FunctionTool)
 class FunctionCommand(Command):
-    function_tool: FunctionTool
+    tool: FunctionTool
 
     @classmethod
     def builder(cls) -> "FunctionCommandBuilder":
@@ -29,14 +31,12 @@ class FunctionCommand(Command):
     def invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> Message:
-        return self.function_tool.invoke(
-            invoke_context, self.get_tool_input(input_data)
-        )
+        return self.tool.invoke(invoke_context, self.get_tool_input(input_data))
 
     async def a_invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
-        async for message in self.function_tool.a_invoke(
+        async for message in self.tool.a_invoke(
             invoke_context, self.get_tool_input(input_data)
         ):
             yield message
@@ -48,7 +48,7 @@ class FunctionCommand(Command):
         return all_messages
 
     def to_dict(self) -> dict[str, Any]:
-        return {"function_tool": self.function_tool.to_dict()}
+        return {"tool": self.tool.to_dict()}
 
 
 class FunctionCommandBuilder(CommandBuilder[FunctionCommand]):
@@ -56,6 +56,6 @@ class FunctionCommandBuilder(CommandBuilder[FunctionCommand]):
     Builder for FunctionCommand.
     """
 
-    def function_tool(self, function_tool: FunctionTool) -> Self:
-        self.kwargs["function_tool"] = function_tool
+    def tool(self, tool: FunctionTool) -> Self:
+        self.kwargs["tool"] = tool
         return self

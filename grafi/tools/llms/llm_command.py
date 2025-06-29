@@ -3,7 +3,6 @@ from typing import List
 from typing import Self
 
 from loguru import logger
-from pydantic import Field
 from pydantic import PrivateAttr
 
 from grafi.common.containers.container import container
@@ -17,6 +16,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.command import Command
 from grafi.common.models.command import CommandBuilder
+from grafi.common.models.command import register_command
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -25,9 +25,9 @@ from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
 
 
+@register_command(LLM)
 class LLMCommand(Command):
-    llm_tool: LLM
-    is_streaming: bool = Field(default=False)
+    tool: LLM
 
     _function_specs: FunctionSpecs = PrivateAttr(default=[])
 
@@ -43,18 +43,15 @@ class LLMCommand(Command):
     def invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> Messages:
-        return self.llm_tool.invoke(
+        return self.tool.invoke(
             invoke_context, self.get_tool_input(invoke_context, input_data)
         )
 
     async def a_invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
-        async_func = (
-            self.llm_tool.a_stream if self.is_streaming else self.llm_tool.a_invoke
-        )
 
-        async for message in async_func(
+        async for message in self.tool.a_invoke(
             invoke_context, self.get_tool_input(invoke_context, input_data)
         ):
             yield message
@@ -165,10 +162,6 @@ class LLMCommandBuilder(CommandBuilder[LLMCommand]):
     Builder for LLMCommand.
     """
 
-    def llm_tool(self, llm_tool: LLM) -> Self:
-        self.kwargs["llm_tool"] = llm_tool
-        return self
-
-    def is_streaming(self, is_streaming: bool) -> Self:
-        self.kwargs["is_streaming"] = is_streaming
+    def tool(self, tool: LLM) -> Self:
+        self.kwargs["llm_tool"] = tool
         return self

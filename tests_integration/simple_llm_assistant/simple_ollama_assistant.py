@@ -46,6 +46,7 @@ class SimpleOllamaAssistant(Assistant):
         llm_node = (
             Node.builder()
             .name("OllamaInputNode")
+            .type("LLMNode")
             .subscribe(agent_input_topic)
             .command(
                 LLMCommand.builder()

@@ -20,7 +20,6 @@ from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -81,16 +80,12 @@ class ReActAgent(Assistant):
                 .subscribed_to(function_result_topic)
                 .build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.system_prompt)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.system_prompt)
                 .build()
             )
             .publish_to(function_call_topic)
@@ -103,7 +98,7 @@ class ReActAgent(Assistant):
         function_call_node = Node(
             name="Node",
             type="Node",
-            command=FunctionCallCommand(function_call_tool=self.function_call_tool),
+            command=FunctionCallCommand(tool=self.function_call_tool),
             subscribed_expressions=[
                 SubscriptionBuilder().subscribed_to(function_call_topic).build()
             ],

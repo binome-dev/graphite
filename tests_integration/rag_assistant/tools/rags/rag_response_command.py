@@ -5,12 +5,14 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.command import Command
+from grafi.common.models.command import register_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from tests_integration.rag_assistant.tools.rags.rag_tool import RagTool
 
 
+@register_command(RagTool)
 class RagResponseCommand(Command):
     """A command that responds with a message."""
 

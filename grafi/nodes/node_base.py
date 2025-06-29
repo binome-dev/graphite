@@ -1,5 +1,6 @@
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Self
 from typing import TypeVar
 from typing import Union
@@ -22,6 +23,7 @@ from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import SubExpr
 from grafi.common.topics.topic_expression import TopicExpr
+from grafi.tools.tool import Tool
 
 
 T_N = TypeVar("T_N", bound="NodeBase")
@@ -35,12 +37,23 @@ class NodeBase(BaseModel):
     node_id: str = default_id
     name: str = Field(default="Node")
     type: str = Field(default="Node")
-    command: Command
+    tool: Optional[Tool] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
     subscribed_expressions: List[SubExpr] = Field(default=[])
     publish_to: List[TopicBase] = Field(default=[])
 
     _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default={})
+    _command: Optional[Command] = PrivateAttr(default=None)
+
+    @property
+    def command(self):
+        """Access the internal command (for backward compatibility)."""
+        return self._command
+
+    @command.setter
+    def command(self, value):
+        """Set the internal command."""
+        self._command = value
 
     def invoke(
         self,
@@ -84,8 +97,9 @@ class NodeBaseBuilder(BaseBuilder["NodeBase"]):
         self.kwargs["type"] = type
         return self
 
-    def command(self, command: Command) -> Self:
-        self.kwargs["command"] = command
+    def tool(self, tool: Tool) -> Self:
+        """Set the tool for this node. Command will be auto-created."""
+        self.kwargs["tool"] = tool
         return self
 
     def subscribe(self, subscribe_to: Union[TopicBase, SubExpr]) -> Self:

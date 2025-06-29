@@ -1,4 +1,6 @@
+from typing import Dict
 from typing import List
+from typing import Type
 from typing import TypeVar
 
 from pydantic import BaseModel
@@ -10,6 +12,7 @@ from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.tool import Tool
 
 
 class Command(BaseModel):
@@ -19,6 +22,20 @@ class Command(BaseModel):
     This class defines the interface for all commands. Each specific command should
     inherit from this class and implement its methods.
     """
+
+    tool: Tool
+
+    @classmethod
+    def for_tool(cls, tool: Tool) -> "Command":
+        """Factory method to create appropriate command for a tool."""
+
+        for registered_type, command_class in TOOL_COMMAND_REGISTRY.items():
+            if isinstance(tool, registered_type):
+                return command_class(tool=tool)
+
+        raise ValueError(
+            f"No command registered for tool type: {type(tool)} or its parent classes"
+        )
 
     def invoke(
         self,
@@ -70,6 +87,20 @@ class Command(BaseModel):
     def to_dict(self) -> dict:
         """Convert the command to a dictionary."""
         raise NotImplementedError("Subclasses must implement this method.")
+
+
+# Registry for tool types to command classes
+TOOL_COMMAND_REGISTRY: Dict[Type[Tool], Type[Command]] = {}
+
+
+def register_command(tool_type: Type[Tool]):
+    """Decorator to register command classes for specific tool types."""
+
+    def decorator(command_class: Type[Command]):
+        TOOL_COMMAND_REGISTRY[tool_type] = command_class
+        return command_class
+
+    return decorator
 
 
 T_C = TypeVar("T_C", bound=Command)
