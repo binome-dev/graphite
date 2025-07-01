@@ -61,6 +61,7 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         llm_input_node = (
             Node.builder()
             .name("OpenAIInputNode")
+            .type("OpenAIInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .tool(
                 OpenAITool.builder()
@@ -81,7 +82,8 @@ class SimpleStreamFunctionCallAssistant(Assistant):
 
         function_call_node = (
             Node.builder()
-            .name("Node")
+            .name("FunctionCallNode")
+            .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(self.function_tool)
             .publish_to(function_result_topic)
@@ -92,6 +94,7 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         llm_node = (
             Node.builder()
             .name("LLMStreamNode")
+            .type("LLMStreamNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(function_result_topic)
@@ -143,9 +146,9 @@ class SimpleStreamFunctionCallAssistantBuilder(
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs[
-            "function_call_llm_system_message"
-        ] = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:

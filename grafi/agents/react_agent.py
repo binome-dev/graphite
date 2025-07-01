@@ -115,12 +115,13 @@ class ReActAgent(Assistant):
 
         return self
 
-    def run(self, question: str) -> str:
-        invoke_context = InvokeContext(
-            conversation_id=uuid.uuid4().hex,
-            invoke_id=uuid.uuid4().hex,
-            assistant_request_id=uuid.uuid4().hex,
-        )
+    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+        if invoke_context is None:
+            invoke_context = InvokeContext(
+                conversation_id=uuid.uuid4().hex,
+                invoke_id=uuid.uuid4().hex,
+                assistant_request_id=uuid.uuid4().hex,
+            )
 
         # Test the run method
         input_data = [
@@ -134,12 +135,15 @@ class ReActAgent(Assistant):
 
         return output[0].content
 
-    async def a_run(self, question: str) -> AsyncGenerator[Message, None]:
-        invoke_context = InvokeContext(
-            conversation_id=uuid.uuid4().hex,
-            invoke_id=uuid.uuid4().hex,
-            assistant_request_id=uuid.uuid4().hex,
-        )
+    async def a_run(
+        self, question: str, invoke_context: Optional[InvokeContext] = None
+    ) -> AsyncGenerator[Message, None]:
+        if invoke_context is None:
+            invoke_context = InvokeContext(
+                conversation_id=uuid.uuid4().hex,
+                invoke_id=uuid.uuid4().hex,
+                assistant_request_id=uuid.uuid4().hex,
+            )
 
         # Test the run method
         input_data = [

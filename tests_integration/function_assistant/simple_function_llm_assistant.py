@@ -58,7 +58,7 @@ class SimpleFunctionLLMAssistant(Assistant):
         llm_input_node = (
             Node.builder()
             .name("OpenAIInputNode")
-            .type("OpenAIInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .tool(
                 OpenAITool.builder()
