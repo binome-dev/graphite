@@ -94,7 +94,7 @@ def main():
         
         try:
             # Get synchronized response from agent
-            output = react_agent.run(user_input, invoke_context)
+            output = react_agent.run(user_input)
             print(f"\nAgent: {output}")
             
         except Exception as e:
@@ -116,14 +116,40 @@ poetry run python main.py
 <div class="bash"><pre>
 <code><span style="color:#FF4689">poetry</span> run python main.py</code></pre></div>
 
-You should see the output result
+You should see following in the terminal
 
 ```text
-Graphite is an open-source framework designed for building domain-specific AI agents using composable workflows. It features an event-driven architecture that allows developers to create customizable workflows. This framework is particularly focused on constructing AI assistants that can interact within specific domains effectively.
+ReAct Agent Chat Interface
+Type your questions and press Enter. Type '/bye' to exit.
+--------------------------------------------------
 
-For more detailed information, you can refer to the following resources:
-1. [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
-2. [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
+You:
+```
+
+then you can add your questions, and exit by typing `/bye`
+
+```text
+ReAct Agent Chat Interface
+Type your questions and press Enter. Type '/bye' to exit.
+--------------------------------------------------
+
+You: Hi, what is agent framework called Graphite? 
+
+<... logs>
+
+Agent: Graphite is an open-source framework designed for building domain-specific AI agents through composable, event-driven workflows. It allows developers to create customizable workflows that are modular and adaptable, making it straightforward to construct AI assistants tailored to specific tasks or domains.
+
+Key features include:
+- **Event-driven architecture**: This supports workflows that react to specific events, enhancing the interactivity and responsiveness of the agents.
+- **Modular workflows**: Developers can create and combine various components easily, allowing for flexible and scalable agent designs.
+
+For more detailed information, you can check these resources:
+- [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
+- [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
+- [Graphite for AI Agents: Event-Driven Design Made Simple](https://medium.com/binome/graphite-for-ai-agents-event-driven-design-made-simple-ede23733b8ef)
+
+You: /bye
+Goodbye!
 ```
 
 ---
