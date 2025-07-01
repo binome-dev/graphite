@@ -8,11 +8,11 @@
 
 Make sure the following are installed:
 
-* Python **>=3.10, <3.13** (required by the `grafi` package)
+* Python **>=3.10, \<3.13** (required by the `grafi` package)
 * [Poetry](https://python-poetry.org/docs/#installation)
 * Git
 
-> ⚠️ **Important:** `grafi` requires Python >= 3.10 and < 3.13. Other python version is not yet supported.
+> ⚠️ **Important:** `grafi` requires Python >= 3.10 and \<3.13. Other python version is not yet supported.
 
 ---
 
