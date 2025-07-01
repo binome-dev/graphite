@@ -1,6 +1,6 @@
 import asyncio
 
-from grafi.agents.react_agent import create_agent
+from grafi.agents.react_agent import create_react_agent
 from grafi.common.models.mcp_connections import StdioConnection
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
@@ -8,7 +8,7 @@ from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 async def run_agent() -> None:
     server_params = {
         "test": StdioConnection(
-            {
+            **{
                 "command": "npx",
                 "args": ["-y", "@modelcontextprotocol/server-everything"],
                 "transport": "stdio",
@@ -16,7 +16,7 @@ async def run_agent() -> None:
         )
     }
 
-    react_agent = create_agent(
+    react_agent = create_react_agent(
         function_call_tool=await MCPTool.builder().connections(server_params).a_build()
     )
 

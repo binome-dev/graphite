@@ -30,11 +30,9 @@ def get_invoke_context() -> InvokeContext:
 async def test_simple_function_call_assistant_with_mcp() -> None:
     server_params = {
         "test": StdioConnection(
-            {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-everything"],
-                "transport": "stdio",
-            }
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-everything"],
+            transport="stdio",
         )
     }
 

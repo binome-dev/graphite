@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from typing import Optional
 from typing import Self
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
@@ -31,6 +32,8 @@ selecting search tool if necessary.
 
 Response in a concise and clear manner, ensuring that your answers are accurate and relevant to the user's query.
 """
+
+CONVERSATION_ID = uuid.uuid4().hex
 
 
 class ReActAgent(Assistant):
@@ -115,21 +118,31 @@ class ReActAgent(Assistant):
 
         return self
 
-    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+    def get_input(
+        self, question: str, invoke_context: Optional[InvokeContext] = None
+    ) -> list[Message]:
         if invoke_context is None:
+            logger.debug(
+                "Creating new InvokeContext with default conversation id for ReActAgent"
+            )
             invoke_context = InvokeContext(
-                conversation_id=uuid.uuid4().hex,
+                conversation_id=CONVERSATION_ID,
                 invoke_id=uuid.uuid4().hex,
                 assistant_request_id=uuid.uuid4().hex,
             )
 
-        # Test the run method
+        # Prepare the input data
         input_data = [
             Message(
                 role="user",
                 content=question,
             )
         ]
+
+        return input_data, invoke_context
+
+    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+        input_data, invoke_context = self.get_input(question, invoke_context)
 
         output = super().invoke(invoke_context, input_data)
 
@@ -138,20 +151,7 @@ class ReActAgent(Assistant):
     async def a_run(
         self, question: str, invoke_context: Optional[InvokeContext] = None
     ) -> AsyncGenerator[Message, None]:
-        if invoke_context is None:
-            invoke_context = InvokeContext(
-                conversation_id=uuid.uuid4().hex,
-                invoke_id=uuid.uuid4().hex,
-                assistant_request_id=uuid.uuid4().hex,
-            )
-
-        # Test the run method
-        input_data = [
-            Message(
-                role="user",
-                content=question,
-            )
-        ]
+        input_data, invoke_context = self.get_input(question, invoke_context)
 
         async for output in super().a_invoke(invoke_context, input_data):
             for message in output:
@@ -178,7 +178,7 @@ class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):
         return self
 
 
-def create_agent(
+def create_react_agent(
     system_prompt: Optional[str] = None,
     function_call_tool: Optional[FunctionCallTool] = None,
     model: Optional[str] = None,

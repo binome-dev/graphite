@@ -44,8 +44,6 @@ class MCPTool(FunctionCallTool):
     name: str = "MCPTool"
     type: str = "MCPTool"
 
-    connections: Dict[str, Connection] = Field(default_factory=dict)
-
     mcp_config: Dict[str, Any] = Field(default_factory=dict)
     resources: List[Resource] = Field(default_factory=list)
     prompts: List[Prompt] = Field(default_factory=list)
@@ -68,8 +66,8 @@ class MCPTool(FunctionCallTool):
         return MCPToolBuilder(cls)
 
     async def _a_get_function_specs(self) -> None:
-        if not self.connections:
-            raise ValueError("Connections are not set.")
+        if not self.mcp_config:
+            raise ValueError("mcp_config are not set.")
 
         all_tools: list[Tool] = []
 
@@ -186,7 +184,6 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     """
 
     def connections(self, connections: Dict[str, Connection]) -> "MCPToolBuilder":
-        self.kwargs["connections"] = connections
         self.kwargs["mcp_config"] = {
             "mcpServers": connections,
         }
