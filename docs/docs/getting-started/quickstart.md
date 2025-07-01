@@ -8,15 +8,15 @@
 
 Make sure the following are installed:
 
-* Python **3.11 or 3.12** (required by the `grafi` package)
+* Python **>=3.10, <3.13** (required by the `grafi` package)
 * [Poetry](https://python-poetry.org/docs/#installation)
 * Git
 
-> ⚠️ **Important:** `grafi` requires Python >=3.11 and <3.13. Python 3.13+ is not yet supported.
+> ⚠️ **Important:** `grafi` requires Python >= 3.10 and < 3.13. Other python version is not yet supported.
 
 ---
 
-## 1. Create a New Project Directory
+## Create a New Project
 
 <!-- ```bash
 mkdir graphite-react
@@ -28,11 +28,7 @@ cd graphite-react
 <span style="color:#FF4689">cd</span> graphite-react
 </code></pre></div>
 
----
-
-## 2. Initialize a Poetry Project
-
-This will create the `pyproject.toml` file that Poetry needs. Be sure to specify a compatible Python version:
+This will create the `pyproject.toml` file that Poetry needs.
 
 <!-- ```bash
 poetry init --name graphite-react -n
@@ -41,12 +37,12 @@ poetry init --name graphite-react -n
 <div class="bash"><pre>
 <code><span style="color:#FF4689">poetry</span> init <span style="color:#AE81FF">--name</span> graphite-react <span style="color:#AE81FF">--n</span></code></pre></div>
 
-Then open `pyproject.toml` and ensure it includes:
+Be sure to specify a compatible Python version,  open `pyproject.toml` and ensure it includes:
 
 ```toml
 [tool.poetry.dependencies]
-grafi = "^0.0.12"
-python = ">=3.11,<3.13"
+grafi = "^0.0.18"
+python = ">=3.10,<3.13"
 ```
 
 Now install the dependencies:
@@ -70,214 +66,47 @@ This will automatically create a virtual environment and install `grafi` with th
 
 ---
 
-## 3. Create ReAct Assistant
+## Use Build-in ReAct Agent
 
-In graphite an assistant is a specialized node that can handle events and perform actions based on the input it receives. We will create a simple assistant that uses OpenAI's language model to process input, make function calls, and generate responses.
+In graphite an agent is a specialized assistant that can handle events and perform actions based on the input it receives. We will create a ReAct agent that uses OpenAI's language model to process input, make function calls, and generate responses.
 
-Create a file named `react_assistant.py` and add the code like following:
-
-### Class `ReactAssistant`
+Create a file named `react_agent_app.py` and create a build-in react-agent:
 
 ```python
-# react assistant.py
-import os
-import uuid
-from typing import Optional
-from typing import Self
+from grafi.agents.react_agent import create_react_agent
 
-from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import Field
-from pydantic import model_validator
+def main():
+    print("ReAct Agent Chat Interface")
+    print("Type your questions and press Enter. Type '/bye' to exit.")
+    print("-" * 50)
+    
+    react_agent = create_react_agent()
 
-from grafi.assistants.assistant import Assistant
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.node import Node
-from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
-from grafi.tools.function_calls.function_call_tool import FunctionCallTool
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMCommand
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+    while True:
+        user_input = input("\nYou: ").strip()
+        
+        if user_input.lower() == '/bye':
+            print("Goodbye!")
+            break
+        
+        if not user_input:
+            continue
+        
+        try:
+            # Get synchronized response from agent
+            output = react_agent.run(user_input, invoke_context)
+            print(f"\nAgent: {output}")
+            
+        except Exception as e:
+            print(f"Error: {e}")
 
-
-AGENT_SYSTEM_MESSAGE = """
-You are a helpful and knowledgeable agent. To achieve your goal of answering complex questions
-correctly, you have access to the search tool.
-
-To answer questions, you'll need to go through multiple steps involving step-by-step thinking and
-selecting search tool if necessary.
-
-Response in a concise and clear manner, ensuring that your answers are accurate and relevant to the user's query.
-"""
-
-
-class ReactAssistant(Assistant):
-
-    oi_span_type: OpenInferenceSpanKindValues = Field(
-        default=OpenInferenceSpanKindValues.AGENT
-    )
-    name: str = Field(default="ReactAssistant")
-    type: str = Field(default="ReactAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
-    function_call_tool: FunctionCallTool = Field(
-        default=GoogleSearchTool.builder()
-        .name("GoogleSearchTool")
-        .fixed_max_results(3)
-        .build()
-    )
-    model: str = Field(default="gpt-4o-mini")
-
-    @model_validator(mode="after")
-    def _construct_workflow(self) -> "ReactAssistant":
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
-            is not None,  # only when the last message is a function call
-        )
-        function_result_topic = Topic(name="function_result_topic")
-
-        agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
-        )
-
-        llm_node = (
-            Node.builder()
-            .name("OpenAIInputNode")
-            .subscribe(
-                SubscriptionBuilder()
-                .subscribed_to(agent_input_topic)
-                .or_()
-                .subscribed_to(function_result_topic)
-                .build()
-            )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.system_prompt)
-                    .build()
-                )
-                .build()
-            )
-            .publish_to(function_call_topic)
-            .publish_to(agent_output_topic)
-            .build()
-        )
-
-        # Create a function call node
-        function_call_node = (
-            Node.builder()
-            .name("Node")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_call_tool)
-                .build()
-            )
-            .publish_to(function_result_topic)
-            .build()
-        )
-
-        # Create a workflow and add the nodes
-        self.workflow = (
-            EventDrivenWorkflow.builder()
-            .name("simple_agent_workflow")
-            .node(llm_node)
-            .node(function_call_node)
-            .build()
-        )
-
-        return self
-```
-
-If you want to add builder pattern, add Builder class
-
-```python
-class ReactAssistantBuilder(AssistantBaseBuilder[ReactAssistant]):
-    """Concrete builder for ReactAssistant."""
-
-    def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
-        return self
-
-    def system_prompt(self, system_prompt: str) -> Self:
-        self._obj.system_prompt = system_prompt
-        return self
-
-    def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
-        self._obj.function_call_tool = function_call_tool
-        return self
-
-    def model(self, model: str) -> Self:
-        self._obj.model = model
-        return self
-
-```
-
-And add builder() method to ReactAssistant class
-
-```python
-class ReactAssistant(Assistant):
-    ...
-
-    @classmethod
-    def builder(cls) -> "ReactAssistantBuilder":
-        """Return a builder for ReactAssistant."""
-        return ReactAssistantBuilder(cls)
-
-    ...
+if __name__ == "__main__":
+    main()
 ```
 
 ---
 
-## 4. Call the Assistant
-
-Create a `main.py` that will call the assistant created previously.
-
-```python
-import os
-import uuid
-
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from <your react assistant path> import ReactAssistant
-
-api_key = "<your openai api key>"
-
-react_assistant = ReactAssistant.builder().api_key(api_key).build()
-
-invoke_context = InvokeContext(
-            conversation_id=uuid.uuid4().hex,
-            invoke_id=uuid.uuid4().hex,
-            assistant_request_id=uuid.uuid4().hex,
-        )
-
-question = "your question"
-
-input_data = [
-            Message(
-                role="user",
-                content=question,
-            )
-        ]
-
-output = react_assistant.invoke(invoke_context, input_data)
-print(output[0].content)
-```
-
-## 5. Run the Application
+## Run the Application
 
 Use Poetry to invoke the script inside the virtual environment:
 

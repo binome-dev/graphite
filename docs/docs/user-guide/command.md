@@ -1,58 +1,222 @@
 # Command
 
-In our platform, the **Command** implements the Command Pattern, effectively separating workflow orchestration (Nodes) from invoke logic (Tools). Commands encapsulate the request or invoke logic, allowing the orchestrator (Node) to delegate invoke to the executor (Tool) without needing to know the internal details of the invoke process.
+The **Command** implements the Command Pattern in Graphite, providing a crucial abstraction layer that separates workflow orchestration (Nodes) from execution logic (Tools). Commands encapsulate the execution logic and data preparation, allowing nodes to delegate processing to tools without needing to understand the internal implementation details.
 
-Using the Command Pattern brings several significant benefits:
+## Architecture Overview
 
-- **Separation of Concerns:** Clearly separates orchestration logic from invoke logic, making the system more modular.
-- **Flexibility and Extensibility:** Allows for easy swapping, extension, and customization of invoke logic without altering workflow structures.
-- **Improved Maintainability:** Facilitates testing and debugging by isolating command logic within distinct units.
+The Command Pattern in Graphite creates a clear separation between:
 
-The `Command` interface class itself primarily defines the interface structure and thus does not contain specific instance fields.
+- **Orchestration Layer**: Nodes manage workflow execution and topic-based messaging
+- **Execution Layer**: Tools perform the actual processing (LLM calls, function execution, etc.)
+- **Command Layer**: Commands bridge the gap, handling data transformation and tool invocation
 
-| Method           | Description                                                                                         |
-|------------------|-----------------------------------------------------------------------------------------------------|
-| `invoke`        | Defines synchronous invoke logic to process inputs and return results; must be implemented by subclasses.|
-| `a_invoke`      | Defines asynchronous invoke logic supporting streaming or concurrent processes; must be implemented by subclasses.|
-| `to_dict`        | Serializes command configurations or state for persistence or debugging purposes; must be implemented by subclasses.|
+This architecture enables flexible, testable, and maintainable workflows where components can be easily swapped, extended, or customized.
 
-The `Command` interface class utilizes an inner `Builder` class to facilitate structured and step-by-step construction of Command instances, enhancing readability and configurability.
+## Core Benefits
 
-Developers implement custom Commands tailored to specific logic or operational needs by inheriting from this base Command class and overriding the required methods. This approach empowers developers to flexibly craft specialized behaviors while maintaining consistency across the workflow invoke environment.
+### 1. Separation of Concerns
 
-The concrete implementation of `Command` interface should be with its associated tools. Here are some examples.
+Commands isolate tool invocation logic from workflow orchestration, making the system more modular and easier to understand.
 
-## LLM Response Command and LLM Stream Command
+### 2. Data Transformation
 
-[`LLMCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) encapsulates synchronous LLM usage within a command, allowing a node to request the LLM for a response.
+Commands handle the complex task of transforming topic event data into the format expected by tools, including:
 
-Fields:
+- Message aggregation from multiple topic events
+- Conversation history reconstruction
+- Tool call message ordering
+- Context-specific data preparation
 
-| Field | Description                                                |
-|-------|------------------------------------------------------------|
-| `llm` | An `LLM` instance (e.g., OpenAI) that provides the response|
+### 3. Automatic Tool Registration
 
-Key methods are:
+The `@use_command` decorator provides automatic command registration for tool types:
 
-| Method                                        | Description                                                                                          |
-|-----------------------------------------------|------------------------------------------------------------------------------------------------------|
-| `invoke(invoke_context, input_data)`      | Synchronously obtains a single response from the LLM based on the provided messages.                 |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously streams generated messages from the LLM.                                              |
-| `to_dict()`                                   | Serializes the command’s state, including its associated LLM configuration.                          |
+```python
+@use_command(LLMCommand)
+class MyLLMTool(LLM):
+    # Tool implementation
+    pass
 
-The [`LLMStreamResponseCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/llms/llm_stream_response_command.py) specializes `LLMCommand` for stream use cases where synchronous responses must be disabled, and only relies exclusively on asynchronous streaming via a_invoke.
+# Command is automatically created when tool is used
+command = Command.for_tool(my_llm_tool)  # Returns LLMCommand instance
+```
 
-## Function Calling Command
+### 4. Flexibility and Extensibility
 
-[`FunctionCallCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/function_call_command.py) is a concrete implementation of the Command interface that allows a Node to call a `FunctionCallTool`. By assigning a `FunctionCallTool` to the command, the Node can trigger function invoke without needing to know how arguments are parsed or how the function is actually invoked.
+Tools can be easily swapped without changing workflow structure, and new command types can be added for specialized processing needs.
 
-Fields:
+### 5. Improved Testability
 
-| Field             | Description                                                                                 |
-|-------------------|---------------------------------------------------------------------------------------------|
-| `function_tool`   | A `FunctionCallTool` instance that encapsulates the registered function and its invoke logic.|
+Commands can be tested independently from workflows and nodes, enabling better unit testing and debugging.
 
-Methods:
+## Base Command Class
+
+The `Command` base class provides the foundational interface:
+
+```python
+class Command(BaseModel):
+    """Base command class for tool execution."""
+    
+    tool: Tool
+
+    def invoke(self, invoke_context: InvokeContext, 
+               input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        """Synchronous tool invocation."""
+        return self.tool.invoke(
+            invoke_context, 
+            self.get_tool_input(invoke_context, input_data)
+        )
+
+    async def a_invoke(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
+        """Asynchronous tool invocation."""
+        async for message in self.tool.a_invoke(
+            invoke_context, 
+            self.get_tool_input(invoke_context, input_data)
+        ):
+            yield message
+
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        """Transform topic events into tool input format."""
+        all_messages = []
+        for event in input_data:
+            all_messages.extend(event.data)
+        return all_messages
+```
+
+### Key Methods
+
+| Method | Description |
+|--------|-------------|
+| `invoke` | Synchronous tool execution with data transformation |
+| `a_invoke` | Asynchronous tool execution supporting streaming |
+| `get_tool_input` | Transforms topic events into tool-compatible format |
+| `to_dict` | Serializes command state for persistence or debugging |
+
+### Factory Method
+
+The `Command.for_tool()` factory method automatically selects the appropriate command class:
+
+```python
+# Automatic command selection based on tool type
+llm_command = Command.for_tool(my_llm_tool)      # Returns LLMCommand
+func_command = Command.for_tool(my_func_tool)    # Returns FunctionCallCommand
+base_command = Command.for_tool(generic_tool)    # Returns Command
+```
+
+## Built-in Command Types
+
+### LLMCommand
+
+The `LLMCommand` handles complex data preparation for Language Model tools, including conversation history and tool call ordering. This command automatically applies sophisticated data preparation logic specific to LLM interactions.
+
+**Key Features**:
+
+- **Conversation History Reconstruction**: Retrieves and orders conversation history from previous assistant responses
+- **Tool Call Message Ordering**: Ensures tool call responses immediately follow their corresponding LLM tool calls
+- **Event Graph Processing**: Uses topological sorting to maintain proper message chronology
+- **Context-Aware Data Preparation**: Filters out current request data to prevent circular references
+
+**Data Processing Flow**:
+
+1. Retrieves conversation history from the event store
+2. Filters out messages from the current assistant request
+3. Processes current topic events using event graph topology
+4. Reorders tool call messages to follow their corresponding LLM messages
+5. Combines and sorts all messages by timestamp
+
+**Use Cases**:
+
+- Conversational AI assistants with memory
+- Context-aware language model interactions
+
+### FunctionCallCommand
+
+The `FunctionCallCommand` processes tool call messages for function execution, extracting unprocessed function calls from topic events.
+
+**Key Features**:
+
+- **Unprocessed Tool Call Detection**: Identifies tool calls that haven't been processed yet
+- **Duplicate Prevention**: Filters out tool call messages that already have responses
+- **Event Processing**: Handles messages from nodes in the workflow
+
+**Data Processing Logic**:
+
+```python
+def get_tool_input(self, _: InvokeContext, 
+                   node_input: List[ConsumeFromTopicEvent]) -> Messages:
+    # Extract all input messages from events
+    input_messages = [msg for event in node_input for msg in event.data]
+    
+    # Find already processed tool calls
+    processed_tool_calls = [msg.tool_call_id for msg in input_messages if msg.tool_call_id]
+    
+    # Return only unprocessed tool call messages
+    tool_calls_messages = []
+    for message in input_messages:
+        if (message.tool_calls and 
+            message.tool_calls[0].id not in processed_tool_calls):
+            tool_calls_messages.append(message)
+    
+    return tool_calls_messages
+```
+
+**Use Cases**:
+
+- Function calling in LLM workflows
+- Tool execution based on model-generated tool calls  
+- Structured function invocation with parameter extraction
+
+## Example Command Implementations
+
+These examples show commands from test integrations that demonstrate specialized data preparation patterns.
+
+### EmbeddingResponseCommand
+
+The `EmbeddingResponseCommand` is used in test integrations for embedding-based retrieval tasks. It extracts the latest message for embedding processing:
+
+```python
+class EmbeddingResponseCommand(Command):
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       node_input: List[ConsumeFromTopicEvent]) -> Messages:
+        # Only consider the last message contains the content to query
+        latest_event_data = node_input[-1].data
+        latest_message = (
+            latest_event_data[0]
+            if isinstance(latest_event_data, list)
+            else latest_event_data
+        )
+        return [latest_message]
+```
+
+**Key Features**:
+
+- **Latest Message Extraction**: Focuses on the most recent message for processing
+- **Simple Data Preparation**: Minimal transformation for embedding queries
+
+### RagResponseCommand
+
+The `RagResponseCommand` is used in test integrations for retrieval-augmented generation tasks. Similar to `EmbeddingResponseCommand`, it extracts the latest message:
+
+```python
+class RagResponseCommand(Command):
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       node_input: List[ConsumeFromTopicEvent]) -> Messages:
+        # Only consider the last message contains the content to query
+        latest_event_data = node_input[-1].data
+        latest_message = (
+            latest_event_data[0]
+            if isinstance(latest_event_data, list)
+            else latest_event_data
+        )
+        return [latest_message]
+```
+
+**Key Features**:
+
+- **Query Focus**: Extracts the latest user query for RAG processing
+- **Streamlined Input**: Provides clean input for retrieval-augmented generation
 
 | Method                                            | Description                                                                                                            |
 |---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
@@ -99,22 +263,306 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 Both commands enable a node to delegate specialized retrieval operations to their respective tools, without needing to manage the internal logic of how embeddings or RAG processes are performed.
 
-## Function Command
+## Command Registration
 
-[`FunctionCommand`](https://github.com/binome-dev/graphite/blob/main/grafi/tools/functions/function_command.py) is a concrete implementation of the Command interface that allows a Node to invoke general function-based operations through a `FunctionTool`. This command provides a flexible framework for integrating custom function logic into event-driven workflows, enabling nodes to perform various computational tasks without embedding invoke details directly in the node logic.
+### Using the @use_command Decorator
 
-`FunctionCommand` fields:
+Register custom commands for specific tool types:
 
-| Field           | Description                                                                          |
-|-----------------|--------------------------------------------------------------------------------------|
-| `function_tool` | A `FunctionTool` instance that encapsulates the function invoke logic.           |
+```python
+from grafi.common.models.command import use_command
 
-`FunctionCommand` methods:
+@use_command(MyCustomCommand)
+class MySpecialTool(Tool):
+    """Tool that requires special data preparation."""
+    pass
 
-| Method                                        | Description                                                                                                    |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `invoke(invoke_context, input_data)`      | Synchronously calls `function_tool.invoke`, returning the resulting `Message`.                               |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously calls `function_tool.a_invoke`, yielding one or more `Message` objects.                       |
-| `to_dict()`                                   | Serializes the command's state, including the `function_tool` configuration.                                  |
+class MyCustomCommand(Command):
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        # Custom data transformation logic
+        return transformed_messages
+```
 
-The `FunctionCommand` enables nodes to delegate function-based operations to their respective tools, maintaining clean separation between workflow orchestration and function invoke logic. This design allows for easy integration of various computational tasks while keeping the system modular and extensible.
+### Registry Lookup
+
+The command registry uses inheritance-based lookup:
+
+```python
+# Registry checks for exact match first
+TOOL_COMMAND_REGISTRY[MySpecialTool] = MyCustomCommand
+
+# Then checks parent classes
+if isinstance(tool, RegisteredToolType):
+    return AssociatedCommand(tool=tool)
+
+# Falls back to base Command
+return Command(tool=tool)
+```
+
+## Creating Custom Commands
+
+### When to Create Custom Commands
+
+Create custom commands when you need:
+
+1. **Specialized Data Preparation**: Complex transformation of topic events into tool input
+2. **Context-Specific Logic**: Tool invocation that depends on workflow context
+3. **Multi-Source Data**: Aggregating data from multiple sources beyond topic events
+4. **Custom Error Handling**: Specialized error processing or recovery logic
+5. **Performance Optimization**: Optimized data processing for specific use cases
+
+### Implementation Guide
+
+#### 1. Define Your Custom Command
+
+```python
+from typing import List
+from grafi.common.models.command import Command
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Messages
+
+class DatabaseQueryCommand(Command):
+    """Command for database query tools with caching and optimization."""
+    
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        # Extract query parameters from messages
+        query_messages = []
+        for event in input_data:
+            for message in event.data:
+                if message.content and "query:" in message.content:
+                    query_messages.append(message)
+        
+        # Add context-specific optimizations
+        if invoke_context.metadata.get("use_cache"):
+            query_messages = self._add_cache_hints(query_messages)
+        
+        return query_messages
+    
+    def _add_cache_hints(self, messages: Messages) -> Messages:
+        """Add caching hints to query messages."""
+        # Custom caching logic
+        return messages
+```
+
+#### 2. Register the Command
+
+```python
+@use_command(DatabaseQueryCommand)
+class DatabaseQueryTool(Tool):
+    """Tool for executing database queries."""
+    
+    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
+        # Database query implementation
+        pass
+```
+
+#### 3. Advanced Custom Command with Multiple Data Sources
+
+```python
+class MultiSourceCommand(Command):
+    """Command that aggregates data from multiple sources."""
+    
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        # 1. Get base messages from topic events
+        base_messages = super().get_tool_input(invoke_context, input_data)
+        
+        # 2. Retrieve external context
+        external_data = self._get_external_context(invoke_context)
+        
+        # 3. Combine and optimize
+        combined_messages = self._combine_data_sources(
+            base_messages, 
+            external_data, 
+            invoke_context
+        )
+        
+        return combined_messages
+    
+    def _get_external_context(self, invoke_context: InvokeContext) -> Messages:
+        """Retrieve additional context from external sources."""
+        # Fetch from databases, APIs, files, etc.
+        return external_messages
+    
+    def _combine_data_sources(self, base: Messages, external: Messages, 
+                              context: InvokeContext) -> Messages:
+        """Intelligently combine multiple data sources."""
+        # Custom combination logic
+        return combined_messages
+```
+
+## Advanced Usage Patterns
+
+### 1. Conditional Command Selection
+
+```python
+class ConditionalCommand(Command):
+    """Command that adapts behavior based on context."""
+    
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        if invoke_context.metadata.get("mode") == "streaming":
+            return self._prepare_streaming_input(input_data)
+        elif invoke_context.metadata.get("mode") == "batch":
+            return self._prepare_batch_input(input_data)
+        else:
+            return super().get_tool_input(invoke_context, input_data)
+```
+
+### 2. Command with State Management
+
+```python
+class StatefulCommand(Command):
+    """Command that maintains state across invocations."""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._state_cache = {}
+    
+    def get_tool_input(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> Messages:
+        request_id = invoke_context.assistant_request_id
+        
+        # Use cached state if available
+        if request_id in self._state_cache:
+            return self._update_with_cache(input_data, self._state_cache[request_id])
+        
+        # Create new state entry
+        processed_data = self._process_fresh_input(input_data)
+        self._state_cache[request_id] = processed_data
+        
+        return processed_data
+```
+
+### 3. Command with Error Recovery
+
+```python
+class ResilientCommand(Command):
+    """Command with built-in error recovery."""
+    
+    async def a_invoke(self, invoke_context: InvokeContext, 
+                       input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                tool_input = self.get_tool_input(invoke_context, input_data)
+                async for message in self.tool.a_invoke(invoke_context, tool_input):
+                    yield message
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    # Yield error message as fallback
+                    yield [Message(role="assistant", content=f"Error: {str(e)}")]
+                else:
+                    # Modify input for retry
+                    input_data = self._prepare_retry_input(input_data, e)
+```
+
+## Best Practices
+
+### 1. Keep Commands Focused
+
+Each command should have a single, well-defined responsibility:
+
+```python
+# Good - Focused on LLM data preparation
+class LLMCommand(Command):
+    def get_tool_input(self, ...):
+        # Only LLM-specific data preparation
+        pass
+
+# Avoid - Mixed responsibilities
+class LLMAndDatabaseCommand(Command):  # Don't do this
+    def get_tool_input(self, ...):
+        # Both LLM and database logic
+        pass
+```
+
+### 2. Use Meaningful Names
+
+Command names should clearly indicate their purpose:
+
+```python
+# Good
+class ConversationHistoryCommand(Command): pass
+class FunctionCallProcessingCommand(Command): pass
+class RealTimeDataCommand(Command): pass
+
+# Avoid
+class MyCommand(Command): pass
+class SpecialCommand(Command): pass
+```
+
+### 3. Handle Edge Cases
+
+Always consider edge cases in data preparation:
+
+```python
+def get_tool_input(self, invoke_context: InvokeContext, 
+                   input_data: List[ConsumeFromTopicEvent]) -> Messages:
+    if not input_data:
+        return []  # Handle empty input
+    
+    messages = []
+    for event in input_data:
+        if not event.data:
+            continue  # Skip empty events
+        
+        # Validate message format
+        valid_messages = [msg for msg in event.data if self._is_valid_message(msg)]
+        messages.extend(valid_messages)
+    
+    return messages if messages else [Message(role="system", content="No valid input")]
+```
+
+### 4. Document Complex Logic
+
+Use clear documentation for complex data transformations:
+
+```python
+def get_tool_input(self, invoke_context: InvokeContext, 
+                   input_data: List[ConsumeFromTopicEvent]) -> Messages:
+    """
+    Prepare LLM input with proper tool call ordering.
+    
+    Process:
+    1. Retrieve conversation history excluding current request
+    2. Process current topic events in topological order
+    3. Ensure tool call messages immediately follow LLM tool calls
+    4. Sort all messages by timestamp
+    
+    Args:
+        invoke_context: Current invocation context
+        input_data: Topic events from workflow
+        
+    Returns:
+        Properly ordered messages for LLM consumption
+    """
+    # Implementation...
+```
+
+## Integration with Workflows
+
+Commands integrate seamlessly with Graphite's event-driven workflows:
+
+```python
+# In a Node
+@record_node_invoke
+def invoke(self, invoke_context: InvokeContext, 
+           node_input: List[ConsumeFromTopicEvent]) -> Messages:
+    # Command automatically handles data transformation
+    response = self.command.invoke(invoke_context, node_input)
+    return response
+
+# Command selection happens automatically
+node = Node.builder().tool(my_llm_tool).build()
+# node.command is automatically set to LLMCommand(tool=my_llm_tool)
+```
+
+This architecture enables clean separation of concerns while maintaining the flexibility to customize data processing for specific use cases.
