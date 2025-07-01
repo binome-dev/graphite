@@ -18,10 +18,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -63,16 +61,12 @@ class ReActAssistant(Assistant):
                 .subscribed_to(observation_result_topic)
                 .build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ThoughtLLMTool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.thought_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ThoughtLLMTool")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.thought_llm_system_message)
                 .build()
             )
             .publish_to(thought_result_topic)
@@ -96,16 +90,12 @@ class ReActAssistant(Assistant):
             Node.builder()
             .name("ActionNode")
             .subscribe(thought_result_topic)
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ActionLLMTool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.action_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ActionLLMTool")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.action_llm_system_message)
                 .build()
             )
             .publish_to(action_result_search_topic)
@@ -121,11 +111,7 @@ class ReActAssistant(Assistant):
             Node.builder()
             .name("SearchNode")
             .subscribe(action_result_search_topic)
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.search_tool)
-                .build()
-            )
+            .tool(self.search_tool)
             .publish_to(search_function_result_topic)
             .build()
         )
@@ -136,16 +122,12 @@ class ReActAssistant(Assistant):
             Node.builder()
             .name("ObservationNode")
             .subscribe(search_function_result_topic)
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ObservationLLMTool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.observation_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ObservationLLMTool")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.observation_llm_system_message)
                 .build()
             )
             .publish_to(observation_result_topic)
@@ -158,16 +140,12 @@ class ReActAssistant(Assistant):
             Node.builder()
             .name("SummariesNode")
             .subscribe(action_result_finish_topic)
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("SummariesLLMTool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("SummariesLLMTool")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
                 .build()
             )
             .publish_to(agent_output_topic)

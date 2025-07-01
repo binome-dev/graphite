@@ -13,10 +13,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.functions.function_command import FunctionCommand
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -62,16 +60,12 @@ class SimpleFunctionLLMAssistant(Assistant):
             .name("OpenAIInputNode")
             .type("OpenAIInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .chat_params({"response_format": self.output_format})
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .chat_params({"response_format": self.output_format})
                 .build()
             )
             .publish_to(function_topic)
@@ -85,11 +79,7 @@ class SimpleFunctionLLMAssistant(Assistant):
             .name("FunctionCallNode")
             .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
-            .command(
-                FunctionCommand.builder()
-                .function_tool(FunctionTool.builder().function(self.function).build())
-                .build()
-            )
+            .tool(FunctionTool.builder().function(self.function).build())
             .publish_to(agent_output_topic)
             .build()
         )

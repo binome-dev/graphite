@@ -19,6 +19,7 @@ class BaseBuilder(Generic[T]):
 
     def __init__(self, cls: type[T]) -> None:
         self._cls = cls
+        self.kwargs = {}
 
     # ── generic helpers ────────────────────────────────────────────
 

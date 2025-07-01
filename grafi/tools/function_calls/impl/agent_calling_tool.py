@@ -28,7 +28,7 @@ class AgentCallingTool(FunctionCallTool):
     agent_call: Callable[[InvokeContext, Message], Any]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    def model_post_init(self, _context):
+    def model_post_init(self, _context: Any) -> None:
         self.function_specs.append(
             FunctionSpec(
                 name=self.agent_name,

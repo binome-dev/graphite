@@ -13,10 +13,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -74,16 +72,12 @@ class SimpleHITLAssistant(Assistant):
                 .subscribed_to(human_request_topic)
                 .build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.hitl_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.hitl_llm_system_message)
                 .build()
             )
             .publish_to(hitl_call_topic)
@@ -98,11 +92,7 @@ class SimpleHITLAssistant(Assistant):
             .name("FunctionCallNode")
             .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.hitl_request)
-                .build()
-            )
+            .tool(self.hitl_request)
             .publish_to(human_request_topic)
             .build()
         )
@@ -113,16 +103,12 @@ class SimpleHITLAssistant(Assistant):
             .name("OpenAIOutputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(register_user_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("UserOutputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserOutputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
                 .build()
             )
             .publish_to(agent_output_topic)

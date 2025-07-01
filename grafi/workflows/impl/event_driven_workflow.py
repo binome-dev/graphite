@@ -33,8 +33,8 @@ from grafi.common.topics.topic import AGENT_INPUT_TOPIC
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
-from grafi.tools.llms.llm_command import LLMCommand
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.llms.llm import LLM
 from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
 
@@ -66,7 +66,7 @@ class EventDrivenWorkflow(Workflow):
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
 
-    def model_post_init(self, _context):
+    def model_post_init(self, _context: Any) -> None:
         self._add_topics()
         self._handle_function_calling_nodes()
 
@@ -102,11 +102,10 @@ class EventDrivenWorkflow(Workflow):
                     topic.publish_to_human_event_handler = self.on_event
 
         # 2) Verify there is an agent input topic
-        if (
-            AGENT_INPUT_TOPIC not in self._topics
-            or AGENT_OUTPUT_TOPIC not in self._topics
-        ):
-            raise ValueError("Agent input output topic not found in workflow topics.")
+        if AGENT_INPUT_TOPIC not in self._topics:
+            raise ValueError("Agent input topic not found in workflow topics.")
+        elif AGENT_OUTPUT_TOPIC not in self._topics:
+            raise ValueError("Agent output topic not found in workflow topics.")
 
     def _add_topic(self, topic: TopicBase) -> None:
         """
@@ -127,29 +126,32 @@ class EventDrivenWorkflow(Workflow):
         function_calling_nodes = [
             node
             for node in self.nodes.values()
-            if isinstance(node.command, FunctionCallCommand)
+            if isinstance(node.tool, FunctionCallTool)
         ]
 
         # Map each topic -> the nodes that publish to it
         published_topics_to_nodes: Dict[str, List[Node]] = {}
 
-        published_topics_to_nodes = {
-            topic.name: [node]
-            for node in self.nodes.values()
-            if isinstance(node.command, LLMCommand)
-            for topic in node.publish_to
-        }
+        published_topics_to_nodes = {}
+
+        for node in self.nodes.values():
+            if isinstance(node.tool, LLM):
+                # If the node is an LLM node, we need to check its published topics
+                for topic in node.publish_to:
+                    if topic.name not in published_topics_to_nodes:
+                        published_topics_to_nodes[topic.name] = []
+                    published_topics_to_nodes[topic.name].append(node)
 
         # If a function node subscribes to a topic that an Node publishes to,
         # we add the function specs to the LLM node.
         for function_node in function_calling_nodes:
             for topic_name in function_node._subscribed_topics:
                 for publisher_node in published_topics_to_nodes.get(topic_name, []):
-                    if isinstance(publisher_node.command, LLMCommand) and isinstance(
-                        function_node.command, FunctionCallCommand
+                    if isinstance(publisher_node.tool, LLM) and isinstance(
+                        function_node.tool, FunctionCallTool
                     ):
-                        publisher_node.command.add_function_spec(
-                            function_node.command.get_function_specs()
+                        publisher_node.tool.add_function_specs(
+                            function_node.tool.get_function_specs()
                         )
 
     # Workflow invoke methods

@@ -11,9 +11,6 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from tests_integration.rag_assistant.tools.rags.rag_response_command import (
-    RagResponseCommand,
-)
 from tests_integration.rag_assistant.tools.rags.rag_tool import RagTool
 
 
@@ -48,9 +45,7 @@ class SimpleRagAssistant(Assistant):
             .name("RagNode")
             .type("RagNode")
             .subscribe(agent_input_topic)
-            .command(
-                RagResponseCommand(rag_tool=RagTool(name="RagTool", index=self.index))
-            )
+            .tool(RagTool(name="RagTool", index=self.index))
             .publish_to(agent_output_topic)
             .build()
         )

@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.mcp_connections import StdioConnection
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
@@ -28,11 +29,13 @@ def get_invoke_context() -> InvokeContext:
 
 async def test_simple_function_call_assistant_with_mcp() -> None:
     server_params = {
-        "test": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-everything"],
-            "transport": "stdio",
-        }
+        "test": StdioConnection(
+            {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"],
+                "transport": "stdio",
+            }
+        )
     }
 
     # Set up the assistant with MCPTool

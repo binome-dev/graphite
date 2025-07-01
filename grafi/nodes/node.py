@@ -21,7 +21,7 @@ from grafi.nodes.node_base import NodeBaseBuilder
 class Node(NodeBase):
     """Abstract base class for nodes in a graph-based agent system."""
 
-    def model_post_init(self, _context) -> None:
+    def model_post_init(self, _context: Any) -> None:
         # Set up the subscribed topics based on the expressions
         topics = {
             topic.name: topic

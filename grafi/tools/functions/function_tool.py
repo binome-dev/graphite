@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.models.command import Command
+from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -23,6 +25,7 @@ from grafi.tools.tool import ToolBuilder
 OutputType = Union[BaseModel, List[BaseModel]]
 
 
+@use_command(Command)
 class FunctionTool(Tool):
     name: str = "FunctionTool"
     type: str = "FunctionTool"

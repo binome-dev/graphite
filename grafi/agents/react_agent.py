@@ -16,7 +16,6 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -98,7 +97,7 @@ class ReActAgent(Assistant):
         function_call_node = Node(
             name="Node",
             type="Node",
-            command=FunctionCallCommand(tool=self.function_call_tool),
+            tool=self.function_call_tool,
             subscribed_expressions=[
                 SubscriptionBuilder().subscribed_to(function_call_topic).build()
             ],

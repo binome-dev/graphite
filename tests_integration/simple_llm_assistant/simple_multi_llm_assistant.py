@@ -11,10 +11,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.functions.function_command import FunctionCommand
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -47,15 +45,11 @@ class SimpleMultiLLMAssistant(Assistant):
             .name("OpenAIInputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenRouterTool.builder()
-                    .name("OpenAIInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model_openai)
-                    .build()
-                )
+            .tool(
+                OpenRouterTool.builder()
+                .name("OpenAIInputLLM")
+                .api_key(self.api_key)
+                .model(self.model_openai)
                 .build()
             )
             .publish_to(openai_function_call_topic)
@@ -67,15 +61,11 @@ class SimpleMultiLLMAssistant(Assistant):
             .name("DeepSeekInputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenRouterTool.builder()
-                    .name("DeepSeekInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model_deepseek)
-                    .build()
-                )
+            .tool(
+                OpenRouterTool.builder()
+                .name("DeepSeekInputLLM")
+                .api_key(self.api_key)
+                .model(self.model_deepseek)
                 .build()
             )
             .publish_to(deepseek_function_call_topic)
@@ -87,15 +77,11 @@ class SimpleMultiLLMAssistant(Assistant):
             .name("GeminiInputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenRouterTool.builder()
-                    .name("GeminiInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model_gemini)
-                    .build()
-                )
+            .tool(
+                OpenRouterTool.builder()
+                .name("GeminiInputLLM")
+                .api_key(self.api_key)
+                .model(self.model_gemini)
                 .build()
             )
             .publish_to(gemini_function_call_topic)
@@ -107,15 +93,11 @@ class SimpleMultiLLMAssistant(Assistant):
             .name("QwenInputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenRouterTool.builder()
-                    .name("QwenInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model_qwen)
-                    .build()
-                )
+            .tool(
+                OpenRouterTool.builder()
+                .name("QwenInputLLM")
+                .api_key(self.api_key)
+                .model(self.model_qwen)
                 .build()
             )
             .publish_to(qwen_function_call_topic)
@@ -130,14 +112,10 @@ class SimpleMultiLLMAssistant(Assistant):
             .subscribe(
                 SubscriptionBuilder().subscribed_to(openai_function_call_topic).build()
             )
-            .command(
-                FunctionCommand.builder()
-                .function_tool(
-                    FunctionTool.builder()
-                    .name("OpenAIInputFunctionTool")
-                    .function(self.openai_function)
-                    .build()
-                )
+            .tool(
+                FunctionTool.builder()
+                .name("OpenAIInputFunctionTool")
+                .function(self.openai_function)
                 .build()
             )
             .publish_to(human_request_topic)
@@ -153,14 +131,10 @@ class SimpleMultiLLMAssistant(Assistant):
                 .subscribed_to(deepseek_function_call_topic)
                 .build()
             )
-            .command(
-                FunctionCommand.builder()
-                .function_tool(
-                    FunctionTool.builder()
-                    .name("DeepSeekFunctionTool")
-                    .function(self.deepseek_function)
-                    .build()
-                )
+            .tool(
+                FunctionTool.builder()
+                .name("DeepSeekFunctionTool")
+                .function(self.deepseek_function)
                 .build()
             )
             .publish_to(human_request_topic)
@@ -174,14 +148,10 @@ class SimpleMultiLLMAssistant(Assistant):
             .subscribe(
                 SubscriptionBuilder().subscribed_to(gemini_function_call_topic).build()
             )
-            .command(
-                FunctionCommand.builder()
-                .function_tool(
-                    FunctionTool.builder()
-                    .name("GeminiFunctionTool")
-                    .function(self.gemini_function)
-                    .build()
-                )
+            .tool(
+                FunctionTool.builder()
+                .name("GeminiFunctionTool")
+                .function(self.gemini_function)
                 .build()
             )
             .publish_to(human_request_topic)
@@ -195,14 +165,10 @@ class SimpleMultiLLMAssistant(Assistant):
             .subscribe(
                 SubscriptionBuilder().subscribed_to(qwen_function_call_topic).build()
             )
-            .command(
-                FunctionCommand.builder()
-                .function_tool(
-                    FunctionTool.builder()
-                    .name("QwenFunctionTool")
-                    .function(self.qwen_function)
-                    .build()
-                )
+            .tool(
+                FunctionTool.builder()
+                .name("QwenFunctionTool")
+                .function(self.qwen_function)
                 .build()
             )
             .publish_to(human_request_topic)
@@ -214,14 +180,10 @@ class SimpleMultiLLMAssistant(Assistant):
             .name("HumanRequestProcessNode")
             .type("FunctionNode")
             .subscribe(SubscriptionBuilder().subscribed_to(human_request_topic).build())
-            .command(
-                FunctionCommand.builder()
-                .function_tool(
-                    FunctionTool.builder()
-                    .name("HumanRequestProcessTool")
-                    .function(self.human_request_process_function)
-                    .build()
-                )
+            .tool(
+                FunctionTool.builder()
+                .name("HumanRequestProcessTool")
+                .function(self.human_request_process_function)
                 .build()
             )
             .publish_to(agent_output_topic)

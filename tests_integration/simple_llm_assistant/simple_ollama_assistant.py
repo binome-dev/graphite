@@ -10,7 +10,6 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -48,16 +47,12 @@ class SimpleOllamaAssistant(Assistant):
             .name("OllamaInputNode")
             .type("LLMNode")
             .subscribe(agent_input_topic)
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OllamaTool.builder()
-                    .name("UserInputLLM")
-                    .api_url(self.api_url)
-                    .model(self.model)
-                    .system_message(self.system_message)
-                    .build()
-                )
+            .tool(
+                OllamaTool.builder()
+                .name("UserInputLLM")
+                .api_url(self.api_url)
+                .model(self.model)
+                .system_message(self.system_message)
                 .build()
             )
             .publish_to(agent_output_topic)

@@ -1,45 +1,19 @@
-from typing import Any
 from typing import List
-from typing import Self
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.command import Command
-from grafi.common.models.command import CommandBuilder
-from grafi.common.models.command import register_command
-from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
-from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
-@register_command(FunctionCallTool)
 class FunctionCallCommand(Command):
     """A command that calls a function on the context object."""
 
-    tool: FunctionCallTool
-
-    @classmethod
-    def builder(cls) -> "FunctionCallCommandBuilder":
-        """Return a builder for FunctionCallCommand."""
-        return FunctionCallCommandBuilder(cls)
-
-    def invoke(
-        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
+    def get_tool_input(
+        self, _: InvokeContext, node_input: List[ConsumeFromTopicEvent]
     ) -> Messages:
-        return self.tool.invoke(invoke_context, self.get_tool_input(input_data))
-
-    async def a_invoke(
-        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
-    ) -> MsgsAGen:
-        async for message in self.tool.a_invoke(
-            invoke_context, self.get_tool_input(input_data)
-        ):
-            yield message
-
-    def get_tool_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
         tool_calls_messages = []
 
         # Only process messages in root event nodes, which is the current node directly consumed by the workflow
@@ -61,17 +35,3 @@ class FunctionCallCommand(Command):
                 tool_calls_messages.append(message)
 
         return tool_calls_messages
-
-    def get_function_specs(self) -> FunctionSpecs:
-        return self.tool.get_function_specs()
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"tool": self.tool.to_dict()}
-
-
-class FunctionCallCommandBuilder(CommandBuilder[FunctionCallCommand]):
-    """Builder for FunctionCallCommand."""
-
-    def tool(self, tool: FunctionCallTool) -> Self:
-        self.kwargs["tool"] = tool
-        return self

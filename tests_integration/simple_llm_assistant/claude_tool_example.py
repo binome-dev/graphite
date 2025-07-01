@@ -8,8 +8,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.node import Node
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 
 
 # --------------------------------------------------------------------------- #
@@ -35,10 +35,10 @@ def get_invoke_context() -> InvokeContext:
 # --------------------------------------------------------------------------- #
 async def test_claude_tool_a_stream() -> None:
     event_store.clear_events()
-    claude = ClaudeTool.builder().api_key(api_key).build()
+    claude = ClaudeTool.builder().is_streaming(True).api_key(api_key).build()
 
     content = ""
-    async for messages in claude.a_stream(
+    async for messages in claude.a_invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -133,11 +133,7 @@ async def test_llm_a_stream_node_claude() -> None:
 
     llm_stream_node = (
         Node.builder()
-        .command(
-            LLMStreamResponseCommand.builder()
-            .llm_tool(ClaudeTool.builder().api_key(api_key).build())
-            .build()
-        )
+        .tool(ClaudeTool.builder().is_streaming(True).api_key(api_key).build())
         .build()
     )
 

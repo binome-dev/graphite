@@ -1,7 +1,7 @@
 from fastmcp import FastMCP
 
 
-mcp = FastMCP("Demo 🚀")
+mcp: FastMCP = FastMCP("Demo 🚀")
 
 
 @mcp.tool

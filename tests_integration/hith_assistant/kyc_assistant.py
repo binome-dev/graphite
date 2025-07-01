@@ -13,10 +13,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -55,16 +53,12 @@ class KycAssistant(Assistant):
                 .subscribed_to(human_request_topic)
                 .build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ThoughtLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.user_info_extract_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ThoughtLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.user_info_extract_system_message)
                 .build()
             )
             .publish_to(user_info_extract_topic)
@@ -96,16 +90,12 @@ class KycAssistant(Assistant):
             .name("ActionNode")
             .type("LLMNode")
             .subscribe(user_info_extract_topic)
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ActionLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.action_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ActionLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.action_llm_system_message)
                 .build()
             )
             .publish_to(hitl_call_topic)
@@ -118,11 +108,7 @@ class KycAssistant(Assistant):
             .name("HumanRequestNode")
             .type("FunctionCallNode")
             .subscribe(hitl_call_topic)
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.hitl_request)
-                .build()
-            )
+            .tool(self.hitl_request)
             .publish_to(human_request_topic)
             .build()
         )
@@ -135,11 +121,7 @@ class KycAssistant(Assistant):
             .name("FunctionCallRegisterNode")
             .type("FunctionCallNode")
             .subscribe(register_user_topic)
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.register_request)
-                .build()
-            )
+            .tool(self.register_request)
             .publish_to(register_user_respond_topic)
             .build()
         )
@@ -151,16 +133,12 @@ class KycAssistant(Assistant):
             .subscribe(
                 SubscriptionBuilder().subscribed_to(register_user_respond_topic).build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    OpenAITool.builder()
-                    .name("ResponseToUserLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("ResponseToUserLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -196,9 +174,9 @@ class KycAssistantBuilder(AssistantBaseBuilder[KycAssistant]):
     def user_info_extract_system_message(
         self, user_info_extract_system_message: str
     ) -> Self:
-        self.kwargs["user_info_extract_system_message"] = (
-            user_info_extract_system_message
-        )
+        self.kwargs[
+            "user_info_extract_system_message"
+        ] = user_info_extract_system_message
         return self
 
     def action_llm_system_message(self, action_llm_system_message: str) -> Self:

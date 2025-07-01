@@ -43,22 +43,24 @@ def test_prepare_api_input():
         Message(
             role="user",
             content="Can you call this function?",
-            tools=[
-                FunctionSpec(
-                    name="test_function",
-                    description="A test function",
-                    parameters=ParametersSchema(
-                        properties={
-                            "arg1": ParameterSchema(
-                                type="string", description="A test argument"
-                            )
-                        },
-                        required=["arg1"],
-                    ),
-                ).to_openai_tool()
-            ],
         ),
     ]
+    tool.add_function_specs(
+        [
+            FunctionSpec(
+                name="test_function",
+                description="A test function",
+                parameters=ParametersSchema(
+                    properties={
+                        "arg1": ParameterSchema(
+                            type="string", description="A test argument"
+                        )
+                    },
+                    required=["arg1"],
+                ),
+            )
+        ]
+    )
     api_messages, api_functions = tool.prepare_api_input(input_data)
 
     assert api_messages == [

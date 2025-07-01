@@ -198,6 +198,5 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
         )
 
     async def a_build(self) -> "MCPTool":
-        mcp_tool = self._cls(**self.kwargs)
-        await mcp_tool._a_get_function_specs()
+        mcp_tool = await self._cls.initialize(**self.kwargs)
         return mcp_tool

@@ -26,9 +26,6 @@ from grafi.common.topics.topic_expression import TopicExpr
 from grafi.tools.tool import Tool
 
 
-T_N = TypeVar("T_N", bound="NodeBase")
-
-
 class NodeBase(BaseModel):
     """Abstract base class for nodes in a graph-based agent system."""
 
@@ -46,12 +43,12 @@ class NodeBase(BaseModel):
     _command: Optional[Command] = PrivateAttr(default=None)
 
     @property
-    def command(self):
+    def command(self) -> Command:
         """Access the internal command (for backward compatibility)."""
         return self._command
 
     @command.setter
-    def command(self, value):
+    def command(self, value: Command) -> None:
         """Set the internal command."""
         self._command = value
 
@@ -79,10 +76,14 @@ class NodeBase(BaseModel):
         This method should be implemented by all subclasses to define
         the specific behavior of each node.
         """
+        yield []
         raise NotImplementedError("Subclasses must implement this method.")
 
 
-class NodeBaseBuilder(BaseBuilder["NodeBase"]):
+T_N = TypeVar("T_N", bound=NodeBase)
+
+
+class NodeBaseBuilder(BaseBuilder[T_N]):
     """Inner builder class for workflow construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:

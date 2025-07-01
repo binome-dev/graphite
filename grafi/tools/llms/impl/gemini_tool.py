@@ -13,19 +13,15 @@ import os
 import uuid
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Self
 
-from deprecated import deprecated
 from google.genai import types
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
-from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -126,16 +122,13 @@ class GeminiTool(LLM):
                 )
 
         function_declarations: List[FunctionDeclaration] = []
-        if input_data and input_data[-1].tools:
-            for tool in input_data[-1].tools:
-                function = tool.get("function")
-                if function is not None:
-                    function_declaration = FunctionDeclaration(
-                        name=function["name"],
-                        description=function["description"],
-                        parameters=Schema.model_validate(function["parameters"]),
-                    )
-                    function_declarations.append(function_declaration)
+        for function in self.get_function_specs():
+            function_declaration = FunctionDeclaration(
+                name=function.name,
+                description=function.description,
+                parameters=Schema.model_validate(function.parameters),
+            )
+            function_declarations.append(function_declaration)
 
         return contents, (
             [Tool(function_declarations=function_declarations)]
@@ -191,71 +184,28 @@ class GeminiTool(LLM):
         )
 
         try:
-            response: GenerateContentResponse = (
-                await client.aio.models.generate_content(
+            if self.is_streaming:
+                async for chunk in await client.aio.models.generate_content_stream(
                     model=self.model,
                     contents=contents,
                     config=cfg,
                     **self.chat_params,
+                ):
+                    yield self.to_stream_messages(chunk)
+            else:
+                response: GenerateContentResponse = (
+                    await client.aio.models.generate_content(
+                        model=self.model,
+                        contents=contents,
+                        config=cfg,
+                        **self.chat_params,
+                    )
                 )
-            )
+                yield self.to_messages(response)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             raise RuntimeError(f"Gemini async call failed: {exc}") from exc
-
-        yield self.to_messages(response)
-
-    # --------------------------------------------------------------------- #
-    # Synchronous streaming  (deprecated wrapper kept for parity)
-    # --------------------------------------------------------------------- #
-    @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Messages, None, None]:
-        contents, tools = self.prepare_api_input(input_data)
-        cfg = (
-            types.GenerateContentConfig(tools=tools)  # type: ignore[arg-type]
-            if tools
-            else None
-        )
-        client = self._client()
-
-        for chunk in client.models.generate_content_stream(
-            model=self.model,
-            contents=contents,
-            config=cfg,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
-
-    # --------------------------------------------------------------------- #
-    # Async streaming
-    # --------------------------------------------------------------------- #
-    @record_tool_a_stream
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        contents, tools = self.prepare_api_input(input_data)
-        cfg = (
-            types.GenerateContentConfig(tools=tools)  # type: ignore[arg-type]
-            if tools
-            else None
-        )
-        client = genai.Client(api_key=self.api_key)
-
-        async for chunk in await client.aio.models.generate_content_stream(
-            model=self.model,
-            contents=contents,
-            config=cfg,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
 
     # --------------------------------------------------------------------- #
     # Response conversion helpers
@@ -288,9 +238,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
+                message_args[
+                    "content"
+                ] = ""  # Clear content when function call is included
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided

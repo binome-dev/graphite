@@ -10,13 +10,8 @@ from pydantic import Field
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
+from grafi.nodes.node import Node
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from tests_integration.embedding_assistant.nodes.embedding_retrieval_node import (
-    EmbeddingRetrievalNode,
-)
-from tests_integration.embedding_assistant.tools.embeddings.embedding_response_command import (
-    EmbeddingResponseCommand,
-)
 from tests_integration.embedding_assistant.tools.embeddings.impl.chromadb_retrieval_tool import (
     ChromadbRetrievalTool,
 )
@@ -51,17 +46,16 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleEmbeddingRetrievalAssistant":
         # Create an LLM node
         embedding_retrieval_node = (
-            EmbeddingRetrievalNode.builder()
+            Node.builder()
             .name("EmbeddingRetrievalNode")
+            .type("EmbeddingRetrievalNode")
             .subscribe(agent_input_topic)
-            .command(
-                EmbeddingResponseCommand(
-                    retrieval_tool=ChromadbRetrievalTool(
-                        name="ChromadbRetrievalTool",
-                        collection=self.collection,
-                        embedding_model=self.embedding_model,
-                        n_results=self.n_results,
-                    )
+            .tool(
+                ChromadbRetrievalTool(
+                    name="ChromadbRetrievalTool",
+                    collection=self.collection,
+                    embedding_model=self.embedding_model,
+                    n_results=self.n_results,
                 )
             )
             .publish_to(agent_output_topic)

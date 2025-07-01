@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Self
 from typing import TypeVar
 
@@ -33,7 +34,7 @@ class AssistantBase(BaseModel):
 
     workflow: Workflow = Workflow()
 
-    def model_post_init(self, _context) -> None:
+    def model_post_init(self, _context: Any) -> None:
         self._construct_workflow()
 
     def _construct_workflow(self) -> "AssistantBase":

@@ -10,8 +10,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 
 
 class UserForm(BaseModel):
@@ -38,30 +38,11 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_openai_tool_stream() -> None:
-    event_store.clear_events()
-    openai_tool = OpenAITool.builder().api_key(api_key).build()
-    content = ""
-    for messages in openai_tool.stream(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content is not None:
-                content += message.content
-                print(message.content, end="", flush=True)
-
-    assert len(event_store.get_events()) == 2
-    assert content is not None
-    assert "Grafi" in content
-
-
 async def test_openai_tool_a_stream() -> None:
     event_store.clear_events()
-    openai_tool = OpenAITool.builder().api_key(api_key).build()
+    openai_tool = OpenAITool.builder().is_streaming(True).api_key(api_key).build()
     content = ""
-    async for messages in openai_tool.a_stream(
+    async for messages in openai_tool.a_invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -160,11 +141,7 @@ async def test_llm_a_stream_node() -> None:
     event_store.clear_events()
     llm_stream_node = (
         Node.builder()
-        .command(
-            LLMStreamResponseCommand.builder()
-            .llm_tool(OpenAITool.builder().api_key(api_key).build())
-            .build()
-        )
+        .tool(OpenAITool.builder().is_streaming(True).api_key(api_key).build())
         .build()
     )
 
@@ -201,7 +178,6 @@ async def test_llm_a_stream_node() -> None:
 test_openai_tool()
 test_openai_tool_with_chat_param()
 test_openai_tool_with_structured_output()
-test_openai_tool_stream()
 asyncio.run(test_openai_tool_a_stream())
 asyncio.run(test_openai_tool_async())
 asyncio.run(test_llm_a_stream_node())

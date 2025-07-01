@@ -1,22 +1,22 @@
-from abc import abstractmethod
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import Optional
 from typing import Self
 from typing import TypeVar
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
+from pydantic import PrivateAttr
 
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.common.models.command import use_command
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
+from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
 
+@use_command(LLMCommand)
 class LLM(Tool):
     system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
@@ -36,22 +36,17 @@ class LLM(Tool):
         description="Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text).",
     )
 
-    @abstractmethod
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Message, None, None]:
-        raise NotImplementedError("Subclasses must implement this method.")
+    _function_specs: FunctionSpecs = PrivateAttr(default_factory=list)
 
-    @abstractmethod
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        yield []  # Too keep mypy happy
-        raise NotImplementedError("Subclasses must implement this method.")
+    def add_function_specs(self, function_spec: FunctionSpecs) -> None:
+        """Add function specifications to the LLM."""
+        if not function_spec:
+            return
+        self._function_specs.extend(function_spec)
+
+    def get_function_specs(self) -> FunctionSpecs:
+        """Return the function specifications for this LLM."""
+        return self._function_specs.copy()
 
     def prepare_api_input(self, input_data: Messages) -> Any:
         """Prepare input data for API consumption."""

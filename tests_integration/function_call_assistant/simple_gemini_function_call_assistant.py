@@ -12,10 +12,8 @@ from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
-from grafi.tools.llms.llm_command import LLMCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -64,16 +62,12 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
             .name("GeminiInputNode")
             .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    GeminiTool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.function_call_llm_system_message)
-                    .build()
-                )
+            .tool(
+                GeminiTool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.function_call_llm_system_message)
                 .build()
             )
             .publish_to(function_call_topic)
@@ -95,11 +89,7 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
             .name("FunctionCallNode")
             .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_tool)
-                .build()
-            )
+            .tool(self.function_tool)
             .publish_to(function_result_topic)
             .build()
         )
@@ -112,16 +102,12 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
-            .command(
-                LLMCommand.builder()
-                .llm_tool(
-                    GeminiTool.builder()
-                    .name("UserOutputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+            .tool(
+                GeminiTool.builder()
+                .name("UserOutputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -159,9 +145,9 @@ class SimpleGeminiFunctionCallAssistantBuilder(
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs["function_call_llm_system_message"] = (
-            function_call_llm_system_message
-        )
+        self.kwargs[
+            "function_call_llm_system_message"
+        ] = function_call_llm_system_message
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:

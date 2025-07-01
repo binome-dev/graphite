@@ -1,9 +1,6 @@
-from typing import Any
 from typing import List
-from typing import Self
 
 from loguru import logger
-from pydantic import PrivateAttr
 
 from grafi.common.containers.container import container
 from grafi.common.events.assistant_events.assistant_respond_event import (
@@ -15,51 +12,12 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.command import Command
-from grafi.common.models.command import CommandBuilder
-from grafi.common.models.command import register_command
-from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
-from grafi.tools.llms.llm import LLM
 
 
-@register_command(LLM)
 class LLMCommand(Command):
-    tool: LLM
-
-    _function_specs: FunctionSpecs = PrivateAttr(default=[])
-
-    @classmethod
-    def builder(cls) -> "LLMCommandBuilder":
-        """
-        Return a builder for LLMCommand.
-
-        This method allows for the construction of an LLMCommand instance with specified parameters.
-        """
-        return LLMCommandBuilder(cls)
-
-    def invoke(
-        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
-    ) -> Messages:
-        return self.tool.invoke(
-            invoke_context, self.get_tool_input(invoke_context, input_data)
-        )
-
-    async def a_invoke(
-        self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
-    ) -> MsgsAGen:
-
-        async for message in self.tool.a_invoke(
-            invoke_context, self.get_tool_input(invoke_context, input_data)
-        ):
-            yield message
-
-    def add_function_spec(self, function_spec: FunctionSpecs) -> None:
-        """Add a function specification to the node."""
-        self._function_specs.extend(function_spec)
-
     def get_tool_input(
         self,
         invoke_context: InvokeContext,
@@ -142,26 +100,6 @@ class LLMCommand(Command):
             else:
                 i += 1
 
-        # Attach function specs to the last message
-        if self._function_specs and messages:
-            last_message = messages[-1]
-            last_message.tools = [
-                spec.to_openai_tool() for spec in self._function_specs
-            ]
-
         sorted_messages.extend(messages)
 
         return sorted_messages
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"tool": self.tool.to_dict()}
-
-
-class LLMCommandBuilder(CommandBuilder[LLMCommand]):
-    """
-    Builder for LLMCommand.
-    """
-
-    def tool(self, tool: LLM) -> Self:
-        self.kwargs["llm_tool"] = tool
-        return self

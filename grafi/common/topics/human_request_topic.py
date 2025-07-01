@@ -28,9 +28,9 @@ class HumanRequestTopic(TopicBase):
     """
 
     name: str = HUMAN_REQUEST_TOPIC
-    publish_to_human_event_handler: Optional[Callable[[OutputTopicEvent], None]] = (
-        Field(default=None)
-    )
+    publish_to_human_event_handler: Optional[
+        Callable[[OutputTopicEvent], None]
+    ] = Field(default=None)
     publish_event_handler: Optional[Callable[[PublishToTopicEvent], None]] = Field(
         default=None
     )
