@@ -40,19 +40,32 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
   - Core Concepts:
-    - Arhitecture Overview: user-guide/architecture.md
+    - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
     - Node: user-guide/node.md
     - Command: user-guide/command.md
     - Tools:
-      - Tools Core: user-guide/tools/tools.md
+      - Tool Base: user-guide/tools/tool.md
+      - LLM Tools: user-guide/tools/llm.md
       - OpenAI: user-guide/tools/openai.md
       - Ollama: user-guide/tools/ollama.md
-      - Function Calls: user-guide/tools/function-call.md
-    - Executor: user-guide/executor.md
-    - Models: user-guide/models.md
-    - Topics: user-guide/topics.md
+      - Function Tools: user-guide/tools/function.md
+      - Function Call Tools: user-guide/tools/function-call.md
+    - Topics:
+      - Topic Base: user-guide/topics/topic_base.md
+      - Topic Implementation: user-guide/topics/topic.md
+      - Output Topics: user-guide/topics/output_topics.md
+      - Subscription Expressions: user-guide/topics/subscription_expression.md
+    - Events:
+      - Events System: user-guide/events/events.md
+      - Event Store: user-guide/events/event_store.md
+      - Event Graph: user-guide/events/event_graph.md
+    - Infrastructure:
+      - Containers: user-guide/containers.md
+      - Models: user-guide/models.md
+      - Builder Pattern: user-guide/builder-pattern.md
+      - Invoke Decorators: user-guide/invoke-decorators.md
     - Conventional Rules: user-guide/conventional-rules.md
 
 site_name: Graphite Documentation
