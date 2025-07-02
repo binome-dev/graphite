@@ -6,7 +6,7 @@ This guide walks you through installing Graphite using pip.
 
 **Prerequisites:**
 
-- Python 3.10+
+- Python >=3.10, < 3.13
 - pip (Python package installer)
 
 ## Installation
