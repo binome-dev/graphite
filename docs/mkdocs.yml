@@ -41,18 +41,30 @@ nav:
       - Quickstart: getting-started/quickstart.md
   - Core Concepts:
     - Arhitecture Overview: user-guide/architecture.md
+    - Builder Pattern: user-guide/builder-pattern.md
+    - Containers: user-guide/containers.md
+    - Invoke Decorators: user-guide/invoke-decorators.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
     - Node: user-guide/node.md
     - Command: user-guide/command.md
+    - Events:
+      - Events : user-guide/events/events.md
+      - Event Graph: user-guide/events/event_graph.md
+      - Event Store: user-guide/events/event_store.md
     - Tools:
-      - Tools Core: user-guide/tools/tools.md
+      - Tools Core: user-guide/tools/tool.md
+      - Function: user-guide/tools/function.md
+      - LLM: user-guide/tools/llm.md
       - OpenAI: user-guide/tools/openai.md
       - Ollama: user-guide/tools/ollama.md
       - Function Calls: user-guide/tools/function-call.md
-    - Executor: user-guide/executor.md
     - Models: user-guide/models.md
-    - Topics: user-guide/topics.md
+    - Topics: 
+        - Topics: user-guide/topics/topic.md
+        - Topic Base: user-guide/topics/topic_base.md
+        - Topic Output: user-guide/topics/output_topics.md
+        - Subscription Expression: user-guide/topics/subscription_expression.md
     - Conventional Rules: user-guide/conventional-rules.md
 
 site_name: Graphite Documentation
