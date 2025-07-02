@@ -126,9 +126,9 @@ def test_invoke_function_call(monkeypatch, openai_instance, invoke_context):
             parameters=ParametersSchema(
                 type="object", properties={"location": ParameterSchema(type="string")}
             ),
-        ).to_openai_tool()
+        )
     ]
-    input_data[-1].tools = tools  # Add functions to the last message
+    openai_instance.add_function_specs(tools)
     result = openai_instance.invoke(invoke_context, input_data)
 
     assert isinstance(result, List)
@@ -201,7 +201,18 @@ def test_prepare_api_input(openai_instance):
             ],
         ),
     ]
-
+    openai_instance.add_function_specs(
+        [
+            FunctionSpec(
+                name="get_weather",
+                description="Get weather",
+                parameters=ParametersSchema(
+                    type="object",
+                    properties={"location": ParameterSchema(type="string")},
+                ),
+            )
+        ]
+    )
     api_messages, api_functions = openai_instance.prepare_api_input(input_data)
 
     assert api_messages == [

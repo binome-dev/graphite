@@ -4,6 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParameterSchema
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
@@ -105,20 +108,18 @@ def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
 
     # prepare input message with a tool definition
     tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_weather",
-                "description": "Get weather",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"location": {"type": "string", "description": ""}},
-                    "required": [],
-                },
-            },
-        }
+        FunctionSpec(
+            name="get_weather",
+            description="Get weather",
+            parameters=ParametersSchema(
+                type="object",
+                properties={"location": ParameterSchema(type="string")},
+            ),
+        )
     ]
-    input_data = [Message(role="user", content="Weather?", tools=tools)]
+    input_data = [Message(role="user", content="Weather?")]
+
+    gemini_instance.add_function_specs(tools)
 
     gemini_instance.invoke(invoke_context, input_data)
 

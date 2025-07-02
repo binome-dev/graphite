@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from typing import Optional
 from typing import Self
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
@@ -15,13 +16,10 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -34,6 +32,8 @@ selecting search tool if necessary.
 
 Response in a concise and clear manner, ensuring that your answers are accurate and relevant to the user's query.
 """
+
+CONVERSATION_ID = uuid.uuid4().hex
 
 
 class ReActAgent(Assistant):
@@ -72,8 +72,9 @@ class ReActAgent(Assistant):
         )
 
         llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("OpenAIInputNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
@@ -81,16 +82,12 @@ class ReActAgent(Assistant):
                 .subscribed_to(function_result_topic)
                 .build()
             )
-            .command(
-                LLMResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.system_prompt)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.system_prompt)
                 .build()
             )
             .publish_to(function_call_topic)
@@ -99,17 +96,15 @@ class ReActAgent(Assistant):
         )
 
         # Create a function call node
-        function_call_node = (
-            LLMFunctionCallNode.builder()
-            .name("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_call_tool)
-                .build()
-            )
-            .publish_to(function_result_topic)
-            .build()
+
+        function_call_node = Node(
+            name="Node",
+            type="Node",
+            tool=self.function_call_tool,
+            subscribed_expressions=[
+                SubscriptionBuilder().subscribed_to(function_call_topic).build()
+            ],
+            publish_to=[function_result_topic],
         )
 
         # Create a workflow and add the nodes
@@ -123,39 +118,40 @@ class ReActAgent(Assistant):
 
         return self
 
-    def run(self, question: str) -> str:
-        invoke_context = InvokeContext(
-            conversation_id=uuid.uuid4().hex,
-            invoke_id=uuid.uuid4().hex,
-            assistant_request_id=uuid.uuid4().hex,
-        )
+    def get_input(
+        self, question: str, invoke_context: Optional[InvokeContext] = None
+    ) -> list[Message]:
+        if invoke_context is None:
+            logger.debug(
+                "Creating new InvokeContext with default conversation id for ReActAgent"
+            )
+            invoke_context = InvokeContext(
+                conversation_id=CONVERSATION_ID,
+                invoke_id=uuid.uuid4().hex,
+                assistant_request_id=uuid.uuid4().hex,
+            )
 
-        # Test the run method
+        # Prepare the input data
         input_data = [
             Message(
                 role="user",
                 content=question,
             )
         ]
+
+        return input_data, invoke_context
+
+    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+        input_data, invoke_context = self.get_input(question, invoke_context)
 
         output = super().invoke(invoke_context, input_data)
 
         return output[0].content
 
-    async def a_run(self, question: str) -> AsyncGenerator[Message, None]:
-        invoke_context = InvokeContext(
-            conversation_id=uuid.uuid4().hex,
-            invoke_id=uuid.uuid4().hex,
-            assistant_request_id=uuid.uuid4().hex,
-        )
-
-        # Test the run method
-        input_data = [
-            Message(
-                role="user",
-                content=question,
-            )
-        ]
+    async def a_run(
+        self, question: str, invoke_context: Optional[InvokeContext] = None
+    ) -> AsyncGenerator[Message, None]:
+        input_data, invoke_context = self.get_input(question, invoke_context)
 
         async for output in super().a_invoke(invoke_context, input_data):
             for message in output:
@@ -166,23 +162,23 @@ class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):
     """Concrete builder for ReActAgent."""
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def system_prompt(self, system_prompt: str) -> Self:
-        self._obj.system_prompt = system_prompt
+        self.kwargs["system_prompt"] = system_prompt
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def function_call_tool(self, function_call_tool: FunctionCallTool) -> Self:
-        self._obj.function_call_tool = function_call_tool
+        self.kwargs["function_call_tool"] = function_call_tool
         return self
 
 
-def create_agent(
+def create_react_agent(
     system_prompt: Optional[str] = None,
     function_call_tool: Optional[FunctionCallTool] = None,
     model: Optional[str] = None,

@@ -9,19 +9,15 @@ import json
 import os
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Self
 from typing import Union
 
-from deprecated import deprecated
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
-from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -69,12 +65,6 @@ class ClaudeTool(LLM):
         """
         return ClaudeToolBuilder(cls)
 
-    # ------------------------------------------------------------------ #
-    # Helpers                                                            #
-    # ------------------------------------------------------------------ #
-    def _client(self) -> Anthropic:
-        return Anthropic(api_key=self.api_key)
-
     def prepare_api_input(
         self, input_data: Messages
     ) -> tuple[List[MessageParam], Union[List[ToolParam], NotGiven]]:
@@ -94,17 +84,15 @@ class ClaudeTool(LLM):
                 )
 
         tools: List[ToolParam] = []
-        if input_data and input_data[-1].tools:
-            for tool in input_data[-1].tools:
-                function = tool.get("function")
-                if function is not None:
-                    tools.append(
-                        {
-                            "name": function["name"],
-                            "description": function["description"],
-                            "input_schema": function["parameters"],
-                        }
-                    )
+        for function in self.get_function_specs():
+            tools.append(
+                {
+                    "name": function.name,
+                    "description": function.description,
+                    "input_schema": function.parameters.model_dump(),
+                }
+            )
+
         return messages, tools or NOT_GIVEN
 
     # ------------------------------------------------------------------ #
@@ -118,7 +106,7 @@ class ClaudeTool(LLM):
     ) -> Messages:
         messages, tools = self.prepare_api_input(input_data)
 
-        client = self._client()
+        client = Anthropic(api_key=self.api_key)
         try:
             resp: AnthropicMessage = client.messages.create(
                 max_tokens=self.max_tokens,
@@ -127,10 +115,9 @@ class ClaudeTool(LLM):
                 tools=tools,  # None is fine here
                 **self.chat_params,
             )
+            return self.to_messages(resp)
         except Exception as exc:
             raise RuntimeError(f"Anthropic API error: {exc}") from exc
-
-        return self.to_messages(resp)
 
     # ------------------------------------------------------------------ #
     # Async call                                                         #
@@ -145,65 +132,31 @@ class ClaudeTool(LLM):
         client = AsyncAnthropic(api_key=self.api_key)
 
         try:
-            resp: AnthropicMessage = await client.messages.create(
-                max_tokens=self.max_tokens,
-                model=self.model,
-                messages=messages,
-                tools=tools,
-                **self.chat_params,
-            )
+            if self.is_streaming:
+                async with client.messages.stream(
+                    max_tokens=self.max_tokens,
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    **self.chat_params,
+                ) as stream:
+                    async for event in stream:
+                        if event.type == "text":
+                            yield self.to_stream_messages(event.text)
+            else:
+                resp: AnthropicMessage = await client.messages.create(
+                    max_tokens=self.max_tokens,
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    **self.chat_params,
+                )
+                yield self.to_messages(resp)
+
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             raise RuntimeError(f"Anthropic async call failed: {exc}") from exc
-
-        yield self.to_messages(resp)
-
-    # ------------------------------------------------------------------ #
-    # Blocking streaming (deprecated wrapper)                            #
-    # ------------------------------------------------------------------ #
-    @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Messages, None, None]:
-        messages, tools = self.prepare_api_input(input_data)
-        client = self._client()
-
-        with client.messages.stream(
-            max_tokens=self.max_tokens,
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            **self.chat_params,
-        ) as stream:
-            for text in stream.text_stream:
-                yield self.to_stream_messages(text)
-
-    # ------------------------------------------------------------------ #
-    # Async streaming                                                    #
-    # ------------------------------------------------------------------ #
-    @record_tool_a_stream
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        messages, tools = self.prepare_api_input(input_data)
-        client = self._client()
-
-        # TODO: change to Async Streaming
-        with client.messages.stream(
-            max_tokens=self.max_tokens,
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            **self.chat_params,
-        ) as stream:
-            for text in stream.text_stream:
-                yield self.to_stream_messages(text)
 
     # ------------------------------------------------------------------ #
     # Conversion helpers                                                 #
@@ -259,11 +212,10 @@ class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
     This is a convenience class to create instances of ClaudeTool using a fluent interface.
     """
 
-    def max_tokens(self, max_tokens: int) -> Self:
-        self._obj.max_tokens = max_tokens
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
         return self
 
-    def build(self) -> ClaudeTool:
-        if not self._obj.api_key:
-            raise ValueError("API key must be set for ClaudeTool.")
-        return self._obj
+    def max_tokens(self, max_tokens: int) -> Self:
+        self.kwargs["max_tokens"] = max_tokens
+        return self

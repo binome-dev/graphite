@@ -1,75 +1,76 @@
 from typing import Any
-from typing import Dict
 from typing import List
-from typing import Optional
-from typing import Self
-from typing import TypeVar
-from typing import Union
 
-from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import Field
+from loguru import logger
 
+from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
+from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.command import Command
-from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import SubExpr
-from grafi.common.topics.topic_expression import TopicExpr
 from grafi.common.topics.topic_expression import evaluate_subscription
 from grafi.common.topics.topic_expression import extract_topics
+from grafi.nodes.node_base import NodeBase
+from grafi.nodes.node_base import NodeBaseBuilder
 
 
-class Node(BaseModel):
+class Node(NodeBase):
     """Abstract base class for nodes in a graph-based agent system."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    def model_post_init(self, _context: Any) -> None:
+        # Set up the subscribed topics based on the expressions
+        topics = {
+            topic.name: topic
+            for expr in self.subscribed_expressions
+            for topic in extract_topics(expr)
+        }
 
-    node_id: str = default_id
-    name: str
-    type: str
-    command: Optional[Command] = Field(default=None)
-    oi_span_type: OpenInferenceSpanKindValues  # Simplified for example
-    subscribed_expressions: List[SubExpr] = Field(default=[])  # DSL-based subscriptions
-    publish_to: List[TopicBase] = Field(default=[])  # Topics to publish to
+        self._subscribed_topics = topics
 
-    _subscribed_topics: Dict[str, TopicBase] = {}
+        # Setup the command if it is not already set
+        if self.tool and not self._command:
+            self._command = Command.for_tool(self.tool)
 
+    @classmethod
+    def builder(cls) -> NodeBaseBuilder:
+        """Return a builder for Node."""
+        return NodeBaseBuilder(cls)
+
+    @record_node_invoke
     def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-        """Invoke the node's operation. (Override in subclass)"""
-        raise NotImplementedError("Subclasses must implement 'invoke'.")
+        logger.debug(f"Executing Node with inputs: {node_input}")
 
+        # Use the LLM's invoke method to get the response
+        response = self.command.invoke(
+            invoke_context,
+            node_input,
+        )
+
+        # Handle the response and update the output
+        return response
+
+    @record_node_a_invoke
     async def a_invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        """Invoke the node's operation. (Override in subclass)"""
-        yield []  # Too keep mypy happy
-        raise NotImplementedError("Subclasses must implement 'invoke'.")
+        logger.debug(f"Executing Node with inputs: {node_input}")
 
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        node_input: List[ConsumeFromTopicEvent],
-    ) -> MsgsAGen:
-        """Invoke the node's operation. (Override in subclass)"""
-        raise NotImplementedError("Subclasses must implement 'invoke'.")
-
-    def get_command_input(self, node_input: List[ConsumeFromTopicEvent]) -> Messages:
-        """Combine inputs in a way that's suitable for this node. (Override in subclass)"""
-        raise NotImplementedError("Subclasses must implement 'get_command_input'.")
+        # Use the LLM's invoke method to get the response generator
+        async for messages in self.command.a_invoke(
+            invoke_context,
+            input_data=node_input,
+        ):
+            yield messages
 
     def can_invoke(self) -> bool:
         """
@@ -102,59 +103,3 @@ class Node(BaseModel):
             "publish_to": [topic.to_dict() for topic in self.publish_to],
             "command": self.command.to_dict() if self.command else None,
         }
-
-
-T_N = TypeVar("T_N", bound=Node)
-
-
-class NodeBuilder(BaseBuilder[T_N]):
-    """Inner builder class for workflow construction."""
-
-    def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
-        self._obj.oi_span_type = oi_span_type
-        return self
-
-    def name(self, name: str) -> Self:
-        self._obj.name = name
-        return self
-
-    def type(self, type: str) -> Self:
-        self._obj.type = type
-        return self
-
-    def command(self, command: Command) -> Self:
-        self._obj.command = command
-        return self
-
-    def subscribe(self, subscribe_to: Union[TopicBase, SubExpr]) -> Self:
-        """
-        Begin building a DSL expression. Returns a SubscriptionDSL.Builder,
-        which the user can chain with:
-            .subscribed_to(topicA).and_().subscribed_to(topicB).build()
-        """
-        if isinstance(subscribe_to, TopicBase):
-            self._obj.subscribed_expressions.append(TopicExpr(topic=subscribe_to))
-        elif isinstance(subscribe_to, SubExpr):
-            self._obj.subscribed_expressions.append(subscribe_to)
-        else:
-            raise ValueError(
-                f"Expected a Topic or SubExpr, but got {type(subscribe_to)}"
-            )
-        return self
-
-    def publish_to(self, topic: TopicBase) -> Self:
-        self._obj.publish_to.append(topic)
-        return self
-
-    def build(self) -> T_N:
-        """Finalize the node and return it."""
-        # Get all topics from subscription expressions recursively
-
-        topics = {
-            topic.name: topic
-            for expr in self._obj.subscribed_expressions
-            for topic in extract_topics(expr)
-        }
-
-        self._obj._subscribed_topics = topics
-        return self._obj

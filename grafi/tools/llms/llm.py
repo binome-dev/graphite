@@ -1,22 +1,22 @@
-from abc import abstractmethod
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import Optional
 from typing import Self
 from typing import TypeVar
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
+from pydantic import PrivateAttr
 
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.common.models.command import use_command
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
+from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
 
+@use_command(LLMCommand)
 class LLM(Tool):
     system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
@@ -29,27 +29,24 @@ class LLM(Tool):
     )
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
+    is_streaming: bool = Field(default=False)
+
     structured_output: bool = Field(
         default=False,
         description="Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text).",
     )
 
-    @abstractmethod
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Message, None, None]:
-        raise NotImplementedError("Subclasses must implement this method.")
+    _function_specs: FunctionSpecs = PrivateAttr(default_factory=list)
 
-    @abstractmethod
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        yield []  # Too keep mypy happy
-        raise NotImplementedError("Subclasses must implement this method.")
+    def add_function_specs(self, function_spec: FunctionSpecs) -> None:
+        """Add function specifications to the LLM."""
+        if not function_spec:
+            return
+        self._function_specs.extend(function_spec)
+
+    def get_function_specs(self) -> FunctionSpecs:
+        """Return the function specifications for this LLM."""
+        return self._function_specs.copy()
 
     def prepare_api_input(self, input_data: Messages) -> Any:
         """Prepare input data for API consumption."""
@@ -69,20 +66,20 @@ T_L = TypeVar("T_L", bound=LLM)
 class LLMBuilder(ToolBuilder[T_L]):
     """Builder for LLM instances."""
 
-    def api_key(self, api_key: Optional[str]) -> Self:
-        self._obj.api_key = api_key
-        return self
-
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def chat_params(self, params: Dict[str, Any]) -> Self:
-        self._obj.chat_params = params
+        self.kwargs["chat_params"] = params
         if "response_format" in params:
-            self._obj.structured_output = True
+            self.kwargs["structured_output"] = True
+        return self
+
+    def is_streaming(self, is_streaming: bool) -> Self:
+        self.kwargs["is_streaming"] = is_streaming
         return self
 
     def system_message(self, system_message: Optional[str]) -> Self:
-        self._obj.system_message = system_message
+        self.kwargs["system_message"] = system_message
         return self

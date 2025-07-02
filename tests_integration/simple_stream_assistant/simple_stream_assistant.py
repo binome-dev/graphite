@@ -8,9 +8,8 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -31,8 +30,6 @@ class SimpleStreamAssistant(Assistant):
     system_message: Optional[str] = Field(default=None)
     model: str = Field(default="gpt-4o-mini")
 
-    workflow: EventDrivenWorkflow
-
     @classmethod
     def builder(cls) -> "SimpleStreamAssistantBuilder":
         """Return a builder for SimpleStreamAssistant."""
@@ -44,19 +41,17 @@ class SimpleStreamAssistant(Assistant):
         """
         # Create an LLM node
         llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("LLMStreamNode")
+            .type("LLMNode")
             .subscribe(agent_input_topic)
-            .command(
-                LLMStreamResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("OpenAITool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("OpenAITool")
+                .is_streaming(True)
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.system_message)
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -75,13 +70,13 @@ class SimpleStreamAssistant(Assistant):
 
 class SimpleStreamAssistantBuilder(AssistantBaseBuilder[SimpleStreamAssistant]):
     def api_key(self, api_key: str) -> "SimpleStreamAssistantBuilder":
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def system_message(self, system_message: str) -> "SimpleStreamAssistantBuilder":
-        self._obj.system_message = system_message
+        self.kwargs["system_message"] = system_message
         return self
 
     def model(self, model: str) -> "SimpleStreamAssistantBuilder":
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self

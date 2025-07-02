@@ -138,9 +138,9 @@ def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
                 type="object",
                 properties={"location": ParameterSchema(type="string")},
             ),
-        ).to_openai_tool()
+        )
     ]
-    input_data[-1].tools = tools
+    deepseek_instance.add_function_specs(tools)
 
     result = deepseek_instance.invoke(invoke_context, input_data)
 
@@ -151,7 +151,20 @@ def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
 
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == "deepseek-chat"
-    assert call_args["tools"] == tools
+    assert call_args["tools"] == [
+        {
+            "function": {
+                "description": "Get weather",
+                "name": "get_weather",
+                "parameters": {
+                    "properties": {"location": {"description": "", "type": "string"}},
+                    "required": [],
+                    "type": "object",
+                },
+            },
+            "type": "function",
+        }
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -181,19 +194,21 @@ def test_prepare_api_input(deepseek_instance):
         Message(
             role="user",
             content="Weather in London?",
-            tools=[
-                FunctionSpec(
-                    name="get_weather",
-                    description="Get weather",
-                    parameters=ParametersSchema(
-                        type="object",
-                        properties={"location": ParameterSchema(type="string")},
-                    ),
-                ).to_openai_tool()
-            ],
         ),
     ]
 
+    deepseek_instance.add_function_specs(
+        [
+            FunctionSpec(
+                name="get_weather",
+                description="Get weather",
+                parameters=ParametersSchema(
+                    type="object",
+                    properties={"location": ParameterSchema(type="string")},
+                ),
+            )
+        ]
+    )
     api_messages, api_functions = deepseek_instance.prepare_api_input(input_data)
 
     assert api_messages == [

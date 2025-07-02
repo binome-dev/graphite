@@ -111,11 +111,11 @@ def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
                 type="object",
                 properties={"location": ParameterSchema(type="string")},
             ),
-        ).to_openai_tool()  # same schema shape; Claude only needs .function
+        )  # same schema shape; Claude only needs .function
     ]
 
-    msgs = [Message(role="user", content="Weather?", tools=tools)]
-
+    msgs = [Message(role="user", content="Weather?")]
+    claude_instance.add_function_specs(tools)
     claude_instance.invoke(invoke_context, msgs)
 
     kwargs = mock_client.messages.create.call_args[1]

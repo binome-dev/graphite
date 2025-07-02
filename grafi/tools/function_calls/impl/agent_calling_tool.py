@@ -28,6 +28,23 @@ class AgentCallingTool(FunctionCallTool):
     agent_call: Callable[[InvokeContext, Message], Any]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
+    def model_post_init(self, _context: Any) -> None:
+        self.function_specs.append(
+            FunctionSpec(
+                name=self.agent_name,
+                description=self.agent_description,
+                parameters=ParametersSchema(
+                    properties={
+                        "prompt": ParameterSchema(
+                            type="string",
+                            description=self.argument_description,
+                        )
+                    },
+                    required=["prompt"],
+                ),
+            )
+        )
+
     @classmethod
     def builder(cls) -> "AgentCallingToolBuilder":
         """
@@ -158,36 +175,18 @@ class AgentCallingToolBuilder(FunctionCallToolBuilder[AgentCallingTool]):
     """Builder for AgentCallingTool instances."""
 
     def agent_name(self, agent_name: str) -> Self:
-        self._obj.agent_name = agent_name
-        self._obj.name = agent_name
+        self.kwargs["agent_name"] = agent_name
+        self.kwargs["name"] = agent_name
         return self
 
     def agent_description(self, agent_description: str) -> Self:
-        self._obj.agent_description = agent_description
+        self.kwargs["agent_description"] = agent_description
         return self
 
     def argument_description(self, argument_description: str) -> Self:
-        self._obj.argument_description = argument_description
+        self.kwargs["argument_description"] = argument_description
         return self
 
     def agent_call(self, agent_call: Callable) -> Self:
-        self._obj.agent_call = agent_call
+        self.kwargs["agent_call"] = agent_call
         return self
-
-    def build(self) -> AgentCallingTool:
-        self._obj.function_specs.append(
-            FunctionSpec(
-                name=self._obj.agent_name,
-                description=self._obj.agent_description,
-                parameters=ParametersSchema(
-                    properties={
-                        "prompt": ParameterSchema(
-                            type="string",
-                            description=self._obj.argument_description,
-                        )
-                    },
-                    required=["prompt"],
-                ),
-            )
-        )
-        return self._obj

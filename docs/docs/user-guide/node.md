@@ -12,9 +12,28 @@ A Node is a discrete component in a graph-based agent system that operates under
   - Stores the event topics designated for downstream nodes to subscribe to, facilitating event routing.
 - Command for Invoke
   - Encapsulates invoke logic through a Command object.
-  - Allows integration of new or specialized commands without modifying the node’s existing structure.
+  - Allows integration of new or specialized commands without modifying the node's existing structure.
 
-Node includes the `can_invoke()` method, which determines whether the Node is ready for invoke based on the availability of events in subscribed topics.
+## NodeBase
+
+The `NodeBase` class serves as the abstract foundation for all nodes in the graph-based agent system. It defines the core structure and interface that all node implementations must follow, including:
+
+- **Core Properties**: Essential attributes like `node_id`, `name`, `type`, and `tool`
+- **Event Management**: Subscription expressions and publish-to topics for event-driven communication
+- **Command Integration**: Internal command management through the Command Pattern
+- **Builder Pattern**: Provides a fluent interface for node construction via `NodeBaseBuilder`
+
+The base class defines abstract methods `invoke` and `a_invoke` that must be implemented by concrete subclasses to define their specific behavior.
+
+## Node Implementation
+
+The `Node` class is a concrete implementation of `NodeBase` that provides a working node with standard invoke behavior. Unlike the abstract base class, `Node` actually implements the `invoke` and `a_invoke` methods by delegating to an internal `Command` object.
+
+Key features of the Node class include:
+
+- **Automatic Command Setup**: Creates commands automatically from tools during initialization
+- **Event-Driven Invocation**: Uses `can_invoke()` to determine readiness based on subscribed topics
+- **Decorator Support**: Includes built-in instrumentation via `@record_node_invoke` and `@record_node_a_invoke`
 
 The following table describes each field within the Node class, highlighting its purpose and usage in the workflow:
 
@@ -23,148 +42,48 @@ The following table describes each field within the Node class, highlighting its
 | `node_id`                | A unique identifier for the node instance.                        |
 | `name`                   | A unique name identifying the node within the workflow.           |
 | `type`                   | Defines the category or type of node, indicating its function.    |
-| `command`                | The command object encapsulating node invoke logic.            |
+| `tool`                   | Optional tool that the node uses; automatically creates a command when set. |
+| `command`                | Property providing access to the internal command object for invoke logic. |
 | `oi_span_type`           | Semantic attribute from OpenInference for tracing purposes.       |
 | `subscribed_expressions` | List of DSL-based subscription expressions used by the node.      |
 | `publish_to`             | List of designated topics the node publishes events to.           |
 | `_subscribed_topics`     | Internal mapping of subscribed topic names to Topic instances.    |
+| `_command`               | Private field storing the command object.                         |
 
 The following table summarizes the methods available in the Node class, highlighting their purpose and intended usage:
 
 | Method               | Description                                                                                              |
 |----------------------|----------------------------------------------------------------------------------------------------------|
-| `invoke`            | Invokes the node's main operation synchronously. Must be overridden by subclasses.                      |
-| `a_invoke`          | Asynchronous version of `invoke`, supporting streaming or asynchronous operations. Must be overridden.  |
-| `get_command_input`  | Combines and formats input events appropriately for the node’s invoke. Must be overridden.            |
+| `builder`           | Class method that returns a `NodeBaseBuilder` for fluent node construction.                              |
+| `model_post_init`   | Model post-initialization hook that sets up subscribed topics and auto-creates commands from tools during initialization. |
+| `invoke`            | Synchronously invokes the node's command with the provided input events and context.                     |
+| `a_invoke`          | Asynchronously invokes the node's command, yielding response messages as they become available.          |
 | `can_invoke`        | Evaluates subscription conditions to determine whether the node is ready to invoke based on new events. |
 | `to_dict`            | Serializes node attributes to a dictionary, suitable for persistence or transmission.                    |
 
-Developers can customize Nodes to meet specific business requirements. Below are several common examples demonstrating Nodes frequently adapted for various use cases.
+## NodeBaseBuilder
 
-## LLMNode
+The `NodeBaseBuilder` class provides a fluent interface for constructing nodes with a builder pattern. It allows for readable and maintainable node configuration through method chaining.
 
-The `LLMNode` class represents a specialized Node within an event-driven workflow, specifically designed for interactions with Language Models (LLMs). The `LLMNode` aggregates historical messages from all ancestor nodes, serializes them based on dependencies and timestamps, and provides these messages as context for the Language Model to process.
+Available builder methods:
 
-### LLMNode Class Fields
+| Method        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `name`        | Sets the unique name for the node within the workflow.                                |
+| `type`        | Sets the node type, indicating its function or category.                              |
+| `tool`        | Sets the tool for the node; automatically creates a command from the tool.            |
+| `oi_span_type`| Sets the OpenInference span type for tracing purposes.                                |
+| `subscribe`   | Adds subscription expressions to topics or SubExpr objects.                           |
+| `publish_to`  | Adds topics that this node will publish events to.                                    |
 
-| Field                   | Description                                                               |
-|-------------------------|---------------------------------------------------------------------------|
-| `node_id`               | Unique identifier for the LLMNode instance.                               |
-| `name`                  | Human-readable name identifying the node (`"LLMNode"` by default).        |
-| `type`                  | Specifies the node type (`"LLMNode"`).                                    |
-| `oi_span_type`          | Semantic attribute from OpenInference indicating tracing semantics.       |
-| `command`               | Command object encapsulating logic for LLM invoke.                     |
-| `subscribed_expressions`| List of subscription expressions defining topic dependencies.             |
-| `publish_to`            | Topics designated for events generated by the node.                       |
-| `function_specs`        | Specifications of functions provided to enhance LLM capabilities.         |
+Example usage:
 
-### LLMNode Class Methods
-
-| Method                  | Description                                                                                               |
-|-------------------------|-----------------------------------------------------------------------------------------------------------|
-| `invoke`               | Synchronous method executing the node’s operation; must be overridden in subclasses.                      |
-| `a_invoke`             | Asynchronous method executing node logic, supporting streaming from LLMs; must be overridden.             |
-| `get_command_input`     | Retrieves, orders, and serializes input messages from ancestor nodes, preparing data for LLM processing.  |
-| `add_function_spec`     | Adds custom function specifications to enhance interactions with the LLM.                                 |
-
-## LLMFunctionCallNode
-
-The `LLMFunctionCallNode` class represents a specialized Node within an event-driven workflow designed specifically to handle function calls made by a Language Model (LLM). It is responsible for generating function specifications (`function_specs`) utilized by upstream LLMNodes. Additionally, the `LLMFunctionCallNode` processes only messages from parent nodes that contain unprocessed tool call requests.
-
-### LLMFunctionCallNode Class Fields
-
-| Field          | Description                                                               |
-|----------------|---------------------------------------------------------------------------|
-| `node_id`      | Unique identifier for the LLMFunctionCallNode instance.                   |
-| `name`         | Human-readable identifier for the node (`"LLMFunctionCallNode"` by default).|
-| `type`         | Specifies the type of node (`"LLMFunctionCallNode"`).                     |
-| `oi_span_type` | Semantic attribute from OpenInference indicating tracing semantics (`CHAIN`).|
-| `command`      | Command object encapsulating function call invoke logic for LLM interactions.|
-
-### LLMFunctionCallNode Class Methods
-
-| Method                | Description                                                                                           |
-|-----------------------|-------------------------------------------------------------------------------------------------------|
-| `invoke`             | Processes synchronous function calls extracted from the LLM response and returns function call results.|
-| `a_invoke`           | Asynchronously invokes function calls derived from LLM responses, supporting concurrent operations.   |
-| `get_function_specs`  | Retrieves function specifications that the upstream LLMNodes can use for function call interactions.   |
-| `get_command_input`   | Filters and retrieves input messages containing unprocessed tool call requests from parent nodes.      |
-| `to_dict`             | Serializes the node’s current configuration and state for persistence or debugging.                    |
-
-### Invoke Flow
-
-The `LLMFunctionCallNode` performs the following actions during invoke:
-
-- Identifies unprocessed tool call messages from parent nodes.
-- Invokes function calls based on these identified messages using the provided command.
-
-This structure ensures streamlined and efficient processing of LLM-initiated function calls within complex event-driven workflows.
-
-## RagNode and EmbeddingRetrievalNode
-
-The `EmbeddingRetrievalNode` and `RagNode` classes represent specialized Nodes tailored for specific use cases, such as embedding retrieval and Retrieval-Augmented Generation (RAG). These nodes demonstrate how developers can craft custom nodes and logic tailored to particular requirements.
-
-### EmbeddingRetrievalNode Class Fields
-
-| Field          | Description                                                                    |
-|----------------|--------------------------------------------------------------------------------|
-| `node_id`      | Unique identifier for the EmbeddingRetrievalNode instance.                     |
-| `name`         | Human-readable name identifying the node (`"EmbeddingRetrievalNode"`).         |
-| `type`         | Node type specification (`"EmbeddingRetrievalNode"`).                          |
-| `oi_span_type` | Semantic attribute for OpenInference tracing (`RETRIEVER`).                    |
-| `command`      | Command object containing embedding retrieval logic.                           |
-
-### EmbeddingRetrievalNode Class Methods
-
-| Method              | Description                                                                                         |
-|---------------------|-----------------------------------------------------------------------------------------------------|
-| `invoke`           | Performs synchronous embedding retrieval operations and returns results as messages.                 |
-| `a_invoke`         | Invokes embedding retrieval asynchronously, yielding results in a stream of messages.               |
-| `get_command_input` | Retrieves the latest message from input events for embedding retrieval queries.                      |
-| `to_dict`           | Serializes the node’s configuration and state for persistence or debugging purposes.                 |
-
-### RagNode Class Fields
-
-| Field          | Description                                                              |
-|----------------|--------------------------------------------------------------------------|
-| `node_id`      | Unique identifier for the RagNode instance.                              |
-| `name`         | Human-readable identifier for the node (`"RagNode"`).                    |
-| `type`         | Specifies node type (`"RagNode"`).                                       |
-| `oi_span_type` | Semantic attribute for OpenInference tracing (`RETRIEVER`).              |
-| `command`      | Command object encapsulating RAG-specific invoke logic.               |
-
-### RagNode Class Methods
-
-| Method              | Description                                                                                        |
-|---------------------|----------------------------------------------------------------------------------------------------|
-| `invoke`           | Performs synchronous RAG operations and returns generated responses as messages.                   |
-| `a_invoke`         | Invokes RAG asynchronously, yielding generated responses in a message stream.                     |
-| `get_command_input` | Retrieves the latest message from input events to serve as input for RAG processing.               |
-| `to_dict`           | Serializes the node’s configuration and current state for persistence or debugging.                |
-
-These specialized Nodes serve as practical examples, guiding developers to extend or customize Nodes for specific, application-driven use cases within event-driven workflows.
-
-## FunctionNode
-
-The `FunctionNode` class represents a specialized Node within an event-driven workflow designed for executing function-based operations. It serves as a versatile component that can handle various function invokes within the workflow, processing input messages and generating appropriate responses through its encapsulated command logic.
-
-### FunctionNode Class Fields
-
-| Field          | Description                                                              |
-|----------------|--------------------------------------------------------------------------|
-| `node_id`      | Unique identifier for the FunctionNode instance.                         |
-| `name`         | Human-readable identifier for the node (`"FunctionNode"`).               |
-| `type`         | Specifies node type (`"FunctionNode"`).                                 |
-| `oi_span_type` | Semantic attribute for OpenInference tracing (`RETRIEVER`).              |
-| `command`      | Command object encapsulating function-specific invoke logic.          |
-
-### FunctionNode Class Methods
-
-| Method              | Description                                                                                        |
-|---------------------|----------------------------------------------------------------------------------------------------|
-| `invoke`           | Performs synchronous function operations and returns generated responses as messages.              |
-| `a_invoke`         | Invokes functions asynchronously, yielding generated responses in a message stream.              |
-| `get_command_input` | Combines all input messages from node input events to serve as input for function processing.     |
-| `to_dict`           | Serializes the node's configuration and current state for persistence or debugging.               |
-
-The `FunctionNode` provides a flexible framework for integrating custom function logic into event-driven workflows, making it suitable for various computational tasks that require message processing and response generation.
+```python
+node = Node.builder()
+    .name("ProcessorNode")
+    .type("DataProcessor")
+    .tool(my_tool)
+    .subscribe(input_topic)
+    .publish_to(output_topic)
+    .build()
+```

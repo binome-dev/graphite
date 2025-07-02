@@ -14,16 +14,19 @@ from pydantic import Field
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.models.command import use_command
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
 
+@use_command(FunctionCallCommand)
 class FunctionCallTool(Tool):
     """
     A class representing a callable function as a tool for language models.
@@ -207,9 +210,12 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
     def function(self, function: Callable) -> Self:
         if not hasattr(function, "_function_spec"):
             function = llm_function(function)
-        self._obj.functions[function.__name__] = function
-        self._obj.function_specs.append(function._function_spec)  # type: ignore[attr-defined]
-        return self
 
-    def build(self) -> FunctionCallTool:
-        return self._obj
+        if "functions" not in self.kwargs:
+            self.kwargs["functions"] = {}
+        if "function_specs" not in self.kwargs:
+            self.kwargs["function_specs"] = []
+
+        self.kwargs["functions"][function.__name__] = function
+        self.kwargs["function_specs"].append(function._function_spec)  # type: ignore[attr-defined]
+        return self

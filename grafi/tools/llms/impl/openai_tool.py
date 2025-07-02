@@ -2,13 +2,12 @@ import asyncio
 import os
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
 from typing import Optional
+from typing import Self
 from typing import Union
 from typing import cast
 
-from deprecated import deprecated
 from openai import NOT_GIVEN
 from openai import AsyncClient
 from openai import NotGiven
@@ -21,9 +20,7 @@ from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
-from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -47,8 +44,6 @@ class OpenAITool(LLM):
     type: str = Field(default="OpenAITool")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     model: str = Field(default="gpt-4o-mini")
-
-    chat_params: Dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def builder(cls) -> "OpenAIToolBuilder":
@@ -98,7 +93,10 @@ class OpenAITool(LLM):
 
         # Extract function specifications if present in latest message
 
-        api_tools = input_data[-1].tools if input_data[-1].tools else NOT_GIVEN
+        api_tools = [
+            function_spec.to_openai_tool()
+            for function_spec in self.get_function_specs()
+        ] or NOT_GIVEN
 
         return api_messages, api_tools
 
@@ -153,9 +151,19 @@ class OpenAITool(LLM):
         input_data: Messages,
     ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
+        try:
+            client = AsyncClient(api_key=self.api_key)
 
-        async with AsyncClient(api_key=self.api_key) as client:
-            try:
+            if self.is_streaming:
+                async for chunk in await client.chat.completions.create(
+                    model=self.model,
+                    messages=api_messages,
+                    tools=api_tools,
+                    stream=True,
+                    **self.chat_params,
+                ):
+                    yield self.to_stream_messages(chunk)
+            else:
                 req_func = (
                     client.chat.completions.create
                     if not self.structured_output
@@ -167,62 +175,13 @@ class OpenAITool(LLM):
                     tools=api_tools,
                     **self.chat_params,
                 )
-            except asyncio.CancelledError:
-                raise  # let caller handle
-            except OpenAIError as exc:
-                # turn client‑specific exceptions into your domain error
-                raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
-        # Convert once we are outside the `async with`, so network resources are freed
-        yield self.to_messages(response)
-
-    @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Messages, None, None]:
-        """
-        Stream tokens from the OpenAI model as they are generated.
-        Yields partial content/tokens.
-
-        Deprecated: Use a_stream() instead for streaming functionality.
-        """
-        api_messages, api_tools = self.prepare_api_input(input_data)
-        client = OpenAI(api_key=self.api_key)
-
-        # The response is a generator
-        for chunk in client.chat.completions.create(
-            model=self.model,
-            messages=api_messages,
-            tools=api_tools,
-            stream=True,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
-
-    @record_tool_a_stream
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        """
-        Stream tokens from the OpenAI model as they are generated.
-        Yields partial content/tokens.
-        """
-        api_messages, api_tools = self.prepare_api_input(input_data)
-        client = AsyncClient(api_key=self.api_key)
-
-        async for chunk in await client.chat.completions.create(
-            model=self.model,
-            messages=api_messages,
-            tools=api_tools,
-            stream=True,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
+                yield self.to_messages(response)
+        except asyncio.CancelledError:
+            raise  # let caller handle
+        except OpenAIError as exc:
+            # turn client‑specific exceptions into your domain error
+            raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
     def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """
@@ -280,7 +239,6 @@ class OpenAITool(LLM):
 
 
 class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
-    def build(self) -> "OpenAITool":
-        if not self._obj.api_key:
-            raise ValueError("API key must be provided for OpenAITool.")
-        return self._obj
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
+        return self

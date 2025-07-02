@@ -77,17 +77,17 @@ class DuckDuckGoToolBuilder(FunctionCallToolBuilder[DuckDuckGoTool]):
     """Builder for DuckDuckGoTool instances."""
 
     def fixed_max_results(self, fixed_max_results: int) -> Self:
-        self._obj.fixed_max_results = fixed_max_results
+        self.kwargs["fixed_max_results"] = fixed_max_results
         return self
 
     def headers(self, headers: dict[str, str]) -> Self:
-        self._obj.headers = headers
+        self.kwargs["headers"] = headers
         return self
 
     def proxy(self, proxy: str) -> Self:
-        self._obj.proxy = proxy
+        self.kwargs["proxy"] = proxy
         return self
 
     def timeout(self, timeout: int) -> Self:
-        self._obj.timeout = timeout
+        self.kwargs["timeout"] = timeout
         return self

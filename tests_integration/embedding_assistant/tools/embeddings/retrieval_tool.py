@@ -3,9 +3,14 @@ from typing import Any
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
+from grafi.common.models.command import use_command
 from grafi.tools.tool import Tool
+from tests_integration.embedding_assistant.tools.embeddings.embedding_response_command import (
+    EmbeddingResponseCommand,
+)
 
 
+@use_command(EmbeddingResponseCommand)
 class RetrievalTool(Tool):
     name: str = "RetrievalTool"
     type: str = "RetrievalTool"

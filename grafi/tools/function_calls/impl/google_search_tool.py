@@ -118,21 +118,21 @@ class GoogleSearchToolBuilder(FunctionCallToolBuilder[GoogleSearchTool]):
     """Builder for GoogleSearchTool instances."""
 
     def fixed_max_results(self, fixed_max_results: Optional[int]) -> Self:
-        self._obj.fixed_max_results = fixed_max_results
+        self.kwargs["fixed_max_results"] = fixed_max_results
         return self
 
     def fixed_language(self, fixed_language: Optional[str]) -> Self:
-        self._obj.fixed_language = fixed_language
+        self.kwargs["fixed_language"] = fixed_language
         return self
 
     def headers(self, headers: Optional[Any]) -> Self:
-        self._obj.headers = headers
+        self.kwargs["headers"] = headers
         return self
 
     def proxy(self, proxy: Optional[str]) -> Self:
-        self._obj.proxy = proxy
+        self.kwargs["proxy"] = proxy
         return self
 
     def timeout(self, timeout: Optional[int]) -> Self:
-        self._obj.timeout = timeout
+        self.kwargs["timeout"] = timeout
         return self

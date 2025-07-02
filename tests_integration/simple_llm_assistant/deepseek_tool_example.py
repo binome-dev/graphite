@@ -8,9 +8,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.impl.llm_node import LLMNode
+from grafi.nodes.node import Node
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 
 
 event_store = container.event_store
@@ -28,38 +27,14 @@ def get_invoke_context() -> InvokeContext:
 
 
 # --------------------------------------------------------------------------- #
-#  synchronous streaming                                                      #
-# --------------------------------------------------------------------------- #
-def test_deepseek_tool_stream() -> None:
-    event_store.clear_events()
-    ds_tool = DeepseekTool.builder().api_key(api_key).build()
-
-    content = ""
-    for messages in ds_tool.stream(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content is not None:
-                content += message.content
-                print(message.content, end="", flush=True)
-
-    assert content  # not empty
-    assert "Grafi" in content
-    # decorators record_tool_stream + record_tool_invoke → 2 events
-    assert len(event_store.get_events()) == 2
-
-
-# --------------------------------------------------------------------------- #
 #  async streaming                                                            #
 # --------------------------------------------------------------------------- #
 async def test_deepseek_tool_a_stream() -> None:
     event_store.clear_events()
-    ds_tool = DeepseekTool.builder().api_key(api_key).build()
+    ds_tool = DeepseekTool.builder().is_streaming(True).api_key(api_key).build()
 
     content = ""
-    async for messages in ds_tool.a_stream(
+    async for messages in ds_tool.a_invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -142,18 +117,14 @@ async def test_deepseek_tool_async() -> None:
 
 
 # --------------------------------------------------------------------------- #
-#  end-to-end: LLMNode streaming with DeepseekTool                            #
+#  end-to-end: Node streaming with DeepseekTool                            #
 # --------------------------------------------------------------------------- #
 async def test_llm_a_stream_node_deepseek() -> None:
     event_store.clear_events()
 
     llm_stream_node = (
-        LLMNode.builder()
-        .command(
-            LLMStreamResponseCommand.builder()
-            .llm(DeepseekTool.builder().api_key(api_key).build())
-            .build()
-        )
+        Node.builder()
+        .tool(DeepseekTool.builder().is_streaming(True).api_key(api_key).build())
         .build()
     )
 
@@ -161,8 +132,8 @@ async def test_llm_a_stream_node_deepseek() -> None:
     topic_event = ConsumeFromTopicEvent(
         invoke_context=invoke_context,
         topic_name="test_topic",
-        consumer_name="LLMNode",
-        consumer_type="LLMNode",
+        consumer_name="Node",
+        consumer_type="Node",
         offset=-1,
         data=[
             Message(role="user", content="Hello, my name is Grafi, how are you doing?")
@@ -179,12 +150,11 @@ async def test_llm_a_stream_node_deepseek() -> None:
 
     assert content
     assert "Grafi" in content
-    # → 2 events from DeepseekTool + 2 from LLMNode wrapper
+    # → 2 events from DeepseekTool + 2 from Node wrapper
     assert len(event_store.get_events()) == 4
 
 
 # synchronous tests
-test_deepseek_tool_stream()
 test_deepseek_tool_invoke()
 test_deepseek_tool_with_chat_param()
 

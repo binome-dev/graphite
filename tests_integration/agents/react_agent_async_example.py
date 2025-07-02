@@ -1,9 +1,9 @@
 import asyncio
 
-from grafi.agents.react_agent import create_agent
+from grafi.agents.react_agent import create_react_agent
 
 
-react_agent = create_agent()
+react_agent = create_react_agent()
 
 
 async def run_agent() -> None:

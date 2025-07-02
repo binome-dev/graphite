@@ -44,11 +44,19 @@ class MCPTool(FunctionCallTool):
     name: str = "MCPTool"
     type: str = "MCPTool"
 
-    connections: Dict[str, Connection] = Field(default_factory=dict)
-
     mcp_config: Dict[str, Any] = Field(default_factory=dict)
     resources: List[Resource] = Field(default_factory=list)
     prompts: List[Prompt] = Field(default_factory=list)
+
+    @classmethod
+    async def initialize(cls, **kwargs: Any) -> "MCPTool":
+        """
+        Initialize the MCPTool with the given keyword arguments.
+        """
+        mcp_tool = cls(**kwargs)
+        await mcp_tool._a_get_function_specs()
+
+        return mcp_tool
 
     @classmethod
     def builder(cls) -> "MCPToolBuilder":
@@ -58,8 +66,8 @@ class MCPTool(FunctionCallTool):
         return MCPToolBuilder(cls)
 
     async def _a_get_function_specs(self) -> None:
-        if not self.connections:
-            raise ValueError("Connections are not set.")
+        if not self.mcp_config:
+            raise ValueError("mcp_config are not set.")
 
         all_tools: list[Tool] = []
 
@@ -176,8 +184,7 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     """
 
     def connections(self, connections: Dict[str, Connection]) -> "MCPToolBuilder":
-        self._obj.connections = connections
-        self._obj.mcp_config = {
+        self.kwargs["mcp_config"] = {
             "mcpServers": connections,
         }
         return self
@@ -188,5 +195,5 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
         )
 
     async def a_build(self) -> "MCPTool":
-        await self._obj._a_get_function_specs()
-        return self._obj
+        mcp_tool = await self._cls.initialize(**self.kwargs)
+        return mcp_tool

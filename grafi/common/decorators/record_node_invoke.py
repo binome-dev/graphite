@@ -21,7 +21,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
-from grafi.nodes.node import T_N
+from grafi.nodes.node_base import T_N
 
 
 def record_node_invoke(

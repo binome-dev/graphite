@@ -8,7 +8,7 @@ Four critical capabilities—**observability, idempotency, auditability,** and *
 
 Overall, **Graphite** offers a powerful, extensible foundation for building AI solutions that scale, adapt to evolving compliance needs, and gracefully handle failures or user-driven pauses. By combining a robust workflow engine, well-structured nodes and tools, and a complete event model, Graphite enables teams to develop sophisticated conversational agents and automated pipelines with confidence.
 
-## What is Graphite?
+## What is Graphite
 
 Graphite is an open-source platform that treats data as interconnected nodes and relationships, allowing you to:
 

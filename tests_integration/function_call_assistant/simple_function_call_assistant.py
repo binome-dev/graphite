@@ -11,12 +11,9 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -60,19 +57,16 @@ class SimpleFunctionCallAssistant(Assistant):
         )
 
         llm_input_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.function_call_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.function_call_llm_system_message)
                 .build()
             )
             .publish_to(function_call_topic)
@@ -91,35 +85,29 @@ class SimpleFunctionCallAssistant(Assistant):
         )
 
         function_call_node = (
-            LLMFunctionCallNode.builder()
+            Node.builder()
             .name("FunctionCallNode")
+            .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_tool)
-                .build()
-            )
+            .tool(self.function_tool)
             .publish_to(function_result_topic)
             .build()
         )
 
         # Create an output LLM node
         llm_output_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIOutputNode")
+            .type("LLMNode")
             .subscribe(
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
-            .command(
-                LLMResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("UserOutputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.summary_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserOutputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -148,23 +136,25 @@ class SimpleFunctionCallAssistantBuilder(
     """
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self._obj.function_call_llm_system_message = function_call_llm_system_message
+        self.kwargs[
+            "function_call_llm_system_message"
+        ] = function_call_llm_system_message
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-        self._obj.summary_llm_system_message = summary_llm_system_message
+        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:
-        self._obj.function_tool = function_tool
+        self.kwargs["function_tool"] = function_tool
         return self

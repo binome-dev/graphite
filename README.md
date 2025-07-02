@@ -74,20 +74,20 @@ Run a build in ReAct agent:
 
 ```mermaid
 graph TD;
-    Input[[agent_input_topic]]-->LLMNode;
-    LLMNode--"call function"-->FunctionCallTopic[[function_call_topic]];
+    Input[[agent_input_topic]]-->Node;
+    Node--"call function"-->FunctionCallTopic[[function_call_topic]];
     FunctionCallTopic-->Function;
     Function-->FunctionResultTopic[[function_result_topic]]
-    FunctionResultTopic-->LLMNode;
-    LLMNode--"final output"-->Output[[agent_output_topic]];
+    FunctionResultTopic-->Node;
+    Node--"final output"-->Output[[agent_output_topic]];
 ```
 
 ```python
-from grafi.agents.simple_agent import create_agent
+from grafi.agents.react_agent import create_react_agent
 
-simple_agent = create_agent()
+react_agent = create_react_agent()
 
-output = simple_agent.run("What is agent framework called Graphite?")
+output = react_agent.run("What is agent framework called Graphite?")
 
 print(output)
 ```
@@ -97,9 +97,9 @@ Output could be:
 > Graphite is an open-source framework designed for building domain-specific AI agents using composable workflows. It features an event-driven architecture that allows  developers to create customizable workflows. This framework is particularly focused on constructing AI assistants that can interact within specific domains effectively.
 >
 > For more detailed information, you can refer to the following resources:
+>
 > 1. [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
 > 2. [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
-
 
 ## Why Graphite?
 

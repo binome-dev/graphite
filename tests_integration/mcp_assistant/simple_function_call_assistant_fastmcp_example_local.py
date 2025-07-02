@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
@@ -30,10 +31,12 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     invoke_context = get_invoke_context()
 
     server_params = {
-        "hello": {
-            "url": "http://localhost:8000/mcp/",
-            "transport": "http",
-        }
+        "hello": StreamableHttpConnection(
+            {
+                "url": "http://localhost:8000/mcp/",
+                "transport": "http",
+            }
+        )
     }
 
     # Set up the assistant with TavilyTool

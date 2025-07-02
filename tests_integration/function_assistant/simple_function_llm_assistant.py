@@ -12,12 +12,9 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.function_node import FunctionNode
-from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.functions.function_command import FunctionCommand
+from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -59,19 +56,16 @@ class SimpleFunctionLLMAssistant(Assistant):
         function_topic = Topic(name="function_call_topic")
 
         llm_input_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .chat_params({"response_format": self.output_format})
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .chat_params({"response_format": self.output_format})
                 .build()
             )
             .publish_to(function_topic)
@@ -81,14 +75,11 @@ class SimpleFunctionLLMAssistant(Assistant):
         # Create a function node
 
         function_call_node = (
-            FunctionNode.builder()
+            Node.builder()
             .name("FunctionCallNode")
+            .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_topic).build())
-            .command(
-                FunctionCommand.builder()
-                .function_tool(FunctionTool.builder().function(self.function).build())
-                .build()
-            )
+            .tool(FunctionTool.builder().function(self.function).build())
             .publish_to(agent_output_topic)
             .build()
         )
@@ -115,17 +106,17 @@ class SimpleFunctionLLMAssistantBuilder(
     """
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def output_format(self, output_format: OutputType) -> Self:
-        self._obj.output_format = output_format
+        self.kwargs["output_format"] = output_format
         return self
 
     def function(self, function: Callable) -> Self:
-        self._obj.function = function
+        self.kwargs["function"] = function
         return self

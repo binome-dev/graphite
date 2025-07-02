@@ -79,7 +79,7 @@ class TopicBuilder(TopicBaseBuilder[Topic]):
     def publish_event_handler(
         self, publish_event_handler: Callable[[PublishToTopicEvent], None]
     ) -> Self:
-        self._obj.publish_event_handler = publish_event_handler
+        self.kwargs["publish_event_handler"] = publish_event_handler
         return self
 
 

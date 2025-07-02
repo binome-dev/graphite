@@ -2,22 +2,18 @@ import json
 import uuid
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
 from typing import Literal
 from typing import Optional
 from typing import Self
 from typing import cast
 
-from deprecated import deprecated
 from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
-from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -81,8 +77,11 @@ class OllamaTool(LLM):
                 ]
             api_messages.append(api_message)
 
-        if input_data[-1].tools:
-            api_functions = input_data[-1].tools
+        # Extract function specifications from self.get_function_specs()
+        api_functions = [
+            function_spec.to_openai_tool()
+            for function_spec in self.get_function_specs()
+        ] or None
 
         return api_messages, api_functions
 
@@ -128,71 +127,24 @@ class OllamaTool(LLM):
         # Use Ollama Client to send the request
         client = ollama.AsyncClient(self.api_url)
         try:
-            response = await client.chat(
-                model=self.model, messages=api_messages, tools=api_functions
-            )
-
-            # Return the raw response as a Message object
-            yield self.to_messages(response)
+            if self.is_streaming:
+                stream = await client.chat(
+                    model=self.model,
+                    messages=api_messages,
+                    tools=api_functions,
+                    stream=True,
+                )
+                async for chunk in stream:
+                    yield self.to_stream_messages(chunk)
+            else:
+                response = await client.chat(
+                    model=self.model, messages=api_messages, tools=api_functions
+                )
+                # Return the raw response as a Message object
+                yield self.to_messages(response)
         except Exception as e:
             logger.error("Ollama API error: %s", e)
             raise RuntimeError(f"Ollama API error: {e}") from e
-
-    @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Messages, None, None]:
-        """
-        Synchronous token streaming from Ollama.
-
-        Yields incremental `Message` lists that contain only the newly
-        generated chunk.
-        """
-        api_messages, api_functions = self.prepare_api_input(input_data)
-        client = ollama.Client(self.api_url)
-
-        try:
-            for chunk in client.chat(
-                model=self.model,
-                messages=api_messages,
-                tools=api_functions,
-                stream=True,
-            ):
-                yield self.to_stream_messages(chunk)
-        except Exception as e:
-            logger.error("Ollama streaming error: %s", e)
-            raise RuntimeError(f"Ollama streaming error: {e}") from e
-
-    @record_tool_a_stream
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        """
-        Asynchronous token streaming from Ollama.
-
-        Follows the same semantics as `stream()` but returns an
-        asynchronous generator.
-        """
-        api_messages, api_functions = self.prepare_api_input(input_data)
-        client = ollama.AsyncClient(self.api_url)
-
-        try:
-            stream = await client.chat(  # returns an *async* generator
-                model=self.model,
-                messages=api_messages,
-                tools=api_functions,
-                stream=True,
-            )
-            async for chunk in stream:
-                yield self.to_stream_messages(chunk)
-        except Exception as e:
-            logger.error("Ollama async streaming error: %s", e)
-            raise RuntimeError(f"Ollama async streaming error: {e}") from e
 
     def to_stream_messages(self, chunk: ChatResponse | dict[str, Any]) -> Messages:
         """
@@ -289,10 +241,5 @@ class OllamaToolBuilder(LLMBuilder[OllamaTool]):
     """
 
     def api_url(self, api_url: str) -> Self:
-        self._obj.api_url = api_url
+        self.kwargs["api_url"] = api_url
         return self
-
-    def build(self) -> OllamaTool:
-        if not self._obj.api_url:
-            raise ValueError("API URL must be provided for OllamaTool.")
-        return self._obj

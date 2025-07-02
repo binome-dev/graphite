@@ -11,13 +11,9 @@ from grafi.common.topics.output_topic import agent_output_topic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.impl.llm_function_call_node import LLMFunctionCallNode
-from grafi.nodes.impl.llm_node import LLMNode
-from grafi.tools.function_calls.function_call_command import FunctionCallCommand
+from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.llm_response_command import LLMResponseCommand
-from grafi.tools.llms.llm_stream_response_command import LLMStreamResponseCommand
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -41,8 +37,6 @@ class SimpleStreamFunctionCallAssistant(Assistant):
     summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionCallTool
 
-    workflow: EventDrivenWorkflow
-
     @classmethod
     def builder(cls) -> "SimpleStreamFunctionCallAssistantBuilder":
         """Return a builder for SimpleStreamFunctionCallAssistant."""
@@ -65,19 +59,16 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         )
 
         llm_input_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("OpenAIInputNode")
+            .type("OpenAIInputNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
-            .command(
-                LLMResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("UserInputLLM")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.function_call_llm_system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("UserInputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.function_call_llm_system_message)
                 .build()
             )
             .publish_to(function_call_topic)
@@ -90,22 +81,20 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         function_result_topic = Topic(name="function_result_topic")
 
         function_call_node = (
-            LLMFunctionCallNode.builder()
+            Node.builder()
             .name("FunctionCallNode")
+            .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .command(
-                FunctionCallCommand.builder()
-                .function_call_tool(self.function_tool)
-                .build()
-            )
+            .tool(self.function_tool)
             .publish_to(function_result_topic)
             .build()
         )
 
         # Create an LLM node
         llm_node = (
-            LLMNode.builder()
+            Node.builder()
             .name("LLMStreamNode")
+            .type("LLMStreamNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(function_result_topic)
@@ -113,16 +102,12 @@ class SimpleStreamFunctionCallAssistant(Assistant):
                 .subscribed_to(summary_topic)
                 .build()
             )
-            .command(
-                LLMStreamResponseCommand.builder()
-                .llm(
-                    OpenAITool.builder()
-                    .name("OpenAITool")
-                    .api_key(self.api_key)
-                    .model(self.model)
-                    .system_message(self.system_message)
-                    .build()
-                )
+            .tool(
+                OpenAITool.builder()
+                .name("OpenAITool")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.system_message)
                 .build()
             )
             .publish_to(agent_output_topic)
@@ -147,27 +132,29 @@ class SimpleStreamFunctionCallAssistantBuilder(
     """Concrete builder for SimpleStreamFunctionCallAssistant."""
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.api_key = api_key
+        self.kwargs["api_key"] = api_key
         return self
 
     def system_message(self, system_message: str) -> Self:
-        self._obj.system_message = system_message
+        self.kwargs["system_message"] = system_message
         return self
 
     def model(self, model: str) -> Self:
-        self._obj.model = model
+        self.kwargs["model"] = model
         return self
 
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self._obj.function_call_llm_system_message = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-        self._obj.summary_llm_system_message = summary_llm_system_message
+        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:
-        self._obj.function_tool = function_tool
+        self.kwargs["function_tool"] = function_tool
         return self

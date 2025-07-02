@@ -89,13 +89,15 @@ class TavilyToolBuilder(FunctionCallToolBuilder[TavilyTool]):
     """Builder for TavilyTool instances."""
 
     def api_key(self, api_key: str) -> Self:
-        self._obj.client = TavilyClient(api_key)
+        from tavily import TavilyClient
+
+        self.kwargs["client"] = TavilyClient(api_key)
         return self
 
     def search_depth(self, search_depth: Literal["basic", "advanced"]) -> Self:
-        self._obj.search_depth = search_depth
+        self.kwargs["search_depth"] = search_depth
         return self
 
     def max_tokens(self, max_tokens: int) -> Self:
-        self._obj.max_tokens = max_tokens
+        self.kwargs["max_tokens"] = max_tokens
         return self

@@ -1,0 +1,507 @@
+# Events System
+
+The Graphite events system provides a comprehensive event-driven architecture for tracking, monitoring, and coordinating activities across assistants, nodes, tools, workflows, and topics. This system enables observability, debugging, and loose coupling between components through a standardized event model.
+
+## Overview
+
+The events system is built around a hierarchical structure where:
+
+- **Base Event**: Provides common fields and functionality for all events
+- **Category Events**: Abstract base classes for different component types (Assistant, Node, Tool, Workflow, Topic)  
+- **Specific Events**: Concrete event implementations for specific actions (Invoke, Respond, Failed)
+
+## Base Event Class
+
+All events inherit from the base `Event` class, which provides core functionality and common fields.
+
+### Fields
+
+| Field            | Type            | Description                                                                    |
+|------------------|-----------------|--------------------------------------------------------------------------------|
+| `event_id`       | `EventId`       | Unique identifier for the event (automatically generated using `default_id`). |
+| `event_version`  | `str`           | Version identifier for the event schema (defaults to `"1.0"`).                |
+| `invoke_context` | `InvokeContext` | Context information about the operation that triggered this event.             |
+| `event_type`     | `EventType`     | Enumerated type indicating the specific kind of event.                         |
+| `timestamp`      | `datetime`      | UTC timestamp when the event was created (automatically generated).           |
+
+### Methods
+
+| Method        | Signature                                        | Description                                                                 |
+|---------------|--------------------------------------------------|-----------------------------------------------------------------------------|
+| `event_dict`  | `() -> Dict[str, Any]`                          | Returns base event data as a dictionary with flattened invoke_context.     |
+| `event_base`  | `classmethod (event_dict: dict) -> Tuple[...]`  | Extracts common event data from a dictionary.                              |
+| `to_dict`     | `() -> Dict[str, Any]`                          | Abstract method for converting event to dictionary (must be implemented).  |
+| `from_dict`   | `classmethod (data: Dict[str, Any]) -> Event`   | Abstract method for creating event from dictionary (must be implemented).  |
+
+### Event Types
+
+The `EventType` enumeration defines all supported event types:
+
+#### Component Events
+
+- `NODE_INVOKE`, `NODE_RESPOND`, `NODE_FAILED`
+- `TOOL_INVOKE`, `TOOL_RESPOND`, `TOOL_FAILED`  
+- `WORKFLOW_INVOKE`, `WORKFLOW_RESPOND`, `WORKFLOW_FAILED`
+- `ASSISTANT_INVOKE`, `ASSISTANT_RESPOND`, `ASSISTANT_FAILED`
+
+#### Topic Events
+
+- `TOPIC_EVENT`, `STREAM_TOPIC_EVENT`
+- `PUBLISH_TO_TOPIC`, `CONSUME_FROM_TOPIC`
+- `OUTPUT_TOPIC`
+
+## Assistant Events
+
+Assistant events track the lifecycle and operations of AI assistants within the system.
+
+### AssistantEvent (Base Class)
+
+Base class for all assistant-related events.
+
+#### AssistantEvent Fields
+
+| Field             | Type  | Description                                        |
+|-------------------|-------|----------------------------------------------------|
+| `assistant_id`    | `str` | Unique identifier for the assistant instance.     |
+| `assistant_name`  | `str` | Human-readable name of the assistant.             |
+| `assistant_type`  | `str` | Type/category of the assistant.                   |
+
+### AssistantInvokeEvent
+
+Emitted when an assistant is invoked with input data.
+
+#### AssistantInvokeEvent Fields
+
+| Field        | Type       | Description                                    |
+|--------------|------------|------------------------------------------------|
+| `input_data` | `Messages` | Input messages provided to the assistant.     |
+
+#### Example Usage
+
+```python
+from grafi.common.events.assistant_events.assistant_invoke_event import AssistantInvokeEvent
+from grafi.common.models.message import Message
+
+event = AssistantInvokeEvent(
+    invoke_context=context,
+    assistant_name="Chat Assistant",
+    assistant_type="ConversationalAssistant",
+    input_data=[Message(role="user", content="Hello!")]
+)
+
+# Convert to dictionary for storage/transmission
+event_dict = event.to_dict()
+
+# Reconstruct from dictionary
+reconstructed_event = AssistantInvokeEvent.from_dict(event_dict)
+```
+
+### AssistantRespondEvent
+
+Emitted when an assistant produces a response.
+
+#### AssistantRespondEvent Fields
+
+| Field         | Type       | Description                                         |
+|---------------|------------|-----------------------------------------------------|
+| `input_data`  | `Messages` | Original input messages provided to the assistant. |
+| `output_data` | `Messages` | Response messages generated by the assistant.      |
+
+### AssistantFailedEvent
+
+Emitted when an assistant operation fails.
+
+#### AssistantFailedEvent Fields
+
+| Field           | Type  | Description                                    |
+|-----------------|-------|------------------------------------------------|
+| `error_message` | `str` | Description of the error that occurred.       |
+| `error_type`    | `str` | Type/category of the error.                   |
+
+## Node Events
+
+Node events track the execution and status of individual nodes in workflows.
+
+### NodeEvent (Base Class)
+
+Base class for all node-related events.
+
+#### NodeEvent Fields
+
+| Field                | Type        | Description                                        |
+|----------------------|-------------|----------------------------------------------------|
+| `node_id`            | `str`       | Unique identifier for the node instance.          |
+| `node_name`          | `str`       | Human-readable name of the node.                  |
+| `node_type`          | `str`       | Type/category of the node.                        |
+| `subscribed_topics`  | `List[str]` | Topics this node subscribes to.                   |
+| `publish_to_topics`  | `List[str]` | Topics this node publishes to.                    |
+
+### NodeInvokeEvent
+
+Emitted when a node begins processing.
+
+#### NodeInvokeEvent Fields
+
+| Field        | Type       | Description                                    |
+|--------------|------------|------------------------------------------------|
+| `input_data` | `Messages` | Input messages provided to the node.          |
+
+### NodeRespondEvent
+
+Emitted when a node completes processing successfully.
+
+#### NodeRespondEvent Fields
+
+| Field         | Type       | Description                                    |
+|---------------|------------|------------------------------------------------|
+| `output_data` | `Messages` | Output messages generated by the node.        |
+
+### NodeFailedEvent
+
+Emitted when a node operation fails.
+
+#### NodeFailedEvent Fields
+
+| Field           | Type  | Description                                    |
+|-----------------|-------|------------------------------------------------|
+| `error_message` | `str` | Description of the error that occurred.       |
+| `error_type`    | `str` | Type/category of the error.                   |
+
+## Tool Events
+
+Tool events track the execution and status of tools within the system.
+
+### ToolEvent (Base Class)
+
+Base class for all tool-related events.
+
+#### ToolEvent Fields
+
+| Field        | Type  | Description                                        |
+|--------------|-------|----------------------------------------------------|
+| `tool_id`    | `str` | Unique identifier for the tool instance.          |
+| `tool_name`  | `str` | Human-readable name of the tool.                  |
+| `tool_type`  | `str` | Type/category of the tool.                        |
+
+### ToolInvokeEvent
+
+Emitted when a tool is invoked.
+
+#### ToolInvokeEvent Fields
+
+| Field        | Type       | Description                                    |
+|--------------|------------|------------------------------------------------|
+| `input_data` | `Messages` | Input messages provided to the tool.          |
+
+### ToolRespondEvent
+
+Emitted when a tool produces a response.
+
+#### ToolRespondEvent Fields
+
+| Field         | Type       | Description                                    |
+|---------------|------------|------------------------------------------------|
+| `output_data` | `Messages` | Response messages generated by the tool.      |
+
+### ToolFailedEvent
+
+Emitted when a tool operation fails.
+
+#### ToolFailedEvent Fields
+
+| Field           | Type  | Description                                    |
+|-----------------|-------|------------------------------------------------|
+| `error_message` | `str` | Description of the error that occurred.       |
+| `error_type`    | `str` | Type/category of the error.                   |
+
+## Workflow Events
+
+Workflow events track the execution and status of entire workflows.
+
+### WorkflowEvent (Base Class)
+
+Base class for all workflow-related events.
+
+#### WorkflowEvent Fields
+
+| Field           | Type  | Description                                        |
+|-----------------|-------|----------------------------------------------------|
+| `workflow_id`   | `str` | Unique identifier for the workflow instance.      |
+| `workflow_name` | `str` | Human-readable name of the workflow.              |
+| `workflow_type` | `str` | Type/category of the workflow.                    |
+
+### WorkflowInvokeEvent
+
+Emitted when a workflow begins execution.
+
+#### WorkflowInvokeEvent Fields
+
+| Field        | Type       | Description                                    |
+|--------------|------------|------------------------------------------------|
+| `input_data` | `Messages` | Input messages provided to the workflow.      |
+
+### WorkflowRespondEvent
+
+Emitted when a workflow completes successfully.
+
+#### WorkflowRespondEvent Fields
+
+| Field         | Type       | Description                                    |
+|---------------|------------|------------------------------------------------|
+| `output_data` | `Messages` | Final output messages from the workflow.      |
+
+### WorkflowFailedEvent
+
+Emitted when a workflow execution fails.
+
+#### WorkflowFailedEvent Fields
+
+| Field           | Type  | Description                                    |
+|-----------------|-------|------------------------------------------------|
+| `error_message` | `str` | Description of the error that occurred.       |
+| `error_type`    | `str` | Type/category of the error.                   |
+
+Topic events handle message passing and communication between components.
+
+### TopicEvent (Base Class)
+
+Basic event for topic-related activities.
+
+#### TopicEvent Base Fields
+
+| Field        | Type  | Description                                        |
+|--------------|-------|----------------------------------------------------|
+| `topic_name` | `str` | Name of the topic.                                |
+| `offset`     | `int` | Position/offset in the topic stream.              |
+| `data`       | `Any` | Data associated with the topic event.             |
+
+### PublishToTopicEvent
+
+Emitted when data is published to a topic.
+
+#### PublishToTopicEvent Fields
+
+| Field                | Type        | Description                                    |
+|----------------------|-------------|------------------------------------------------|
+| `topic_name`         | `str`       | Name of the topic being published to.         |
+| `offset`             | `int`       | Position/offset in the topic stream.          |
+| `consumed_event_ids` | `List[str]` | IDs of events consumed before publishing.     |
+| `publisher_name`     | `str`       | Name of the component publishing the data.    |
+| `publisher_type`     | `str`       | Type of the component publishing the data.    |
+| `data`               | `Messages`  | Messages being published to the topic.        |
+
+### ConsumeFromTopicEvent
+
+Emitted when data is consumed from a topic.
+
+#### ConsumeFromTopicEvent Fields
+
+| Field                | Type        | Description                                    |
+|----------------------|-------------|------------------------------------------------|
+| `topic_name`         | `str`       | Name of the topic being consumed from.        |
+| `offset`             | `int`       | Position/offset in the topic stream.          |
+| `consumed_event_ids` | `List[str]` | IDs of events consumed.                        |
+| `publisher_name`     | `str`       | Name of the original publisher.               |
+| `publisher_type`     | `str`       | Type of the original publisher.               |
+| `data`               | `Messages`  | Messages consumed from the topic.             |
+
+### OutputTopicEvent
+
+Emitted for output topic operations.
+
+#### OutputTopicEvent Fields
+
+| Field                | Type        | Description                                    |
+|----------------------|-------------|------------------------------------------------|
+| `topic_name`         | `str`       | Name of the output topic.                     |
+| `offset`             | `int`       | Position/offset in the topic stream.          |
+| `consumed_event_ids` | `List[str]` | IDs of events consumed before outputting.     |
+| `publisher_name`     | `str`       | Name of the component outputting the data.    |
+| `publisher_type`     | `str`       | Type of the component outputting the data.    |
+| `data`               | `Messages`  | Data being output to the topic.               |
+
+### OutputAsyncEvent
+
+Emitted for asynchronous output topic operations.
+
+#### OutputAsyncEvent Fields
+
+| Field                | Type        | Description                                    |
+|----------------------|-------------|------------------------------------------------|
+| `topic_name`         | `str`       | Name of the output topic.                     |
+| `offset`             | `int`       | Position/offset in the topic stream.          |
+| `consumed_event_ids` | `List[str]` | IDs of events consumed before outputting.     |
+| `publisher_name`     | `str`       | Name of the component outputting the data.    |
+| `publisher_type`     | `str`       | Type of the component outputting the data.    |
+| `data`               | `Messages`  | Data being output asynchronously.             |
+
+## Event Usage Patterns
+
+### Creating Events
+
+```python
+from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
+
+# Create invoke context
+context = InvokeContext(assistant_request_id="req_123")
+
+# Create tool invoke event
+event = ToolInvokeEvent(
+    invoke_context=context,
+    tool_name="OpenAI Tool",
+    tool_type="LLMTool",
+    input_data=[Message(role="user", content="Hello")]
+)
+```
+
+### Serialization and Deserialization
+
+```python
+# Convert event to dictionary for storage/transmission
+event_dict = event.to_dict()
+
+# Store or transmit event_dict...
+
+# Reconstruct event from dictionary
+reconstructed_event = ToolInvokeEvent.from_dict(event_dict)
+```
+
+### Event Handling
+
+```python
+def handle_tool_event(event: ToolEvent):
+    """Handle any tool-related event."""
+    print(f"Tool {event.tool_name} event: {event.event_type}")
+    
+    if isinstance(event, ToolInvokeEvent):
+        print(f"Tool invoked with {len(event.input_data)} messages")
+    elif isinstance(event, ToolRespondEvent):
+        print(f"Tool responded with {len(event.output_data)} messages")
+    elif isinstance(event, ToolFailedEvent):
+        print(f"Tool failed: {event.error_message}")
+```
+
+### Topic Event Handling
+
+```python
+def handle_topic_event(event: TopicEvent):
+    """Handle topic-related events."""
+    print(f"Topic {event.topic_name} at offset {event.offset}")
+    
+    if isinstance(event, PublishToTopicEvent):
+        print(f"Published by {event.publisher_name} ({event.publisher_type})")
+        print(f"Consumed events: {event.consumed_event_ids}")
+    elif isinstance(event, OutputTopicEvent):
+        print(f"Output from {event.publisher_name}")
+        print(f"Data: {len(event.data)} messages")
+```
+
+## Event Context and Metadata
+
+### InvokeContext
+
+All events carry an `InvokeContext` that provides:
+
+- **Request Tracking**: `assistant_request_id` for correlating related events
+- **Workflow Context**: Information about the current workflow execution  
+- **Metadata**: Additional context-specific information
+
+### Event Context
+
+Each event type includes structured context information:
+
+```python
+# Assistant events include:
+{
+    "assistant_id": "asst_123",
+    "assistant_name": "Chat Assistant", 
+    "assistant_type": "ConversationalAssistant",
+    "invoke_context": {...}
+}
+
+# Tool events include:
+{
+    "tool_id": "tool_456",
+    "tool_name": "OpenAI Tool",
+    "tool_type": "LLMTool", 
+    "invoke_context": {...}
+}
+
+# Topic events include:
+{
+    "consumed_event_ids": ["event_1", "event_2"],
+    "publisher_name": "Data Processor",
+    "publisher_type": "ProcessingNode",
+    "topic_name": "output_topic",
+    "offset": 42,
+    "invoke_context": {...}
+}
+```
+
+## Best Practices
+
+### Event Design
+
+1. **Immutability**: Events should be immutable once created
+2. **Complete Information**: Include all relevant context for debugging and monitoring
+3. **Structured Data**: Use typed fields rather than generic data blobs
+4. **Correlation**: Ensure proper `invoke_context` for request correlation
+
+### Event Handling Best Practices
+
+1. **Type Safety**: Use `isinstance()` checks for type-specific handling
+2. **Error Handling**: Always handle potential deserialization errors
+3. **Logging**: Log important events for debugging and monitoring
+4. **Performance**: Avoid expensive operations in event handlers
+
+### Serialization
+
+1. **JSON Compatibility**: Ensure all event data is JSON-serializable
+2. **Schema Versioning**: Use `event_version` for backward compatibility
+3. **Validation**: Validate events during deserialization
+4. **Error Recovery**: Handle malformed event data gracefully
+
+### Topic Event Best Practices
+
+1. **Event Correlation**: Use `consumed_event_ids` to track event dependencies
+2. **Publisher Information**: Always include `publisher_name` and `publisher_type` for traceability
+3. **Offset Management**: Properly manage topic offsets for ordered processing
+4. **Async Handling**: Use `OutputAsyncEvent` for non-blocking output operations
+
+## Integration with Graphite
+
+### Observability
+
+Events integrate with Graphite's observability system:
+
+- **Tracing**: Events can be correlated with OpenInference traces
+- **Monitoring**: Event streams provide real-time system monitoring
+- **Debugging**: Event history helps diagnose issues
+
+### Workflow Coordination
+
+Events enable loose coupling between workflow components:
+
+- **Asynchronous Processing**: Components can react to events asynchronously
+- **Topic-Based Communication**: Events flow through topic-based messaging
+- **State Management**: Events provide a history of state changes
+
+### Error Handling
+
+Failed events provide structured error information:
+
+- **Error Classification**: `error_type` enables categorized error handling
+- **Context Preservation**: Failed events retain full context for debugging
+- **Recovery Strategies**: Error events can trigger recovery mechanisms
+
+### Event Sourcing
+
+The events system supports event sourcing patterns:
+
+- **Event History**: Complete history of system state changes
+- **Replay Capability**: Events can be replayed to reconstruct system state
+- **Audit Trail**: Events provide a complete audit trail of operations
+
+The events system forms the backbone of Graphite's event-driven architecture, enabling robust, observable, and loosely-coupled systems that can scale and adapt to complex workflow requirements.

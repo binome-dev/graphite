@@ -8,14 +8,12 @@ import asyncio
 import os
 from typing import Any
 from typing import Dict
-from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Self
 from typing import Union
 from typing import cast
 
-from deprecated import deprecated
 from openai import AsyncClient
 from openai import NotGiven
 from openai import OpenAI
@@ -27,9 +25,7 @@ from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
 from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_a_stream import record_tool_a_stream
 from grafi.common.decorators.record_tool_invoke import record_tool_invoke
-from grafi.common.decorators.record_tool_stream import record_tool_stream
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -99,9 +95,12 @@ class OpenRouterTool(LLM):
                 )
             )
 
-        api_tools = (
-            input_data[-1].tools if input_data and input_data[-1].tools else None
-        )
+        # Extract function specifications from self.get_function_specs()
+        api_tools = [
+            function_spec.to_openai_tool()
+            for function_spec in self.get_function_specs()
+        ] or None
+
         return api_messages, api_tools
 
     # ------------------------------------------------------------------ #
@@ -139,8 +138,20 @@ class OpenRouterTool(LLM):
     ) -> MsgsAGen:
         messages, tools = self.prepare_api_input(input_data)
 
-        async with AsyncClient(api_key=self.api_key, base_url=self.base_url) as client:
-            try:
+        try:
+            client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
+
+            if self.is_streaming:
+                async for chunk in await client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    stream=True,
+                    extra_headers=self.extra_headers or None,
+                    **self.chat_params,
+                ):
+                    yield self.to_stream_messages(chunk)
+            else:
                 resp: ChatCompletion = await client.chat.completions.create(
                     model=self.model,
                     messages=messages,
@@ -148,57 +159,11 @@ class OpenRouterTool(LLM):
                     extra_headers=self.extra_headers or None,
                     **self.chat_params,
                 )
-            except asyncio.CancelledError:
-                raise
-            except OpenAIError as exc:
-                raise RuntimeError(f"OpenRouter async call failed: {exc}") from exc
-
-        yield self.to_messages(resp)
-
-    # ------------------------------------------------------------------ #
-    # Blocking streaming (deprecated)                                    #
-    # ------------------------------------------------------------------ #
-    @record_tool_stream
-    @deprecated("Use a_stream() instead for streaming functionality")
-    def stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Generator[Messages, None, None]:
-        messages, tools = self.prepare_api_input(input_data)
-        client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-
-        for chunk in client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            stream=True,
-            extra_headers=self.extra_headers or None,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
-
-    # ------------------------------------------------------------------ #
-    # Async streaming                                                    #
-    # ------------------------------------------------------------------ #
-    @record_tool_a_stream
-    async def a_stream(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
-        messages, tools = self.prepare_api_input(input_data)
-        client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
-
-        async for chunk in await client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            tools=tools,
-            stream=True,
-            extra_headers=self.extra_headers or None,
-            **self.chat_params,
-        ):
-            yield self.to_stream_messages(chunk)
+                yield self.to_messages(resp)
+        except asyncio.CancelledError:
+            raise
+        except OpenAIError as exc:
+            raise RuntimeError(f"OpenRouter async call failed: {exc}") from exc
 
     # ------------------------------------------------------------------ #
     # Response converters                                                #
@@ -236,14 +201,13 @@ class OpenRouterToolBuilder(LLMBuilder[OpenRouterTool]):
     """
 
     def base_url(self, base_url: str) -> Self:
-        self._obj.base_url = base_url.rstrip("/")
+        self.kwargs["base_url"] = base_url.rstrip("/")
         return self
 
     def extra_headers(self, headers: Dict[str, str]) -> Self:
-        self._obj.extra_headers = headers
+        self.kwargs["extra_headers"] = headers
         return self
 
-    def build(self) -> OpenRouterTool:
-        if not self._obj.api_key:
-            raise ValueError("API key must be provided for OpenRouterTool.")
-        return self._obj
+    def api_key(self, api_key: Optional[str]) -> Self:
+        self.kwargs["api_key"] = api_key
+        return self

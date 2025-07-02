@@ -15,6 +15,7 @@ from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
 from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.tools.tool import T_T
@@ -62,9 +63,22 @@ def record_tool_a_invoke(
                 # --------------------------------------------------
                 # iterate over the ORIGINAL async‑generator
                 # --------------------------------------------------
+                result_content = ""
+                is_streaming = False
                 async for data in func(self, invoke_context, input_data):
-                    result.extend(data)
-                    yield data  # forward item
+                    for message in data:
+                        if message.is_streaming:
+                            if message.content is not None and isinstance(
+                                message.content, str
+                            ):
+                                result_content += message.content
+                            is_streaming = True
+                        else:
+                            result.append(message)
+                    yield data
+
+                if is_streaming:
+                    result = [Message(role="assistant", content=result_content)]
                 # --------------------------------------------------
 
                 span.set_attribute(

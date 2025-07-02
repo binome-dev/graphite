@@ -154,11 +154,11 @@ def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
                 type="object",
                 properties={"location": ParameterSchema(type="string")},
             ),
-        ).to_openai_tool()
+        )
     ]
 
-    input_data = [Message(role="user", content="Weather?", tools=tools)]
-
+    input_data = [Message(role="user", content="Weather?")]
+    openrouter_instance.add_function_specs(tools)
     result = openrouter_instance.invoke(invoke_context, input_data)
 
     assert result[0].tool_calls[0].id == "test_id"
