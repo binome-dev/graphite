@@ -186,10 +186,6 @@ class OpenRouterTool(LLM):
     def to_dict(self) -> Dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
             "base_url": self.base_url,
             "extra_headers": self.extra_headers,
         }

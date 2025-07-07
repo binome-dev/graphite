@@ -61,6 +61,10 @@ class Workflow(BaseModel):
         """Convert the workflow to a dictionary."""
         return {
             "workflow_id": self.workflow_id,
+            "name": self.name,
+            "type": self.type,
+            "oi_span_type": self.oi_span_type.value,
+            "nodes": {name: node.to_dict() for name, node in self.nodes.items()},
         }
 
 

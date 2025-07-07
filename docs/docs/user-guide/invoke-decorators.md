@@ -138,7 +138,7 @@ Records synchronous node invocations in event-driven workflows.
 from grafi.common.decorators.record_node_invoke import record_node_invoke
 
 @record_node_invoke
-def invoke(self, invoke_context: InvokeContext, 
+def invoke(self, invoke_context: InvokeContext,
            input_data: List[ConsumeFromTopicEvent]) -> Messages:
     # Node processing logic
     return processed_messages
@@ -163,7 +163,7 @@ Records asynchronous node invocations that return async generators.
 from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
 
 @record_node_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext, 
+async def a_invoke(self, invoke_context: InvokeContext,
                    input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
     # Async node processing
     yield processed_messages

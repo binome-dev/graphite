@@ -62,9 +62,6 @@ class GeminiTool(LLM):
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
     model: str = Field(default="gemini-2.0-flash-lite")
 
-    # Any key‑value pairs you want to pass straight through to the SDK
-    chat_params: Dict[str, Any] = Field(default_factory=dict)
-
     @classmethod
     def builder(cls) -> "GeminiToolBuilder":
         """

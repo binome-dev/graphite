@@ -42,6 +42,7 @@ class TestAssistant:
         """Create a mock Assistant instance."""
         with patch.object(Assistant, "_construct_workflow"):
             assistant = Assistant(
+                assistant_id="test_id",
                 name="test_assistant",
                 type="test_type",
                 oi_span_type=OpenInferenceSpanKindValues.AGENT,
@@ -224,7 +225,15 @@ class TestAssistant:
         """Test successful to_dict method."""
         result = mock_assistant.to_dict()
 
-        assert result == {"workflow": "data"}
+        assert result == {
+            "assistant_id": "test_id",
+            "name": "test_assistant",
+            "oi_span_type": "AGENT",
+            "type": "test_type",
+            "workflow": {
+                "workflow": "data",
+            },
+        }
         mock_assistant.workflow.to_dict.assert_called_once()
 
     def test_to_dict_workflow_exception_propagated(self, mock_assistant):
@@ -255,7 +264,15 @@ class TestAssistant:
         with open(expected_path, "r") as f:
             manifest_data = json.load(f)
 
-        assert manifest_data == {"workflow": "data"}
+        assert manifest_data == {
+            "assistant_id": "test_id",
+            "name": "test_assistant",
+            "oi_span_type": "AGENT",
+            "type": "test_type",
+            "workflow": {
+                "workflow": "data",
+            },
+        }
         mock_assistant.workflow.to_dict.assert_called()
 
     def test_generate_manifest_with_default_directory(self, mock_assistant):
@@ -269,7 +286,18 @@ class TestAssistant:
                 mock_open.assert_called_once_with(expected_path, "w")
 
                 # Verify JSON serialization
-                mock_dumps.assert_called_once_with({"workflow": "data"}, indent=4)
+                mock_dumps.assert_called_once_with(
+                    {
+                        "assistant_id": "test_id",
+                        "name": "test_assistant",
+                        "oi_span_type": "AGENT",
+                        "type": "test_type",
+                        "workflow": {
+                            "workflow": "data",
+                        },
+                    },
+                    indent=4,
+                )
 
     def test_generate_manifest_custom_directory(self, mock_assistant, tmp_path):
         """Test manifest generation with custom directory."""
@@ -284,7 +312,15 @@ class TestAssistant:
         with open(expected_path, "r") as f:
             manifest_data = json.load(f)
 
-        assert manifest_data == {"workflow": "data"}
+        assert manifest_data == {
+            "assistant_id": "test_id",
+            "name": "test_assistant",
+            "oi_span_type": "AGENT",
+            "type": "test_type",
+            "workflow": {
+                "workflow": "data",
+            },
+        }
 
     def test_generate_manifest_file_write_error(self, mock_assistant):
         """Test manifest generation with file write error."""
@@ -306,7 +342,9 @@ class TestAssistant:
     ):
         """Test full integration with real workflow calls."""
         with patch.object(Assistant, "_construct_workflow"):
-            assistant = Assistant(name="integration_test", workflow=mock_workflow)
+            assistant = Assistant(
+                assistant_id="test_id", name="integration_test", workflow=mock_workflow
+            )
 
             # Test synchronous invoke
             sync_result = assistant.invoke(invoke_context, input_messages)
@@ -315,7 +353,15 @@ class TestAssistant:
 
             # Test to_dict
             dict_result = assistant.to_dict()
-            assert dict_result == {"workflow": "data"}
+            assert dict_result == {
+                "assistant_id": "test_id",
+                "name": "integration_test",
+                "oi_span_type": "AGENT",
+                "type": "assistant",
+                "workflow": {
+                    "workflow": "data",
+                },
+            }
 
     @pytest.mark.asyncio
     async def test_full_async_workflow_integration(

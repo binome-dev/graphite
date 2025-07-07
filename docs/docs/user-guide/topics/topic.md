@@ -277,7 +277,7 @@ def test_topic_publishing():
     # Create test topic
     topic = Topic(name="test_topic")
     messages = [Message(role="user", content="test")]
-    
+
     # Test successful publishing
     event = topic.publish_data(
         invoke_context=InvokeContext(),
@@ -286,7 +286,7 @@ def test_topic_publishing():
         data=messages,
         consumed_events=[]
     )
-    
+
     assert event is not None
     assert len(topic.topic_events) == 1
 
@@ -296,7 +296,7 @@ def test_condition_filtering():
         .name("filtered_topic")
         .condition(lambda msgs: len(msgs) > 1)
         .build())
-    
+
     # Test with single message (should be filtered)
     single_message = [Message(role="user", content="test")]
     event = topic.publish_data(
@@ -306,7 +306,7 @@ def test_condition_filtering():
         data=single_message,
         consumed_events=[]
     )
-    
+
     assert event is None
     assert len(topic.topic_events) == 0
 ```

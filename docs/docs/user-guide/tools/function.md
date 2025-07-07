@@ -76,7 +76,7 @@ class ProcessResult(BaseModel):
 def my_custom_function(messages: Messages) -> ProcessResult:
     # Process the input messages
     content = messages[0].content if messages else ""
-    
+
     return ProcessResult(
         status="processed",
         data={"input_length": len(content)}

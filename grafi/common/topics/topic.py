@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Callable
 from typing import List
 from typing import Optional
@@ -10,7 +11,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
@@ -22,8 +22,6 @@ class Topic(TopicBase):
     """
     Represents a topic in a message queue system.
     """
-
-    topic_events: List[TopicEvent] = []
 
     publish_event_handler: Optional[Callable[[PublishToTopicEvent], None]] = Field(
         default=None
@@ -69,6 +67,14 @@ class Topic(TopicBase):
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the topic to a dictionary.
+        """
+        return {
+            **super().to_dict(),
+        }
 
 
 class TopicBuilder(TopicBaseBuilder[Topic]):

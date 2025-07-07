@@ -228,10 +228,7 @@ class OllamaTool(LLM):
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
             "api_url": self.api_url,
-            "model": self.model,
         }
 
 

@@ -113,9 +113,6 @@ class TopicBase(BaseModel):
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             self.consumption_offsets[topic_event.consumer_name] = topic_event.offset + 1
 
-    def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "condition": self.serialize_callable()}
-
     def serialize_callable(self) -> dict:
         """
         Serialize the condition field. If it's a function, return the function name.
@@ -142,6 +139,12 @@ class TopicBase(BaseModel):
                     "class_name": self.condition.__class__.__name__,
                 }
         return {"type": "unknown"}
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the topic to a dictionary representation.
+        """
+        return {"name": self.name, "condition": self.serialize_callable()}
 
 
 T_T = TypeVar("T_T", bound=TopicBase)

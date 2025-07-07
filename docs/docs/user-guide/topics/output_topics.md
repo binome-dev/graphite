@@ -143,7 +143,7 @@ async def streaming_response() -> AsyncIterator[Messages]:
         [Message(role="assistant", content="The answer is 42.")],
         [Message(role="assistant", content="Is there anything else?")]
     ]
-    
+
     for response in responses:
         await asyncio.sleep(0.1)  # Simulate processing delay
         yield response
@@ -169,7 +169,7 @@ async def consume_output_events():
         print(f"Received event: {event.event_id}")
         for message in event.data:
             print(f"Content: {message.content}")
-        
+
         # Process the event
         await process_output_event(event)
 
@@ -190,7 +190,7 @@ async def managed_streaming():
         publisher_name="stream1",
         publisher_type="generator"
     )
-    
+
     agent_output_topic.add_generator(
         generator=stream2(),
         data=initial_data2,
@@ -198,10 +198,10 @@ async def managed_streaming():
         publisher_name="stream2",
         publisher_type="generator"
     )
-    
+
     # Wait for all generators to complete
     await agent_output_topic.wait_for_completion()
-    
+
     print("All generators completed")
 ```
 
@@ -252,11 +252,11 @@ else:
 class HumanApprovalWorkflow:
     def __init__(self):
         self.pending_approvals = {}
-        
+
         # Set up event handlers
         human_request_topic.publish_to_human_event_handler = self.handle_human_request
         human_request_topic.publish_event_handler = self.handle_user_response
-    
+
     def handle_human_request(self, event: OutputTopicEvent):
         """Handle requests sent to human."""
         self.pending_approvals[event.event_id] = {
@@ -265,7 +265,7 @@ class HumanApprovalWorkflow:
             "timestamp": event.timestamp
         }
         print(f"Approval request sent: {event.event_id}")
-    
+
     def handle_user_response(self, event: PublishToTopicEvent):
         """Handle user responses."""
         # Find the original request
@@ -275,14 +275,14 @@ class HumanApprovalWorkflow:
                 approval["response"] = event
                 print(f"User responded to: {approval_id}")
                 break
-    
+
     async def request_approval(self, document: str) -> bool:
         """Request human approval for a document."""
         approval_message = [Message(
-            role="assistant", 
+            role="assistant",
             content=f"Please approve this document: {document}"
         )]
-        
+
         event = human_request_topic.publish_data(
             invoke_context=InvokeContext(),
             publisher_name="approval_system",
@@ -290,14 +290,14 @@ class HumanApprovalWorkflow:
             data=approval_message,
             consumed_events=[]
         )
-        
+
         # Wait for response (simplified)
         while True:
             approval = self.pending_approvals.get(event.event_id)
             if approval and approval["status"] == "responded":
                 response_content = approval["response"].data[0].content
                 return "approve" in response_content.lower()
-            
+
             await asyncio.sleep(1)  # Poll for response
 ```
 
@@ -330,7 +330,7 @@ class HumanApprovalWorkflow:
 async def test_output_topic():
     """Test output topic functionality."""
     topic = OutputTopic(name="test_output")
-    
+
     # Test basic publishing
     messages = [Message(role="assistant", content="test")]
     event = topic.publish_data(
@@ -340,15 +340,15 @@ async def test_output_topic():
         data=messages,
         consumed_events=[]
     )
-    
+
     assert event is not None
     assert len(topic.topic_events) == 1
-    
+
     # Test generator addition
     async def test_generator():
         yield [Message(role="assistant", content="stream1")]
         yield [Message(role="assistant", content="stream2")]
-    
+
     topic.add_generator(
         generator=test_generator(),
         data=[],
@@ -356,14 +356,14 @@ async def test_output_topic():
         publisher_name="test_gen",
         publisher_type="test"
     )
-    
+
     # Collect events
     events = []
     async for event in topic.get_events():
         events.append(event)
-    
+
     assert len(events) >= 2  # At least 2 streaming events
-    
+
     # Clean up
     topic.reset()
     assert len(topic.active_generators) == 0
@@ -371,7 +371,7 @@ async def test_output_topic():
 def test_human_request_topic():
     """Test human request topic functionality."""
     topic = HumanRequestTopic(name="test_human")
-    
+
     # Test publishing to human
     messages = [Message(role="assistant", content="Please help")]
     event = topic.publish_data(
@@ -381,19 +381,19 @@ def test_human_request_topic():
         data=messages,
         consumed_events=[]
     )
-    
+
     assert event is not None
-    
+
     # Test user input appending
     user_input = [Message(role="user", content="Sure, I'll help")]
-    
+
     assert topic.can_append_user_input("user1", event)
-    
+
     user_event = topic.append_user_input(
         user_input_event=event,
         data=user_input
     )
-    
+
     assert user_event is not None
     assert len(topic.topic_events) == 2
 ```

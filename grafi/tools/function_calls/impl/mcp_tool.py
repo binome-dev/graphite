@@ -177,6 +177,14 @@ class MCPTool(FunctionCallTool):
         async with Client(self.mcp_config) as client:
             return await client.read_resource(uri)
 
+    def to_dict(self):
+        return {
+            **super().to_dict(),
+            "mcp_config": self.mcp_config,
+            "resources": [resource.model_dump_json() for resource in self.resources],
+            "prompts": [prompt.model_dump_json() for prompt in self.prompts],
+        }
+
 
 class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     """

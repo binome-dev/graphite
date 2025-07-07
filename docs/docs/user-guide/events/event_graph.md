@@ -115,12 +115,12 @@ graph TB
         A[Consume Event A<br/>Topic: input<br/>Offset: 1] --> B[Publish Event B<br/>Topic: processing<br/>Offset: 1]
         B --> C[Consume Event C<br/>Topic: processing<br/>Offset: 1]
         C --> D[Publish Event D<br/>Topic: output<br/>Offset: 1]
-        
+
         E[Consume Event E<br/>Topic: input<br/>Offset: 2] --> F[Publish Event F<br/>Topic: processing<br/>Offset: 2]
         F --> G[Consume Event G<br/>Topic: processing<br/>Offset: 2]
         G --> D
     end
-    
+
     style A fill:#e1f5fe
     style E fill:#e1f5fe
     style D fill:#e8f5e8
@@ -170,7 +170,7 @@ min_heap: List[tuple] = []
 for node in self.nodes.values():
     if in_degree[node.event_id] == 0:
         heapq.heappush(
-            min_heap, 
+            min_heap,
             (-node.event.timestamp.timestamp(), node.event_id)
         )
 ```
@@ -201,7 +201,7 @@ gantt
     title Event Processing Timeline
     dateFormat X
     axisFormat %s
-    
+
     section Processing Order
     Event A (t=100) :done, a, 0, 1
     Event E (t=150) :done, e, 1, 2
@@ -241,7 +241,7 @@ sorted_events = graph.get_topology_sorted_events()
 def replay_events_in_order(graph: EventGraph):
     """Replay events in proper causal order."""
     sorted_events = graph.get_topology_sorted_events()
-    
+
     for node in sorted_events:
         event = node.event
         print(f"Replaying event {event.event_id} at {event.timestamp}")
@@ -255,9 +255,9 @@ def analyze_event_dependencies(graph: EventGraph, event_id: str):
     """Analyze dependencies for a specific event."""
     if event_id not in graph.nodes:
         return None
-    
+
     node = graph.nodes[event_id]
-    
+
     return {
         "event_id": event_id,
         "upstream_count": len(node.upstream_events),
@@ -273,7 +273,7 @@ def analyze_event_dependencies(graph: EventGraph, event_id: str):
 def find_root_causes(graph: EventGraph):
     """Find all events that started processing chains."""
     root_nodes = graph.get_root_event_nodes()
-    
+
     return [
         {
             "event_id": node.event_id,
@@ -298,7 +298,7 @@ graph LR
         D --> E[Output Generation]
         E --> F[Response Delivery]
     end
-    
+
     subgraph "Event Graph Representation"
         A1[ConsumeEvent A] --> B1[PublishEvent B]
         B1 --> C1[ConsumeEvent C]
@@ -315,29 +315,29 @@ def identify_parallel_opportunities(graph: EventGraph):
     """Identify events that can be processed in parallel."""
     sorted_events = graph.get_topology_sorted_events()
     parallel_groups = []
-    
+
     current_level = []
     processed_dependencies = set()
-    
+
     for node in sorted_events:
         # Check if all dependencies are satisfied
         dependencies_satisfied = all(
-            dep_id in processed_dependencies 
+            dep_id in processed_dependencies
             for dep_id in node.upstream_events
         )
-        
+
         if dependencies_satisfied:
             current_level.append(node.event_id)
         else:
             if current_level:
                 parallel_groups.append(current_level)
                 current_level = [node.event_id]
-        
+
         processed_dependencies.add(node.event_id)
-    
+
     if current_level:
         parallel_groups.append(current_level)
-    
+
     return parallel_groups
 ```
 
@@ -347,28 +347,28 @@ def identify_parallel_opportunities(graph: EventGraph):
 def validate_event_graph(graph: EventGraph):
     """Validate the integrity of the event graph."""
     issues = []
-    
+
     # Check for cycles
     sorted_events = graph.get_topology_sorted_events()
     if len(sorted_events) != len(graph.nodes):
         issues.append("Graph contains cycles")
-    
+
     # Check for orphaned nodes
     referenced_nodes = set()
     for node in graph.nodes.values():
         referenced_nodes.update(node.upstream_events)
         referenced_nodes.update(node.downstream_events)
-    
+
     orphaned = set(graph.nodes.keys()) - referenced_nodes - {node.event_id for node in graph.root_nodes}
     if orphaned:
         issues.append(f"Orphaned nodes found: {orphaned}")
-    
+
     # Check for consistency
     for node in graph.nodes.values():
         for upstream_id in node.upstream_events:
             if upstream_id not in graph.nodes:
                 issues.append(f"Node {node.event_id} references non-existent upstream {upstream_id}")
-    
+
     return issues
 ```
 
@@ -399,13 +399,13 @@ graph = EventGraph.from_dict(graph_data)
 def save_graph_to_event_store(graph: EventGraph, event_store: EventStore):
     """Save event graph analysis as a special event."""
     from grafi.common.events.topic_events.topic_event import TopicEvent
-    
+
     graph_event = TopicEvent(
         topic_name="event_graph_analysis",
         offset=0,
         data=graph.to_dict()
     )
-    
+
     event_store.record_event(graph_event)
 ```
 
@@ -429,7 +429,7 @@ def optimize_graph_memory(graph: EventGraph):
     for node in graph.nodes.values():
         if not_needed_downstream():
             node.downstream_events.clear()
-    
+
     # Implement node pooling for frequent operations
     # Consider lazy loading for large graphs
 ```
@@ -480,7 +480,7 @@ def debug_graph_structure(graph: EventGraph):
     """Print detailed graph structure for debugging."""
     print(f"Graph contains {len(graph.nodes)} nodes")
     print(f"Root nodes: {len(graph.root_nodes)}")
-    
+
     for node in graph.nodes.values():
         print(f"Node {node.event_id}:")
         print(f"  Upstream: {node.upstream_events}")

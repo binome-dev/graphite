@@ -56,7 +56,11 @@ class LLM(Tool):
         return {
             **super().to_dict(),
             "system_message": self.system_message,
-            "oi_span_type": self.oi_span_type.value,
+            "api_key": "****************",
+            "model": self.model,
+            "chat_params": self.chat_params,
+            "is_streaming": self.is_streaming,
+            "structured_output": self.structured_output,
         }
 
 

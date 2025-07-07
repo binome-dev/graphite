@@ -55,8 +55,6 @@ class ClaudeTool(LLM):
     max_tokens: int = Field(default=4096)
     model: str = Field(default="claude-3-5-haiku-20241022")  # or haiku, opus…
 
-    chat_params: Dict[str, Any] = Field(default_factory=dict)
-
     @classmethod
     def builder(cls) -> "ClaudeToolBuilder":
         """
@@ -199,10 +197,7 @@ class ClaudeTool(LLM):
     def to_dict(self) -> Dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
+            "max_tokens": self.max_tokens,
         }
 
 

@@ -119,6 +119,9 @@ class HumanRequestTopic(TopicBase):
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
 
+    def to_dict(self):
+        return {**super().to_dict()}
+
 
 class HumanRequestTopicBuilder(TopicBaseBuilder[HumanRequestTopic]):
     """

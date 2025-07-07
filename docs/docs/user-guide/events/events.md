@@ -374,7 +374,7 @@ reconstructed_event = ToolInvokeEvent.from_dict(event_dict)
 def handle_tool_event(event: ToolEvent):
     """Handle any tool-related event."""
     print(f"Tool {event.tool_name} event: {event.event_type}")
-    
+
     if isinstance(event, ToolInvokeEvent):
         print(f"Tool invoked with {len(event.input_data)} messages")
     elif isinstance(event, ToolRespondEvent):
@@ -389,7 +389,7 @@ def handle_tool_event(event: ToolEvent):
 def handle_topic_event(event: TopicEvent):
     """Handle topic-related events."""
     print(f"Topic {event.topic_name} at offset {event.offset}")
-    
+
     if isinstance(event, PublishToTopicEvent):
         print(f"Published by {event.publisher_name} ({event.publisher_type})")
         print(f"Consumed events: {event.consumed_event_ids}")
@@ -416,7 +416,7 @@ Each event type includes structured context information:
 # Assistant events include:
 {
     "assistant_id": "asst_123",
-    "assistant_name": "Chat Assistant", 
+    "assistant_name": "Chat Assistant",
     "assistant_type": "ConversationalAssistant",
     "invoke_context": {...}
 }
@@ -425,7 +425,7 @@ Each event type includes structured context information:
 {
     "tool_id": "tool_456",
     "tool_name": "OpenAI Tool",
-    "tool_type": "LLMTool", 
+    "tool_type": "LLMTool",
     "invoke_context": {...}
 }
 

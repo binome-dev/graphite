@@ -96,10 +96,5 @@ class Node(NodeBase):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "node_id": self.node_id,
-            "subscribed_expressions": [
-                expr.to_dict() for expr in self.subscribed_expressions
-            ],
-            "publish_to": [topic.to_dict() for topic in self.publish_to],
-            "command": self.command.to_dict() if self.command else None,
+            **super().to_dict(),
         }

@@ -56,27 +56,27 @@ The `Command` base class provides the foundational interface:
 ```python
 class Command(BaseModel):
     """Base command class for tool execution."""
-    
+
     tool: Tool
 
-    def invoke(self, invoke_context: InvokeContext, 
+    def invoke(self, invoke_context: InvokeContext,
                input_data: List[ConsumeFromTopicEvent]) -> Messages:
         """Synchronous tool invocation."""
         return self.tool.invoke(
-            invoke_context, 
+            invoke_context,
             self.get_tool_input(invoke_context, input_data)
         )
 
-    async def a_invoke(self, invoke_context: InvokeContext, 
+    async def a_invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         """Asynchronous tool invocation."""
         async for message in self.tool.a_invoke(
-            invoke_context, 
+            invoke_context,
             self.get_tool_input(invoke_context, input_data)
         ):
             yield message
 
-    def get_tool_input(self, invoke_context: InvokeContext, 
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         """Transform topic events into tool input format."""
         all_messages = []
@@ -144,21 +144,21 @@ The `FunctionCallCommand` processes tool call messages for function execution, e
 **Data Processing Logic**:
 
 ```python
-def get_tool_input(self, _: InvokeContext, 
+def get_tool_input(self, _: InvokeContext,
                    node_input: List[ConsumeFromTopicEvent]) -> Messages:
     # Extract all input messages from events
     input_messages = [msg for event in node_input for msg in event.data]
-    
+
     # Find already processed tool calls
     processed_tool_calls = [msg.tool_call_id for msg in input_messages if msg.tool_call_id]
-    
+
     # Return only unprocessed tool call messages
     tool_calls_messages = []
     for message in input_messages:
-        if (message.tool_calls and 
+        if (message.tool_calls and
             message.tool_calls[0].id not in processed_tool_calls):
             tool_calls_messages.append(message)
-    
+
     return tool_calls_messages
 ```
 
@@ -178,7 +178,7 @@ The `EmbeddingResponseCommand` is used in test integrations for embedding-based 
 
 ```python
 class EmbeddingResponseCommand(Command):
-    def get_tool_input(self, invoke_context: InvokeContext, 
+    def get_tool_input(self, invoke_context: InvokeContext,
                        node_input: List[ConsumeFromTopicEvent]) -> Messages:
         # Only consider the last message contains the content to query
         latest_event_data = node_input[-1].data
@@ -201,7 +201,7 @@ The `RagResponseCommand` is used in test integrations for retrieval-augmented ge
 
 ```python
 class RagResponseCommand(Command):
-    def get_tool_input(self, invoke_context: InvokeContext, 
+    def get_tool_input(self, invoke_context: InvokeContext,
                        node_input: List[ConsumeFromTopicEvent]) -> Messages:
         # Only consider the last message contains the content to query
         latest_event_data = node_input[-1].data
@@ -278,7 +278,7 @@ class MySpecialTool(Tool):
     pass
 
 class MyCustomCommand(Command):
-    def get_tool_input(self, invoke_context: InvokeContext, 
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         # Custom data transformation logic
         return transformed_messages
@@ -325,8 +325,8 @@ from grafi.common.models.message import Messages
 
 class DatabaseQueryCommand(Command):
     """Command for database query tools with caching and optimization."""
-    
-    def get_tool_input(self, invoke_context: InvokeContext, 
+
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         # Extract query parameters from messages
         query_messages = []
@@ -334,13 +334,13 @@ class DatabaseQueryCommand(Command):
             for message in event.data:
                 if message.content and "query:" in message.content:
                     query_messages.append(message)
-        
+
         # Add context-specific optimizations
         if invoke_context.metadata.get("use_cache"):
             query_messages = self._add_cache_hints(query_messages)
-        
+
         return query_messages
-    
+
     def _add_cache_hints(self, messages: Messages) -> Messages:
         """Add caching hints to query messages."""
         # Custom caching logic
@@ -353,7 +353,7 @@ class DatabaseQueryCommand(Command):
 @use_command(DatabaseQueryCommand)
 class DatabaseQueryTool(Tool):
     """Tool for executing database queries."""
-    
+
     def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         # Database query implementation
         pass
@@ -364,30 +364,30 @@ class DatabaseQueryTool(Tool):
 ```python
 class MultiSourceCommand(Command):
     """Command that aggregates data from multiple sources."""
-    
-    def get_tool_input(self, invoke_context: InvokeContext, 
+
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         # 1. Get base messages from topic events
         base_messages = super().get_tool_input(invoke_context, input_data)
-        
+
         # 2. Retrieve external context
         external_data = self._get_external_context(invoke_context)
-        
+
         # 3. Combine and optimize
         combined_messages = self._combine_data_sources(
-            base_messages, 
-            external_data, 
+            base_messages,
+            external_data,
             invoke_context
         )
-        
+
         return combined_messages
-    
+
     def _get_external_context(self, invoke_context: InvokeContext) -> Messages:
         """Retrieve additional context from external sources."""
         # Fetch from databases, APIs, files, etc.
         return external_messages
-    
-    def _combine_data_sources(self, base: Messages, external: Messages, 
+
+    def _combine_data_sources(self, base: Messages, external: Messages,
                               context: InvokeContext) -> Messages:
         """Intelligently combine multiple data sources."""
         # Custom combination logic
@@ -401,8 +401,8 @@ class MultiSourceCommand(Command):
 ```python
 class ConditionalCommand(Command):
     """Command that adapts behavior based on context."""
-    
-    def get_tool_input(self, invoke_context: InvokeContext, 
+
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         if invoke_context.metadata.get("mode") == "streaming":
             return self._prepare_streaming_input(input_data)
@@ -417,23 +417,23 @@ class ConditionalCommand(Command):
 ```python
 class StatefulCommand(Command):
     """Command that maintains state across invocations."""
-    
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._state_cache = {}
-    
-    def get_tool_input(self, invoke_context: InvokeContext, 
+
+    def get_tool_input(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> Messages:
         request_id = invoke_context.assistant_request_id
-        
+
         # Use cached state if available
         if request_id in self._state_cache:
             return self._update_with_cache(input_data, self._state_cache[request_id])
-        
+
         # Create new state entry
         processed_data = self._process_fresh_input(input_data)
         self._state_cache[request_id] = processed_data
-        
+
         return processed_data
 ```
 
@@ -442,12 +442,12 @@ class StatefulCommand(Command):
 ```python
 class ResilientCommand(Command):
     """Command with built-in error recovery."""
-    
-    async def a_invoke(self, invoke_context: InvokeContext, 
+
+    async def a_invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         max_retries = 3
         retry_count = 0
-        
+
         while retry_count < max_retries:
             try:
                 tool_input = self.get_tool_input(invoke_context, input_data)
@@ -504,20 +504,20 @@ class SpecialCommand(Command): pass
 Always consider edge cases in data preparation:
 
 ```python
-def get_tool_input(self, invoke_context: InvokeContext, 
+def get_tool_input(self, invoke_context: InvokeContext,
                    input_data: List[ConsumeFromTopicEvent]) -> Messages:
     if not input_data:
         return []  # Handle empty input
-    
+
     messages = []
     for event in input_data:
         if not event.data:
             continue  # Skip empty events
-        
+
         # Validate message format
         valid_messages = [msg for msg in event.data if self._is_valid_message(msg)]
         messages.extend(valid_messages)
-    
+
     return messages if messages else [Message(role="system", content="No valid input")]
 ```
 
@@ -526,21 +526,21 @@ def get_tool_input(self, invoke_context: InvokeContext,
 Use clear documentation for complex data transformations:
 
 ```python
-def get_tool_input(self, invoke_context: InvokeContext, 
+def get_tool_input(self, invoke_context: InvokeContext,
                    input_data: List[ConsumeFromTopicEvent]) -> Messages:
     """
     Prepare LLM input with proper tool call ordering.
-    
+
     Process:
     1. Retrieve conversation history excluding current request
     2. Process current topic events in topological order
     3. Ensure tool call messages immediately follow LLM tool calls
     4. Sort all messages by timestamp
-    
+
     Args:
         invoke_context: Current invocation context
         input_data: Topic events from workflow
-        
+
     Returns:
         Properly ordered messages for LLM consumption
     """
@@ -554,7 +554,7 @@ Commands integrate seamlessly with Graphite's event-driven workflows:
 ```python
 # In a Node
 @record_node_invoke
-def invoke(self, invoke_context: InvokeContext, 
+def invoke(self, invoke_context: InvokeContext,
            node_input: List[ConsumeFromTopicEvent]) -> Messages:
     # Command automatically handles data transformation
     response = self.command.invoke(invoke_context, node_input)

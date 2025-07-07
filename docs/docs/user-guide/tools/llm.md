@@ -190,19 +190,19 @@ from grafi.tools.llms.llm import LLM, LLMBuilder
 class CustomLLM(LLM):
     name: str = Field(default="CustomLLM")
     type: str = Field(default="CustomLLM")
-    
+
     @classmethod
     def builder(cls) -> "CustomLLMBuilder":
         return CustomLLMBuilder(cls)
-    
+
     def prepare_api_input(self, input_data: Messages) -> Any:
         # Convert Messages to provider-specific format
         pass
-    
+
     def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         # Synchronous API call implementation
         pass
-    
+
     async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         # Asynchronous API call implementation
         pass

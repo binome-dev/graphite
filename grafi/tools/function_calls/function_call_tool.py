@@ -188,9 +188,7 @@ class FunctionCallTool(Tool):
             Dict[str, Any]: A dictionary representation of the tool.
         """
         return {
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
+            **super().to_dict(),
             "function_specs": [spec.model_dump() for spec in self.function_specs],
             "function": list(self.functions.keys()),
         }

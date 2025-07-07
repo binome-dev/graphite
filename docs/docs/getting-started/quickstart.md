@@ -79,24 +79,24 @@ def main():
     print("ReAct Agent Chat Interface")
     print("Type your questions and press Enter. Type '/bye' to exit.")
     print("-" * 50)
-    
+
     react_agent = create_react_agent()
 
     while True:
         user_input = input("\nYou: ").strip()
-        
+
         if user_input.lower() == '/bye':
             print("Goodbye!")
             break
-        
+
         if not user_input:
             continue
-        
+
         try:
             # Get synchronized response from agent
             output = react_agent.run(user_input)
             print(f"\nAgent: {output}")
-            
+
         except Exception as e:
             print(f"Error: {e}")
 
@@ -133,7 +133,7 @@ ReAct Agent Chat Interface
 Type your questions and press Enter. Type '/bye' to exit.
 --------------------------------------------------
 
-You: Hi, what is agent framework called Graphite? 
+You: Hi, what is agent framework called Graphite?
 
 <... logs>
 

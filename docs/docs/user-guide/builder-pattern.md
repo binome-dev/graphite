@@ -62,7 +62,7 @@ from pydantic import BaseModel, Field
 
 class DatabaseConnection(BaseModel):
     """Database connection configuration."""
-    
+
     host: str
     port: int = Field(default=5432)
     database: str
@@ -122,7 +122,7 @@ from pydantic import BaseModel, Field
 
 class DatabaseConnection(BaseModel):
     """Database connection configuration."""
-    
+
     host: str
     port: int = Field(default=5432)
     database: str
@@ -239,7 +239,7 @@ class MyComponent(BaseModel):
 
 ### 2. Validation in build()
 
-Perform validation in the `build()` method if have to, pydantic will validate the required fields. 
+Perform validation in the `build()` method if have to, pydantic will validate the required fields.
 
 ```python
 def build(self) -> MyComponent:
@@ -247,11 +247,11 @@ def build(self) -> MyComponent:
     # Validate required fields
     if "name" not in self.kwargs:
         raise ValueError("name is required")
-    
+
     # Validate business rules
     if self.kwargs.get("value", 0) < 0:
         raise ValueError("value must be non-negative")
-    
+
     return super().build()
 ```
 
@@ -276,7 +276,7 @@ Provide clear, actionable error messages:
 def build(self) -> MyComponent:
     if "host" not in self.kwargs:
         raise ValueError("host is required. Use .host('hostname') to set it.")
-    
+
     if self.kwargs.get("port", 0) <= 0:
         raise ValueError("port must be positive. Use .port(8080) to set a valid port.")
 ```

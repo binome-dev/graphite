@@ -121,7 +121,7 @@ from grafi.tools.tool import ToolBuilder
 
 class MyCustomToolBuilder(ToolBuilder[MyCustomTool]):
     """Builder for MyCustomTool instances."""
-    
+
     def custom_parameter(self, value: str) -> Self:
         self.kwargs["custom_parameter"] = value
         return self
@@ -151,38 +151,38 @@ from grafi.common.models.message import Message, Messages, MsgsAGen
 
 class TextProcessorTool(Tool):
     """A tool for processing text data."""
-    
+
     name: str = Field(default="TextProcessorTool")
     type: str = Field(default="TextProcessorTool")
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-    
+
     # Tool-specific configuration
     operation: str = Field(default="uppercase")
     prefix: str = Field(default="")
-    
+
     @classmethod
     def builder(cls) -> "TextProcessorToolBuilder":
         return TextProcessorToolBuilder(cls)
-    
+
     def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         """Process text synchronously."""
         if not input_data:
             return []
-        
+
         content = input_data[0].content or ""
         processed = self._process_text(content)
         return self.to_messages(processed)
-    
+
     async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         """Process text asynchronously."""
         if not input_data:
             yield []
             return
-        
+
         content = input_data[0].content or ""
         processed = self._process_text(content)
         yield self.to_messages(processed)
-    
+
     def _process_text(self, text: str) -> str:
         """Internal text processing logic."""
         if self.operation == "uppercase":
@@ -191,13 +191,13 @@ class TextProcessorTool(Tool):
             result = text.lower()
         else:
             result = text
-        
+
         return f"{self.prefix}{result}"
-    
+
     def to_messages(self, response: str) -> Messages:
         """Convert processed text to Messages."""
         return [Message(role="assistant", content=response)]
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize tool configuration."""
         return {
@@ -210,11 +210,11 @@ class TextProcessorTool(Tool):
 
 class TextProcessorToolBuilder(ToolBuilder[TextProcessorTool]):
     """Builder for TextProcessorTool instances."""
-    
+
     def operation(self, operation: str) -> Self:
         self.kwargs["operation"] = operation
         return self
-    
+
     def prefix(self, prefix: str) -> Self:
         self.kwargs["prefix"] = prefix
         return self
@@ -258,7 +258,7 @@ oi_span_type = OpenInferenceSpanKindValues.EMBEDDING
 ```python
 class MyTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
@@ -354,9 +354,9 @@ def test_tool_invoke():
     tool = MyCustomTool()
     context = InvokeContext()
     input_messages = [Message(role="user", content="test input")]
-    
+
     result = tool.invoke(context, input_messages)
-    
+
     assert len(result) > 0
     assert result[0].content is not None
 
@@ -365,11 +365,11 @@ async def test_tool_a_invoke():
     tool = MyCustomTool()
     context = InvokeContext()
     input_messages = [Message(role="user", content="test input")]
-    
+
     results = []
     async for batch in tool.a_invoke(context, input_messages):
         results.extend(batch)
-    
+
     assert len(results) > 0
 ```
 

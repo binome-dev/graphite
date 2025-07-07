@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -78,6 +79,21 @@ class NodeBase(BaseModel):
         """
         yield []
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "class": self.__class__.__name__,
+            "node_id": self.node_id,
+            "name": self.name,
+            "type": self.type,
+            "oi_span_type": self.oi_span_type.value,
+            "tool": self.tool.to_dict() if self.tool else None,
+            "subscribed_expressions": [
+                expr.to_dict() for expr in self.subscribed_expressions
+            ],
+            "publish_to": [topic.to_dict() for topic in self.publish_to],
+            "command": self.command.to_dict() if self.command else None,
+        }
 
 
 T_N = TypeVar("T_N", bound=NodeBase)
