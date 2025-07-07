@@ -77,13 +77,13 @@ request_events = event_store.get_agent_events("req_123")
 class EventStoreInMemory(EventStore):
     def __init__(self) -> None:
         self.events = []
-    
+
     def record_event(self, event: Event) -> None:
         self.events.append(event)
-    
+
     def get_events(self) -> List[Event]:
         return self.events.copy()
-    
+
     def get_event(self, event_id: str) -> Optional[Event]:
         for event in self.events:
             if event.event_id == event_id:
@@ -191,7 +191,7 @@ event_dict = event.to_dict()
 # Produces:
 {
     "event_id": "evt_123",
-    "assistant_request_id": "req_456", 
+    "assistant_request_id": "req_456",
     "event_type": "ToolInvoke",
     "event_context": {...},
     "data": {...},
@@ -241,20 +241,20 @@ The event store supports all event types defined in the Graphite events system:
 class MyWorkflow:
     def __init__(self, event_store: EventStore):
         self.event_store = event_store
-    
+
     def process_request(self, request):
         # Record start event
         start_event = WorkflowInvokeEvent(...)
         self.event_store.record_event(start_event)
-        
+
         try:
             # Process request
             result = self.do_work(request)
-            
+
             # Record success event
             success_event = WorkflowRespondEvent(...)
             self.event_store.record_event(success_event)
-            
+
             return result
         except Exception as e:
             # Record failure event
@@ -269,11 +269,11 @@ class MyWorkflow:
 def rebuild_conversation_state(conversation_id: str, event_store: EventStore):
     """Rebuild conversation state from events."""
     events = event_store.get_conversation_events(conversation_id)
-    
+
     state = ConversationState()
     for event in sorted(events, key=lambda e: e.timestamp):
         state.apply_event(event)
-    
+
     return state
 ```
 
@@ -283,11 +283,11 @@ def rebuild_conversation_state(conversation_id: str, event_store: EventStore):
 def monitor_assistant_performance(assistant_request_id: str, event_store: EventStore):
     """Monitor assistant performance using events."""
     events = event_store.get_agent_events(assistant_request_id)
-    
+
     invoke_events = [e for e in events if isinstance(e, AssistantInvokeEvent)]
     respond_events = [e for e in events if isinstance(e, AssistantRespondEvent)]
     failed_events = [e for e in events if isinstance(e, AssistantFailedEvent)]
-    
+
     return {
         "total_requests": len(invoke_events),
         "successful_responses": len(respond_events),
@@ -324,7 +324,7 @@ event_store = EventStorePostgres(db_url)
 def create_event_store() -> EventStore:
     """Create event store based on environment."""
     env = os.getenv("ENVIRONMENT", "development")
-    
+
     if env == "production":
         db_url = os.getenv("DATABASE_URL")
         if not db_url:

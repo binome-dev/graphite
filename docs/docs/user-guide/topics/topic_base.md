@@ -115,10 +115,10 @@ def consume(self, consumer_name: str) -> List[PublishToTopicEvent]:
 
     # Get new events
     new_events = self.topic_events[already_consumed:]
-    
+
     # Update offset
     self.consumption_offsets[consumer_name] = total_published
-    
+
     return new_events
 ```
 

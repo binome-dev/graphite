@@ -54,8 +54,6 @@ class DeepseekTool(LLM):
     base_url: str = Field(default="https://api.deepseek.com")  # SDK will append /v1
     model: str = Field(default="deepseek-chat")  # or deepseek‑reasoner
 
-    chat_params: Dict[str, Any] = Field(default_factory=dict)
-
     @classmethod
     def builder(cls) -> "DeepseekToolBuilder":
         """
@@ -191,10 +189,6 @@ class DeepseekTool(LLM):
     def to_dict(self) -> Dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
             "base_url": self.base_url,
         }
 

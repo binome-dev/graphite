@@ -231,6 +231,9 @@ class OutputTopic(TopicBase):
         if self.active_generators:
             await asyncio.gather(*self.active_generators, return_exceptions=True)
 
+    def to_dict(self):
+        return {**super().to_dict()}
+
 
 class OutputTopicBuilder(TopicBaseBuilder[OutputTopic]):
     """

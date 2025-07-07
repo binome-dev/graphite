@@ -161,8 +161,6 @@ class AgentCallingTool(FunctionCallTool):
         """
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
             "agent_name": self.agent_name,
             "agent_description": self.agent_description,
             "argument_description": self.argument_description,

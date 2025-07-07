@@ -64,8 +64,6 @@ class DuckDuckGoTool(FunctionCallTool):
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
             "fixed_max_results": self.fixed_max_results,
             "headers": self.headers,
             "proxy": self.proxy,

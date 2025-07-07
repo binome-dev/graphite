@@ -310,23 +310,23 @@ def safe_subscription_build():
     """Example of proper error handling in subscription building."""
     try:
         builder = SubscriptionBuilder()
-        
+
         # This will raise ValueError if topic is not TopicBase
         expr = builder.subscribed_to("invalid_topic").build()
-        
+
     except ValueError as e:
         print(f"Invalid subscription: {e}")
         return None
-    
+
     try:
         builder = SubscriptionBuilder()
-        
+
         # This will raise ValueError - missing operator
         expr = (builder
             .subscribed_to(topic1)
             .subscribed_to(topic2)  # Missing .and_() or .or_()
             .build())
-        
+
     except ValueError as e:
         print(f"Invalid subscription chain: {e}")
         return None
@@ -375,30 +375,30 @@ def test_subscription_expression():
     # Create test topics
     topic1 = Topic(name="test1")
     topic2 = Topic(name="test2")
-    
+
     # Test AND expression
     and_expr = (SubscriptionBuilder()
         .subscribed_to(topic1)
         .and_()
         .subscribed_to(topic2)
         .build())
-    
+
     # Test with no messages
     assert not evaluate_subscription(and_expr, [])
-    
+
     # Test with one message
     assert not evaluate_subscription(and_expr, ["test1"])
-    
+
     # Test with both messages
     assert evaluate_subscription(and_expr, ["test1", "test2"])
-    
+
     # Test OR expression
     or_expr = (SubscriptionBuilder()
         .subscribed_to(topic1)
         .or_()
         .subscribed_to(topic2)
         .build())
-    
+
     # Test with one message
     assert evaluate_subscription(or_expr, ["test1"])
     assert evaluate_subscription(or_expr, ["test2"])

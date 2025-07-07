@@ -62,7 +62,9 @@ class Assistant(AssistantBase):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the workflow to a dictionary."""
-        return self.workflow.to_dict()
+        return {
+            **super().to_dict(),
+        }
 
     def generate_manifest(self, output_dir: str = ".") -> str:
         """

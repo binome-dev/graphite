@@ -82,10 +82,8 @@ class FunctionTool(Tool):
             Dict[str, Any]: A dictionary representation of the tool.
         """
         return {
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "function": self.function.__name__,
+            **super().to_dict(),
+            "function": self.function.__name__,  # will add functionality to serialize the function later
         }
 
 

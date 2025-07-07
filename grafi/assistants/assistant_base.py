@@ -57,6 +57,16 @@ class AssistantBase(BaseModel):
         """Invoke the assistant's workflow with the provided input data asynchronously."""
         raise NotImplementedError("Subclasses must implement 'a_invoke'.")
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert the assistant to a dictionary representation."""
+        return {
+            "assistant_id": self.assistant_id,
+            "name": self.name,
+            "type": self.type,
+            "oi_span_type": self.oi_span_type.value,
+            "workflow": self.workflow.to_dict(),
+        }
+
 
 T_A = TypeVar("T_A", bound=AssistantBase)
 

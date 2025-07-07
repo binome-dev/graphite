@@ -78,7 +78,11 @@ class Tool(BaseModel):
             Dict[str, Any]: A dictionary representation of the tool.
         """
         return {
+            "class": self.__class__.__name__,
             "tool_id": self.tool_id,
+            "name": self.name,
+            "type": self.type,
+            "oi_span_type": self.oi_span_type.value,
         }
 
 

@@ -615,10 +615,6 @@ class EventDrivenWorkflow(Workflow):
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "nodes": {name: node.to_dict() for name, node in self.nodes.items()},
             "topics": {name: topic.to_dict() for name, topic in self._topics.items()},
             "topic_nodes": self._topic_nodes,
         }

@@ -231,10 +231,6 @@ class OpenAITool(LLM):
         """
         return {
             **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
         }
 
 

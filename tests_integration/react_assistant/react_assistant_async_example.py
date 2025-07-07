@@ -5,14 +5,13 @@ import uuid
 from grafi.common.containers.container import container
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
+from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
 
 
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
-tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 observation_llm_system_message = """
 You are an AI assistant that records and reports the results obtained from invoked actions.
@@ -55,11 +54,9 @@ async def test_react_assistant_async() -> None:
         .action_llm_system_message(action_llm_system_message)
         .summary_llm_system_message(summary_llm_system_message)
         .search_tool(
-            TavilyTool.builder()
-            .name("TavilyTestTool")
-            .api_key(tavily_api_key)
-            .max_tokens(6000)
-            .search_depth("advanced")
+            GoogleSearchTool.builder()
+            .name("GoogleSearchTool")
+            .fixed_max_results(3)
             .build()
         )
         .build()
