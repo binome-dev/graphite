@@ -41,11 +41,11 @@ For better dependency management, it's recommended to install Graphite in a virt
 
 <!-- ```bash
 # Create a virtual environment
-python -m venv graphite-env
+python -m venv .venv
 
 # Activate the virtual environment
 # On Linux/macOS:
-source graphite-env/bin/activate
+source .venv/bin/activate
 # On Windows:
 graphite-env\Scripts\activate
 

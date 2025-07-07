@@ -21,6 +21,7 @@ Make sure the following are installed:
 <!-- ```bash
 mkdir graphite-react
 cd graphite-react
+touch README.md
 ``` -->
 
 <div class="bash"><pre>
@@ -31,7 +32,11 @@ cd graphite-react
 This will create the `pyproject.toml` file that uv needs.
 
 <!-- ```bash
+<<<<<<< HEAD
 uv init --name graphite-react
+=======
+poetry init --name graphite-react
+>>>>>>> 17a3def (updated code for installation / quiickstart)
 ``` -->
 
 <div class="bash"><pre>
@@ -40,12 +45,20 @@ uv init --name graphite-react
 Be sure to specify a compatible Python version,  open `pyproject.toml` and ensure it includes:
 
 ```toml
+<<<<<<< HEAD
 [project]
 name = "graphite-react"
 dependencies = [
     "grafi>=0.0.18",
 ]
 requires-python = ">=3.10,<3.13"
+=======
+[tool.poetry.dependencies]
+grafi = "^0.0.18"
+python = ">=3.10,<3.13"
+googlesearch-python = "^1.3.0"
+pycountry = "^24.6.1"
+>>>>>>> 17a3def (updated code for installation / quiickstart)
 ```
 
 Now install the dependencies:
@@ -107,6 +120,12 @@ if __name__ == "__main__":
     main()
 ```
 
+And finally export an `OPENAI_API_KEY` key as an environment variable:
+
+```bash
+export OPENAI_API_KEY="sk-proj-******"
+```
+
 ---
 
 ## Run the Application
@@ -136,20 +155,18 @@ ReAct Agent Chat Interface
 Type your questions and press Enter. Type '/bye' to exit.
 --------------------------------------------------
 
-You: Hi, what is agent framework called Graphite?
+You: What year was the United Kingdom Founded?
 
 <... logs>
 
-Agent: Graphite is an open-source framework designed for building domain-specific AI agents through composable, event-driven workflows. It allows developers to create customizable workflows that are modular and adaptable, making it straightforward to construct AI assistants tailored to specific tasks or domains.
+Agent: The United Kingdom (UK) was officially formed in 1707 with the Acts of Union, 
+which united the Kingdom of England and the Kingdom of Scotland into a single 
+entity known as the Kingdom of Great Britain. Later, in 1801, another 
+Act of Union added the Kingdom of Ireland, leading to the formation of the 
+United Kingdom of Great Britain and Ireland. After the majority of Ireland gained 
+independence in 1922, the name was changed to the United Kingdom of 
+Great Britain and Northern Ireland.
 
-Key features include:
-- **Event-driven architecture**: This supports workflows that react to specific events, enhancing the interactivity and responsiveness of the agents.
-- **Modular workflows**: Developers can create and combine various components easily, allowing for flexible and scalable agent designs.
-
-For more detailed information, you can check these resources:
-- [Introducing Graphite — An Event Driven AI Agent Framework](https://medium.com/binome/introduction-to-graphite-an-event-driven-ai-agent-framework-540478130cd2)
-- [Graphite - Framework AI Agent Builder](https://bestaiagents.ai/agent/graphite)
-- [Graphite for AI Agents: Event-Driven Design Made Simple](https://medium.com/binome/graphite-for-ai-agents-event-driven-design-made-simple-ede23733b8ef)
 
 You: /bye
 Goodbye!
