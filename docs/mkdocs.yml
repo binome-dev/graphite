@@ -39,6 +39,8 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
+  - Guides:
+    - Simple Workflow: guide/creating-a-simple-workflow.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
