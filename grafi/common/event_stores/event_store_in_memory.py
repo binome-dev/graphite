@@ -73,4 +73,3 @@ class EventStoreInMemory(EventStore):
                 and event.offset in offset_set
             )
         ]
-

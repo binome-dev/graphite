@@ -227,25 +227,28 @@ class EventStorePostgres(EventStore):
         """Get all events for a given topic name and specific offsets using JSONB operators."""
         if not offsets:
             return []
-            
+
         session = self.Session()
         try:
             # Use JSONB operators for efficient filtering at the database level
             rows = (
-                session.query(EventModel)
-                .filter(
+                session.query(EventModel).filter(
                     # Filter by event type
                     EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
                     # Use JSONB ->> operator to extract topic_name and compare
-                    EventModel.event_context.op('->>')('topic_name') == topic_name,
+                    EventModel.event_context.op("->>")("topic_name") == topic_name,
                     # Use JSONB -> operator to extract offset and check if it's in our list
                     # Cast the JSONB value to integer for comparison
-                    EventModel.event_context.op('->')('offset').astext.cast(Integer).in_(offsets)
+                    EventModel.event_context.op("->")("offset")
+                    .astext.cast(Integer)
+                    .in_(offsets),
                 )
                 # Order by offset for consistent results
-                .order_by(EventModel.event_context.op('->')('offset').astext.cast(Integer))
+                .order_by(
+                    EventModel.event_context.op("->")("offset").astext.cast(Integer)
+                )
             ).all()
-            
+
             events: List[Event] = []
             for r in rows:
                 event_data = {
@@ -261,7 +264,7 @@ class EventStorePostgres(EventStore):
                     events.append(event)
 
             return events
-            
+
         except Exception as e:
             logger.error(f"Failed to get topic events for {topic_name}: {e}")
             raise e

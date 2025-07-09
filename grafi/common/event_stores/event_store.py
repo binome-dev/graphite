@@ -72,7 +72,7 @@ class EventStore:
     def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID."""
         raise NotImplementedError
-    
+
     def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name."""
         raise NotImplementedError

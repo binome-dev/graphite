@@ -49,10 +49,10 @@ class TopicEventCache:
         """Evict approximately 20% of cache items when over the size limit."""
         if len(self._cache) <= self.max_size:
             return
-        
+
         # Calculate how many items to remove (20% of current cache size, minimum 1)
         items_to_remove = max(1, int(len(self._cache) * 0.2))
-        
+
         # Remove the oldest items
         for _ in range(min(items_to_remove, len(self._insertion_order))):
             if not self._insertion_order:
@@ -70,9 +70,9 @@ class TopicEventCache:
         if offset not in self._cache:
             # New entry - add to insertion order
             self._insertion_order.append(offset)
-        
+
         self._cache[offset] = event
-        
+
         # Evict if necessary
         self._evict_fifo()
 
@@ -129,7 +129,9 @@ class TopicBase(BaseModel):
             "Method 'publish_data' must be implemented in subclasses."
         )
 
-    def _retrieve_events_from_store(self, start_offset: int, end_offset: int) -> List[TopicEvent]:
+    def _retrieve_events_from_store(
+        self, start_offset: int, end_offset: int
+    ) -> List[TopicEvent]:
         """
         Retrieve events from the event store for the given offset range.
         This method should be overridden by subclasses that need specific event store queries.
@@ -139,47 +141,53 @@ class TopicBase(BaseModel):
         offsets = list(range(start_offset, end_offset))
         if not offsets:
             return []
-        
+
         try:
             events = container.event_store.get_topic_events(self.name, offsets)
-            return [event for event in events if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))]
+            return [
+                event
+                for event in events
+                if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
+            ]
 
         except Exception:
             # If event store is not available or fails, return empty list
             return []
 
-    def get_events_by_offset_range(self, start_offset: int, end_offset: int) -> List[TopicEvent]:
+    def get_events_by_offset_range(
+        self, start_offset: int, end_offset: int
+    ) -> List[TopicEvent]:
         """
         Get events in the specified offset range, retrieving from cache first,
         then from event store if necessary.
         """
         events = []
-        
+
         # First, try to get events from cache
         cached_events = self.event_cache.get_range(start_offset, end_offset)
         cached_offsets = {event.offset for event in cached_events}
-        
+
         # Add cached events to result
         events.extend(cached_events)
-        
+
         # Find missing offsets
         missing_offsets = []
         for offset in range(start_offset, end_offset):
             if offset not in cached_offsets:
                 missing_offsets.append(offset)
-        
+
         if missing_offsets:
             # Retrieve missing events from event store
             missing_start = min(missing_offsets)
             missing_end = max(missing_offsets) + 1
             store_events = self._retrieve_events_from_store(missing_start, missing_end)
-            
+
             # Cache the retrieved events and add to result
             for event in store_events:
                 if event.offset in missing_offsets:
                     self.event_cache.put(event.offset, event)
                     events.append(event)
-        
+
         # Sort by offset and return
         events.sort(key=lambda e: e.offset)
         return events
@@ -208,13 +216,19 @@ class TopicBase(BaseModel):
             return []
 
         # Get the new events using the offset range
-        new_events = self.get_events_by_offset_range(already_consumed, self.total_published)
+        new_events = self.get_events_by_offset_range(
+            already_consumed, self.total_published
+        )
 
         # Update the offset
         self.consumption_offsets[consumer_name] = self.total_published
 
         # Filter to only return PublishToTopicEvent instances for backward compatibility
-        return [event for event in new_events if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))]
+        return [
+            event
+            for event in new_events
+            if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
+        ]
 
     def reset(self) -> None:
         """
@@ -246,7 +260,7 @@ class TopicBase(BaseModel):
             # Ensure the offset is set correctly
             if event.offset == -1 or event.offset is None:
                 event.offset = self.total_published
-            
+
             self.event_cache.put(event.offset, event)
             self.total_published = max(self.total_published, event.offset + 1)
 
@@ -258,14 +272,14 @@ class TopicBase(BaseModel):
         cached_event = self.event_cache.get(offset)
         if cached_event:
             return cached_event
-        
+
         # If not in cache, try to retrieve from event store
         events = self._retrieve_events_from_store(offset, offset + 1)
         if events:
             event = events[0]
             self.event_cache.put(offset, event)
             return event
-        
+
         return None
 
     def serialize_callable(self) -> dict:
@@ -300,7 +314,7 @@ class TopicBase(BaseModel):
         Convert the topic to a dictionary representation.
         """
         return {
-            "name": self.name, 
+            "name": self.name,
             "condition": self.serialize_callable(),
             "total_published": self.total_published,
             "cache_size": len(self.event_cache),
