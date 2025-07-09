@@ -5,6 +5,8 @@ from typing import Optional
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
+from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
 class EventStoreInMemory(EventStore):
@@ -54,3 +56,21 @@ class EventStoreInMemory(EventStore):
             for event in self.events
             if event.invoke_context.conversation_id == conversation_id
         ]
+
+    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+        """Get all events for a given topic name and specific offsets."""
+
+        # Convert offsets to a set for faster lookup
+        offset_set = set(offsets)
+
+        return [
+            event
+            for event in self.events
+            if (
+                isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
+                and hasattr(event, "topic_name")
+                and event.topic_name == topic_name
+                and event.offset in offset_set
+            )
+        ]
+

@@ -128,7 +128,7 @@ class TestHumanRequestTopic:
         assert topic.name == HUMAN_REQUEST_TOPIC
         assert topic.publish_to_human_event_handler is None
         assert topic.publish_event_handler is None
-        assert topic.topic_events == []
+        assert len(topic.event_cache) == 0
         assert topic.consumption_offsets == {}
 
     def test_human_request_topic_with_custom_name(self):
@@ -182,8 +182,8 @@ class TestHumanRequestTopic:
         self, human_request_topic_instance, sample_output_topic_event
     ):
         """Test can_append_user_input with new consumer (no prior consumption)."""
-        # Add an event to the topic
-        human_request_topic_instance.topic_events.append(sample_output_topic_event)
+        # Add an event to the topic using the proper method
+        human_request_topic_instance.add_event(sample_output_topic_event)
 
         # New consumer should be able to append
         result = human_request_topic_instance.can_append_user_input(
@@ -195,8 +195,8 @@ class TestHumanRequestTopic:
         self, human_request_topic_instance, sample_output_topic_event
     ):
         """Test can_append_user_input when consumer is caught up."""
-        # Add an event to the topic
-        human_request_topic_instance.topic_events.append(sample_output_topic_event)
+        # Add an event to the topic using the proper method
+        human_request_topic_instance.add_event(sample_output_topic_event)
 
         # Consumer has consumed all events
         human_request_topic_instance.consumption_offsets["consumer1"] = 1
@@ -210,10 +210,20 @@ class TestHumanRequestTopic:
         self, human_request_topic_instance, sample_output_topic_event
     ):
         """Test can_append_user_input when event was already consumed."""
-        # Add multiple events to the topic
-        human_request_topic_instance.topic_events.extend(
-            [sample_output_topic_event, sample_output_topic_event]
+        # Add multiple events to the topic using proper methods
+        human_request_topic_instance.add_event(sample_output_topic_event)
+        # Create a second event with offset 1
+        second_event = OutputTopicEvent(
+            event_id="second_event",
+            invoke_context=sample_output_topic_event.invoke_context,
+            topic_name=sample_output_topic_event.topic_name,
+            publisher_name=sample_output_topic_event.publisher_name,
+            publisher_type=sample_output_topic_event.publisher_type,
+            data=sample_output_topic_event.data,
+            consumed_event_ids=sample_output_topic_event.consumed_event_ids,
+            offset=1,
         )
+        human_request_topic_instance.add_event(second_event)
 
         # Consumer has consumed more than the event offset
         human_request_topic_instance.consumption_offsets["consumer1"] = 1
@@ -239,8 +249,8 @@ class TestHumanRequestTopic:
         self, human_request_topic_instance, sample_output_topic_event
     ):
         """Test can_append_user_input in valid scenario."""
-        # Add an event to the topic
-        human_request_topic_instance.topic_events.append(sample_output_topic_event)
+        # Add an event to the topic using proper method
+        human_request_topic_instance.add_event(sample_output_topic_event)
 
         # Consumer has consumed some but not all events
         human_request_topic_instance.consumption_offsets["consumer1"] = 0
@@ -288,7 +298,7 @@ class TestHumanRequestTopic:
         assert event.data == sample_messages
         assert event.consumed_event_ids == ["test_id_1", "test_id_2"]
         assert event.offset == 0
-        assert len(human_request_topic_instance.topic_events) == 1
+        assert len(human_request_topic_instance.event_cache) == 1
 
     def test_publish_data_with_condition_false(
         self,
@@ -310,7 +320,7 @@ class TestHumanRequestTopic:
         )
 
         assert event is None
-        assert len(human_request_topic_instance.topic_events) == 0
+        assert len(human_request_topic_instance.event_cache) == 0
 
     def test_publish_data_with_human_event_handler(
         self,
@@ -352,7 +362,7 @@ class TestHumanRequestTopic:
         assert event.data == sample_messages
         assert event.consumed_event_ids == sample_output_topic_event.consumed_event_ids
         assert event.offset == 0
-        assert len(human_request_topic_instance.topic_events) == 1
+        assert len(human_request_topic_instance.event_cache) == 1
 
     def test_append_user_input_with_publish_to_topic_event(
         self,
@@ -388,7 +398,7 @@ class TestHumanRequestTopic:
         )
 
         assert event is None
-        assert len(human_request_topic_instance.topic_events) == 0
+        assert len(human_request_topic_instance.event_cache) == 0
 
     def test_append_user_input_with_publish_event_handler(
         self, human_request_topic_instance, sample_output_topic_event, sample_messages
@@ -422,7 +432,7 @@ class TestHumanRequestTopic:
 
         assert event1.offset == 0
         assert event2.offset == 1
-        assert len(human_request_topic_instance.topic_events) == 2
+        assert len(human_request_topic_instance.event_cache) == 2
 
     def test_publish_data_offset_increments(
         self,
@@ -454,7 +464,7 @@ class TestHumanRequestTopic:
 
         assert event1.offset == 0
         assert event2.offset == 1
-        assert len(human_request_topic_instance.topic_events) == 2
+        assert len(human_request_topic_instance.event_cache) == 2
 
     def test_global_human_request_topic(self):
         """Test the global human_request_topic instance."""
@@ -486,12 +496,12 @@ class TestHumanRequestTopic:
             user_input_event=sample_output_topic_event, data=sample_messages
         )
 
-        assert len(human_request_topic_instance.topic_events) == 2
+        assert len(human_request_topic_instance.event_cache) == 2
         assert isinstance(
-            human_request_topic_instance.topic_events[0], OutputTopicEvent
+            human_request_topic_instance.event_cache.get(0), OutputTopicEvent
         )
         assert isinstance(
-            human_request_topic_instance.topic_events[1], PublishToTopicEvent
+            human_request_topic_instance.event_cache.get(1), PublishToTopicEvent
         )
         assert output_event.offset == 0
         assert publish_event.offset == 1
@@ -500,8 +510,8 @@ class TestHumanRequestTopic:
         self, human_request_topic_instance, sample_publish_to_topic_event
     ):
         """Test can_append_user_input works with PublishToTopicEvent."""
-        # Add an event to the topic
-        human_request_topic_instance.topic_events.append(sample_publish_to_topic_event)
+        # Add an event to the topic using proper method
+        human_request_topic_instance.add_event(sample_publish_to_topic_event)
 
         # New consumer should be able to append
         result = human_request_topic_instance.can_append_user_input(

@@ -20,8 +20,6 @@ class PublishToTopicEvent(TopicEvent):
     publisher_type: str
     event_type: EventType = EventType.PUBLISH_TO_TOPIC
 
-    data: Messages
-
     def to_dict(self) -> Dict[str, Any]:
         event_context = {
             "consumed_event_ids": self.consumed_event_ids,

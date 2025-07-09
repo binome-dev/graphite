@@ -75,7 +75,7 @@ def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
     topic.reset()
 
-    assert len(topic.topic_events) == 0  # All messages should be cleared
+    assert len(topic.event_cache) == 0  # All messages should be cleared
     assert topic.consumption_offsets == {}  # Consumption offsets should be reset
 
 
@@ -94,8 +94,8 @@ def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
 
     topic.restore_topic(event)
 
-    assert len(topic.topic_events) == 1
-    assert topic.topic_events[0].event_id == "event_1"
+    assert len(topic.event_cache) == 1
+    assert topic.event_cache.get(0).event_id == "event_1"
 
 
 def test_serialize_callable_function():

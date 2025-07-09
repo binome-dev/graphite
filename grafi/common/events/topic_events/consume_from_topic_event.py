@@ -17,7 +17,6 @@ class ConsumeFromTopicEvent(TopicEvent):
     event_type: EventType = EventType.CONSUME_FROM_TOPIC
     consumer_name: str
     consumer_type: str
-    data: Messages
 
     def to_dict(self) -> Dict[str, Any]:
         event_context = {

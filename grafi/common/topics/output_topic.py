@@ -82,9 +82,10 @@ class OutputTopic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=len(self.topic_events),
+                offset=self.total_published,
             )
-            self.topic_events.append(event)
+            # Add event to cache and update total_published
+            self.add_event(event)
             if self.publish_event_handler:
                 self.publish_event_handler(event)
             logger.info(

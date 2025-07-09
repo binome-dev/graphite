@@ -222,3 +222,48 @@ class EventStorePostgres(EventStore):
             raise e
         finally:
             session.close()
+
+    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+        """Get all events for a given topic name and specific offsets using JSONB operators."""
+        if not offsets:
+            return []
+            
+        session = self.Session()
+        try:
+            # Use JSONB operators for efficient filtering at the database level
+            rows = (
+                session.query(EventModel)
+                .filter(
+                    # Filter by event type
+                    EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
+                    # Use JSONB ->> operator to extract topic_name and compare
+                    EventModel.event_context.op('->>')('topic_name') == topic_name,
+                    # Use JSONB -> operator to extract offset and check if it's in our list
+                    # Cast the JSONB value to integer for comparison
+                    EventModel.event_context.op('->')('offset').astext.cast(Integer).in_(offsets)
+                )
+                # Order by offset for consistent results
+                .order_by(EventModel.event_context.op('->')('offset').astext.cast(Integer))
+            ).all()
+            
+            events: List[Event] = []
+            for r in rows:
+                event_data = {
+                    "event_id": r.event_id,
+                    "assistant_request_id": r.assistant_request_id,
+                    "event_type": r.event_type,
+                    "event_context": r.event_context,
+                    "data": r.data,
+                    "timestamp": str(r.timestamp),
+                }
+                event = self._create_event_from_dict(event_data)
+                if event:
+                    events.append(event)
+
+            return events
+            
+        except Exception as e:
+            logger.error(f"Failed to get topic events for {topic_name}: {e}")
+            raise e
+        finally:
+            session.close()

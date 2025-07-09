@@ -22,7 +22,6 @@ class OutputTopicEvent(TopicEvent):
     publisher_name: str
     publisher_type: str
     event_type: EventType = EventType.OUTPUT_TOPIC
-    data: Messages
 
     def to_dict(self) -> Dict[str, Any]:
         # TODO: Implement serialization for `data` field

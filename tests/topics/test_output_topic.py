@@ -137,7 +137,9 @@ class TestOutputTopic:
         mock_task2.done.return_value = True
 
         output_topic.active_generators = [mock_task1, mock_task2]
-        output_topic.topic_events = [Mock(), Mock()]
+        # Add some events to the cache to test reset
+        output_topic.event_cache.put(0, Mock())
+        output_topic.event_cache.put(1, Mock())
 
         output_topic.reset()
 
@@ -147,7 +149,7 @@ class TestOutputTopic:
 
         # Check that collections were cleared
         assert output_topic.active_generators == []
-        assert output_topic.topic_events == []
+        assert len(output_topic.event_cache) == 0
         assert isinstance(output_topic.event_queue, asyncio.Queue)
 
     def test_publish_data_with_condition_true(
@@ -176,7 +178,7 @@ class TestOutputTopic:
         assert event.data == sample_messages
         assert event.consumed_event_ids == ["test_id_1", "test_id_2"]
         assert event.offset == 0
-        assert len(output_topic.topic_events) == 1
+        assert len(output_topic.event_cache) == 1
 
     def test_publish_data_with_condition_false(
         self,
@@ -198,7 +200,7 @@ class TestOutputTopic:
         )
 
         assert event is None
-        assert len(output_topic.topic_events) == 0
+        assert len(output_topic.event_cache) == 0
 
     def test_publish_data_with_event_handler(
         self,

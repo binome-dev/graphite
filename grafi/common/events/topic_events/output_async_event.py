@@ -4,7 +4,6 @@ from pydantic import ConfigDict
 
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.models.message import Messages
 
 
 class OutputAsyncEvent(TopicEvent):
@@ -14,4 +13,3 @@ class OutputAsyncEvent(TopicEvent):
     publisher_name: str
     publisher_type: str
     event_type: EventType = EventType.OUTPUT_TOPIC
-    data: Messages
