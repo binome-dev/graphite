@@ -73,6 +73,10 @@ class EventStore:
         """Get all events for a given conversation ID."""
         raise NotImplementedError
 
+    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+        """Get all events for a given topic name."""
+        raise NotImplementedError
+
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
         """Create an event object from a dictionary."""
         event_type: Any = event_dict.get("event_type")

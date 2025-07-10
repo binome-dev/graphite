@@ -32,6 +32,8 @@ def test_topic_expr_to_dict(mock_topics: tuple[TopicBase, TopicBase, TopicBase])
                 "type": "lambda",
                 "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
             },
+            "total_published": 0,
+            "cache_size": 0,
         }
     }
 
@@ -53,6 +55,8 @@ def test_combined_expr_to_dict(mock_topics):
                     "type": "lambda",
                     "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
                 },
+                "total_published": 0,
+                "cache_size": 0,
             }
         },
         "right": {
@@ -62,6 +66,8 @@ def test_combined_expr_to_dict(mock_topics):
                     "type": "lambda",
                     "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
                 },
+                "total_published": 0,
+                "cache_size": 0,
             }
         },
     }

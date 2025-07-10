@@ -26,8 +26,8 @@ def test_publish_message(topic: Topic, invoke_context: InvokeContext):
         invoke_context, "test_publisher", "test_type", [message], []
     )
 
-    assert len(topic.topic_events) == 1  # Ensure the message was published
-    assert topic.topic_events[0].offset == 0  # First message should have offset 0
+    assert len(topic.event_cache) == 1  # Ensure the message was published
+    assert topic.event_cache.get(0).offset == 0  # First message should have offset 0
     assert topic.publish_event_handler.called  # Ensure the publish handler was invoked
     assert event.publisher_name == "test_publisher"
     assert event.publisher_type == "test_type"

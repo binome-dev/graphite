@@ -46,8 +46,7 @@ class HumanRequestTopic(TopicBase):
         self, consumer_name: str, event: PublishToTopicEvent | OutputTopicEvent
     ) -> bool:
         already_consumed = self.consumption_offsets.get(consumer_name, 0)
-        total_published = len(self.topic_events)
-        if already_consumed >= total_published:
+        if already_consumed >= self.total_published:
             return False
 
         if event.offset < already_consumed:
@@ -77,9 +76,10 @@ class HumanRequestTopic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=len(self.topic_events),
+                offset=self.total_published,
             )
-            self.topic_events.append(event)
+            # Add event to cache and update total_published
+            self.add_event(event)
             if self.publish_to_human_event_handler:
                 self.publish_to_human_event_handler(event)
             logger.info(
@@ -106,9 +106,10 @@ class HumanRequestTopic(TopicBase):
                 publisher_type=user_input_event.publisher_type,
                 data=data,
                 consumed_event_ids=user_input_event.consumed_event_ids,
-                offset=len(self.topic_events),
+                offset=self.total_published,
             )
-            self.topic_events.append(event)
+            # Add event to cache and update total_published
+            self.add_event(event)
             if self.publish_event_handler:
                 self.publish_event_handler(event)
             logger.info(
