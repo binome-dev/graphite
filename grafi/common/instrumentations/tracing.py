@@ -6,11 +6,12 @@ import arize.otel
 import phoenix.otel
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
-from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import Tracer
+from opentelemetry.trace import get_tracer
+from opentelemetry.trace import set_tracer_provider
 
 
 class TracingOptions(Enum):
@@ -85,7 +86,7 @@ def setup_tracing(
         tracer_provider.add_span_processor(span_processor)
 
         OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-        trace.set_tracer_provider(tracer_provider)
+        set_tracer_provider(tracer_provider)
     elif tracing_options == TracingOptions.AUTO:
         collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
         if is_local_endpoint_available(collector_endpoint, collector_port):
@@ -108,7 +109,7 @@ def setup_tracing(
             tracer_provider.add_span_processor(span_processor)
 
             OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-            trace.set_tracer_provider(tracer_provider)
+            set_tracer_provider(tracer_provider)
         else:
             # Fallback to InMemorySpanExporter if the endpoint is not available
             span_exporter_im = InMemorySpanExporter()
@@ -126,4 +127,4 @@ def setup_tracing(
             "Choose from ARIZE, PHOENIX, AUTO, or IN_MEMORY."
         )
 
-    return trace.get_tracer(__name__)
+    return get_tracer(__name__)
