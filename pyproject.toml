@@ -1,52 +1,50 @@
-[tool.poetry]
+[project]
 name = "grafi"
-version = "0.0.20"
+version = "0.0.21"
 description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI agents through composable agentic workflows."
-authors = ["Craig Li <craig@binome.dev>"]
-license = "Mozilla Public License Version 2.0"
+authors = [{name = "Craig Li", email = "craig@binome.dev"}]
+license = {text = "Mozilla Public License Version 2.0"}
 readme = "README.md"
-packages = [{ include = "grafi" }]
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "pydantic>=2.11.5",
+    "openai>=1.88.0",
+    "docstring-parser>=0.16",
+    "openinference-instrumentation-openai>=0.1.30",
+    "arize-otel>=0.8.2",
+    "loguru>=0.7.3",
+    "jsonpickle>=4.1.0",
+    "arize-phoenix-otel>=0.10.3",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-pydantic = "^2.11.5"
-openai = "^1.88.0"
-docstring-parser = "^0.16"
-openinference-instrumentation-openai = "^0.1.30"
-arize-otel = "^0.8.2"
-loguru = "^0.7.3"
-jsonpickle = "^4.1.0"
-arize-phoenix-otel = "^0.10.3"
-
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.3"
-pytest-asyncio = "^0.25.3"
-chromadb = "^0.6.3"
-llama-index-core = "^0.12.41"
-llama-index-llms-openai = "^0.4.4"
-llama-index-embeddings-openai = "^0.3.1"
-tavily-python = "^0.7.6"
-duckduckgo-search = "^8.0.4"
-ollama = "^0.5.1"
-sqlalchemy = "^2.0.40"
-ruff = "^0.11.1"
-pre-commit = "^4.2.0"
-mypy = "^1.15.0"
-psycopg2-binary = "^2.9.10"
-arize-phoenix = "^10.13.2"
-h11 = ">=0.15.0"
-google-genai = "^1.20.0"
-mcp = "^1.9.4"
-anthropic = "^0.54.0"
-googlesearch-python = "^1.3.0"
-pycountry = "^24.6.1"
-fastmcp = "^2.9.0"
-
-
-[tool.poetry.group.docs.dependencies]
-mkdoc = "^0.1"
+[dependency-groups]
+dev = [
+    "anthropic>=0.57.1",
+    "arize-phoenix>=11.6.2",
+    "chromadb>=1.0.15",
+    "duckduckgo-search>=8.1.1",
+    "fastmcp>=2.10.4",
+    "google-genai>=1.25.0",
+    "googlesearch-python>=1.3.0",
+    "h11>=0.16.0",
+    "llama-index-core>=0.12.48",
+    "llama-index-embeddings-openai>=0.3.1",
+    "llama-index-llms-openai>=0.4.7",
+    "mcp>=1.11.0",
+    "mypy>=1.16.1",
+    "ollama>=0.5.1",
+    "pre-commit>=4.2.0",
+    "psycopg2-binary>=2.9.10",
+    "pycountry>=24.6.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "ruff>=0.12.2",
+    "sqlalchemy>=2.0.41",
+    "tavily-python>=0.7.9",
+]
+docs = [
+    "mkdoc>=0.1",
+]
 
 [tool.ruff]
 lint.select = [ "E", "F", "I", "TID251" ]
@@ -146,6 +144,9 @@ force_single_line = true
 
 
 
+[tool.hatch.build.targets.wheel]
+packages = ["grafi"]
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

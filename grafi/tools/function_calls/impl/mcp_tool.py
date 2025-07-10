@@ -30,7 +30,7 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
 
 try:
-    from fastmcp.utilities.types import MCPContent
+    from mcp.types import Content as MCPContent
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
 

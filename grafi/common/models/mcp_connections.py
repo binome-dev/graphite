@@ -4,9 +4,9 @@ from typing import Any
 from typing import Callable
 from typing import Literal
 from typing import Optional
-from typing import TypedDict
 
 import httpx
+from typing_extensions import TypedDict
 
 
 EncodingErrorHandler = Literal["strict", "ignore", "replace"]
