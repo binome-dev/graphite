@@ -97,13 +97,14 @@ pre-commit run --all-files
 ## Common Tasks
 
 ### Creating New Agents
-1. Extend base agent classes in `grafi/agents/`
-2. Implement required event handlers
+1. Extend base agent classes in `grafi/assistants/`
+2. implement designed workflow with node and tools
 3. Define tool integrations
 4. Add comprehensive tests
 
 ### Adding New Tools
 1. Create tool in `grafi/tools/`
+2. Every subfolder has a definition of a tool, check if tools matches to the correct category
 2. Implement tool interface
 3. Add event capturing decorators
 4. Include usage examples
@@ -111,7 +112,7 @@ pre-commit run --all-files
 ### Workflow Development
 1. Define workflow nodes and connections
 2. Set up pub/sub topics
-3. Implement event handlers
+3. Build Nodes that execute Tools
 4. Test recovery scenarios
 
 ## Dependencies
