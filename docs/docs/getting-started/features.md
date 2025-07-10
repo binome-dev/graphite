@@ -1,6 +1,6 @@
 # Features
 
-The core design principles that set Graphite apart from other agent frameworks are:
+The core design principles that sAuditability in Graphite emerges naturally from its observability. By automatically persisting all invoke events and pub/sub events in a centralized event store, the platform provides a complete historical record of every action taken. Function decorators capture each invoke (including inputs, outputs, and exceptions), while Topic operations log every publish and consume operation, effectively acting as a "cache" layer of orchestration events.t Graphite apart from other agent frameworks are:
 
 1. **A Simple 3-Layer Invoke Model**  
    Three distinct layers—assistant, node, and tool—manage invoke, while a dedicated workflow layer oversees orchestration.
@@ -31,7 +31,7 @@ Together, these capabilities—observability, idempotency, auditability, and res
 
 The system leverages event sourcing to record all operations, combined with OpenTelemetry for standardized tracing. Thanks to the clearly defined three-layer invoke model (assistant, node, tool) plus an orchestration workflow, each invoke function is decorated to capture inputs, outputs, and any exceptions. These captures are converted into events (stored in the event store) and traces (exported to platforms like Arize or other OpenTelemetry services).
 
-Meanwhile, each Topic instance logs pub/sub interactions in the event store after processing. Coupled with the InvokeContext object, this approach makes the entire data flow within the agentic workflow fully transparent. Because every node and tool has a unique name and ID, and each operation is stamped with invoke context IDs, locating specific inputs and outputs is straightforward. Then given pub/sub events, the framework can build a directed data flows between nodes. Even there are circles, the data flow can form a DAG with publishing and consuming offset in each topic.
+Meanwhile, each Topic instance logs pub/sub interactions in the event store after processing. Coupled with the InvokeContext object, this approach makes the entire data flow within the agentic workflow fully transparent. Because every node and tool has a unique name and ID, and each operation is stamped with invoke context IDs, locating specific inputs and outputs is straightforward. Then given pub/sub events, the framework can build directed data flows between nodes. Even when there are circles, the data flow can form a DAG with publishing and consuming offset in each topic.
 
 ## Idempotency
 

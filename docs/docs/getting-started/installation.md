@@ -58,7 +58,7 @@ deactivate
 
 <div class="bash"><pre>
 <code><span style="color:#959077"># Create a virtual environment</span>
-<span style="color:#FF4689">python</span> <span style="color:#AE81FF">--m</span> venv graphite-env
+<span style="color:#FF4689">python</span> <span style="color:#AE81FF">-m</span> venv graphite-env
 
 <span style="color:#959077"># Activate the virtual environment</span>
 <span style="color:#959077"># On Linux/macOS</span>
