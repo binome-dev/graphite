@@ -40,7 +40,7 @@ nav:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
   - Core Concepts:
-    - Arhitecture Overview: user-guide/architecture.md
+    - Architecture Overview: user-guide/architecture.md
     - Builder Pattern: user-guide/builder-pattern.md
     - Containers: user-guide/containers.md
     - Invoke Decorators: user-guide/invoke-decorators.md
