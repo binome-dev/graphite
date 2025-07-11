@@ -1,6 +1,6 @@
 # Features
 
-The core design principles that sAuditability in Graphite emerges naturally from its observability. By automatically persisting all invoke events and pub/sub events in a centralized event store, the platform provides a complete historical record of every action taken. Function decorators capture each invoke (including inputs, outputs, and exceptions), while Topic operations log every publish and consume operation, effectively acting as a "cache" layer of orchestration events.t Graphite apart from other agent frameworks are:
+The core design principles that set Graphite apart from other agent frameworks are:
 
 1. **A Simple 3-Layer Invoke Model**  
    Three distinct layers—assistant, node, and tool—manage invoke, while a dedicated workflow layer oversees orchestration.
