@@ -20,6 +20,7 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilde
 
 
 try:
+    from mcp.types import CallToolResult
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
     from mcp.types import Prompt
@@ -28,11 +29,6 @@ try:
     from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
-
-try:
-    from mcp.types import Content as MCPContent
-except (ImportError, ModuleNotFoundError):
-    raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
 
 
 class MCPTool(FunctionCallTool):
@@ -124,11 +120,11 @@ class MCPTool(FunctionCallTool):
                 async with Client(self.mcp_config) as client:
                     logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
 
-                    result: list[MCPContent] = await client.call_tool(tool_name, kwargs)
+                    result: CallToolResult = await client.call_tool(tool_name, kwargs)
 
                     # Process the result content
                     response_str = ""
-                    for content in result:
+                    for content in result.content:
                         if isinstance(content, TextContent):
                             response_str += content.text + "\n"
                         elif isinstance(content, ImageContent):
