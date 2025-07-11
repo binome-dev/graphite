@@ -174,5 +174,6 @@ cython_debug/
 storage/
 .pgdata/
 .vscode/
+.claude/
 
 docs/site/sitemap.xml.gz

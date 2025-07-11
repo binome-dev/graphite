@@ -9,7 +9,7 @@
 Make sure the following are installed:
 
 * Python **>=3.10, < 3.13** (required by the `grafi` package)
-* [Poetry](https://python-poetry.org/docs/#installation)
+* [uv](https://docs.astral.sh/uv/#installation)
 * Git
 
 > ⚠️ **Important:** `grafi` requires Python >= 3.10 and < 3.13. Other python version is not yet supported.
@@ -28,40 +28,43 @@ cd graphite-react
 <span style="color:#FF4689">cd</span> graphite-react
 </code></pre></div>
 
-This will create the `pyproject.toml` file that Poetry needs.
+This will create the `pyproject.toml` file that uv needs.
 
 <!-- ```bash
-poetry init --name graphite-react -n
+uv init --name graphite-react
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">poetry</span> init <span style="color:#AE81FF">--name</span> graphite-react <span style="color:#AE81FF">--n</span></code></pre></div>
+<code><span style="color:#FF4689">uv</span> init <span style="color:#AE81FF">--name</span> graphite-react</code></pre></div>
 
 Be sure to specify a compatible Python version,  open `pyproject.toml` and ensure it includes:
 
 ```toml
-[tool.poetry.dependencies]
-grafi = "^0.0.18"
-python = ">=3.10,<3.13"
+[project]
+name = "graphite-react"
+dependencies = [
+    "grafi>=0.0.18",
+]
+requires-python = ">=3.10,<3.13"
 ```
 
 Now install the dependencies:
 
 <!-- ```bash
-poetry install --no-root
+uv sync
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">poetry</span> install <span style="color:#AE81FF">--no-root</span></code></pre></div>
+<code><span style="color:#FF4689">uv</span> sync</code></pre></div>
 
 This will automatically create a virtual environment and install `grafi` with the appropriate Python version.
 
-> 💡 You can also create the virtual environment with the correct Python version explicitly:
+> 💡 You can also specify the Python version explicitly:
 >
 ><div class="bash"><pre>
-><code><span style="color:#FF4689">poetry</span> env use python3.12</code></pre></div>
+><code><span style="color:#FF4689">uv</span> python pin python3.12</code></pre></div>
 <!-- > ```bash
-> poetry env use python3.12
+> uv python pin python3.12
 > ``` -->
 
 ---
@@ -108,13 +111,13 @@ if __name__ == "__main__":
 
 ## Run the Application
 
-Use Poetry to invoke the script inside the virtual environment:
+Use uv to invoke the script inside the virtual environment:
 
 <!-- ```bash
-poetry run python main.py
+uv run python main.py
 ``` -->
 <div class="bash"><pre>
-<code><span style="color:#FF4689">poetry</span> run python main.py</code></pre></div>
+<code><span style="color:#FF4689">uv</span> run python main.py</code></pre></div>
 
 You should see following in the terminal
 
@@ -156,7 +159,7 @@ Goodbye!
 
 ## Summary
 
-✅ Initialized a Poetry project
+✅ Initialized a uv project
 
 ✅ Installed `grafi` with the correct Python version constraint
 

@@ -102,9 +102,12 @@ async def test_a_invoke_text_content(
 
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
-        instance.call_tool = AsyncMock(
-            return_value=[TextContent(type="text", text="hello")]
-        )
+
+        # Create a mock CallToolResult with content attribute
+        mock_result = MagicMock()
+        mock_result.content = [TextContent(type="text", text="hello")]
+        instance.call_tool = AsyncMock(return_value=mock_result)
+
         result = [
             m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
@@ -120,11 +123,14 @@ async def test_a_invoke_image_content(
 
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
-        instance.call_tool = AsyncMock(
-            return_value=[
-                ImageContent(type="image", data="imgdata", mimeType="image/png")
-            ],
-        )
+
+        # Create a mock CallToolResult with content attribute
+        mock_result = MagicMock()
+        mock_result.content = [
+            ImageContent(type="image", data="imgdata", mimeType="image/png")
+        ]
+        instance.call_tool = AsyncMock(return_value=mock_result)
+
         result = [
             m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
@@ -140,18 +146,21 @@ async def test_a_invoke_embedded_resource(
 
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
-        instance.call_tool = AsyncMock(
-            return_value=[
-                EmbeddedResource(
-                    type="resource",
-                    resource=TextResourceContents(
-                        uri="user://resource/123",
-                        text="Embedded resource content",
-                        mimeType="text/plain",
-                    ),
-                )
-            ]
-        )
+
+        # Create a mock CallToolResult with content attribute
+        mock_result = MagicMock()
+        mock_result.content = [
+            EmbeddedResource(
+                type="resource",
+                resource=TextResourceContents(
+                    uri="user://resource/123",
+                    text="Embedded resource content",
+                    mimeType="text/plain",
+                ),
+            )
+        ]
+        instance.call_tool = AsyncMock(return_value=mock_result)
+
         result = [
             m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
         ]
@@ -170,7 +179,11 @@ async def test_a_invoke_unsupported_content(
 
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
-        instance.call_tool = AsyncMock(return_value=[DummyOtherContent()])
+
+        # Create a mock CallToolResult with content attribute
+        mock_result = MagicMock()
+        mock_result.content = [DummyOtherContent()]
+        instance.call_tool = AsyncMock(return_value=mock_result)
 
         result = [
             m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
