@@ -63,11 +63,7 @@ Now let's integrate the PostgreSQL event store with your Graphite workflow.
 ### Environment Setup
 
 ```python
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.node import Node
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
 ```
 
 ### Event Store Initialization
@@ -130,6 +126,13 @@ message = Message(role="user", content=user_input)
 This is the same workflow as the [creating a simple workflow guide](creating-a-simple-workflow.md) .
 
 ```python
+from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.topic import agent_input_topic
+from grafi.nodes.node import Node
+from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
 llm_node = (
     Node.builder()
     .name("OpenAINode")
@@ -161,6 +164,8 @@ This creates a standard Graphite workflow with an OpenAI node. The key differenc
 Once you have built the workflow and invoked it we can get all the events from the previously configured `event_store` and print it out
 
 ```python
+
+
 result = workflow.invoke(invoke_context, [message])
 
 for output_message in result:
