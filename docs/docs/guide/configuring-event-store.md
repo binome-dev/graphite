@@ -4,7 +4,7 @@ Event stores are a powerful feature in the Graphite AI framework that enable per
 
 ## What is an Event Store?
 
-An event store in Graphite captures and persists all events that occur during workflow execution, including:
+An event store in Graphite captures and persists  pub/sub events that occur during workflow execution, including:
 - User messages and system responses
 - Node executions and tool invocations
 - Workflow state changes
@@ -50,21 +50,57 @@ services:
 
 Launch your PostgreSQL container:
 
-```bash
-docker-compose up -d
-```
+<div class="bash"><pre>
+<code><span style="color:#FF4689">docker compose</span> up -d</code></pre></div>
+
 
 The `-d` flag runs the container in detached mode, allowing it to run in the background.
 
 ## Configuring the Event Store
 
-Now let's integrate the PostgreSQL event store with your Graphite workflow.
+Now let's integrate the PostgreSQL event store with your Graphite workflow. You need to have followed the [quickstart](../getting-started/quickstart.md)  to create a `uv` project with grafite installed.
 
-### Environment Setup
+You will have to add `sqlalchemy` and `psycopg2` dependencies to it since we will be using postgres as the event store.
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">uv</span> add sqlalchemy psycopg2</code></pre></div>
+
+
+### Context and Message Setup
+
+Generate unique identifiers for tracking this conversation and request, configure OpenAI credentials and settings and then create the invoke context with all necessary tracking IDs.
+
+
 
 ```python
+import os
+import uuid
+
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    raise ValueError("OPENAI_API_KEY environment variable is required")
+
+model = os.getenv("OPENAI_MODEL", "gpt-4o")
+system_message = os.getenv("OPENAI_SYSTEM_MESSAGE", "You are a helpful assistant.")
+
+invoke_context = InvokeContext(
+    user_id=uuid.uuid4().hex,
+    conversation_id=uuid.uuid4().hex,
+    invoke_id=uuid.uuid4().hex,
+    assistant_request_id=uuid.uuid4().hex
+)
+user_input = "What is the capital of the United Kingdom"
+
+message = Message(
+    role="user", 
+    content=user_input
+)
 
 ```
+
+Nothing fancy here, just initialization of context and setting up of variables.
+
 
 ### Event Store Initialization
 
@@ -75,108 +111,40 @@ from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.containers.container import container
 
 postgres_event_store = EventStorePostgres(
-    db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
+    # must match what is in docker-compose.yaml
+    db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db", 
 )
 
 container.register_event_store(postgres_event_store)
 event_store = container.event_store
 ```
 
+## Running the agent and Retrieving Events
 
-
-### Context and Message Setup
-
-Generate unique identifiers for tracking this conversation and request, configure OpenAI credentials and settings and then create the invoke context with all necessary tracking IDs.
+Graphite has a built in react agent that can be used out of the box for your needs, we will use it for the simple use case of passing in input and retrieving the output from OpenAI.
 
 ```python
-import uuid
-import os
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.agents.react_agent import create_react_agent
 
-# Generate consistent IDs for the conversation
-conversation_id = uuid.uuid4().hex
-user_id = uuid.uuid4().hex
-invoke_id = uuid.uuid4().hex
-assistant_request_id = uuid.uuid4().hex
+react_agent = create_react_agent()
 
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
+result = react_agent.run(user_input, invoke_context)
 
-model = os.getenv("OPENAI_MODEL", "gpt-4o")
-system_message = os.getenv("OPENAI_SYSTEM_MESSAGE", "You are a helpful assistant.")
-
-user_input = "What is the capital of the United Kingdom"
-
-# Create invoke context with consistent IDs
-invoke_context = InvokeContext(
-    user_id=user_id,
-    conversation_id=conversation_id,
-    invoke_id=invoke_id,
-    assistant_request_id=assistant_request_id,
-)
-
-message = Message(role="user", content=user_input)
-```
+print("Output from React Agent:", result)
 
 
-## Building the Workflow
-
-This is the same workflow as the [creating a simple workflow guide](creating-a-simple-workflow.md) .
-
-```python
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.node import Node
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-
-
-llm_node = (
-    Node.builder()
-    .name("OpenAINode")
-    .subscribe(agent_input_topic)
-    .tool(
-        OpenAITool.builder()
-        .name("OpenAITool")
-        .api_key(api_key)
-        .model(model)
-        .system_message(system_message)
-        .build()
-    )
-    .publish_to(agent_output_topic)
-    .build()
-)
-
-workflow = (
-    EventDrivenWorkflow.builder()
-    .name("OpenAIEventDrivenWorkflow")
-    .node(llm_node)
-    .build()
-)
-```
-
-This creates a standard Graphite workflow with an OpenAI node. The key difference is that with the event store configured, all events will be automatically persisted.
-
-## Executing and Retrieving Events
-
-Once you have built the workflow and invoked it we can get all the events from the previously configured `event_store` and print it out
-
-```python
-
-
-result = workflow.invoke(invoke_context, [message])
-
-for output_message in result:
-    print("Output message:", output_message.content)
-
-# Retrieve stored events
 events = event_store.get_conversation_events(conversation_id)
 
 print(f"Events for conversation {conversation_id}:")
-print(f"Events: {events}")
+
+print(f"Events: {events} ")
+
 ```
+
+The key difference is that with the event store configured, all events will be automatically persisted.
+
+Once you have built the workflow and invoked it we can get all the events from the previously configured `event_store` and print it out.
+
 
 
 
@@ -185,24 +153,24 @@ print(f"Events: {events}")
 Here's the complete `event_store.py` file that demonstrates the full integration:
 
 ```python
+# event_store.py
+ 
 import os
 import uuid
 
+from grafi.agents.react_agent import create_react_agent
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.node import Node
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 postgres_event_store = EventStorePostgres(
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
 
+
 container.register_event_store(postgres_event_store)
+
 event_store = container.event_store
 
 # Generate consistent IDs for the conversation
@@ -230,38 +198,20 @@ invoke_context = InvokeContext(
 
 message = Message(role="user", content=user_input)
 
-llm_node = (
-    Node.builder()
-    .name("OpenAINode")
-    .subscribe(agent_input_topic)
-    .tool(
-        OpenAITool.builder()
-        .name("OpenAITool")
-        .api_key(api_key)
-        .model(model)
-        .system_message(system_message)
-        .build()
-    )
-    .publish_to(agent_output_topic)
-    .build()
-)
 
-workflow = (
-    EventDrivenWorkflow.builder()
-    .name("OpenAIEventDrivenWorkflow")
-    .node(llm_node)
-    .build()
-)
+react_agent = create_react_agent()
 
-result = workflow.invoke(invoke_context, [message])
+result = react_agent.run(user_input, invoke_context)
+
 
 for output_message in result:
-    print("Output message:", output_message.content)
+    print("Output message:", output_message)
 
 events = event_store.get_conversation_events(conversation_id)
 
 print(f"Events for conversation {conversation_id}:")
-print(f"Events: {events}")
+print(f"Events: {events} ")
+
 ```
 
 ## Running the Example
@@ -284,11 +234,20 @@ print(f"Events: {events}")
    ```
 
 4. **Expected output**:
-   ```
-   Output message: The capital of the United Kingdom is London.
-   Events for conversation 1a2b3c4d5e6f7g8h9i0j:
-   Events: [Event objects with full conversation history]
-   ```
+
+<div class="python"><pre>
+<code>
+2025-07-12 17:38:55.566 | WARNING  | grafi.tools.function_calls.function_call_tool:__init_subclass__:86 - GoogleSearchTool: no method decorated with @llm_function found.
+2025-07-12 17:38:55.895 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:30 - Endpoint check failed: [Errno 111] Connection refused
+2025-07-12 17:38:55.895 | DEBUG    | grafi.common.instrumentations.tracing:setup_tracing:117 - OTLP endpoint is not available. Using InMemorySpanExporter.
+2025-07-12 17:38:55.905 | INFO     | grafi.common.topics.topic:publish_data:64 - [agent_input_topic] Message published with event_id: 1da4f45008264dc98fd63dc154dcaa6e
+2025-07-12 17:38:55.912 | DEBUG    | grafi.nodes.node:invoke:49 - Executing Node with inputs: [ConsumeFromTopicEvent(event_id='8dd13f159fbc40b29ca030501f4d2859', event_version='1.0', invoke_context=InvokeContext(conversation_id='9051491ca7a84b71a3f3e9d790b79e4f', invoke_id='6e56da25ca824bf4a8d454a731b6f336', assistant_request_id='0e0317d25c9b40e4a76a130bbbb7bc43', user_id='9e396be8f8c442bc9269a31a9b3f69a2'), event_type=<EventType.CONSUME_FROM_TOPIC: 'ConsumeFromTopic'>, timestamp=datetime.datetime(2025, 7, 12, 16, 38, 55, 909090, tzinfo=datetime.timezone.utc), topic_name='agent_input_topic', offset=0, data=[Message(name=None, message_id='ae2638fa5f3047fbbfb43dbd1545e6d2', timestamp=1752338335885634346, content='What is the capital of the United Kingdom', refusal=None, annotations=None, audio=None, role='user', tool_call_id=None, tools=None, function_call=None, tool_calls=None, is_streaming=False)], consumer_name='OpenAIInputNode', consumer_type='OpenAIInputNode')]
+2025-07-12 17:38:57.400 | INFO     | grafi.common.topics.topic:publish_data:69 - [function_call_topic] Message NOT published (condition not met)
+2025-07-12 17:38:57.400 | INFO     | grafi.common.topics.output_topic:publish_data:91 - [agent_output_topic] Message published with event_id: d83d3339fbd94d6e983fc51965177891
+<span style="color:#FF4689">Output from React Agent:</span>  The capital of the United Kingdom is London.
+<span style="color:#FF4689">Events for conversation: </span> 9051491ca7a84b71a3f3e9d790b79e4f:
+<span style="color:#FF4689">Events: </span>[AssistantInvokeEvent(event_id='7d97059ad3404c74be582ed4d01e365e', event_version='1.0', invoke_context=InvokeContext(conversation_id='9051491ca7a84b71a3f3e9d790b79e4f', invoke_id='6e56da25ca824bf4a8d454a731b6f336', assistant_request_id='0e0317d25c9b40e4a76a130bbbb7bc43', user_id='9e396be8f8c442bc9269a31a9b3f69a2'), event_type=<EventType.ASSISTANT_INVOKE: 'AssistantInvoke'>, timestamp=datetime.datetime(2025, 7, 12, 16, 38, 55, 885710), assistant_id='de51912ecc6c44ce803a0cd5eb358ba5', assistant_name='ReActAgent', assistant_type='ReActAgent', input_data=[Message(name=None, message_id='ae2638fa5f3047fbbfb43dbd1545e6d2', timestamp=1752338335885634346, content='What is the capital of the United Kingdom', refusal=None, annotations=No```</code></pre></div>
+```
 
 You can view the events in your postgres database as well now
 
@@ -325,7 +284,7 @@ You can view the events in your postgres database as well now
 ### Common Issues
 
 **Database Connection Errors**:
-- Ensure PostgreSQL container is running: `docker-compose ps`
+- Ensure PostgreSQL container is running: `docker compose ps`
 - Check connection string matches container configuration
 - Verify port 5432 is available
 
