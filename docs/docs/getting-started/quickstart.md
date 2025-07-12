@@ -32,11 +32,7 @@ touch README.md
 This will create the `pyproject.toml` file that uv needs.
 
 <!-- ```bash
-<<<<<<< HEAD
 uv init --name graphite-react
-=======
-poetry init --name graphite-react
->>>>>>> 17a3def (updated code for installation / quiickstart)
 ``` -->
 
 <div class="bash"><pre>
@@ -45,26 +41,19 @@ poetry init --name graphite-react
 Be sure to specify a compatible Python version,  open `pyproject.toml` and ensure it includes:
 
 ```toml
-<<<<<<< HEAD
 [project]
 name = "graphite-react"
 dependencies = [
-    "grafi>=0.0.18",
+    "grafi>=0.0.19",
 ]
 requires-python = ">=3.10,<3.13"
-=======
-[tool.poetry.dependencies]
-grafi = "^0.0.18"
-python = ">=3.10,<3.13"
-googlesearch-python = "^1.3.0"
-pycountry = "^24.6.1"
->>>>>>> 17a3def (updated code for installation / quiickstart)
 ```
 
 Now install the dependencies:
 
 <!-- ```bash
 uv sync
+uv pip install googlesearch-python pycountry
 ``` -->
 
 <div class="bash"><pre>
