@@ -7,18 +7,18 @@ This guide walks you through installing Graphite using pip.
 **Prerequisites:**
 
 - Python >=3.10, < 3.13
-- pip (Python package installer)
+- [uv](https://docs.astral.sh/uv/#installation)
 
 ## Installation
 
 Graphite can be installed with a single command using pip:
 
 <!-- ```bash
-pip install grafi
+uv pip install grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install grafi</code></pre></div>
+<code><span style="color:#FF4689">uv pip</span> install grafi</code></pre></div>
 
 That's it! Graphite will be installed along with all its dependencies.
 
@@ -67,7 +67,7 @@ deactivate
 graphite-env\Scripts\activate
 
 <span style="color:#959077"># Install Graphite</span>
-<span style="color:#FF4689">pip</span> install grafi
+<span style="color:#FF4689">uv pip</span> install grafi
 
 <span style="color:#959077"># When done, deactivate the virtual environment</span>
 <span style="color:#FF4689">deactivate</span></code></pre></div>
@@ -81,7 +81,7 @@ pip install --upgrade grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--upgrade</span> grafi</code></pre></div>
+<code><span style="color:#FF4689">uv pip</span> install <span style="color:#AE81FF">--upgrade</span> grafi</code></pre></div>
 
 ## Troubleshooting
 
@@ -95,7 +95,7 @@ pip install --user grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--user</span> grafi</code></pre></div>
+<code><span style="color:#FF4689">uv pip</span> install <span style="color:#AE81FF">--user</span> grafi</code></pre></div>
 
 **Dependency Conflicts:**
 If you have dependency conflicts, consider using a virtual environment or:
@@ -105,7 +105,7 @@ pip install --force-reinstall grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--force-reinstall</span> grafi</code></pre></div>
+<code><span style="color:#FF4689">uv pip</span> install <span style="color:#AE81FF">--force-reinstall</span> grafi</code></pre></div>
 
 **Python Version Issues:**
 Ensure you're using a supported Python version:
