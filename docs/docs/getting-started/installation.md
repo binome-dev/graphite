@@ -41,7 +41,7 @@ For better dependency management, it's recommended to install Graphite in a virt
 
 <!-- ```bash
 # Create a virtual environment
-python -m venv .venv
+uv venv
 
 # Activate the virtual environment
 # On Linux/macOS:
@@ -58,13 +58,13 @@ deactivate
 
 <div class="bash"><pre>
 <code><span style="color:#959077"># Create a virtual environment</span>
-<span style="color:#FF4689">python</span> <span style="color:#AE81FF">-m</span> venv graphite-env
+<span style="color:#FF4689">uv</span> venv
 
 <span style="color:#959077"># Activate the virtual environment</span>
 <span style="color:#959077"># On Linux/macOS</span>
-<span style="color:#FF4689">source</span> graphite-env/bin/activate
+<span style="color:#FF4689">source</span> .venv/bin/activate
 <span style="color:#959077"># On Windows:</span>
-graphite-env\Scripts\activate
+.venv\Scripts\activate
 
 <span style="color:#959077"># Install Graphite</span>
 <span style="color:#FF4689">uv </span> add grafi
