@@ -44,7 +44,7 @@ Be sure to specify a compatible Python version,  open `pyproject.toml` and ensur
 [project]
 name = "graphite-react"
 dependencies = [
-    "grafi>=0.0.19",
+    "grafi>=0.0.21",
 ]
 requires-python = ">=3.10,<3.13"
 ```
@@ -53,7 +53,7 @@ Now install the dependencies:
 
 <!-- ```bash
 uv sync
-uv pip install googlesearch-python pycountry
+uv add googlesearch-python pycountry
 ``` -->
 
 <div class="bash"><pre>

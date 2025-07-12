@@ -26,7 +26,7 @@ Let's examine the complete code and break it down line by line:
 
 Configure your code to read `OPENAI_API_KEY` from your environment, as well as `OPENAI_MODEL` and `OPENAI_SYSTEM_MESSAGE`. You can modify the default values if you prefer not to set environment variables, although it is recommended to set `OPENAI_API_KEY` as an environment variable for security.
 
-```python linenums="1"
+```python
 import os
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
@@ -62,11 +62,15 @@ def main():
     )
 ```
 
-The `InvokeContext` object contains essential metadata:
-- `user_id`: Identifies the user making the request
-- `conversation_id`: Groups related messages in a conversation
-- `invoke_id`: Unique identifier for this specific invocation
-- `assistant_request_id`: Tracks the specific request
+
+The `InvokeContext` maintains the workflow state and tracking information across different operations in the system. It provides essential context for conversation management and request tracing.
+
+
+
+- `user_id`: Optional user identifier, defaults to empty string.
+- `conversation_id`: Unique identifier for a conversation between user and assistant.
+- `invoke_id`: Unique identifier for each conversation invoke - an invoke can involve multiple agents.
+- `assistant_request_id`: Created when an agent receives a request from the user.
 
 The `Message` object represents the user's input:
 - `role`: Specifies this is a "user" message
