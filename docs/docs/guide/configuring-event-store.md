@@ -7,7 +7,6 @@ Event stores are a powerful feature in the Graphite AI framework that enable per
 An event store in Graphite captures and persists  pub/sub events that occur during workflow execution, including:
 - User messages and system responses
 - Node executions and tool invocations
-- Workflow state changes
 - Error events and debugging information
 
 This provides valuable insights into your AI application's behavior and enables features like conversation history, debugging, and analytics.
@@ -26,6 +25,11 @@ First, let's set up a PostgreSQL database using Docker Compose. This provides a 
 
 ### Docker Compose Configuration
 
+
+create `.pgdata` directory that will act as the volume for your database
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">mkdir</span> .pgdata</code></pre></div>
 Create a `docker-compose.yaml` file in your project root:
 
 ```yamlversion: '3.8'
@@ -262,7 +266,7 @@ You can view the events in your postgres database as well now
 
 ### Conversation Management
 - **History Retrieval**: Access complete conversation history for context
-- **Session Continuity**: Maintain state across multiple interactions
+- **Session Continuity**: Maintain history across multiple interactions
 - **User Analytics**: Understand user behavior patterns
 
 ### Compliance and Auditing
