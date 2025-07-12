@@ -1,24 +1,24 @@
 # Installation Guide
 
-This guide walks you through installing Graphite using pip.
+This guide walks you through installing Graphite using uv.
 
 ## System Requirements
 
 **Prerequisites:**
 
 - Python >=3.10, < 3.13
-- pip (Python package installer)
+- [uv](https://docs.astral.sh/uv/#installation)
 
 ## Installation
 
-Graphite can be installed with a single command using pip:
+Graphite can be installed with a single command using uv:
 
 <!-- ```bash
-pip install grafi
+uv add grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install grafi</code></pre></div>
+<code><span style="color:#FF4689">uv</span> add grafi</code></pre></div>
 
 That's it! Graphite will be installed along with all its dependencies.
 
@@ -41,16 +41,16 @@ For better dependency management, it's recommended to install Graphite in a virt
 
 <!-- ```bash
 # Create a virtual environment
-python -m venv graphite-env
+uv venv
 
 # Activate the virtual environment
 # On Linux/macOS:
-source graphite-env/bin/activate
+source .venv/bin/activate
 # On Windows:
 graphite-env\Scripts\activate
 
 # Install Graphite
-pip install grafi
+uv add grafi
 
 # When done, deactivate the virtual environment
 deactivate
@@ -58,16 +58,16 @@ deactivate
 
 <div class="bash"><pre>
 <code><span style="color:#959077"># Create a virtual environment</span>
-<span style="color:#FF4689">python</span> <span style="color:#AE81FF">-m</span> venv graphite-env
+<span style="color:#FF4689">uv</span> venv
 
 <span style="color:#959077"># Activate the virtual environment</span>
 <span style="color:#959077"># On Linux/macOS</span>
-<span style="color:#FF4689">source</span> graphite-env/bin/activate
+<span style="color:#FF4689">source</span> .venv/bin/activate
 <span style="color:#959077"># On Windows:</span>
-graphite-env\Scripts\activate
+.venv\Scripts\activate
 
 <span style="color:#959077"># Install Graphite</span>
-<span style="color:#FF4689">pip</span> install grafi
+<span style="color:#FF4689">uv </span> add grafi
 
 <span style="color:#959077"># When done, deactivate the virtual environment</span>
 <span style="color:#FF4689">deactivate</span></code></pre></div>
@@ -77,35 +77,26 @@ graphite-env\Scripts\activate
 To upgrade to the latest version of Graphite:
 
 <!-- ```bash
-pip install --upgrade grafi
+uv add --upgrade grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--upgrade</span> grafi</code></pre></div>
+<code><span style="color:#FF4689">uv</span> add <span style="color:#AE81FF">--upgrade</span> grafi</code></pre></div>
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Permission Errors:**
-If you encounter permission errors, try installing with the `--user` flag:
-
-<!-- ```bash
-pip install --user grafi
-``` -->
-
-<div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--user</span> grafi</code></pre></div>
 
 **Dependency Conflicts:**
 If you have dependency conflicts, consider using a virtual environment or:
 
 <!-- ```bash
-pip install --force-reinstall grafi
+uv add --force-reinstall grafi
 ``` -->
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">pip</span> install <span style="color:#AE81FF">--force-reinstall</span> grafi</code></pre></div>
+<code><span style="color:#FF4689">uv</span> add <span style="color:#AE81FF">--force-reinstall</span> grafi</code></pre></div>
 
 **Python Version Issues:**
 Ensure you're using a supported Python version:
@@ -125,7 +116,7 @@ If you encounter installation issues:
 2. Look through [GitHub Issues](https://github.com/binome-dev/graphite/issues) for similar problems
 3. Create a new issue with:
    - Your operating system and version
-   - Python and pip versions
+   - Python and uv versions
    - Complete error messages
 
 ## Next Steps

@@ -39,6 +39,8 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
+  - Guides:
+    - Simple Workflow: guide/creating-a-simple-workflow.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
@@ -72,7 +74,7 @@ site_name: Graphite Documentation
 
 markdown_extensions:
   - codehilite:
-      linenums: false
+      linenums: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
