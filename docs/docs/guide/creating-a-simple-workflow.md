@@ -24,7 +24,9 @@ Let's examine the complete code and break it down line by line:
 
 ### 1. Environment Configuration
 
-```python
+Configure your code to read `OPENAI_API_KEY` from your environment, as well as `OPENAI_MODEL` and `OPENAI_SYSTEM_MESSAGE`. You can modify the default values if you prefer not to set environment variables, although it is recommended to set `OPENAI_API_KEY` as an environment variable for security.
+
+```python linenums="1"
 import os
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
@@ -34,17 +36,12 @@ model = os.getenv("OPENAI_MODEL", "gpt-4o")
 system_message = os.getenv("OPENAI_SYSTEM_MESSAGE", "You are a helpful assistant.")
 ```
 
-**Line 11**: Retrieve the OpenAI API key from environment variables.
-
-**Lines 12-13**: Validate that the API key exists, raising an error if it's missing.
-
-**Line 15**: Get the model name from environment variables, defaulting to "gpt-4o" if not specified.
-
-**Line 16**: Set the system message that defines the AI's behavior, with a default helpful assistant prompt.
 
 ### 2. Main Function Setup
 
-```python
+The main function orchestrates the entire workflow. We start by defining a sample user question about the UK's capital, then create the necessary context and message objects.
+
+```python linenums="9"
 import uuid
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
@@ -65,23 +62,23 @@ def main():
     )
 ```
 
-**Line 19**: Define the main function that orchestrates the entire workflow.
-
-**Line 20**: Set up a sample user question about the UK's capital.
-
-**Lines 22-27**: Create an `InvokeContext` object containing:
+The `InvokeContext` object contains essential metadata:
 - `user_id`: Identifies the user making the request
 - `conversation_id`: Groups related messages in a conversation
 - `invoke_id`: Unique identifier for this specific invocation
 - `assistant_request_id`: Tracks the specific request
 
-**Lines 29-32**: Create a `Message` object representing the user's input:
+The `Message` object represents the user's input:
 - `role`: Specifies this is a "user" message
 - `content`: Contains the actual question text
 
 ### 3. Node Creation
 
-```python
+Nodes are first-class citizens in Graphite - all functionality must be wrapped in a node. Since we want to query OpenAI for the capital of the United Kingdom, we create a Node using the builder pattern.
+
+The node subscribes to the `agent_input_topic` (the root topic in Graphite), uses the `OpenAITool` to query OpenAI's endpoint with the required configuration (`api_key`, `model`, and `system_message`), and publishes results to the `agent_output_topic` (the final topic in any Graphite workflow).
+
+```python linenums="27"
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.common.topics.topic import agent_input_topic
@@ -103,29 +100,12 @@ llm_node = (
 )
 ```
 
-**Lines 35-47**: Create an AI node using the builder pattern:
-
-**Line 36**: Start building a new Node instance.
-
-**Line 37**: Name the node "LLMNode" for identification.
-
-**Line 38**: Subscribe to the input topic to receive user messages.
-
-**Lines 39-45**: Configure the OpenAI tool:
-- **Line 40**: Start building the OpenAI tool
-- **Line 41**: Name the tool "OpenAITool"
-- **Line 42**: Set the API key for authentication
-- **Line 43**: Specify which model to use
-- **Line 44**: Set the system message that defines AI behavior
-- **Line 45**: Build the tool instance
-
-**Line 46**: Configure the node to publish responses to the output topic.
-
-**Line 47**: Build the final node instance.
 
 ### 4. Workflow Creation
 
-```python
+Now that we have created a node with its input (subscribe) and output (publish_to) configuration, we must bind it to a workflow. We use Graphite's `EventDrivenWorkflow` with the builder pattern to attach the node.
+
+```python linenums="46"
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 workflow = (
@@ -136,19 +116,12 @@ workflow = (
 )
 ```
 
-**Lines 49-54**: Create an event-driven workflow:
-
-**Line 50**: Start building the workflow.
-
-**Line 51**: Name the workflow for identification.
-
-**Line 52**: Add the previously created LLM node to the workflow.
-
-**Line 53**: Build the workflow instance.
 
 ### 5. Workflow Execution
 
-```python
+With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`. 
+
+```python linenums="54"
 result = workflow.invoke(
     invoke_context,
     [message]
@@ -158,22 +131,14 @@ for output_message in result:
     print("Output message:", output_message.content)
 ```
 
-**Lines 57-60**: Execute the workflow:
-- **Line 57**: Call the workflow's invoke method
-- **Line 58**: Pass the context containing metadata
-- **Line 59**: Pass a list containing the user's message
-
-**Lines 62-63**: Process the results:
-- **Line 62**: Iterate through each response message
-- **Line 63**: Print the content of each response
-
 ### 6. Entry Point
 
-```python
+Finally, add the standard Python entry point to run the main function when the script is executed directly.
+
+```python linenums="62"
 if __name__ == "__main__":
     main()
 ```
-
 
 ## Running the Code
 
