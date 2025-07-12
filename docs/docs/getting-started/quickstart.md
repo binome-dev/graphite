@@ -69,6 +69,12 @@ This will automatically create a virtual environment and install `grafi` with th
 > uv python pin python3.12
 > ``` -->
 
+You also need the following two dependencies for this guide.
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">uv</span> add googlesearch-python pycountry</code></pre></div>
+
+
 ---
 
 ## Use Build-in ReAct Agent
