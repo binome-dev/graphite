@@ -9,9 +9,10 @@ import httpx
 from loguru import logger
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_execution import record_tool_a_execution
-from grafi.common.decorators.record_tool_execution import record_tool_execution
-from grafi.common.models.execution_context import ExecutionContext
+
+from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.mcp_tool_spec import MCPToolSpec
 from grafi.common.models.message import Message
@@ -118,25 +119,25 @@ class FastMCPClient(FunctionCallTool):
                 f"Request failed: {e}. Please check your MCP server configuration."
             )
 
-    @record_tool_execution
+    @record_tool_invoke
     def execute(
-        self, execution_context: ExecutionContext, input_data: Messages
+        self, invoke_context: InvokeContext, input_data: Messages
     ) -> Messages:
         raise NotImplementedError(
             "FastMCPClient does not support synchronous execution. Use a_execute instead."
         )
 
-    @record_tool_a_execution
+    @record_tool_a_invoke
     async def a_execute(
         self,
-        execution_context: ExecutionContext,
+        invoke_context: InvokeContext,
         input_data: Messages,
     ) -> AsyncGenerator[Messages, None]:
         """
         Execute the FastMCPClient with the provided input data.
 
         Args:
-            execution_context (ExecutionContext): The context for executing the function.
+            invoke_context (InvokeContext): The context for executing the function.
             input_data (Message): The input data for the function.
 
         Returns:

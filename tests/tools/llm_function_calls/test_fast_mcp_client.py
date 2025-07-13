@@ -11,7 +11,7 @@ from mcp.types import ImageContent
 from mcp.types import TextContent
 from mcp.types import TextResourceContents
 
-from grafi.common.models.execution_context import ExecutionContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
@@ -162,9 +162,9 @@ class TestFastMCPClient:
     async def test_a_execute_no_tool_calls(self, test_client_config):
         fastmcp_client = FastMCPClient()
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
         messages = [
@@ -195,9 +195,9 @@ class TestFastMCPClient:
                 ),
             )
         ]
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -223,9 +223,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = None
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -254,9 +254,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -298,9 +298,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -343,9 +343,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -385,9 +385,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -417,9 +417,9 @@ class TestFastMCPClient:
             )
         ]
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
 
@@ -453,9 +453,9 @@ class TestFastMCPClient:
     def test_execute_not_implemented(self, test_client_config):
         fastmcp_client = FastMCPClient()
         fastmcp_client.client_config = test_client_config
-        context = ExecutionContext(
+        context = InvokeContext(
             conversation_id="test_conv",
-            execution_id="test_execution_id",
+            invoke_id="test_invoke_id",
             assistant_request_id="test_req",
         )
         messages = []
