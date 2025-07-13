@@ -42,32 +42,32 @@ Assistants solve these problems by providing a structured, object-oriented appro
 
 ## Code Walkthrough
 
-Let's examine how to transform our simple workflow into a powerful assistant. For this we will create an mock alert assistant that will assist us later to handle alerts from other services.
+Let's examine how to transform our simple workflow into a powerful assistant. For this we will create an finance assistant that will provide us with financial information to make decisions.
 
 ### Global Configuration
 
-```python linenums="19"
+```python
 CONVERSATION_ID = uuid.uuid4().hex
 ```
 
 Set `CONVERSATION_ID` to track conversation flow.
 ### Assistant Class Definition
 
-```python linenums="19"
+```python
 # main.py
 from grafi.assistants.assistant import Assistant
 from typing import Optional
 
 from pydantic import Field
 
-class GraphiteAlertsAssistant(Assistant):
-    """Assistant for handling graphite alerts using OpenAI."""
+class FinanceAssistant(Assistant):
+    """Assistant for handling financial queries and analysis using OpenAI."""
     
-    name: str = Field(default="GraphiteAlertsAssistant")
-    api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY", ""))
+    name: str = Field(default="FinanceAssistant")
+    type: str = Field(default="FinanceAssistant")
+    api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY"))
     model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
-    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE", ""))
-
+    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE"))
    
 ```
 
@@ -87,12 +87,8 @@ from typing import Self
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 
 
-class GraphiteAlertsAssistantBuilder(AssistantBaseBuilder[GraphiteAlertsAssistant]):
-    """Concrete builder for GraphiteAlertsAssistant."""
-
-    def name(self, name: str) -> Self:
-        self.kwargs["name"] = name
-        return self
+class FinanceAssistantBuilder(AssistantBaseBuilder[FinanceAssistant]):
+    """Concrete builder for FinanceAssistant."""
 
     def api_key(self, api_key: str) -> Self:
         self.kwargs["api_key"] = api_key
@@ -112,22 +108,22 @@ class GraphiteAlertsAssistantBuilder(AssistantBaseBuilder[GraphiteAlertsAssistan
 - Provides methods for setting API key, model, and system message
 - Returns `self` for method chaining
 
-This class is used to set the fields from the `GraphiteAlertsAssistant` the magic happens on the `builer` method up next.
+This class is used to set the fields from the `FinanceAssistant` the magic happens on the `builer` method up next.
 
 ### Builder Pattern Implementation
 
 ```python 
-class GraphiteAlertsAssistant(Assistant):
+class FinanceAssistant(Assistant):
 
     ...
 
     @classmethod
-    def builder(cls) -> "GraphiteAlertsAssistantBuilder":
-        """Return a builder for GraphiteAlertsAssistant."""
-        return GraphiteAlertsAssistantBuilder(cls)
+    def builder(cls) -> "FinanceAssistantBuilder":
+        """Return a builder for FinanceAssistant."""
+        return FinanceAssistantBuilder(cls)
 ```
 
-Implement the builder pattern for fluent configuration of the assistant. This piece makes sure that when you call the builder() class methohd, instead of returning an instance of `GraphiteAlertsAssistant` it will return an instance of `GraphiteAlertsAssistantBuilder` which will configure the main assistant class's values.
+Implement the builder pattern for fluent configuration of the assistant. This piece makes sure that when you call the builder() class methohd, instead of returning an instance of `FinanceAssistant` it will return an instance of `FinanceAssistantBuilder` which will configure the main assistant class's values.
 
 ### Workflow Construction
 
@@ -140,11 +136,11 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 
-class GraphiteAlertsAssistant(Assistant):
+class FinanceAssistant(Assistant):
 
     ...
 
-    def _construct_workflow(self) -> "GraphiteAlertsAssistant":
+    def _construct_workflow(self) -> "FinanceAssistant":
         """Construct the workflow for the assistant."""
         llm_node = (
             Node.builder()
@@ -164,8 +160,8 @@ class GraphiteAlertsAssistant(Assistant):
 
         self.workflow = (
             EventDrivenWorkflow.builder()
-            .name("GraphiteAlertsWorkflow")
-            .node(llm_node)
+            .name("FinanceWorkflow")
+            .node(finance_llm_node)
             .build()
         )
 
@@ -191,14 +187,14 @@ from grafi.common.models.invoke_context import InvokeContext
 from typing import Optional
 from grafi.common.models.message import Message
 
-class GraphiteAlertsAssistant(Assistant):
+class FinanceAssistant(Assistant):
 
     ...
 
-    def get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
+    ef get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
         """Prepare input data and invoke context."""
         if invoke_context is None:
-            logger.debug("Creating new InvokeContext with default conversation id for GraphiteAlertsAssistant")
+            logger.debug("Creating new InvokeContext with default conversation id for FinanceAssistant")
             invoke_context = InvokeContext(
                 user_id=uuid.uuid4().hex,
                 conversation_id=CONVERSATION_ID,
@@ -223,7 +219,7 @@ This function is not part of the framework, but rather a helper function used to
 ### Assistant Execution
 
 ```python
-class GraphiteAlertsAssistant(Assistant):
+class FinanceAssistant(Assistant):
 
     ...
     def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
@@ -258,17 +254,21 @@ Now that we have created the class for the assistance, we have to instantiate it
 ```python
 # main.py
 def main():
-    builder = GraphiteAlertsAssistant.builder()
+    system_message = os.getenv("OPENAI_SYSTEM_MESSAGE")
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL")
+
+    builder = FinanceAssistant.builder()
     assistant = (
         builder
-        .system_message("You are a helpful assistant for handling graphite alerts.")
-        .model("gpt-4o")
-        .api_key(os.getenv("OPENAI_API_KEY"))
+        .system_message(system_message)
+        .model(model)
+        .api_key(api_key)
         .build()
     )
 
     """Main function to run the assistant."""
-    user_input = "What is the capital of the United Kingdom"
+    user_input = "What are the key factors to consider when choosing between a 401(k) and a Roth IRA?"
     result = assistant.run(user_input)
     print("Output message:", result)
 
@@ -282,13 +282,13 @@ A better approach would be to create a function that handles the creation of the
 
 ```python
 # main.py
-def create_graphite_alerts_assistant(
+def create_finance_assistant(
     system_message: Optional[str] = None,
     model: Optional[str] = None,
     api_key: Optional[str] = None,
-) -> GraphiteAlertsAssistant:
-    """Create a GraphiteAlertsAssistant instance."""
-    builder = GraphiteAlertsAssistant.builder()
+) -> FinanceAssistant:
+    """Create a FinanceAssistant instance."""
+    builder = FinanceAssistant.builder()
 
     if system_message:
         builder.system_message(system_message)
@@ -306,14 +306,14 @@ def main():
     model = os.getenv("OPENAI_MODEL")
 # These values are for readability, as these values are already being set from the environment variables from within the class
 
-    assistant = create_graphite_alerts_assistant(
+    assistant = create_finance_assistant(
         system_message,
         model,
         api_key
     ) 
    
     """Main function to run the assistant."""
-    user_input = "What is the capital of the United Kingdom"
+    user_input = "What are the key factors to consider when choosing between a 401(k) and a Roth IRA?"
     result = assistant.run(user_input)
     print("Output message:", result)
 
@@ -332,7 +332,7 @@ To run this assistant example:
    ```bash
    export OPENAI_API_KEY="your-api-key-here"
    export OPENAI_MODEL="gpt-4o"  # Optional
-   export OPENAI_SYSTEM_MESSAGE="You are a helpful assistant for handling graphite alerts."  # Optional
+   export OPENAI_SYSTEM_MESSAGE="You are a knowledgeable financial advisor assistant. Help users with financial planning, investment analysis, market insights, and general financial questions. Provide accurate, helpful advice while emphasizing the importance of professional financial consultation for major decisions."  # Optional
    ```
 
 2. **Execute the script**:
@@ -342,7 +342,16 @@ To run this assistant example:
 
 3. **Expected output**:
    ```
-   Output message: The capital of the United Kingdom is London.
+   Output message:
+   Financial advice: When choosing between a 401(k) and a Roth IRA, it's important to consider several key factors. Each has its unique advantages and may be better suited to different financial situations and goals. Here are some factors to consider:
+
+    1. **Tax Treatment**:
+   - **401(k)**: Contributions are typically made with pre-tax dollars, which can lower your current taxable income. However, withdrawals during retirement are taxed as ordinary income.
+   - **Roth IRA**: Contributions are made with after-tax dollars, meaning you pay taxes upfront. However, qualified withdrawals are tax-free, including the earnings.
+
+    2. **Income and Contribution Limits**:
+   - **401(k)**: As of 2023, the contribution limit is $22,500 annually, with an additional $7,500 catch-up contribution for those aged 50 and over. There are no income limits for 401(k) eligibility.
+   - **Roth IRA**: The contribution limit is $6,500 annually, with a $1,000 catch-up contribution for those aged 50 and over. Contributions are restricted for high earners. For example, for 2023, contributions phase out for single filers with MAGI (Modified Adjusted Gross Income) between $138,000 and $153,000.
    ```
 
 ## Key Benefits of the Assistant Pattern
@@ -373,13 +382,13 @@ To run this assistant example:
 
 ```python
 # Create specialized assistants for different use cases
-grafana_assistant = create_graphite_alerts_assistant(
-    system_message="You are a grafana support specialist.",
+stock_assistant = create_finance_assistant(
+    system_message="You are a stock specialist,  you will process all contexst data and give out the best stock picks for a given date",
     model="gpt-4o"
 )
 
-slack_assistant = create_graphite_alerts_assistant(
-    system_message="You are a slack specialist, you will summirize alerts and provide feedback on a given channel",
+currency_assistant = create_finance_assistant(
+    system_message="You are a currency specialist, you will analyze all contexts and data to get the best currency trades possible",
     model="gpt-3.5-turbo"
 )
 ```
@@ -388,7 +397,7 @@ slack_assistant = create_graphite_alerts_assistant(
 
 ```python
 custom_assistant = (
-    GraphiteAlertsAssistant.builder()
+    FinanceAssistant.builder()
     .api_key("your-api-key")
     .model("gpt-4o")
     .system_message("You are a custom assistant.")
@@ -408,8 +417,8 @@ context = InvokeContext(
 )
 
 # Use the same context across multiple interactions
-response1 = grafana_assistant.run("Give me all alerts that happened on the 24th of July", context)
-response2 = slack_assistant.run("Give me all the alerts from channel #alerts", context)
+response1 = stock_assistant.run("Give me the best stock today to buy for a 10% gain in 2025", context)
+response2 = currency_assistant.run("The lyra crashed, what's the best currency to exchange to?", context)
 ```
 
 
