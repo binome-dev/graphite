@@ -128,9 +128,6 @@ export OPENAI_API_KEY="sk-proj-******"
 
 Use uv to invoke the script inside the virtual environment:
 
-<!-- ```bash
-uv run python main.py
-``` -->
 <div class="bash"><pre>
 <code><span style="color:#FF4689">uv</span> run python react_agent_app.py</code></pre></div>
 

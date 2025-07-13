@@ -64,20 +64,11 @@ class GraphiteAlertsAssistant(Assistant):
     """Assistant for handling graphite alerts using OpenAI."""
     
     name: str = Field(default="GraphiteAlertsAssistant")
-
     api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY", ""))
-
     model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
-    
     system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE", ""))
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if self.api_key is None or self.api_key == "":
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-
-        if self.system_message is None or self.system_message == "":
-            raise ValueError("OPENAI_SYSTEM_MESSAGE environment variable is required")
+   
 ```
 
 Create a class that defines the assistant class inheriting from Graphite's base `Assistant` class.
@@ -87,8 +78,7 @@ A good practice is to use Pydantic fields for configuration with environment var
 - `model`: OpenAI model selection with default
 - `system_message`: Customizable system prompt
 
-Even though we have default values it's good practice to allow users to override the values. You should use a separate file for this class, but for simplicity's sake we will keep it all on the `main.py` file.
-in the `__init__` method we validate that at least the `OPENAI_API_KEY` and the `OPENAI_SYSTEM_MESSAGE` has been set
+
 ### Builder Class Implementation
 
 ```python 
@@ -260,81 +250,6 @@ Main execution method that:
 - Handles different response content types
 - Returns a clean string response
 
-
-
-<!-- ### 7. Factory Function
-
-```python
-def create_graphite_alerts_assistant(
-    system_message: Optional[str] = None,
-    model: Optional[str] = None,
-    api_key: Optional[str] = None,
-) -> GraphiteAlertsAssistant:
-    """Create a GraphiteAlertsAssistant instance."""
-    builder = GraphiteAlertsAssistant.builder()
-
-    if system_message:
-        builder.system_message(system_message)
-    if model:
-        builder.model(model)
-    if api_key:
-        builder.api_key(api_key)
-    
-    return builder.build()
-```
-
-**Lines 122-137**: Convenience factory function for creating assistant instances:
-- Provides optional parameters for configuration
-- Uses the builder pattern internally
-- Returns a configured assistant instance
-
-### 10. Global Assistant Instance
-
-```python linenums="140"
-# Create the global assistant instance
-assistant = create_graphite_alerts_assistant()
-```
-
-**Lines 139-140**: Create a global assistant instance for easy access throughout the application. -->
-
-<!-- ### 11. Testing and Execution
-
-```python linenums="143"
-def test_assistant():
-    """Test the assistant with different questions."""
-    print("Testing GraphiteAlertsAssistant...\n")
-    
-    # Test with different questions
-    questions = [
-        "What is the capital of France?",
-        "How do you handle graphite alerts?",
-        "What is 2 + 2?",
-    ]
-    
-    for question in questions:
-        print(f"Question: {question}")
-        response = assistant.run(question)
-        print(f"Response: {response}\n")
-
-
-def main():
-    """Main function to run the assistant."""
-    user_input = "What is the capital of the United Kingdom"
-    result = assistant.run(user_input)
-    print("Output message:", result)
-    
-    # Uncomment to test multiple questions
-    # test_assistant()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-**Lines 143-171**: Provide testing and execution functions:
-- `test_assistant()`: Tests the assistant with multiple questions
-- `main()`: Simple execution example
-- Standard Python entry point -->
 
 ### Putting it all together
 
