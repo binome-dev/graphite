@@ -42,33 +42,7 @@ Assistants solve these problems by providing a structured, object-oriented appro
 
 ## Code Walkthrough
 
-Let's examine how to transform our simple workflow into a powerful assistant. For this we will create an alert assistant that will assist us later to handle alerts from other services.
-
-<!-- ### 1. Import Dependencies
-
-```python linenums="1"
-import os
-import uuid
-from typing import Self
-
-from loguru import logger
-from pydantic import Field
-
-from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import agent_input_topic
-from grafi.nodes.node import Node
-from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-```
-
-**Lines 1-8**: Import standard Python libraries for type hints, logging, and data validation.
-
-**Lines 10-17**: Import Graphite framework components for assistants, models, topics, nodes, tools, and workflows.
-
-
-
-**Line 19**: Define a global conversation ID for maintaining context across assistant interactions. -->
+Let's examine how to transform our simple workflow into a powerful assistant. For this we will create an mock alert assistant that will assist us later to handle alerts from other services.
 
 ### Global Configuration
 
@@ -79,7 +53,7 @@ CONVERSATION_ID = uuid.uuid4().hex
 Set `CONVERSATION_ID` to track conversation flow.
 ### Assistant Class Definition
 
-```python
+```python linenums="19"
 # main.py
 from grafi.assistants.assistant import Assistant
 from typing import Optional
@@ -90,15 +64,20 @@ class GraphiteAlertsAssistant(Assistant):
     """Assistant for handling graphite alerts using OpenAI."""
     
     name: str = Field(default="GraphiteAlertsAssistant")
-    type: str = Field(default="GraphiteAlertsAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+
+    api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY", ""))
+
     model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
-    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE", "You are a helpful assistant for handling graphite alerts."))
+    
+    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE", ""))
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if not self.api_key:
+        if self.api_key is None or self.api_key == "":
             raise ValueError("OPENAI_API_KEY environment variable is required")
+
+        if self.system_message is None or self.system_message == "":
+            raise ValueError("OPENAI_SYSTEM_MESSAGE environment variable is required")
 ```
 
 Create a class that defines the assistant class inheriting from Graphite's base `Assistant` class.
@@ -109,13 +88,21 @@ A good practice is to use Pydantic fields for configuration with environment var
 - `system_message`: Customizable system prompt
 
 Even though we have default values it's good practice to allow users to override the values. You should use a separate file for this class, but for simplicity's sake we will keep it all on the `main.py` file.
-
+in the `__init__` method we validate that at least the `OPENAI_API_KEY` and the `OPENAI_SYSTEM_MESSAGE` has been set
 ### Builder Class Implementation
 
 ```python 
 # main.py
+from typing import Self
+from grafi.assistants.assistant_base import AssistantBaseBuilder
+
+
 class GraphiteAlertsAssistantBuilder(AssistantBaseBuilder[GraphiteAlertsAssistant]):
     """Concrete builder for GraphiteAlertsAssistant."""
+
+    def name(self, name: str) -> Self:
+        self.kwargs["name"] = name
+        return self
 
     def api_key(self, api_key: str) -> Self:
         self.kwargs["api_key"] = api_key
@@ -150,11 +137,19 @@ class GraphiteAlertsAssistant(Assistant):
         return GraphiteAlertsAssistantBuilder(cls)
 ```
 
-Implement the builder pattern for fluent configuration of the assistant. This piece makes sure that when you call the builder() class methohd, instead of returning an instance of `GraphiteAlertsAssistant` it will return an inner class called `GraphiteAlertsAssistantBuilder` that will configure the assistant.
+Implement the builder pattern for fluent configuration of the assistant. This piece makes sure that when you call the builder() class methohd, instead of returning an instance of `GraphiteAlertsAssistant` it will return an instance of `GraphiteAlertsAssistantBuilder` which will configure the main assistant class's values.
 
 ### Workflow Construction
 
-```python linenums="41"
+```python
+from grafi.nodes.node import Node
+from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.topic import agent_input_topic
+from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+
 class GraphiteAlertsAssistant(Assistant):
 
     ...
@@ -195,6 +190,11 @@ Here we implement the `_construct_workflow` method to create the internal workfl
 All the same principles that the simple workflow used apply here.
 
 ### Input Preparation
+Prepare input data and context for workflow execution:
+- Creates a new `InvokeContext` if none is provided
+- Uses the global conversation ID for session continuity
+- Formats the user question as a `Message` object
+- Returns both the input data and context
 
 ```python 
 from grafi.common.models.invoke_context import InvokeContext
@@ -226,11 +226,7 @@ class GraphiteAlertsAssistant(Assistant):
         return input_data, invoke_context
 ```
 
-Prepare input data and context for workflow execution:
-- Creates a new `InvokeContext` if none is provided
-- Uses the global conversation ID for session continuity
-- Formats the user question as a `Message` object
-- Returns both the input data and context
+
 
 This function is not part of the framework, but rather a helper function used to process inputs. It is not necessary, you are free to handle input as you wish.
 
@@ -393,6 +389,8 @@ def main():
     system_message = os.getenv("OPENAI_SYSTEM_MESSAGE")
     api_key = os.getenv("OPENAI_API_KEY")
     model = os.getenv("OPENAI_MODEL")
+# These values are for readability, as these values are already being set from the environment variables from within the class
+
     assistant = create_graphite_alerts_assistant(
         system_message,
         model,
@@ -460,13 +458,13 @@ To run this assistant example:
 
 ```python
 # Create specialized assistants for different use cases
-support_assistant = create_graphite_alerts_assistant(
-    system_message="You are a technical support specialist.",
+grafana_assistant = create_graphite_alerts_assistant(
+    system_message="You are a grafana support specialist.",
     model="gpt-4o"
 )
 
-sales_assistant = create_graphite_alerts_assistant(
-    system_message="You are a sales representative.",
+slack_assistant = create_graphite_alerts_assistant(
+    system_message="You are a slack specialist, you will summirize alerts and provide feedback on a given channel",
     model="gpt-3.5-turbo"
 )
 ```
@@ -495,8 +493,8 @@ context = InvokeContext(
 )
 
 # Use the same context across multiple interactions
-response1 = assistant.run("Hello, how are you?", context)
-response2 = assistant.run("What did I just ask?", context)
+response1 = grafana_assistant.run("Give me all alerts that happened on the 24th of July", context)
+response2 = slack_assistant.run("Give me all the alerts from channel #alerts", context)
 ```
 
 
@@ -523,31 +521,6 @@ response2 = assistant.run("What did I just ask?", context)
 - Test different conversation scenarios
 - Mock external dependencies
 
-## Common Patterns
-
-### Singleton Pattern
-```python
-class SingletonAssistant:
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = create_graphite_alerts_assistant()
-        return cls._instance
-```
-
-### Factory Pattern
-```python
-class AssistantFactory:
-    @staticmethod
-    def create_assistant(assistant_type: str) -> Assistant:
-        if assistant_type == "alerts":
-            return create_graphite_alerts_assistant()
-        elif assistant_type == "support":
-            return create_support_assistant()
-        else:
-            raise ValueError(f"Unknown assistant type: {assistant_type}")
-```
 
 ## Next Steps
 
@@ -558,5 +531,6 @@ With assistants implemented, you can:
 3. **Add Conversation Memory**: Implement persistent conversation storage
 4. **Create Assistant Hierarchies**: Build networks of cooperating assistants
 5. **Add Monitoring**: Implement comprehensive logging and metrics
+6. **Use Grafi-Dev**: Graphite's internal workflow UI
 
 The assistant pattern provides a solid foundation for building production-ready AI applications that are maintainable, testable, and scalable.
