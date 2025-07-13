@@ -84,6 +84,7 @@ In graphite an agent is a specialized assistant that can handle events and perfo
 Create a file named `react_agent_app.py` and create a build-in react-agent:
 
 ```python
+# react_agent_app.py
 from grafi.agents.react_agent import create_react_agent
 
 def main():
@@ -127,11 +128,8 @@ export OPENAI_API_KEY="sk-proj-******"
 
 Use uv to invoke the script inside the virtual environment:
 
-<!-- ```bash
-uv run python main.py
-``` -->
 <div class="bash"><pre>
-<code><span style="color:#FF4689">uv</span> run python main.py</code></pre></div>
+<code><span style="color:#FF4689">uv</span> run python react_agent_app.py</code></pre></div>
 
 You should see following in the terminal
 

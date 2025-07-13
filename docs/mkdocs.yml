@@ -41,6 +41,7 @@ nav:
       - Quickstart: getting-started/quickstart.md
   - Guides:
     - Simple Workflow: guide/creating-a-simple-workflow.md
+    - Getting Started with Assistants: guide/getting-started-with-assistants.md
     - Configuring Event Store: guide/configuring-event-store.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
