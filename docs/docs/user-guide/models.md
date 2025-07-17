@@ -58,7 +58,8 @@ assistant_message = Message(
 | `conversation_id`       | Unique identifier for a conversation between user and assistant.                       |
 | `invoke_id`             | Unique identifier for each conversation invoke - an invoke can involve multiple agents.|
 | `assistant_request_id`  | Created when an agent receives a request from the user.                                |
-| `user_id`               | Optional user identifier, defaults to empty string.                                   |
+| `user_id`               | Optional user identifier, defaults to empty string.                                    |
+| `kwargs`                | Optional additional keyword arguments and context for the workflow                     |
 
 ### InvokeContext Usage Example
 
