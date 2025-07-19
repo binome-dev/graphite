@@ -5,8 +5,10 @@ from typing import Self
 from typing import Tuple
 from typing import TypeVar
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
+from pydantic import PrivateAttr
 
 from grafi.common.events.event import Event
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
@@ -27,6 +29,24 @@ class Workflow(BaseModel):
     name: str = "Workflow"
     type: str = "Workflow"
     nodes: Dict[str, Node] = {}
+
+    # Stop flag to control workflow execution
+    _stop_requested: bool = PrivateAttr(default=False)
+
+    def stop(self) -> None:
+        """
+        Stop the workflow execution.
+        This method can be called by an assistant to stop the workflow during execution.
+        """
+        logger.info("Workflow stop requested")
+        self._stop_requested = True
+
+    def reset_stop_flag(self) -> None:
+        """
+        Reset the stop flag for the workflow.
+        This should be called before starting a new workflow execution.
+        """
+        self._stop_requested = False
 
     def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
         """Invokes the workflow with the given initial inputs."""

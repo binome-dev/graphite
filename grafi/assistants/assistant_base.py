@@ -2,6 +2,7 @@ from typing import Any
 from typing import Self
 from typing import TypeVar
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -66,6 +67,19 @@ class AssistantBase(BaseModel):
             "oi_span_type": self.oi_span_type.value,
             "workflow": self.workflow.to_dict(),
         }
+
+    def stop_workflow(self) -> None:
+        """
+        Stop the current workflow execution.
+        This method allows the assistant to stop an ongoing workflow.
+        """
+        if hasattr(self.workflow, "stop"):
+            self.workflow.stop()
+        else:
+            # Fallback for workflows that don't support stop method
+            logger.warning(
+                f"Workflow {self.workflow.__class__.__name__} does not support stop method"
+            )
 
 
 T_A = TypeVar("T_A", bound=AssistantBase)

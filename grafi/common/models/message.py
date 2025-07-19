@@ -32,6 +32,8 @@ class Message(BaseModel):
         str,
         Dict[str, Any],
         List[Dict[str, Any]],
+        BaseModel,
+        List[BaseModel],
         None,
     ] = None
     refusal: Optional[str] = None

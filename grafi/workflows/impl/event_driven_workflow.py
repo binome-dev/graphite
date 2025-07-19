@@ -264,12 +264,20 @@ class EventDrivenWorkflow(Workflow):
         Invoke the workflow with the given context and input.
         Returns results when all nodes complete processing.
         """
+        # Reset stop flag at the beginning of new execution
+        self.reset_stop_flag()
+
         consumed_events: List[ConsumeFromTopicEvent] = []
         try:
             self.initial_workflow(invoke_context, input)
 
-            # Process nodes until invoke queue is empty
+            # Process nodes until invoke queue is empty or workflow is stopped
             while self._invoke_queue:
+                # Check if workflow should be stopped
+                if self._stop_requested:
+                    logger.info("Workflow execution stopped by assistant request")
+                    break
+
                 node = self._invoke_queue.popleft()
 
                 # Given node, collect all the messages can be linked to it
@@ -309,6 +317,9 @@ class EventDrivenWorkflow(Workflow):
         """
         Run the workflow with streaming output.
         """
+        # Reset stop flag at the beginning of new execution
+        self.reset_stop_flag()
+
         # 1 – initial seeding
         self.initial_workflow(invoke_context, input)
 
@@ -367,9 +378,14 @@ class EventDrivenWorkflow(Workflow):
                     # If nothing ever arrived, that's an error
                     if not consumed_output_async_events and event_queue.empty():
                         get_event_task.cancel()
-                        raise RuntimeError(
-                            "Node processing completed without emitting any agent_output_topic events"
-                        )
+                        if self._stop_requested:
+                            logger.info(
+                                "Workflow execution stopped by assistant request"
+                            )
+                        else:
+                            raise RuntimeError(
+                                "Node processing completed without emitting any agent_output_topic events"
+                            )
                     # Otherwise break to drain remaining events
                     break
 
@@ -398,8 +414,21 @@ class EventDrivenWorkflow(Workflow):
     ) -> None:
         """Process all nodes without blocking event streaming."""
         while self._invoke_queue or running_tasks:
+            # Check if workflow should be stopped
+            if self._stop_requested:
+                logger.info("Nodes execution stopped by assistant request")
+                # Cancel all running tasks
+                for task in running_tasks:
+                    task.cancel()
+                break
+
             # Start new tasks for all queued nodes
             while self._invoke_queue:
+                # Check again before processing each node
+                if self._stop_requested:
+                    logger.info("Workflow execution stopped by assistant request")
+                    break
+
                 node = self._invoke_queue.popleft()
 
                 if node.name in executing_nodes:
@@ -478,6 +507,11 @@ class EventDrivenWorkflow(Workflow):
         Invoke a single node asynchronously with proper stream handling.
         """
         try:
+            # Check if workflow should be stopped before invoking node
+            if self._stop_requested:
+                logger.info(f"Skipping node {node.name} execution - workflow stopped")
+                return
+
             node_consumed_events: List[ConsumeFromTopicEvent] = self.get_node_input(
                 node
             )

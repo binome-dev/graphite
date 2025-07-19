@@ -56,6 +56,7 @@ def workflow_failed_event_dict():
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
+                "kwargs": {},
                 "user_id": "",
             },
         },
