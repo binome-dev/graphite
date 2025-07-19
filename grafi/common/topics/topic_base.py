@@ -23,13 +23,9 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 
 
-AGENT_INPUT_TOPIC = "agent_input_topic"
-HUMAN_REQUEST_TOPIC = "human_request_topic"
-
-AGENT_RESERVED_TOPICS = [
-    AGENT_INPUT_TOPIC,
-    HUMAN_REQUEST_TOPIC,
-]
+AGENT_INPUT_TOPIC_TYPE = "AgentInput"
+AGENT_OUTPUT_TOPIC_TYPE = "AgentOutput"
+HUMAN_REQUEST_TOPIC_TYPE = "HumanRequest"
 
 # Topic cache configuration
 DEFAULT_MAX_CACHE_SIZE = 1000  # Maximum number of events to keep in cache
@@ -106,6 +102,7 @@ class TopicBase(BaseModel):
     """
 
     name: str = Field(default="")
+    type: str = Field(default="Topic")
     condition: Callable[[Messages], bool] = Field(default=lambda _: True)
     consumption_offsets: Dict[str, int] = {}
     event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
@@ -315,6 +312,7 @@ class TopicBase(BaseModel):
         """
         return {
             "name": self.name,
+            "type": self.type,
             "condition": self.serialize_callable(),
             "total_published": self.total_published,
             "cache_size": len(self.event_cache),
@@ -326,9 +324,11 @@ T_T = TypeVar("T_T", bound=TopicBase)
 
 class TopicBaseBuilder(BaseBuilder[T_T]):
     def name(self, name: str) -> Self:
-        if name in AGENT_RESERVED_TOPICS:
-            raise ValueError(f"Topic name '{name}' is reserved for the agent.")
         self.kwargs["name"] = name
+        return self
+
+    def type(self, type_name: str) -> Self:
+        self.kwargs["type"] = type_name
         return self
 
     def condition(self, condition: Callable[[Messages], bool]) -> Self:

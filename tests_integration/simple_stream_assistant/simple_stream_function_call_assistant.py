@@ -7,10 +7,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -46,6 +46,8 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         """
         Build the underlying EventDrivenStreamWorkflow with a single LLMStreamNode.
         """
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(
             name="function_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls
@@ -146,9 +148,9 @@ class SimpleStreamFunctionCallAssistantBuilder(
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs[
-            "function_call_llm_system_message"
-        ] = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:

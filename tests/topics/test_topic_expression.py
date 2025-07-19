@@ -28,6 +28,7 @@ def test_topic_expr_to_dict(mock_topics: tuple[TopicBase, TopicBase, TopicBase])
     assert result == {
         "topic": {
             "name": "topic_1",
+            "type": "Topic",
             "condition": {
                 "type": "lambda",
                 "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
@@ -51,6 +52,7 @@ def test_combined_expr_to_dict(mock_topics):
         "left": {
             "topic": {
                 "name": "topic_1",
+                "type": "Topic",
                 "condition": {
                     "type": "lambda",
                     "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",
@@ -62,6 +64,7 @@ def test_combined_expr_to_dict(mock_topics):
         "right": {
             "topic": {
                 "name": "topic_2",
+                "type": "Topic",
                 "condition": {
                     "type": "lambda",
                     "code": "condition: Callable[[Messages], bool] = Field(default=lambda _: True)",

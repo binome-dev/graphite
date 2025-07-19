@@ -4,13 +4,15 @@ import pytest
 
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
 
 
 @pytest.fixture
-def topic() -> Topic:
+def topic() -> InputTopic:
     """Fixture to create a Topic instance with a mocked publish event handler."""
-    topic = Topic(name="test_topic")
+    topic = InputTopic(name="agent_input_topic")
     topic.publish_event_handler = MagicMock()  # Mock the event handler
     return topic
 
@@ -24,6 +26,8 @@ def test_publish_message(topic: Topic, invoke_context: InvokeContext):
     )
 
     assert len(topic.event_cache) == 1  # Ensure the message was published
+    assert topic.name == "agent_input_topic"
+    assert topic.type == AGENT_INPUT_TOPIC_TYPE
     assert topic.event_cache.get(0).offset == 0  # First message should have offset 0
     assert topic.publish_event_handler.called  # Ensure the publish handler was invoked
     assert event.publisher_name == "test_publisher"

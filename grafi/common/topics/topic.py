@@ -13,7 +13,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
-from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_base import TopicBaseBuilder
 
@@ -88,6 +87,3 @@ class TopicBuilder(TopicBaseBuilder[Topic]):
     ) -> Self:
         self.kwargs["publish_event_handler"] = publish_event_handler
         return self
-
-
-agent_input_topic = Topic(name=AGENT_INPUT_TOPIC)

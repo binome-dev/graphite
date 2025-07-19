@@ -25,11 +25,11 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.human_request_topic import HumanRequestTopic
-from grafi.common.topics.human_request_topic import human_request_topic
-from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
 from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import AGENT_INPUT_TOPIC
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC_TYPE
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.node import Node
@@ -102,10 +102,22 @@ class EventDrivenWorkflow(Workflow):
                     topic.publish_to_human_event_handler = self.on_event
 
         # 2) Verify there is an agent input topic
-        if AGENT_INPUT_TOPIC not in self._topics:
-            raise ValueError("Agent input topic not found in workflow topics.")
-        elif AGENT_OUTPUT_TOPIC not in self._topics:
-            raise ValueError("Agent output topic not found in workflow topics.")
+        # Check if any topic has the required type
+        has_input_topic = any(
+            topic.type == AGENT_INPUT_TOPIC_TYPE for topic in self._topics.values()
+        )
+        has_output_topic = any(
+            topic.type == AGENT_OUTPUT_TOPIC_TYPE for topic in self._topics.values()
+        )
+
+        if not has_input_topic:
+            raise ValueError(
+                "EventDrivenWorkflow must have at least one topic of type 'agent_input_topic'."
+            )
+        if not has_output_topic:
+            raise ValueError(
+                "EventDrivenWorkflow must have at least one topic of type 'agent_output_topic'."
+            )
 
     def _add_topic(self, topic: TopicBase) -> None:
         """
@@ -229,10 +241,38 @@ class EventDrivenWorkflow(Workflow):
 
     def _get_consumed_events(self) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []
-        if human_request_topic.can_consume(self.name):
-            events = human_request_topic.consume(self.name)
-            for event in events:
-                if isinstance(event, OutputTopicEvent):
+
+        human_request_topics = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == HUMAN_REQUEST_TOPIC_TYPE
+        ]
+
+        for human_request_topic in human_request_topics:
+            if human_request_topic.can_consume(self.name):
+                events = human_request_topic.consume(self.name)
+                for event in events:
+                    if isinstance(event, OutputTopicEvent):
+                        consumed_event = ConsumeFromTopicEvent(
+                            topic_name=event.topic_name,
+                            consumer_name=self.name,
+                            consumer_type=self.type,
+                            invoke_context=event.invoke_context,
+                            offset=event.offset,
+                            data=event.data,
+                        )
+                        consumed_events.append(consumed_event)
+
+        agent_output_topics = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
+        ]
+
+        for agent_output_topic in agent_output_topics:
+            if agent_output_topic.can_consume(self.name):
+                events = agent_output_topic.consume(self.name)
+                for event in events:
                     consumed_event = ConsumeFromTopicEvent(
                         topic_name=event.topic_name,
                         consumer_name=self.name,
@@ -242,19 +282,6 @@ class EventDrivenWorkflow(Workflow):
                         data=event.data,
                     )
                     consumed_events.append(consumed_event)
-
-        if agent_output_topic.can_consume(self.name):
-            events = agent_output_topic.consume(self.name)
-            for event in events:
-                consumed_event = ConsumeFromTopicEvent(
-                    topic_name=event.topic_name,
-                    consumer_name=self.name,
-                    consumer_type=self.type,
-                    invoke_context=event.invoke_context,
-                    offset=event.offset,
-                    data=event.data,
-                )
-                consumed_events.append(consumed_event)
 
         return consumed_events
 
@@ -323,6 +350,21 @@ class EventDrivenWorkflow(Workflow):
         # 1 – initial seeding
         self.initial_workflow(invoke_context, input)
 
+        # Get all agent_output_topics and human_request_topics from self._topics
+        agent_output_topics: list[OutputTopic] = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
+        ]
+        human_request_topics: List[Topic] = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == HUMAN_REQUEST_TOPIC_TYPE
+        ]
+
+        if not agent_output_topics:
+            raise ValueError("No agent output topics found in workflow topics.")
+
         # Track running tasks and executing nodes
         running_tasks: Set[asyncio.Task] = set()
         executing_nodes: Set[str] = set()
@@ -334,8 +376,18 @@ class EventDrivenWorkflow(Workflow):
 
         # Prepare to stream events as they arrive
         consumed_output_async_events: List[OutputAsyncEvent] = []
-        event_queue = agent_output_topic.event_queue
-        get_event_task = asyncio.create_task(event_queue.get())
+
+        # Create get_event_task for the first agent output topic that has an event_queue
+        get_event_task = None
+        primary_output_topic = None
+        for topic in agent_output_topics:
+            if hasattr(topic, "event_queue"):
+                primary_output_topic = topic
+                get_event_task = asyncio.create_task(topic.event_queue.get())
+                break
+
+        if not get_event_task:
+            raise ValueError("No agent output topic with event_queue found.")
 
         try:
             # Race between new events and node processing completion
@@ -351,32 +403,43 @@ class EventDrivenWorkflow(Workflow):
                     consumed_output_async_events.append(ev)
                     yield ev.data
                     # schedule next event retrieval
-                    get_event_task = asyncio.create_task(event_queue.get())
+                    if primary_output_topic and hasattr(
+                        primary_output_topic, "event_queue"
+                    ):
+                        get_event_task = asyncio.create_task(
+                            primary_output_topic.event_queue.get()
+                        )
                     continue
 
+                # Check all human request topics for events
                 consumed_events: List[OutputAsyncEvent] = []
-                if human_request_topic.can_consume(self.name):
-                    events = human_request_topic.consume(self.name)
-                    for event in events:
-                        if isinstance(event, OutputTopicEvent):
-                            yield event.data
-                            consumed_events.append(
-                                OutputAsyncEvent(
-                                    topic_name=event.topic_name,
-                                    publisher_name=self.name,
-                                    publisher_type=self.type,
-                                    invoke_context=event.invoke_context,
-                                    offset=event.offset,
-                                    data=event.data,
+                for human_request_topic in human_request_topics:
+                    if human_request_topic.can_consume(self.name):
+                        events = human_request_topic.consume(self.name)
+                        for event in events:
+                            if isinstance(event, OutputTopicEvent):
+                                yield event.data
+                                consumed_events.append(
+                                    OutputAsyncEvent(
+                                        topic_name=event.topic_name,
+                                        publisher_name=self.name,
+                                        publisher_type=self.type,
+                                        invoke_context=event.invoke_context,
+                                        offset=event.offset,
+                                        data=event.data,
+                                    )
                                 )
-                            )
 
-                    consumed_output_async_events.extend(consumed_events)
+                consumed_output_async_events.extend(consumed_events)
 
                 # Otherwise node processing must have finished
                 if node_processing_task in done:
                     # If nothing ever arrived, that's an error
-                    if not consumed_output_async_events and event_queue.empty():
+                    all_queues_empty = all(
+                        not hasattr(topic, "event_queue") or topic.event_queue.empty()
+                        for topic in agent_output_topics
+                    )
+                    if not consumed_output_async_events and all_queues_empty:
                         get_event_task.cancel()
                         if self._stop_requested:
                             logger.info(
@@ -389,14 +452,17 @@ class EventDrivenWorkflow(Workflow):
                     # Otherwise break to drain remaining events
                     break
 
-            # Drain any leftover events
-            async for ev in agent_output_topic.get_events():
-                consumed_output_async_events.append(ev)
-                yield ev.data
+            # Drain any leftover events from all agent output topics
+            for agent_output_topic in agent_output_topics:
+                if hasattr(agent_output_topic, "get_events"):
+                    async for ev in agent_output_topic.get_events():
+                        consumed_output_async_events.append(ev)
+                        yield ev.data
 
         finally:
             # Clean up the pending get_event_task
-            get_event_task.cancel()
+            if get_event_task:
+                get_event_task.cancel()
 
             # Ensure node processing fully completes
             if not node_processing_task.done():
@@ -459,8 +525,15 @@ class EventDrivenWorkflow(Workflow):
                         pending_task.cancel()
                     raise
 
-        # Wait for all generators to complete
-        await agent_output_topic.wait_for_completion()
+        # Wait for all generators to complete on all agent output topics
+        agent_output_topics = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
+        ]
+        for agent_output_topic in agent_output_topics:
+            if hasattr(agent_output_topic, "wait_for_completion"):
+                await agent_output_topic.wait_for_completion()
 
     def _record_consumed_events(self, events: List[OutputAsyncEvent]) -> None:
         """Record consumed events to event store."""
@@ -596,18 +669,28 @@ class EventDrivenWorkflow(Workflow):
 
         if len(events) == 0:
             # Initialize by publish input data to input topic
-            input_topic = self._topics.get(AGENT_INPUT_TOPIC)
-            if input_topic is None:
+            input_topics: List[TopicBase] = [
+                topic
+                for topic in self._topics.values()
+                if topic.type == AGENT_INPUT_TOPIC_TYPE
+            ]
+            if not input_topics:
                 raise ValueError("Agent input topic not found in workflow topics.")
 
-            event = input_topic.publish_data(
-                invoke_context=invoke_context,
-                publisher_name=self.name,
-                publisher_type=self.type,
-                data=input,
-                consumed_events=[],
-            )
-            container.event_store.record_event(event)
+            events_to_record: List[TopicEvent] = []
+            for input_topic in input_topics:
+                event = input_topic.publish_data(
+                    invoke_context=invoke_context,
+                    publisher_name=self.name,
+                    publisher_type=self.type,
+                    data=input,
+                    consumed_events=[],
+                )
+                if event:
+                    events_to_record.append(event)
+
+            if events_to_record:
+                container.event_store.record_events(events_to_record)
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:

@@ -13,10 +13,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -46,7 +46,8 @@ class ReActAssistant(Assistant):
         workflow_dag_builder = EventDrivenWorkflow.builder().name(
             "ReActAssistantWorkflow"
         )
-
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
         thought_result_topic = Topic(name="thought_result")
 
         observation_result_topic = Topic(name="observation_result")
