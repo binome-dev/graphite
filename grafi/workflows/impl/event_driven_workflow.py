@@ -686,8 +686,7 @@ class EventDrivenWorkflow(Workflow):
                     data=input,
                     consumed_events=[],
                 )
-                if event:
-                    events_to_record.append(event)
+                events_to_record.append(event)
 
             if events_to_record:
                 container.event_store.record_events(events_to_record)
