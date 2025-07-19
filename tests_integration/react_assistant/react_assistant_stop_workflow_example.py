@@ -88,7 +88,7 @@ def test_react_assistant() -> None:
 def stop_workflow() -> None:
     # Stop the assistant's workflow
     time.sleep(4)
-    assistant.workflow.stop()
+    assistant.stop_workflow()
     print("Workflow stopped.")
 
 

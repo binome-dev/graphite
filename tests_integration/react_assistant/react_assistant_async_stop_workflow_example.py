@@ -81,7 +81,7 @@ async def test_react_assistant_async() -> None:
 async def stop_workflow() -> None:
     # Stop the assistant's workflow
     await asyncio.sleep(5)
-    assistant.workflow.stop()
+    assistant.stop_workflow()
     print("Workflow stopped.")
 
 
