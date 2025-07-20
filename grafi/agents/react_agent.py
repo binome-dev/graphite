@@ -12,10 +12,10 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
@@ -65,10 +65,13 @@ class ReActAgent(Assistant):
         )
         function_result_topic = Topic(name="function_result_topic")
 
-        agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None
+        agent_input_topic = InputTopic(name="agent_input_topic")
+
+        agent_output_topic = OutputTopic(
+            name="agent_output_topic",
+            condition=lambda msgs: msgs[-1].content is not None
             and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            and msgs[-1].content.strip() != "",
         )
 
         llm_node = (

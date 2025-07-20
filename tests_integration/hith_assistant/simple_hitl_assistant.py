@@ -7,11 +7,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.human_request_topic import human_request_topic
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -55,6 +55,9 @@ class SimpleHITLAssistant(Assistant):
             name="hitl_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls is not None,
         )
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
+        human_request_topic = HumanRequestTopic(name="human_request_topic")
 
         register_user_topic = Topic(
             name="register_user_topic",

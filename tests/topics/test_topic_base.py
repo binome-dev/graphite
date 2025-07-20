@@ -6,9 +6,7 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_base import TopicBaseBuilder
 
 
 class MockTopic(TopicBase):
@@ -57,15 +55,6 @@ def topic() -> TopicBase:
     topic = MockTopic(name="test_topic")
     topic.publish_event_handler = MagicMock()  # Mock the event handler
     return topic
-
-
-def test_reserved_topic_names():
-    """Ensure reserved topic names raise an error."""
-    for name in AGENT_RESERVED_TOPICS:
-        with pytest.raises(
-            ValueError, match=f"Topic name '{name}' is reserved for the agent."
-        ):
-            TopicBaseBuilder(TopicBase).name(name).build()
 
 
 def test_reset(topic: TopicBase, invoke_context: InvokeContext):

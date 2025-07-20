@@ -7,11 +7,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.human_request_topic import human_request_topic
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -39,7 +39,9 @@ class KycAssistant(Assistant):
 
     def _construct_workflow(self) -> "KycAssistant":
         # Create thought node to process user input
-
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
+        human_request_topic = HumanRequestTopic(name="human_request_topic")
         user_info_extract_topic = Topic(name="user_info_extract_topic")
 
         user_info_extract_node = (
@@ -174,9 +176,9 @@ class KycAssistantBuilder(AssistantBaseBuilder[KycAssistant]):
     def user_info_extract_system_message(
         self, user_info_extract_system_message: str
     ) -> Self:
-        self.kwargs[
-            "user_info_extract_system_message"
-        ] = user_info_extract_system_message
+        self.kwargs["user_info_extract_system_message"] = (
+            user_info_extract_system_message
+        )
         return self
 
     def action_llm_system_message(self, action_llm_system_message: str) -> Self:
