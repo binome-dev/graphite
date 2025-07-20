@@ -6,7 +6,6 @@ from typing import Optional
 from typing import Self
 
 from loguru import logger
-from pydantic import ConfigDict
 from pydantic import Field
 
 from grafi.common.containers.container import container
@@ -19,13 +18,9 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
+from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_base import TopicBaseBuilder
-
-
-AGENT_OUTPUT_TOPIC = "agent_output_topic"
-AGENT_RESERVED_TOPICS.extend([AGENT_OUTPUT_TOPIC])
 
 
 # OutputTopic handles sync and async publishing of messages to the agent output topic.
@@ -34,14 +29,12 @@ class OutputTopic(TopicBase):
     A topic implementation for output events.
     """
 
-    name: str = AGENT_OUTPUT_TOPIC
+    type: str = AGENT_OUTPUT_TOPIC_TYPE
     event_queue: asyncio.Queue[OutputAsyncEvent] = Field(default_factory=asyncio.Queue)
     active_generators: List[asyncio.Task] = Field(default_factory=list)
     publish_event_handler: Optional[Callable[[OutputTopicEvent], None]] = Field(
         default=None
     )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
     def builder(cls) -> "OutputTopicBuilder":
@@ -246,6 +239,3 @@ class OutputTopicBuilder(TopicBaseBuilder[OutputTopic]):
     ) -> Self:
         self.kwargs["publish_event_handler"] = publish_event_handler
         return self
-
-
-agent_output_topic = OutputTopic(name=AGENT_OUTPUT_TOPIC)

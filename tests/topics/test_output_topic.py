@@ -11,10 +11,12 @@ from grafi.common.events.topic_events.output_async_event import OutputAsyncEvent
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import AGENT_OUTPUT_TOPIC
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.output_topic import OutputTopicBuilder
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
+
+
+agent_output_topic = OutputTopic(name="agent_output_topic")
 
 
 class TestOutputTopic:
@@ -99,9 +101,10 @@ class TestOutputTopic:
 
     def test_output_topic_creation(self):
         """Test creating an OutputTopic with default values."""
-        topic = OutputTopic()
+        topic = OutputTopic(name="agent_output_topic")
 
-        assert topic.name == AGENT_OUTPUT_TOPIC
+        assert topic.name == "agent_output_topic"
+        assert topic.type == AGENT_OUTPUT_TOPIC_TYPE
         assert isinstance(topic.event_queue, asyncio.Queue)
         assert topic.active_generators == []
         assert topic.publish_event_handler is None
@@ -405,11 +408,6 @@ class TestOutputTopic:
 
         assert task1.done()
         assert task2.done()
-
-    def test_global_agent_output_topic(self):
-        """Test the global agent_output_topic instance."""
-        assert agent_output_topic.name == AGENT_OUTPUT_TOPIC
-        assert isinstance(agent_output_topic, OutputTopic)
 
     @pytest.mark.asyncio
     async def test_integration_add_generator_and_get_events(

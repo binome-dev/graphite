@@ -9,10 +9,12 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.human_request_topic import HUMAN_REQUEST_TOPIC
 from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.human_request_topic import HumanRequestTopicBuilder
-from grafi.common.topics.human_request_topic import human_request_topic
+from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC_TYPE
+
+
+human_request_topic = HumanRequestTopic(name="human_request_topic")
 
 
 class TestHumanRequestTopic:
@@ -123,9 +125,10 @@ class TestHumanRequestTopic:
 
     def test_human_request_topic_creation(self):
         """Test creating a HumanRequestTopic with default values."""
-        topic = HumanRequestTopic()
+        topic = HumanRequestTopic(name="human_request_topic")
 
-        assert topic.name == HUMAN_REQUEST_TOPIC
+        assert topic.name == "human_request_topic"
+        assert topic.type == HUMAN_REQUEST_TOPIC_TYPE
         assert topic.publish_to_human_event_handler is None
         assert topic.publish_event_handler is None
         assert len(topic.event_cache) == 0
@@ -465,11 +468,6 @@ class TestHumanRequestTopic:
         assert event1.offset == 0
         assert event2.offset == 1
         assert len(human_request_topic_instance.event_cache) == 2
-
-    def test_global_human_request_topic(self):
-        """Test the global human_request_topic instance."""
-        assert human_request_topic.name == HUMAN_REQUEST_TOPIC
-        assert isinstance(human_request_topic, HumanRequestTopic)
 
     def test_mixed_event_types_in_topic(
         self,

@@ -13,13 +13,9 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
-from grafi.common.topics.topic_base import AGENT_RESERVED_TOPICS
-from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC
+from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC_TYPE
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_base import TopicBaseBuilder
-
-
-AGENT_RESERVED_TOPICS.extend([HUMAN_REQUEST_TOPIC])
 
 
 class HumanRequestTopic(TopicBase):
@@ -27,10 +23,10 @@ class HumanRequestTopic(TopicBase):
     Represents a topic for human request events.
     """
 
-    name: str = HUMAN_REQUEST_TOPIC
-    publish_to_human_event_handler: Optional[
-        Callable[[OutputTopicEvent], None]
-    ] = Field(default=None)
+    type: str = HUMAN_REQUEST_TOPIC_TYPE
+    publish_to_human_event_handler: Optional[Callable[[OutputTopicEvent], None]] = (
+        Field(default=None)
+    )
     publish_event_handler: Optional[Callable[[PublishToTopicEvent], None]] = Field(
         default=None
     )
@@ -140,6 +136,3 @@ class HumanRequestTopicBuilder(TopicBaseBuilder[HumanRequestTopic]):
     ) -> Self:
         self.kwargs["publish_to_human_event_handler"] = publish_to_human_event_handler
         return self
-
-
-human_request_topic = HumanRequestTopic(name=HUMAN_REQUEST_TOPIC)

@@ -8,10 +8,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -53,6 +53,8 @@ class SimpleFunctionLLMAssistant(Assistant):
         return SimpleFunctionLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleFunctionLLMAssistant":
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
         function_topic = Topic(name="function_call_topic")
 
         llm_input_node = (

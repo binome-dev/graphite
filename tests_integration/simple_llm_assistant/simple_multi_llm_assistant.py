@@ -6,10 +6,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.topics.human_request_topic import human_request_topic
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import agent_input_topic
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
@@ -34,6 +34,8 @@ class SimpleMultiLLMAssistant(Assistant):
     human_request_process_function: Callable
 
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
         openai_function_call_topic = Topic(name="openai_function_call_topic")
         deepseek_function_call_topic = Topic(name="deepseek_function_call_topic")
         gemini_function_call_topic = Topic(name="gemini_function_call_topic")
