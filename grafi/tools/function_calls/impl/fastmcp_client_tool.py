@@ -30,12 +30,12 @@ try:
     from mcp.types import ImageContent
     from mcp.types import TextContent
 except (ImportError, ModuleNotFoundError):
-    raise ImportError("`mcp` not installed. Please install using `pip install mpc`")
+    raise ImportError("`mcp` not installed. Please install using `uv add mpc`")
 try:
     from fastmcp import Client
     from fastmcp.exceptions import McpError
 except (ImportError, ModuleNotFoundError):
-    raise ImportError("`mcp` not installed. Please install using `pip install fastmcp`")
+    raise ImportError("`mcp` not installed. Please install using `uv add fastmcp`")
 
 
 class FastMCPClient(FunctionCallTool):
@@ -50,6 +50,16 @@ class FastMCPClient(FunctionCallTool):
     prompts: Optional[ListPromptsResult] = None
     resources: Optional[ListResourcesResult] = None
     client_config: Dict[str, Any] = Field(default_factory=lambda: {})
+
+    @classmethod
+    async def initialize(cls, **kwargs: Any) -> "FastMCPClient":
+        """
+        Initialize the FastMCPClient with the given keyword arguments.
+        """
+        fast_mcp_client = cls(**kwargs)
+        await fast_mcp_client._a_get_function_specs()
+
+        return fast_mcp_client
 
     @classmethod
     def builder(cls) -> "FastMCPClientBuilder":
@@ -208,7 +218,7 @@ class FastMCPClientBuilder(FunctionCallToolBuilder[FastMCPClient]):
         """
         Set the client configuration for the FastMCPClient.
         """
-        self._obj.client_config = config
+        self.kwargs["client_config"] = config
         return self
 
     def build(self) -> None:
@@ -217,5 +227,6 @@ class FastMCPClientBuilder(FunctionCallToolBuilder[FastMCPClient]):
         )
 
     async def a_build(self) -> "FastMCPClient":
-        await self._obj._a_get_function_specs()
-        return self._obj
+        fast_mcp_client = await self._cls.initialize(**self.kwargs)
+        return fast_mcp_client
+        

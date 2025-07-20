@@ -76,7 +76,7 @@ site_name: Graphite Documentation
 
 markdown_extensions:
   - codehilite:
-      linenums: true
+      linenums: false
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
