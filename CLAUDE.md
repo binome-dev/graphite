@@ -63,7 +63,7 @@ pre-commit run --all-files
 - `grafi/events/` - Event sourcing implementation
 - `grafi/workflows/` - Workflow orchestration
 - `grafi/tools/` - Built-in tools and utilities
--  `grafi/nodes/` - workflow components with event subscriptions and publishing
+- `grafi/nodes/` - workflow components with event subscriptions and publishing
 
 ### Tests
 - `tests/` - Unit tests
