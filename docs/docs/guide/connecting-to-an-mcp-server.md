@@ -461,6 +461,13 @@ async def company_overview(ticker: str, ctx: Context) -> dict:
     return data
 ```
 
+To ensure the model queries your MCP server instead of using training data, you can:
+
+- Be explicit in your prompt: "What is Tesla's current stock price?" (emphasis on "current")
+- Design good tool descriptions: Make your MCP tool description clearly indicate it provides real-time, current data
+- Use system prompts: Instruct the model to prefer external tools for specific types of queries
+- Context setting: Make it clear that up-to-date information is needed
+
 The  more detailed you are in the """ Description """ the more likely the model will reason that it needs to use the MCP server for routing the request. In the example we've built the question was `What is the overview of the company Tesla?` which uses the keywords `company` and `overview` for the MCP Server tool description and function tool name `company_overview` and the model reasons that it should forward to this instead of it's internal training data.
 
 
