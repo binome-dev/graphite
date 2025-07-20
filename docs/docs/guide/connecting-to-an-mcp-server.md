@@ -35,7 +35,7 @@ export OPENAI_API_KEY="sk-proj-*****"
 
 ### MCP Server
 
-MCP servers (Multi-Agent Control Protocol servers) are systems used to manage and coordinate multiple AI components or agents. They help different parts of an AI system—like sensors, decision-making units, and learning tools—communicate and work together smoothly. These servers are commonly used in areas like robotics, simulations, and game AI, where many AI agents need to operate at the same time. MCP servers make it easier to build and maintain these systems by providing a common way for the parts to connect and share information.
+[MCP](https://modelcontextprotocol.io/introduction) is an open protocol that standardizes how applications provide context to LLMs. Think of MCP like a USB-C port for AI applications. Just as USB-C provides a standardized way to connect your devices to various peripherals and accessories, MCP provides a standardized way to connect AI models to different data sources and tools. 
 
 For our use case we will simulate that our internal databases have more accurate information that whatever the model is trained on. If you check the latest data on stocks that the model has been trained on.
 
@@ -165,119 +165,144 @@ Just like before we create an assistant that will act as an interface to be call
 
 ```python
 # assistant.py
-from grafi.assistants.assistant import Assistant
-from typing import Optional
 import os
-from pydantic import Field
-from grafi.assistants.assistant_base import AssistantBaseBuilder
+from typing import Optional
 from typing import Self
-from grafi.nodes.node import Node
 
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import Field
+
+from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import Topic, agent_input_topic
+from grafi.common.topics.subscription_builder import SubscriptionBuilder
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic import agent_input_topic
+from grafi.nodes.node import Node
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.common.models.invoke_context import InvokeContext
-import uuid
-from grafi.common.models.message import Message
-from grafi.tools.function_calls.impl.fastmcp_client_tool import FastMCPClient
-from typing import AsyncGenerator
 
 
 class StockAssistant(Assistant):
-    name: str = Field(default="StockAssistant", description="An assistant that provides stock information")
-    api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
-    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE"))
-    mcp_tool: FastMCPClient = Field()
+    """
+    A simple assistant class that uses OpenAI's language model to process input,
+    make function calls, and generate responses.
+
+    This class sets up a workflow with three nodes: an input LLM node, a function call node,
+    and an output LLM node. It provides a method to run input through this workflow.
+
+    Attributes:
+        name (str): The name of the assistant.
+        api_key (str): The API key for OpenAI. If not provided, it tries to use the OPENAI_API_KEY environment variable.
+        model (str): The name of the OpenAI model to use.
+        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
+        function (Callable): The function to be called by the assistant.
+    """
+
+    oi_span_type: OpenInferenceSpanKindValues = Field(
+        default=OpenInferenceSpanKindValues.AGENT
+    )
+    name: str = Field(default="StockAssistant")
+    type: str = Field(default="StockAssistant")
+    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    model: str = Field(default="gpt-4o-mini")
+    function_call_llm_system_message: Optional[str] = Field(default=None)
+    summary_llm_system_message: Optional[str] = Field(default=None)
+    function_tool: FunctionCallTool
 
     @classmethod
     def builder(cls) -> "StockAssistantBuilder":
-        """Return a builder for FinanceAssistant."""
+        """Return a builder for StockAssistant."""
         return StockAssistantBuilder(cls)
-    
 
-    def get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
-        """Prepare input data and invoke context."""
-        if invoke_context is None:
-            invoke_context = InvokeContext(
-                user_id=uuid.uuid4().hex,
-                conversation_id=uuid.uuid4().hex,
-                invoke_id=uuid.uuid4().hex,
-                assistant_request_id=uuid.uuid4().hex,
-            )
-
-        input_data = [
-            Message(
-                role="user",
-                content=question,
-            )
-        ]
-
-        return input_data, invoke_context
-    
-
-    async def a_run(
-        self, question: str, invoke_context: Optional[InvokeContext] = None
-    ) -> AsyncGenerator[Message, None]:
-        input_data, invoke_context = self.get_input(question, invoke_context)
-
-        async for output in super().a_invoke(invoke_context, input_data):
-            for message in output:
-                yield message
-    
     def _construct_workflow(self) -> "StockAssistant":
-        """Construct the workflow for the assistant."""
-
         function_call_topic = Topic(
             name="function_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls
             is not None,  # only when the last message is a function call
-        )  # Check last message is not null or empty string
+        )
 
         llm_input_node = (
             Node.builder()
             .name("OpenAIInputNode")
-            .subscribe(agent_input_topic)
+            .type("LLMNode")
+            .subscribe(SubscriptionBuilder().subscribed_to(agent_input_topic).build())
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
                 .api_key(self.api_key)
                 .model(self.model)
-                .system_message(self.system_message)
+                .system_message(self.function_call_llm_system_message)
                 .build()
             )
             .publish_to(function_call_topic)
-            # .publish_to(agent_output_topic)
+            .publish_to(agent_output_topic)
             .build()
+        )
+
+        # Create a function call node
+
+        function_result_topic = Topic(name="function_result_topic")
+
+        agent_output_topic.condition = (
+            lambda msgs: msgs[-1].content is not None
+            and isinstance(msgs[-1].content, str)
+            and msgs[-1].content.strip() != ""
         )
 
         function_call_node = (
             Node.builder()
-                .name("FunctionCallNode")
-                .subscribe(function_call_topic)
-                .tool(self.mcp_tool)
-                #            .publish_to(function_result_topic)
-                .publish_to(agent_output_topic)
-                .build()
+            .name("FunctionCallNode")
+            .type("FunctionCallNode")
+            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
+            .tool(self.function_tool)
+            .publish_to(function_result_topic)
+            .build()
         )
 
+        # Create an output LLM node
+        llm_output_node = (
+            Node.builder()
+            .name("OpenAIOutputNode")
+            .type("LLMNode")
+            .subscribe(
+                SubscriptionBuilder().subscribed_to(function_result_topic).build()
+            )
+            .tool(
+                OpenAITool.builder()
+                .name("UserOutputLLM")
+                .api_key(self.api_key)
+                .model(self.model)
+                .system_message(self.summary_llm_system_message)
+                .build()
+            )
+            .publish_to(agent_output_topic)
+            .build()
+        )
+
+        # Create a workflow and add the nodes
         self.workflow = (
             EventDrivenWorkflow.builder()
-                .name("Get Stock Prices Workflow")
-                .node(llm_input_node)
-                .node(function_call_node)
-                .build()
+            .name("simple_function_call_workflow")
+            .node(llm_input_node)
+            .node(function_call_node)
+            .node(llm_output_node)
+            .build()
         )
 
         return self
 
 
+class StockAssistantBuilder(
+    AssistantBaseBuilder[StockAssistant]
+):
+    """
+    Concrete builder for StockAssistant.
+    This builder allows setting the API key, model, system messages, and function tool.
+    """
 
-class StockAssistantBuilder(AssistantBaseBuilder[StockAssistant]):
-    """Concrete builder for StockAssistantBuilder."""
-
-    def api_key(self, api_key: str | None) -> Self:
+    def api_key(self, api_key: str) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 
@@ -285,13 +310,22 @@ class StockAssistantBuilder(AssistantBaseBuilder[StockAssistant]):
         self.kwargs["model"] = model
         return self
 
-    def system_message(self, system_message: str) -> Self:
-        self.kwargs["system_message"] = system_message
+    def function_call_llm_system_message(
+        self, function_call_llm_system_message: str
+    ) -> Self:
+        self.kwargs[
+            "function_call_llm_system_message"
+        ] = function_call_llm_system_message
         return self
-    
-    def mcp_tool(self, mcp_tool: FastMCPClient) -> Self:
-        self.kwargs["mcp_tool"] = mcp_tool
+
+    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
+        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
         return self
+
+    def function_tool(self, function_tool: FunctionCallTool) -> Self:
+        self.kwargs["function_tool"] = function_tool
+        return self
+
 ```
 
 
@@ -299,8 +333,6 @@ Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines a
 
 ```python
 #main.py
-
-
 import asyncio
 import os
 import uuid
@@ -315,7 +347,7 @@ from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from stock_assistant import StockAssistant
 
 event_store = container.event_store
-assistant = None
+
 
 async def create_assistant():
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -331,6 +363,7 @@ async def create_assistant():
     return (
         StockAssistant.builder()
         .name("MCPAssistant")
+        .model("gpt-4o")
         .api_key(api_key)
         .function_call_llm_system_message(function_call_llm_system_message)
         .function_tool(await MCPTool.builder().connections(mcp_config).a_build())
@@ -339,7 +372,6 @@ async def create_assistant():
 
 
 async def main():
-    global assistant
     assistant = await create_assistant()
 
     invoke_context = InvokeContext(
@@ -362,6 +394,8 @@ async def main():
 
 
 asyncio.run(main())
+
+
 
 ```
 
@@ -410,7 +444,7 @@ When you call the assistant's `a_invoke()` method from `main.py`
 
 ```python
 
-    async for output in assistant.a_invoke(invoke_context, input_data):
+async for output in assistant.a_invoke(invoke_context, input_data):
 ```
 
 The `input_data` gets published on the agent `agent_input_topic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/main/grafi/workflows/impl/event_driven_workflow.py#L603-L609) but we are outlying it here so you can follow the flow of data.
