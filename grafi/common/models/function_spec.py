@@ -21,7 +21,7 @@ class ParametersSchema(BaseModel):
 
 class FunctionSpec(BaseModel):
     name: str
-    description: str
+    description: Optional[str]
     parameters: ParametersSchema
 
     def to_openai_tool(self) -> ChatCompletionToolParam:

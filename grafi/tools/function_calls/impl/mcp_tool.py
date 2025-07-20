@@ -28,7 +28,7 @@ try:
     from mcp.types import TextContent
     from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
-    raise ImportError("`mcp` not installed. Please install using `pip install mcp`")
+    raise ImportError("`mcp` not installed. Please install using `uv add mcp`")
 
 
 class MCPTool(FunctionCallTool):

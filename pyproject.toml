@@ -14,7 +14,7 @@ dependencies = [
     "arize-otel>=0.8.2",
     "loguru>=0.7.3",
     "jsonpickle>=4.1.0",
-    "arize-phoenix-otel>=0.10.3",
+    "arize-phoenix-otel>=0.10.3"
 ]
 
 [dependency-groups]

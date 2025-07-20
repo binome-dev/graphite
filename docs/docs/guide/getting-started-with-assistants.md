@@ -191,7 +191,7 @@ class FinanceAssistant(Assistant):
 
     ...
 
-    ef get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
+    def get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
         """Prepare input data and invoke context."""
         if invoke_context is None:
             logger.debug("Creating new InvokeContext with default conversation id for FinanceAssistant")
@@ -329,30 +329,31 @@ if __name__ == "__main__":
 To run this assistant example:
 
 1. **Set up environment variables**:
-   ```bash
-   export OPENAI_API_KEY="your-api-key-here"
-   export OPENAI_MODEL="gpt-4o"  # Optional
-   export OPENAI_SYSTEM_MESSAGE="You are a knowledgeable financial advisor assistant. Help users with financial planning, investment analysis, market insights, and general financial questions. Provide accurate, helpful advice while emphasizing the importance of professional financial consultation for major decisions."  # Optional
-   ```
+```bash
+export OPENAI_API_KEY="your-api-key-here"
+export OPENAI_MODEL="gpt-4o"  # Optional
+export OPENAI_SYSTEM_MESSAGE="You are a knowledgeable financial advisor assistant. Help users with financial planning, investment analysis, market insights, and general financial questions. Provide accurate, helpful advice while emphasizing the importance of professional financial consultation for major decisions."  # Optional
+```
 
 2. **Execute the script**:
-   ```bash
-   python main.py
-   ```
+
+
+<div class="bash"><pre>
+<code><span style="color:#FF4689">python</span> main.py</code></pre></div>
 
 3. **Expected output**:
-   ```
-   Output message:
-   Financial advice: When choosing between a 401(k) and a Roth IRA, it's important to consider several key factors. Each has its unique advantages and may be better suited to different financial situations and goals. Here are some factors to consider:
+```
+Output message:
+Financial advice: When choosing between a 401(k) and a Roth IRA, it's important to consider several key factors. Each has its unique advantages and may be better suited to different financial situations and goals. Here are some factors to consider:
 
-    1. **Tax Treatment**:
-   - **401(k)**: Contributions are typically made with pre-tax dollars, which can lower your current taxable income. However, withdrawals during retirement are taxed as ordinary income.
-   - **Roth IRA**: Contributions are made with after-tax dollars, meaning you pay taxes upfront. However, qualified withdrawals are tax-free, including the earnings.
+1. **Tax Treatment**:
+- **401(k)**: Contributions are typically made with pre-tax dollars, which can lower your current taxable income. However, withdrawals during retirement are taxed as ordinary income.
+- **Roth IRA**: Contributions are made with after-tax dollars, meaning you pay taxes upfront. However, qualified withdrawals are tax-free, including the earnings.
 
-    2. **Income and Contribution Limits**:
-   - **401(k)**: As of 2023, the contribution limit is $22,500 annually, with an additional $7,500 catch-up contribution for those aged 50 and over. There are no income limits for 401(k) eligibility.
-   - **Roth IRA**: The contribution limit is $6,500 annually, with a $1,000 catch-up contribution for those aged 50 and over. Contributions are restricted for high earners. For example, for 2023, contributions phase out for single filers with MAGI (Modified Adjusted Gross Income) between $138,000 and $153,000.
-   ```
+2. **Income and Contribution Limits**:
+- **401(k)**: As of 2023, the contribution limit is $22,500 annually, with an additional $7,500 catch-up contribution for those aged 50 and over. There are no income limits for 401(k) eligibility.
+- **Roth IRA**: The contribution limit is $6,500 annually, with a $1,000 catch-up contribution for those aged 50 and over. Contributions are restricted for high earners. For example, for 2023, contributions phase out for single filers with MAGI (Modified Adjusted Gross Income) between $138,000 and $153,000.
+```
 
 ## Key Benefits of the Assistant Pattern
 
