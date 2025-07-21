@@ -43,6 +43,7 @@ nav:
     - Simple Workflow: guide/creating-a-simple-workflow.md
     - Getting Started with Assistants: guide/getting-started-with-assistants.md
     - Configuring Event Store: guide/configuring-event-store.md
+    - Connecting to an MCP Server: guide/connecting-to-an-mcp-server.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
