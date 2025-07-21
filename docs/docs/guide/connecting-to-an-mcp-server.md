@@ -26,7 +26,7 @@ Let's examine the complete code and break it down line by line:
 
 ### Environment Configuration
 
-Configure your code to read `OPENAI_API_KEY` from your environment, as well as `OPENAI_MODEL` and `OPENAI_SYSTEM_MESSAGE`. You can modify the default values if you prefer not to set environment variables, although it is recommended to set `OPENAI_API_KEY` as an environment variable for security.
+Configure your code to read `OPENAI_API_KEY` from your environment. You can modify the default values if you prefer not to set environment variables, although it is recommended to set `OPENAI_API_KEY` as an environment variable for security.
 
 ```bash
 export OPENAI_API_KEY="sk-proj-*****"
@@ -410,16 +410,18 @@ Runnig this code with
 You'll see that the logs on your MCP server have been triggered by the call.
 
 
-<div class="logs"><pre>
+<div class="bash">
+<pre>
+```
 ...
-stock-mcp-server-1  | INFO:     192.168.48.1:39408 - "POST /mcp/ HTTP/1.1" 202 Accepted
-stock-mcp-server-1  | INFO:     192.168.48.1:39422 - "GET /mcp/ HTTP/1.1" 200 OK
-stock-mcp-server-1  | INFO:     192.168.48.1:39434 - "POST /mcp/ HTTP/1.1" 200 OK
-<code><span style="color:#FF4689">stock-mcp-server-1  | 2025-07-19 12:01:42.826 | INFO     | __main__:company_overview:70 - Started Company Overview Tool for Request ID: 1
-</span> </code>
-stock-mcp-server-1  | INFO:     192.168.48.1:39450 - "POST /mcp/ HTTP/1.1" 200 OK
-stock-mcp-server-1  | INFO:     192.168.48.1:39456 - "DELETE /mcp/ HTTP/1.1" 200 OK
+INFO:     192.168.48.1:39408 - "POST /mcp/ HTTP/1.1" 202 Accepted
+INFO:     192.168.48.1:39422 - "GET /mcp/ HTTP/1.1" 200 OK
+INFO:     192.168.48.1:39434 - "POST /mcp/ HTTP/1.1" 200 OK
+INFO      __main__:company_overview:70 - Started Company Overview Tool for Request ID: 1
+INFO:     192.168.48.1:39450 - "POST /mcp/ HTTP/1.1" 200 OK
+INFO:     192.168.48.1:39456 - "DELETE /mcp/ HTTP/1.1" 200 OK
 ...
+```
 </pre>
 </div>
 
