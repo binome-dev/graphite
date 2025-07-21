@@ -5,6 +5,7 @@ The Graphite AI framework provides a powerful, event-driven approach to building
 ## Overview
 
 This tutorial will show you how to:
+
 - Create a simple MCP Server over HTTP
 - Create an Event Driven Workflow that calls MCP Server
 - Parse the output from the MCP Server
@@ -13,6 +14,7 @@ This tutorial will show you how to:
 ## Prerequisites
 
 Before getting started, make sure you have:
+
 - Python environment with Graphite AI framework installed
 - OpenAI API key
 - Basic understanding of Python and AI concepts
@@ -661,6 +663,7 @@ The last major crusade is often considered to be the Ninth Crusade, which took p
 ### Next Steps
 
 With this foundation, you can extend your implementation by:
+
 - Adding more MCP servers for different data sources
 - Implementing caching strategies for frequently accessed data
 - Creating specialized assistants for different domains
