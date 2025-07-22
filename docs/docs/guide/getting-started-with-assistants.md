@@ -129,8 +129,8 @@ Implement the builder pattern for fluent configuration of the assistant. This pi
 
 ```python
 from grafi.nodes.node import Node
-from grafi.common.topics.output_topic import agent_output_topic
-from grafi.common.topics.topic import agent_input_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
@@ -139,6 +139,11 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 class FinanceAssistant(Assistant):
 
     ...
+
+
+    agent_input_topic = InputTopic(name="agent_input_topic")
+
+    agent_output_topic = OutputTopic(name="agent_output_topic")
 
     def _construct_workflow(self) -> "FinanceAssistant":
         """Construct the workflow for the assistant."""

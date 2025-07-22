@@ -85,8 +85,14 @@ The node subscribes to the `agent_input_topic` (the root topic in Graphite), use
 ```python linenums="27"
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.common.topics.topic import agent_input_topic
-from grafi.common.topics.output_topic import agent_output_topic
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
+
+
+agent_input_topic = InputTopic(name="agent_input_topic")
+
+agent_output_topic = OutputTopic(name="agent_output_topic")
+
 llm_node = (
     Node.builder()
     .name("LLMNode")

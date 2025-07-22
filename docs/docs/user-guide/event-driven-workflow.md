@@ -69,7 +69,7 @@ The topic setup process:
 - Extracts topics from node subscription expressions using `extract_topics`
 - Maps topic names to subscribing node names in `_topic_nodes`
 - Registers all topics in the `_topics` dictionary with event handlers
-- Validates that required `agent_input_topic` and `agent_output_topic` exist
+- Validates that required `InputTopic` and `OutputTopic` exist
 
 For function calling capabilities:
 
@@ -171,7 +171,7 @@ A key advantage of this event-driven architecture is its ability to restore and 
 
 1. **Event Store Check**: Retrieves stored events for the given `assistant_request_id`
 2. **State Restoration**: If events exist, restores workflow topics and state from stored events
-3. **Fresh Start**: If no events exist, publishes input to `agent_input_topic` to begin new workflow
+3. **Fresh Start**: If no events exist, publishes input to `InputTopic` to begin new workflow
 4. **Topic Restoration**: Replays stored `PublishToTopicEvent` and `OutputTopicEvent` to restore topic states
 5. **Node Queue Setup**: Evaluates node readiness and populates `_invoke_queue` appropriately
 
@@ -185,7 +185,7 @@ A key advantage of this event-driven architecture is its ability to restore and 
 ```mermaid
 graph TD
     A[initial_workflow Called] --> B{Events Exist for assistant_request_id?}
-    B -->|No| C[Publish Input to agent_input_topic]
+    B -->|No| C[Publish Input to InputTopic]
     B -->|Yes| D[Reset All Topics]
     D --> E[Restore Events from Event Store]
     E --> F[Replay PublishToTopicEvent Events]
