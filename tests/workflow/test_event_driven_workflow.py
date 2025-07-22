@@ -16,6 +16,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
@@ -810,11 +811,11 @@ class TestEventDrivenWorkflow:
     ):
         """Test a_invoke with actual event streaming."""
         # Create mock output topic with event_queue
-        mock_output_topic = Mock()
+        mock_output_topic = Mock(OutputTopic)
         mock_output_topic.type = AGENT_OUTPUT_TOPIC_TYPE
 
         # Create mock human topic
-        mock_human_topic = Mock()
+        mock_human_topic = Mock(HumanRequestTopic)
         mock_human_topic.type = HUMAN_REQUEST_TOPIC_TYPE
         mock_human_topic.can_consume.return_value = False
 
