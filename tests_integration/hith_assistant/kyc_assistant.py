@@ -176,9 +176,9 @@ class KycAssistantBuilder(AssistantBaseBuilder[KycAssistant]):
     def user_info_extract_system_message(
         self, user_info_extract_system_message: str
     ) -> Self:
-        self.kwargs["user_info_extract_system_message"] = (
-            user_info_extract_system_message
-        )
+        self.kwargs[
+            "user_info_extract_system_message"
+        ] = user_info_extract_system_message
         return self
 
     def action_llm_system_message(self, action_llm_system_message: str) -> Self:

@@ -4,7 +4,6 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 
-from fastmcp import Client
 from loguru import logger
 from pydantic import Field
 
@@ -18,6 +17,11 @@ from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
+
+try:
+    from fastmcp import Client
+except (ImportError, ModuleNotFoundError):
+    raise ImportError("`fastmcp` not installed. Please install using `uv add fastmcp`")
 
 try:
     from mcp.types import CallToolResult
@@ -173,7 +177,7 @@ class MCPTool(FunctionCallTool):
         async with Client(self.mcp_config) as client:
             return await client.read_resource(uri)
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return {
             **super().to_dict(),
             "mcp_config": self.mcp_config,

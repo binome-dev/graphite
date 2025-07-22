@@ -84,7 +84,8 @@ def test_openrouter_tool_with_chat_param() -> None:
         assert m.role == "assistant"
         assert m.content and "Grafi" in m.content
         print(m.content)
-        assert len(m.content) < 70  # 15 tokens ≈ < 70 chars
+        if isinstance(m.content, str):
+            assert len(m.content) < 70  # 15 tokens ≈ < 70 chars
 
     assert len(event_store.get_events()) == 2
 

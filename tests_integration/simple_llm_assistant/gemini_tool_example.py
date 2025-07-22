@@ -89,7 +89,9 @@ def test_gemini_tool_with_chat_param() -> None:
         assert message.content and "Grafi" in message.content
         print(message.content)
         # 15 tokens ~ < 120 chars in normal language
-        assert len(message.content) < 150
+        if isinstance(message.content, str):
+            # Ensure the content length is within the expected range
+            assert len(message.content) < 150
 
     assert len(event_store.get_events()) == 2
 

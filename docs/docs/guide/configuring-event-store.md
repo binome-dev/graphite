@@ -99,7 +99,7 @@ invoke_context = InvokeContext(
 user_input = "What is the capital of the United Kingdom"
 
 message = Message(
-    role="user", 
+    role="user",
     content=user_input
 )
 
@@ -118,7 +118,7 @@ from grafi.common.containers.container import container
 
 postgres_event_store = EventStorePostgres(
     # must match what is in docker-compose.yaml
-    db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db", 
+    db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
 
 container.register_event_store(postgres_event_store)
@@ -160,7 +160,7 @@ Here's the complete `event_store.py` file that demonstrates the full integration
 
 ```python
 # event_store.py
- 
+
 import os
 import uuid
 

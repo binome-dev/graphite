@@ -152,12 +152,12 @@ You: What year was the United Kingdom Founded?
 
 <... logs>
 
-Agent: The United Kingdom (UK) was officially formed in 1707 with the Acts of Union, 
-which united the Kingdom of England and the Kingdom of Scotland into a single 
-entity known as the Kingdom of Great Britain. Later, in 1801, another 
-Act of Union added the Kingdom of Ireland, leading to the formation of the 
-United Kingdom of Great Britain and Ireland. After the majority of Ireland gained 
-independence in 1922, the name was changed to the United Kingdom of 
+Agent: The United Kingdom (UK) was officially formed in 1707 with the Acts of Union,
+which united the Kingdom of England and the Kingdom of Scotland into a single
+entity known as the Kingdom of Great Britain. Later, in 1801, another
+Act of Union added the Kingdom of Ireland, leading to the formation of the
+United Kingdom of Great Britain and Ireland. After the majority of Ireland gained
+independence in 1922, the name was changed to the United Kingdom of
 Great Britain and Northern Ireland.
 
 

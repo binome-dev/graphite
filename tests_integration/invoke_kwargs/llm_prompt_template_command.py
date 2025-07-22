@@ -13,7 +13,6 @@ from grafi.tools.llms.llm_command import LLMCommand
 
 
 class LLMPromptTemplateCommand(LLMCommand):
-
     def get_tool_input(
         self,
         invoke_context: InvokeContext,
@@ -25,8 +24,7 @@ class LLMPromptTemplateCommand(LLMCommand):
 
         message = messages[-1] if messages else None
 
-        if "prompt_template" in invoke_context.kwargs:
-
+        if invoke_context.kwargs and "prompt_template" in invoke_context.kwargs:
             template_str = invoke_context.kwargs["prompt_template"]
             template: Template = Template(template_str)
 
@@ -38,9 +36,7 @@ class LLMPromptTemplateCommand(LLMCommand):
                     # Create a new message with the rendered template
                     new_message = Message(role="user", content=rendered_prompt)
 
-                    logger.info(
-                        f"Rendered prompt template with input: {message.content[:100]}..."
-                    )
+                    logger.info(f"Rendered prompt template with input...")
                     return [new_message]
                 except Exception as e:
                     logger.error(f"Error rendering template: {e}")

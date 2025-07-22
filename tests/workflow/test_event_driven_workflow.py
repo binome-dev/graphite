@@ -27,7 +27,9 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
 
 
-agent_output_topic = OutputTopic(name="agent_output_topic", type=AGENT_OUTPUT_TOPIC_TYPE)
+agent_output_topic = OutputTopic(
+    name="agent_output_topic", type=AGENT_OUTPUT_TOPIC_TYPE
+)
 
 
 class TestEventDrivenWorkflow:
@@ -338,7 +340,7 @@ class TestEventDrivenWorkflow:
         mock_human_topic = Mock()
         mock_human_topic.type = HUMAN_REQUEST_TOPIC_TYPE
         mock_human_topic.can_consume.return_value = True
-        
+
         mock_output_topic = Mock()
         mock_output_topic.type = AGENT_OUTPUT_TOPIC_TYPE
         mock_output_topic.can_consume.return_value = True
@@ -372,11 +374,11 @@ class TestEventDrivenWorkflow:
 
         mock_human_topic.consume.return_value = [mock_output_event]
         mock_output_topic.consume.return_value = [mock_output_event]
-        
+
         # Set up topics in workflow
         populated_workflow._topics = {
             "human_request_topic": mock_human_topic,
-            "agent_output_topic": mock_output_topic
+            "agent_output_topic": mock_output_topic,
         }
 
         result = populated_workflow._get_consumed_events()
@@ -427,11 +429,9 @@ class TestEventDrivenWorkflow:
         mock_output_topic = Mock()
         mock_output_topic.type = AGENT_OUTPUT_TOPIC_TYPE
         mock_output_topic.wait_for_completion = AsyncMock()
-        
+
         # Set up topics in workflow
-        populated_workflow._topics = {
-            "agent_output_topic": mock_output_topic
-        }
+        populated_workflow._topics = {"agent_output_topic": mock_output_topic}
 
         with patch.object(EventDrivenWorkflow, "_invoke_node") as mock_invoke:
             mock_invoke.return_value = None
@@ -812,16 +812,16 @@ class TestEventDrivenWorkflow:
         # Create mock output topic with event_queue
         mock_output_topic = Mock()
         mock_output_topic.type = AGENT_OUTPUT_TOPIC_TYPE
-        
+
         # Create mock human topic
         mock_human_topic = Mock()
         mock_human_topic.type = HUMAN_REQUEST_TOPIC_TYPE
         mock_human_topic.can_consume.return_value = False
-        
+
         # Set up topics in workflow
         populated_workflow._topics = {
             "agent_output_topic": mock_output_topic,
-            "human_request_topic": mock_human_topic
+            "human_request_topic": mock_human_topic,
         }
 
         with (
@@ -843,7 +843,7 @@ class TestEventDrivenWorkflow:
             mock_event_queue.get.side_effect = [test_event, asyncio.CancelledError()]
             mock_event_queue.empty.return_value = True
             mock_output_topic.event_queue = mock_event_queue
-            
+
             async def empty_generator():
                 return
                 yield

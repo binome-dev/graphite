@@ -1,6 +1,8 @@
 import asyncio
+from typing import Any
 from typing import AsyncIterator
 from typing import Callable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Self
@@ -225,7 +227,7 @@ class OutputTopic(TopicBase):
         if self.active_generators:
             await asyncio.gather(*self.active_generators, return_exceptions=True)
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return {**super().to_dict()}
 
 

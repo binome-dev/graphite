@@ -61,11 +61,11 @@ class MIMOLLMAssistant(Assistant):
     def _construct_workflow(self) -> "MIMOLLMAssistant":
         agent_input_greeting_topic = InputTopic(
             name="agent_input_greeting_topic",
-            condition=lambda msgs: "hello" in msgs[-1].content.lower(),
+            condition=lambda msgs: "hello" in str(msgs[-1].content).lower(),
         )
         agent_input_question_topic = InputTopic(
             name="agent_input_question_topic",
-            condition=lambda msgs: "question" in msgs[-1].content.lower(),
+            condition=lambda msgs: "question" in str(msgs[-1].content).lower(),
         )
         agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")
         agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")
