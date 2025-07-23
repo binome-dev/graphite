@@ -74,7 +74,7 @@ Run a build in ReAct agent:
 
 ```mermaid
 graph TD;
-    Input[[agent_input_topic]]-->Node;
+    Input[[InputTopic]]-->Node;
     Node--"call function"-->FunctionCallTopic[[function_call_topic]];
     FunctionCallTopic-->Function;
     Function-->FunctionResultTopic[[function_result_topic]]
