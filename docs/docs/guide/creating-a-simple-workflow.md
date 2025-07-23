@@ -90,7 +90,6 @@ from grafi.common.topics.output_topic import OutputTopic
 
 
 agent_input_topic = InputTopic(name="agent_input_topic")
-
 agent_output_topic = OutputTopic(name="agent_output_topic")
 
 llm_node = (
