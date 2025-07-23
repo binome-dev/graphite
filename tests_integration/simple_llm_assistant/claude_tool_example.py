@@ -98,7 +98,9 @@ def test_claude_tool_with_chat_param() -> None:
         assert msg.content and "Grafi" in msg.content
         print(msg.content)
         # 30 tokens ≈ < 250 chars for normal prose
-        assert len(msg.content) < 250
+        if isinstance(msg.content, str):
+            # Ensure the content length is within the expected range
+            assert len(msg.content) < 250
 
     assert len(event_store.get_events()) == 2
 

@@ -89,7 +89,8 @@ def test_deepseek_tool_with_chat_param() -> None:
         assert message.content
         print(message.content)
         assert "Grafi" in message.content
-        assert len(message.content) < 70
+        if isinstance(message.content, str):
+            assert len(message.content) < 70
 
     assert len(event_store.get_events()) == 2
 

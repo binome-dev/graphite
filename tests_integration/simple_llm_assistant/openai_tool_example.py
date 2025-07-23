@@ -93,7 +93,9 @@ def test_openai_tool_with_chat_param() -> None:
         assert len(event_store.get_events()) == 2
         assert message.content is not None
         assert "Grafi" in message.content
-        assert len(message.content) < 70
+        if isinstance(message.content, str):
+            # Ensure the content length is within the expected range
+            assert len(message.content) < 70
 
 
 def test_openai_tool_with_structured_output() -> None:

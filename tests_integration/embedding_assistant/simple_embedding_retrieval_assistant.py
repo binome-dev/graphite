@@ -44,7 +44,6 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _construct_workflow(self) -> "SimpleEmbeddingRetrievalAssistant":
-
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
 

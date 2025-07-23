@@ -26,7 +26,6 @@ from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC_TYPE
@@ -354,12 +353,13 @@ class EventDrivenWorkflow(Workflow):
         agent_output_topics: list[OutputTopic] = [
             topic
             for topic in self._topics.values()
-            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
+            if topic.type == AGENT_OUTPUT_TOPIC_TYPE and isinstance(topic, OutputTopic)
         ]
-        human_request_topics: List[Topic] = [
+        human_request_topics: List[HumanRequestTopic] = [
             topic
             for topic in self._topics.values()
             if topic.type == HUMAN_REQUEST_TOPIC_TYPE
+            and isinstance(topic, HumanRequestTopic)
         ]
 
         if not agent_output_topics:
@@ -677,7 +677,7 @@ class EventDrivenWorkflow(Workflow):
             if not input_topics:
                 raise ValueError("Agent input topic not found in workflow topics.")
 
-            events_to_record: List[TopicEvent] = []
+            events_to_record: List[Event] = []
             for input_topic in input_topics:
                 event = input_topic.publish_data(
                     invoke_context=invoke_context,
@@ -686,7 +686,8 @@ class EventDrivenWorkflow(Workflow):
                     data=input,
                     consumed_events=[],
                 )
-                events_to_record.append(event)
+                if event:
+                    events_to_record.append(event)
 
             if events_to_record:
                 container.event_store.record_events(events_to_record)

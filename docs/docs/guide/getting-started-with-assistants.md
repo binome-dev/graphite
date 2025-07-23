@@ -62,13 +62,13 @@ from pydantic import Field
 
 class FinanceAssistant(Assistant):
     """Assistant for handling financial queries and analysis using OpenAI."""
-    
+
     name: str = Field(default="FinanceAssistant")
     type: str = Field(default="FinanceAssistant")
     api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY"))
     model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
     system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE"))
-   
+
 ```
 
 Create a class that defines the assistant class inheriting from Graphite's base `Assistant` class.
@@ -81,7 +81,7 @@ A good practice is to use Pydantic fields for configuration with environment var
 
 ### Builder Class Implementation
 
-```python 
+```python
 # main.py
 from typing import Self
 from grafi.assistants.assistant_base import AssistantBaseBuilder
@@ -112,7 +112,7 @@ This class is used to set the fields from the `FinanceAssistant` the magic happe
 
 ### Builder Pattern Implementation
 
-```python 
+```python
 class FinanceAssistant(Assistant):
 
     ...
@@ -187,7 +187,7 @@ Prepare input data and context for workflow execution:
 - Formats the user question as a `Message` object
 - Returns both the input data and context
 
-```python 
+```python
 from grafi.common.models.invoke_context import InvokeContext
 from typing import Optional
 from grafi.common.models.message import Message
@@ -233,7 +233,7 @@ class FinanceAssistant(Assistant):
         input_data, invoke_context = self.get_input(question, invoke_context)
         # This is the line that invokes the workflow
         output = super().invoke(invoke_context, input_data)
-        
+
         # Handle different content types
         if output and len(output) > 0:
             content = output[0].content
@@ -241,7 +241,7 @@ class FinanceAssistant(Assistant):
                 return content
             elif content is not None:
                 return str(content)
-        
+
         return "No response generated"
 ```
 
@@ -301,7 +301,7 @@ def create_finance_assistant(
         builder.model(model)
     if api_key:
         builder.api_key(api_key)
-    
+
     return builder.build()
 
 def main():
@@ -315,8 +315,8 @@ def main():
         system_message,
         model,
         api_key
-    ) 
-   
+    )
+
     """Main function to run the assistant."""
     user_input = "What are the key factors to consider when choosing between a 401(k) and a Roth IRA?"
     result = assistant.run(user_input)

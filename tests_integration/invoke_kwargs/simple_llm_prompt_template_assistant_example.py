@@ -3,8 +3,6 @@
 import os
 import uuid
 
-import markdown
-
 from grafi.common.containers.container import container
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
@@ -22,7 +20,6 @@ api_key = os.getenv("OPENAI_API_KEY", "")
 
 
 def get_invoke_context() -> InvokeContext:
-
     return InvokeContext(
         conversation_id="conversation_id",
         invoke_id=uuid.uuid4().hex,
@@ -49,10 +46,10 @@ def get_invoke_context() -> InvokeContext:
 
 ## Analysis:
 Please first provide a brief analysis of the input, identifying:
-- Central themes: 
-- Emotional tone: 
-- Key imagery: 
-- Poetic approach: 
+- Central themes:
+- Emotional tone:
+- Key imagery:
+- Poetic approach:
 
 ## Generated Sonnet:
 Based on your analysis, create a 14-line sonnet that captures the essence of the input:
@@ -84,8 +81,7 @@ def test_simple_llm_assistant() -> None:
     ]
     output = assistant.invoke(invoke_context, input_data)
 
-    html = markdown.markdown(output[0].content)
-    print(html)
+    print(output[0].content)
     assert output is not None
     assert len(event_store.get_events()) == 12
 

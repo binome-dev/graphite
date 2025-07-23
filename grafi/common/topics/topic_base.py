@@ -198,7 +198,9 @@ class TopicBase(BaseModel):
         already_consumed = self.consumption_offsets.get(consumer_name, 0)
         return already_consumed < self.total_published
 
-    def consume(self, consumer_name: str) -> List[PublishToTopicEvent]:
+    def consume(
+        self, consumer_name: str
+    ) -> List[PublishToTopicEvent | OutputTopicEvent]:
         """
         Retrieve new/unconsumed messages for the given node by fetching them
         from the cache or event store. Once retrieved, the node's

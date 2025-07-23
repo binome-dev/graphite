@@ -43,7 +43,6 @@ class SimpleLLMAssistant(Assistant):
         return SimpleLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleLLMAssistant":
-
         agent_input_topic = Topic(name="agent_input_topic", type=AGENT_INPUT_TOPIC_TYPE)
         agent_output_topic = OutputTopic(name="agent_output_topic")
 

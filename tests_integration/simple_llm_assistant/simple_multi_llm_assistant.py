@@ -5,7 +5,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
-from grafi.common.topics.human_request_topic import human_request_topic
+from grafi.common.topics.human_request_topic import HumanRequestTopic
 from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -36,6 +36,7 @@ class SimpleMultiLLMAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
+        human_request_topic = HumanRequestTopic(name="human_request_topic")
         openai_function_call_topic = Topic(name="openai_function_call_topic")
         deepseek_function_call_topic = Topic(name="deepseek_function_call_topic")
         gemini_function_call_topic = Topic(name="gemini_function_call_topic")

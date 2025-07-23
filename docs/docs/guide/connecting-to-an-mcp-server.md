@@ -37,7 +37,7 @@ export OPENAI_API_KEY="sk-proj-*****"
 
 ### MCP Server
 
-[MCP](https://modelcontextprotocol.io/introduction) is an open protocol that standardizes how applications provide context to LLMs. Think of MCP like a USB-C port for AI applications. Just as USB-C provides a standardized way to connect your devices to various peripherals and accessories, MCP provides a standardized way to connect AI models to different data sources and tools. 
+[MCP](https://modelcontextprotocol.io/introduction) is an open protocol that standardizes how applications provide context to LLMs. Think of MCP like a USB-C port for AI applications. Just as USB-C provides a standardized way to connect your devices to various peripherals and accessories, MCP provides a standardized way to connect AI models to different data sources and tools.
 
 For our use case we will simulate that our internal databases have more accurate information that whatever the model is trained on. If you check the latest data on stocks that the model has been trained on.
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
 ```
 
-Some of the environment variables can be overriden but for now, runnig it as is will start an mcp server on port `8081` 
+Some of the environment variables can be overriden but for now, runnig it as is will start an mcp server on port `8081`
 
 ```bash
 ❯ python server.py
@@ -219,7 +219,7 @@ class StockAssistant(Assistant):
         return StockAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "StockAssistant":
-        
+
         mcp_tool_call_topic = Topic(
             name="mcp_tool_call_topic",
             condition=lambda msgs: msgs[-1].tool_calls
@@ -402,7 +402,7 @@ async def main():
 assistant = asyncio.run(main())
 ```
 
-Runnig this code with 
+Runnig this code with
 
 <div class="bash"><pre>
 <code><span style="color:#FF4689">python</span> main.py</code></pre></div>
@@ -524,7 +524,7 @@ Topics can have conditions attached to them to trigger them, in the case of `Inp
 
 
 
-When you call the assistant's `a_invoke()` method from `main.py` 
+When you call the assistant's `a_invoke()` method from `main.py`
 
 ```python
 
@@ -618,7 +618,7 @@ output_data:
           type: function
       is_streaming: false
 ```
-You can view this using our internal tool called `grafi-dev` which we will demonstrate in future guides. 
+You can view this using our internal tool called `grafi-dev` which we will demonstrate in future guides.
 
 This is the reason why when we declare the topic `mcp_tool_call_topic` we add a condition that it can only publish to it if the `tool_calls` field is set on the response from OpenAI
 
@@ -626,7 +626,7 @@ This is the reason why when we declare the topic `mcp_tool_call_topic` we add a 
  mcp_tool_call_topic = Topic(
     name="mcp_tool_call_topic",
     condition=lambda msgs: msgs[-1].tool_calls
-    is not None, 
+    is not None,
 )
 ```
 

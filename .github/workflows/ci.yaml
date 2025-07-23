@@ -90,7 +90,17 @@ jobs:
 
     - name: Run Integration Test ALL
       run: |
-        uv run python tests_integration/run_all.py
+        set -e
+        output=$(uv run python tests_integration/run_all.py)
+        echo "$output"
+        
+        # Check if there are any failed tests
+        if echo "$output" | grep -q "Failed scripts:"; then
+          echo "❌ Integration tests failed! Check the output above for details."
+          exit 1
+        else
+          echo "✅ All integration tests passed!"
+        fi
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

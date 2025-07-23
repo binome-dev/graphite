@@ -123,7 +123,7 @@ class ReActAgent(Assistant):
 
     def get_input(
         self, question: str, invoke_context: Optional[InvokeContext] = None
-    ) -> list[Message]:
+    ) -> tuple[list[Message], InvokeContext]:
         if invoke_context is None:
             logger.debug(
                 "Creating new InvokeContext with default conversation id for ReActAgent"

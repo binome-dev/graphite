@@ -128,7 +128,7 @@ workflow = (
 
 ### 5. Workflow Execution
 
-With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`. 
+With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`.
 
 ```python linenums="54"
 result = workflow.invoke(

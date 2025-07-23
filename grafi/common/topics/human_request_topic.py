@@ -1,4 +1,6 @@
+from typing import Any
 from typing import Callable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Self
@@ -116,7 +118,7 @@ class HumanRequestTopic(TopicBase):
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Any]:
         return {**super().to_dict()}
 
 
