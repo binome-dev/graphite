@@ -32,21 +32,11 @@ class MockTopic(TopicBase):
             timestamp=datetime(2023, 1, 1, 13, 0),
         )
 
+        # Add event to cache like the real implementation
+        self.add_event(event)
         return event
 
-    def can_consume(self, consumer_name):
-        return consumer_name in self.consumption_offsets and self.consumption_offsets[
-            consumer_name
-        ] < len(self.topic_events)
-
-    def consume(self, consumer_name):
-        if not self.can_consume(consumer_name):
-            return []
-
-        start_offset = self.consumption_offsets.get(consumer_name, 0)
-        new_messages = self.topic_events[start_offset:]
-        self.consumption_offsets[consumer_name] = len(self.topic_events)
-        return new_messages
+    # can_consume and consume are now inherited from TopicBase
 
 
 @pytest.fixture
@@ -64,8 +54,8 @@ def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
     topic.reset()
 
-    assert len(topic.event_cache) == 0  # All messages should be cleared
-    assert topic.consumption_offsets == {}  # Consumption offsets should be reset
+    assert topic.event_cache.num_events() == 0  # All messages should be cleared
+    # Consumption offsets are now managed internally by TopicEventCache
 
 
 def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
@@ -83,8 +73,11 @@ def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
 
     topic.restore_topic(event)
 
-    assert len(topic.event_cache) == 1
-    assert topic.event_cache.get(0).event_id == "event_1"
+    assert topic.event_cache.num_events() == 1
+    # Event was restored to cache, verify by consuming it
+    consumed_events = topic.consume("test_consumer")
+    assert len(consumed_events) == 1
+    assert consumed_events[0].event_id == "event_1"
 
 
 def test_serialize_callable_function():

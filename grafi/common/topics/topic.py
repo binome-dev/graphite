@@ -54,7 +54,7 @@ class Topic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=self.total_published,
+                offset=self.event_cache.num_events(),
             )
             # Add event to cache and update total_published
             self.add_event(event)
@@ -63,6 +63,33 @@ class Topic(TopicBase):
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )
+            return event
+        else:
+            logger.info(f"[{self.name}] Message NOT published (condition not met)")
+            return None
+
+    async def a_publish_data(
+        self,
+        invoke_context: InvokeContext,
+        publisher_name: str,
+        publisher_type: str,
+        data: Messages,
+        consumed_events: List[ConsumeFromTopicEvent],
+    ) -> PublishToTopicEvent:
+        if self.condition(data):
+            event = PublishToTopicEvent(
+                invoke_context=invoke_context,
+                topic_name=self.name,
+                publisher_name=publisher_name,
+                publisher_type=publisher_type,
+                data=data,
+                consumed_event_ids=[
+                    consumed_event.event_id for consumed_event in consumed_events
+                ],
+                offset=self.event_cache.num_events(),
+            )
+
+            await self.a_add_event(event)
             return event
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")

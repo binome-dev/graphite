@@ -7,7 +7,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -57,7 +58,11 @@ class SimpleHITLAssistant(Assistant):
         )
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        human_request_topic = HumanRequestTopic(name="human_request_topic")
+        in_workflow_input_topic = InWorkflowInputTopic(name="human_response_topic")
+        in_workflow_output_topic = InWorkflowOutputTopic(
+            name="human_request_topic",
+            paired_in_workflow_input_topic_name=in_workflow_input_topic.name,
+        )
 
         register_user_topic = Topic(
             name="register_user_topic",
@@ -72,7 +77,7 @@ class SimpleHITLAssistant(Assistant):
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
                 .or_()
-                .subscribed_to(human_request_topic)
+                .subscribed_to(in_workflow_input_topic)
                 .build()
             )
             .tool(
@@ -96,7 +101,7 @@ class SimpleHITLAssistant(Assistant):
             .type("FunctionCallNode")
             .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
             .tool(self.hitl_request)
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 

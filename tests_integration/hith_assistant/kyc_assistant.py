@@ -7,7 +7,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -41,7 +42,11 @@ class KycAssistant(Assistant):
         # Create thought node to process user input
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        human_request_topic = HumanRequestTopic(name="human_request_topic")
+        in_workflow_input_topic = InWorkflowInputTopic(name="human_response_topic")
+        in_workflow_output_topic = InWorkflowOutputTopic(
+            name="human_request_topic",
+            paired_in_workflow_input_topic_name=in_workflow_input_topic.name,
+        )
         user_info_extract_topic = Topic(name="user_info_extract_topic")
 
         user_info_extract_node = (
@@ -52,7 +57,7 @@ class KycAssistant(Assistant):
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
                 .or_()
-                .subscribed_to(human_request_topic)
+                .subscribed_to(in_workflow_input_topic)
                 .build()
             )
             .tool(
@@ -111,7 +116,7 @@ class KycAssistant(Assistant):
             .type("FunctionCallNode")
             .subscribe(hitl_call_topic)
             .tool(self.hitl_request)
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 
@@ -176,9 +181,9 @@ class KycAssistantBuilder(AssistantBaseBuilder[KycAssistant]):
     def user_info_extract_system_message(
         self, user_info_extract_system_message: str
     ) -> Self:
-        self.kwargs[
-            "user_info_extract_system_message"
-        ] = user_info_extract_system_message
+        self.kwargs["user_info_extract_system_message"] = (
+            user_info_extract_system_message
+        )
         return self
 
     def action_llm_system_message(self, action_llm_system_message: str) -> Self:

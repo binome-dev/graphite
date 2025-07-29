@@ -3,6 +3,8 @@ import json
 import os
 import uuid
 
+from loguru import logger
+
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.invoke_context import InvokeContext
@@ -75,6 +77,10 @@ async def test_simple_hitl_assistant() -> None:
     async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
 
+    events = event_store.get_events()
+    print(len(events))
+    assert len(events) == 18
+
     human_input = [
         Message(
             role="user",
@@ -82,8 +88,14 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
+    logger.info(f"Human input: {human_input}")
+
     async for output in assistant.a_invoke(invoke_context, human_input):
         print(output)
+
+    events = event_store.get_events()
+    print(len(events))
+    assert len(events) == 36
 
     human_input = [
         Message(
@@ -92,12 +104,14 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
+    logger.info(f"Human input: {human_input}")
+
     async for output in assistant.a_invoke(invoke_context, human_input):
         print(output)
 
     events = event_store.get_events()
     print(len(events))
-    assert len(events) == 56
+    assert len(events) == 54
 
 
 asyncio.run(test_simple_hitl_assistant())

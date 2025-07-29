@@ -63,7 +63,9 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        logger.debug(f"Executing Node with inputs: {node_input}")
+        logger.debug(
+            f"Executing Node {self.name} with inputs: {[event.to_dict() for event in node_input]}"
+        )
 
         # Use the LLM's invoke method to get the response generator
         async for messages in self.command.a_invoke(
@@ -90,6 +92,22 @@ class Node(NodeBase):
 
         for expr in self.subscribed_expressions:
             if not evaluate_subscription(expr, list(topics_with_new_msgs)):
+                return False
+
+        return True
+
+    def can_invoke_with_topics(self, topics: List[str]) -> bool:
+        """
+        Check if this node can invoke given a list of topic names.
+        If ALL of the node's subscribed_expressions is True, we return True.
+        :param topics: List of topic names to check against the node's expressions.
+        :return: Boolean indicating whether the node should run.
+        """
+        if not self.subscribed_expressions:
+            return True
+
+        for expr in self.subscribed_expressions:
+            if not evaluate_subscription(expr, topics):
                 return False
 
         return True

@@ -3,7 +3,6 @@ from collections import deque
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Set
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -16,24 +15,30 @@ from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_async_event import OutputAsyncEvent
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
-from grafi.common.topics.topic_base import HUMAN_REQUEST_TOPIC_TYPE
+from grafi.common.topics.topic_base import IN_WORKFLOW_OUTPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
+from grafi.workflows.impl.utils import AsyncNodeTracker
+from grafi.workflows.impl.utils import MergeIdleQueue
+from grafi.workflows.impl.utils import a_publish_events
+from grafi.workflows.impl.utils import get_async_output_events
+from grafi.workflows.impl.utils import get_node_input
+from grafi.workflows.impl.utils import output_listener
+from grafi.workflows.impl.utils import publish_events
 from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
 
@@ -61,6 +66,8 @@ class EventDrivenWorkflow(Workflow):
     # Event graph for this workflow
     # Queue of nodes that are ready to invoke (in response to published events)
     _invoke_queue: deque[Node] = PrivateAttr(default=deque())
+
+    _tracker: AsyncNodeTracker = AsyncNodeTracker()
 
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
@@ -95,10 +102,6 @@ class EventDrivenWorkflow(Workflow):
             # For each publish topic, ensure it's registered
             for topic in node.publish_to:
                 self._add_topic(topic)
-
-                # If the topic is for streaming, attach the specialized handler
-                if isinstance(topic, HumanRequestTopic):
-                    topic.publish_to_human_event_handler = self.on_event
 
         # 2) Verify there is an agent input topic
         # Check if any topic has the required type
@@ -166,90 +169,19 @@ class EventDrivenWorkflow(Workflow):
                         )
 
     # Workflow invoke methods
-    def _publish_events(
-        self,
-        node: Node,
-        invoke_context: InvokeContext,
-        result: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
-    ) -> None:
-        published_events = []
-        for topic in node.publish_to:
-            event = topic.publish_data(
-                invoke_context=invoke_context,
-                publisher_name=node.name,
-                publisher_type=node.type,
-                data=result,
-                consumed_events=consumed_events,
-            )
-            if event:
-                published_events.append(event)
 
-        all_events: List[Event] = []
-        all_events.extend(consumed_events)
-        all_events.extend(published_events)
-
-        container.event_store.record_events(all_events)
-
-    async def _publish_agen_events(
-        self,
-        node: Node,
-        invoke_context: InvokeContext,
-        messages_agen: MsgsAGen,
-        consumed_events: List[ConsumeFromTopicEvent],
-    ) -> None:
-        published_events = []
-        consumed_messages: Messages = []
-        for topic in node.publish_to:
-            if not isinstance(topic, OutputTopic):
-                # Add the generator to the async topic
-                if not consumed_messages:
-                    async for messages in messages_agen:
-                        consumed_messages.extend(
-                            messages if isinstance(messages, list) else [messages]
-                        )
-
-                event = topic.publish_data(
-                    invoke_context=invoke_context,
-                    publisher_name=node.name,
-                    publisher_type=node.type,
-                    data=consumed_messages,
-                    consumed_events=consumed_events,
-                )
-                if event:
-                    published_events.append(event)
-
-        for topic in node.publish_to:
-            if isinstance(topic, OutputTopic):
-                # If it's an OutputTopic, we need to handle async generator
-                topic.add_generator(
-                    generator=messages_agen,
-                    data=consumed_messages,
-                    invoke_context=invoke_context,
-                    publisher_name=node.name,
-                    publisher_type=node.type,
-                    consumed_events=consumed_events,
-                )
-                break
-
-        all_events: List[Event] = []
-        all_events.extend(consumed_events)
-        all_events.extend(published_events)
-
-        container.event_store.record_events(all_events)
-
-    def _get_consumed_events(self) -> List[ConsumeFromTopicEvent]:
+    def _get_output_events(self) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []
 
-        human_request_topics = [
+        in_workflow_output_topic = [
             topic
             for topic in self._topics.values()
-            if topic.type == HUMAN_REQUEST_TOPIC_TYPE
+            if topic.type == IN_WORKFLOW_OUTPUT_TOPIC_TYPE
         ]
 
-        for human_request_topic in human_request_topics:
-            if human_request_topic.can_consume(self.name):
-                events = human_request_topic.consume(self.name)
+        for in_workflow_output_topic in in_workflow_output_topic:
+            if in_workflow_output_topic.can_consume(self.name):
+                events = in_workflow_output_topic.consume(self.name)
                 for event in events:
                     if isinstance(event, OutputTopicEvent):
                         consumed_event = ConsumeFromTopicEvent(
@@ -284,6 +216,22 @@ class EventDrivenWorkflow(Workflow):
 
         return consumed_events
 
+    async def _a_commit_events(
+        self, consumer_name: str, events: List[ConsumeFromTopicEvent]
+    ) -> None:
+        if not events:
+            return
+        # commit all consumed events
+        topic_max_offset: Dict[str, int] = {}
+
+        for event in events:
+            topic_max_offset[event.topic_name] = max(
+                topic_max_offset.get(event.topic_name, 0), event.offset
+            )
+
+        for topic, offset in topic_max_offset.items():
+            await self._topics[topic].a_commit(consumer_name, offset)
+
     @record_workflow_invoke
     def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
         """
@@ -308,21 +256,21 @@ class EventDrivenWorkflow(Workflow):
 
                 # Given node, collect all the messages can be linked to it
 
-                node_consumed_events: List[ConsumeFromTopicEvent] = self.get_node_input(
-                    node
-                )
+                node_consumed_events: List[ConsumeFromTopicEvent] = get_node_input(node)
 
                 # Invoke node with collected inputs
                 if node_consumed_events:
                     result = node.invoke(invoke_context, node_consumed_events)
 
-                    self._publish_events(
+                    events = publish_events(
                         node, invoke_context, result, node_consumed_events
                     )
 
+                    container.event_store.record_events(events)
+
             output: Messages = []
 
-            consumed_events = self._get_consumed_events()
+            consumed_events = self._get_output_events()
 
             for event in consumed_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
@@ -346,296 +294,211 @@ class EventDrivenWorkflow(Workflow):
         # Reset stop flag at the beginning of new execution
         self.reset_stop_flag()
 
-        # 1 – initial seeding
-        self.initial_workflow(invoke_context, input)
+        await self.a_init_workflow(invoke_context, input)
 
-        # Get all agent_output_topics and human_request_topics from self._topics
-        agent_output_topics: list[OutputTopic] = [
-            topic
-            for topic in self._topics.values()
-            if topic.type == AGENT_OUTPUT_TOPIC_TYPE and isinstance(topic, OutputTopic)
-        ]
-        human_request_topics: List[HumanRequestTopic] = [
-            topic
-            for topic in self._topics.values()
-            if topic.type == HUMAN_REQUEST_TOPIC_TYPE
-            and isinstance(topic, HumanRequestTopic)
-        ]
-
-        if not agent_output_topics:
-            raise ValueError("No agent output topics found in workflow topics.")
-
-        # Track running tasks and executing nodes
-        running_tasks: Set[asyncio.Task] = set()
-        executing_nodes: Set[str] = set()
+        await asyncio.sleep(0.01)  # Yield control to allow listeners to start
 
         # Start a background task to process all nodes (including streaming generators)
-        node_processing_task = asyncio.create_task(
-            self._process_all_nodes(invoke_context, running_tasks, executing_nodes)
-        )
+        node_processing_task = [
+            asyncio.create_task(
+                self._invoke_node(
+                    invoke_context=invoke_context,
+                    node=node,
+                ),
+                name=node.name,
+            )
+            for node in self.nodes.values()
+        ]
 
-        # Prepare to stream events as they arrive
-        consumed_output_async_events: List[OutputAsyncEvent] = []
+        # Queue for fan‑in of output topics
+        queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
 
-        # Create get_event_task for the first agent output topic that has an event_queue
-        get_event_task = None
-        primary_output_topic = None
-        for topic in agent_output_topics:
-            if hasattr(topic, "event_queue"):
-                primary_output_topic = topic
-                get_event_task = asyncio.create_task(topic.event_queue.get())
-                break
+        output_topics: list[OutputTopic] = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
+            or topic.type == IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+        ]
 
-        if not get_event_task:
-            raise ValueError("No agent output topic with event_queue found.")
+        # Launch one listener per output topic
+        listener_tasks = [
+            asyncio.create_task(output_listener(t, queue, self.name, self._tracker))
+            for t in output_topics
+        ]
 
+        consumed_output_events: List[ConsumeFromTopicEvent] = []
+
+        # Wait for either new data or completion, with a timeout to check stop flag
         try:
-            # Race between new events and node processing completion
-            while True:
-                done, _ = await asyncio.wait(
-                    {node_processing_task, get_event_task},
-                    return_when=asyncio.FIRST_COMPLETED,
+            async for event in MergeIdleQueue(queue, self._tracker):
+                yield event.data
+                consumed_output_events.append(
+                    ConsumeFromTopicEvent(
+                        topic_name=event.topic_name,
+                        consumer_name=self.name,
+                        consumer_type=self.type,
+                        invoke_context=event.invoke_context,
+                        offset=event.offset,
+                        data=event.data,
+                    )
+                )
+        finally:
+            for t in listener_tasks:
+                t.cancel()
+            await asyncio.gather(*listener_tasks, return_exceptions=True)
+
+            # Commit consumed events
+            await self._a_commit_events(
+                consumer_name=self.name, events=consumed_output_events
+            )
+
+            # 4. graceful shutdown all the nodes
+            self.stop()
+
+            # process streaming events
+            if consumed_output_events:
+                logger.debug(f"Committing {len(consumed_output_events)} output events")
+                container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+
+            # Wait for all node tasks to complete with proper error handling
+            for t in node_processing_task:
+                t.cancel()
+            node_results = await asyncio.gather(
+                *node_processing_task, return_exceptions=True
+            )
+
+            # Log any exceptions from node tasks
+            for i, result in enumerate(node_results):
+                if isinstance(result, Exception):
+                    node_name = (
+                        list(self.nodes.keys())[i]
+                        if i < len(self.nodes)
+                        else f"node_{i}"
+                    )
+                    logger.error(f"Node {node_name} ended with exception: {result}")
+
+    async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
+        """Enhanced node invocation with better async patterns and error handling."""
+        buffer: Dict[str, List[TopicEvent]] = {}
+
+        async def _wait_and_buffer(consumer_name: str, topic: TopicBase) -> None:
+            """
+            Block until *at least one* new record is available on `topic`,
+            put **all** currently‑available new records into its buffer.
+            """
+            recs = await topic.a_consume(consumer_name)
+
+            if topic.name not in buffer:
+                buffer[topic.name] = []
+            buffer[topic.name].extend(recs)
+
+        async def _ignore_cancel(task: asyncio.Task) -> None:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        async def wait_node_invoke(node: Node) -> None:
+            while not node.can_invoke_with_topics(list(buffer.keys())):
+                # for every topic that *doesn't* have data yet, start one waiter
+                tasks = [
+                    asyncio.create_task(_wait_and_buffer(node.name, topic))
+                    for topic in node.subscribed_topics
+                ]
+
+                _, pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
                 )
 
-                # If an output‐event arrived, yield it immediately
-                if get_event_task in done:
-                    ev = get_event_task.result()
-                    consumed_output_async_events.append(ev)
-                    yield ev.data
-                    # schedule next event retrieval
-                    if primary_output_topic and hasattr(
-                        primary_output_topic, "event_queue"
-                    ):
-                        get_event_task = asyncio.create_task(
-                            primary_output_topic.event_queue.get()
-                        )
-                    continue
+                # finished waiters have already filled their buffer inside
+                # _wait_and_buffer(); we just cancel the rest for this cycle
+                for t in pending:
+                    t.cancel()
+                    # silence "task was destroyed but it is pending"
+                    asyncio.create_task(_ignore_cancel(t))
 
-                # Check all human request topics for events
-                consumed_events: List[OutputAsyncEvent] = []
-                for human_request_topic in human_request_topics:
-                    if human_request_topic.can_consume(self.name):
-                        events = human_request_topic.consume(self.name)
+        try:
+            while not self._stop_requested:
+                # Check if node can be invoked
+
+                await wait_node_invoke(node)
+
+                await self._tracker.enter(node.name)
+
+                try:
+                    consumed_events: List[ConsumeFromTopicEvent] = []
+                    ignored_events: List[ConsumeFromTopicEvent] = []
+
+                    for events in buffer.values():
                         for event in events:
-                            if isinstance(event, OutputTopicEvent):
-                                yield event.data
-                                consumed_events.append(
-                                    OutputAsyncEvent(
-                                        topic_name=event.topic_name,
-                                        publisher_name=self.name,
-                                        publisher_type=self.type,
+                            if isinstance(event, PublishToTopicEvent):
+                                consumed_event = ConsumeFromTopicEvent(
+                                    invoke_context=event.invoke_context,
+                                    topic_name=event.topic_name,
+                                    consumer_name=node.name,
+                                    consumer_type=node.type,
+                                    offset=event.offset,
+                                    data=event.data,
+                                )
+                                consumed_events.append(consumed_event)
+                            else:
+                                # Ignore output events, they are not needed for node input
+                                ignored_events.append(
+                                    ConsumeFromTopicEvent(
                                         invoke_context=event.invoke_context,
+                                        topic_name=event.topic_name,
+                                        consumer_name=node.name,
+                                        consumer_type=node.type,
                                         offset=event.offset,
                                         data=event.data,
                                     )
                                 )
 
-                consumed_output_async_events.extend(consumed_events)
-
-                # Otherwise node processing must have finished
-                if node_processing_task in done:
-                    # If nothing ever arrived, that's an error
-                    all_queues_empty = all(
-                        not hasattr(topic, "event_queue") or topic.event_queue.empty()
-                        for topic in agent_output_topics
+                    # publish before commit
+                    node_output_events: List[PublishToTopicEvent | OutputTopicEvent] = (
+                        []
                     )
-                    if not consumed_output_async_events and all_queues_empty:
-                        get_event_task.cancel()
-                        if self._stop_requested:
-                            logger.info(
-                                "Workflow execution stopped by assistant request"
+                    if consumed_events:
+                        async for msgs in node.a_invoke(
+                            invoke_context, consumed_events
+                        ):
+                            node_output_events.extend(
+                                await a_publish_events(
+                                    node=node,
+                                    result=msgs,
+                                    invoke_context=invoke_context,
+                                    consumed_events=consumed_events,
+                                )
                             )
-                        else:
-                            raise RuntimeError(
-                                "Node processing completed without emitting any agent_output_topic events"
-                            )
-                    # Otherwise break to drain remaining events
-                    break
 
-            # Drain any leftover events from all agent output topics
-            for agent_output_topic in agent_output_topics:
-                if hasattr(agent_output_topic, "get_events"):
-                    async for ev in agent_output_topic.get_events():
-                        consumed_output_async_events.append(ev)
-                        yield ev.data
+                    await self._a_commit_events(
+                        consumer_name=node.name, events=consumed_events
+                    )
+                    await self._a_commit_events(
+                        consumer_name=node.name, events=ignored_events
+                    )
+                    container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
+                    container.event_store.record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
 
-        finally:
-            # Clean up the pending get_event_task
-            if get_event_task:
-                get_event_task.cancel()
+                except Exception as node_error:
+                    logger.error(f"Error processing node {node.name}: {node_error}")
+                    # Don't break the loop, just log and continue
+                finally:
+                    await self._tracker.leave(node.name)
+                    buffer.clear()  # Clear buffer for next iteration
 
-            # Ensure node processing fully completes
-            if not node_processing_task.done():
-                await node_processing_task
-
-            # Record all consumed output events
-            if consumed_output_async_events:
-                self._record_consumed_events(consumed_output_async_events)
-
-    async def _process_all_nodes(
-        self,
-        invoke_context: InvokeContext,
-        running_tasks: Set[asyncio.Task],
-        executing_nodes: Set[str],
-    ) -> None:
-        """Process all nodes without blocking event streaming."""
-        while self._invoke_queue or running_tasks:
-            # Check if workflow should be stopped
-            if self._stop_requested:
-                logger.info("Nodes execution stopped by assistant request")
-                # Cancel all running tasks
-                for task in running_tasks:
-                    task.cancel()
-                break
-
-            # Start new tasks for all queued nodes
-            while self._invoke_queue:
-                # Check again before processing each node
-                if self._stop_requested:
-                    logger.info("Workflow execution stopped by assistant request")
-                    break
-
-                node = self._invoke_queue.popleft()
-
-                if node.name in executing_nodes:
-                    continue
-
-                executing_nodes.add(node.name)
-                task = asyncio.create_task(
-                    self._invoke_node(invoke_context, node, executing_nodes)
-                )
-                running_tasks.add(task)
-
-            if not running_tasks:
-                break
-
-            # Wait for at least one task to complete
-            done, pending = await asyncio.wait(
-                running_tasks, return_when=asyncio.FIRST_COMPLETED
-            )
-
-            running_tasks = pending
-
-            for task in done:
-                try:
-                    await task
-                except Exception as e:
-                    logger.error(f"Error in node invoke: {e}")
-                    for pending_task in running_tasks:
-                        pending_task.cancel()
-                    raise
-
-        # Wait for all generators to complete on all agent output topics
-        agent_output_topics = [
-            topic
-            for topic in self._topics.values()
-            if topic.type == AGENT_OUTPUT_TOPIC_TYPE
-        ]
-        for agent_output_topic in agent_output_topics:
-            if hasattr(agent_output_topic, "wait_for_completion"):
-                await agent_output_topic.wait_for_completion()
-
-    def _record_consumed_events(self, events: List[OutputAsyncEvent]) -> None:
-        """Record consumed events to event store."""
-        if not events:
-            return
-
-        # TODO: Update for multimodel content
-        result_content = ""
-
-        for event in events:
-            is_streaming = False
-            for message in event.data:
-                if message.is_streaming:
-                    if message.content is not None and isinstance(message.content, str):
-                        result_content += message.content
-                    is_streaming = True
-            if not is_streaming:
-                consumed_event = ConsumeFromTopicEvent(
-                    topic_name=event.topic_name,
-                    consumer_name=self.name,
-                    consumer_type=self.type,
-                    invoke_context=event.invoke_context,
-                    offset=event.offset,
-                    data=event.data,
-                )
-
-                container.event_store.record_event(consumed_event)
-
-        if is_streaming:
-            consumed_event = ConsumeFromTopicEvent(
-                topic_name=events[0].topic_name,
-                consumer_name=self.name,
-                consumer_type=self.type,
-                invoke_context=events[0].invoke_context,
-                offset=events[0].offset,
-                data=[Message(role="assistant", content=result_content)],
-            )
-            container.event_store.record_event(consumed_event)
-
-    async def _invoke_node(
-        self, invoke_context: InvokeContext, node: Node, executing_nodes: Set[str]
-    ) -> None:
-        """
-        Invoke a single node asynchronously with proper stream handling.
-        """
-        try:
-            # Check if workflow should be stopped before invoking node
-            if self._stop_requested:
-                logger.info(f"Skipping node {node.name} execution - workflow stopped")
-                return
-
-            node_consumed_events: List[ConsumeFromTopicEvent] = self.get_node_input(
-                node
-            )
-            if not node_consumed_events:
-                return
-
-            logger.debug(f"Executing node: {node.name}")
-
-            # Handle streaming nodes specially
-            result = node.a_invoke(invoke_context, node_consumed_events)
-
-            await self._publish_agen_events(
-                node, invoke_context, result, node_consumed_events
-            )
-
+        except asyncio.CancelledError:
+            logger.info(f"Node {node.name} was cancelled")
+            raise
         except Exception as e:
-            logger.error(f"Error executing node {node.name}: {e}")
+            logger.error(f"Fatal error in node {node.name} execution: {e}")
             raise
         finally:
-            # Always remove from executing set when done
-            executing_nodes.discard(node.name)
-
-    def get_node_input(self, node: Node) -> List[ConsumeFromTopicEvent]:
-        consumed_events: List[ConsumeFromTopicEvent] = []
-
-        node_subscribed_topics = node._subscribed_topics.values()
-
-        # Process each topic the node is subscribed to
-        for subscribed_topic in node_subscribed_topics:
-            if subscribed_topic.can_consume(node.name):
-                # Get messages from topic and create consume events
-                node_consumed_events = subscribed_topic.consume(node.name)
-                for event in node_consumed_events:
-                    consumed_event = ConsumeFromTopicEvent(
-                        invoke_context=event.invoke_context,
-                        topic_name=event.topic_name,
-                        consumer_name=node.name,
-                        consumer_type=node.type,
-                        offset=event.offset,
-                        data=event.data,
-                    )
-                    consumed_events.append(consumed_event)
-
-        return consumed_events
+            buffer.clear()  # Clear buffer for next iteration
 
     def on_event(self, event: TopicEvent) -> None:
         """Handle topic publish events and trigger node invoke if conditions are met."""
         if not isinstance(event, PublishToTopicEvent):
-            return
-
-        if isinstance(event, OutputTopicEvent):
             return
 
         topic_name = event.topic_name
@@ -706,28 +569,135 @@ class EventDrivenWorkflow(Workflow):
 
             for publish_event in publish_events:
                 topic_name = publish_event.topic_name
-                if topic_name not in self._topic_nodes:
+                if topic_name not in self._topic_nodes and not isinstance(
+                    self._topics[topic_name], InWorkflowOutputTopic
+                ):
                     continue
 
                 topic = self._topics[topic_name]
 
-                # Get all nodes subscribed to this topic
-                subscribed_nodes = self._topic_nodes[topic_name]
+                if not isinstance(topic, InWorkflowOutputTopic):
+                    # Get all nodes subscribed to this topic
+                    subscribed_nodes = self._topic_nodes[topic_name]
 
-                for node_name in subscribed_nodes:
-                    node = self.nodes[node_name]
-                    # add unprocessed node to the invoke queue
-                    if topic.can_consume(node_name) and node.can_invoke():
-                        if isinstance(
-                            topic, HumanRequestTopic
-                        ) and topic.can_append_user_input(node_name, publish_event):
-                            # if the topic is human request topic, we need to produce a new topic event
-                            event = topic.append_user_input(
-                                user_input_event=publish_event,
+                    for node_name in subscribed_nodes:
+                        node = self.nodes[node_name]
+                        # add unprocessed node to the invoke queue
+                        if topic.can_consume(node_name) and node.can_invoke():
+                            self._invoke_queue.append(node)
+
+                # Process in-workflow output topics
+                if isinstance(topic, InWorkflowOutputTopic):
+                    # if the topic is human request topic, we need to produce a new topic event
+                    paired_in_workflow_input_topic = self._topics.get(
+                        topic.paired_in_workflow_input_topic_name
+                    )
+                    if (
+                        paired_in_workflow_input_topic
+                        and paired_in_workflow_input_topic.event_cache.num_events()
+                        < topic.event_cache.num_events()
+                        and isinstance(
+                            paired_in_workflow_input_topic, InWorkflowInputTopic
+                        )
+                        and publish_event.offset
+                        >= paired_in_workflow_input_topic.event_cache.num_events()
+                    ):
+                        event = paired_in_workflow_input_topic.publish_input_data(
+                            upstream_event=publish_event,
+                            data=input,
+                        )
+                        if event:
+                            container.event_store.record_event(event)
+
+                        for node_name in self._topic_nodes[
+                            paired_in_workflow_input_topic.name
+                        ]:
+                            node = self.nodes[node_name]
+                            # add unprocessed node to the invoke queue
+                            if topic.can_consume(node_name) and node.can_invoke():
+                                self._invoke_queue.append(node)
+
+    async def a_init_workflow(
+        self, invoke_context: InvokeContext, input: Messages
+    ) -> Any:
+        # 1 – initial seeding
+        self._tracker.reset()
+        for topic in self._topics.values():
+            await topic.a_reset()
+
+        events = [
+            event
+            for event in container.event_store.get_agent_events(
+                invoke_context.assistant_request_id
+            )
+            if isinstance(event, TopicEvent)
+        ]
+
+        if len(events) == 0:
+
+            input_topics: List[TopicBase] = [
+                topic
+                for topic in self._topics.values()
+                if topic.type == AGENT_INPUT_TOPIC_TYPE
+            ]
+
+            events_to_record: List[Event] = []
+            for input_topic in input_topics:
+                event = await input_topic.a_publish_data(
+                    invoke_context=invoke_context,
+                    publisher_name=self.name,
+                    publisher_type=self.type,
+                    data=input,
+                    consumed_events=[],
+                )
+                if event:
+                    events_to_record.append(event)
+
+            if events_to_record:
+                container.event_store.record_events(events_to_record)
+        else:
+            # When there is unfinished workflow, we need to restore the workflow topics
+            for topic_event in events:
+                logger.debug(
+                    f"Restoring topic {topic_event.topic_name} {topic_event.event_type}"
+                )
+                await self._topics[topic_event.topic_name].a_restore_topic(topic_event)
+
+            publish_events = [
+                event
+                for event in events
+                if isinstance(event, PublishToTopicEvent)
+                or isinstance(event, OutputTopicEvent)
+            ]
+
+            for publish_event in publish_events:
+                topic_name = publish_event.topic_name
+
+                topic = self._topics[topic_name]
+
+                # add human in the loop
+                if isinstance(topic, InWorkflowOutputTopic):
+                    paired_in_workflow_input_topic = self._topics.get(
+                        topic.paired_in_workflow_input_topic_name
+                    )
+                    if (
+                        paired_in_workflow_input_topic
+                        and paired_in_workflow_input_topic.event_cache.num_events()
+                        < topic.event_cache.num_events()
+                        and isinstance(
+                            paired_in_workflow_input_topic, InWorkflowInputTopic
+                        )
+                        and publish_event.offset
+                        >= paired_in_workflow_input_topic.event_cache.num_events()
+                    ):
+                        event = (
+                            await paired_in_workflow_input_topic.a_publish_input_data(
+                                upstream_event=publish_event,
                                 data=input,
                             )
+                        )
+                        if event:
                             container.event_store.record_event(event)
-                        self._invoke_queue.append(node)
 
     def to_dict(self) -> dict[str, Any]:
         return {

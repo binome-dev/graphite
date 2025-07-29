@@ -38,16 +38,18 @@ class HumanInfo(FunctionCallTool):
         )
 
 
+assistant_request_id = uuid.uuid4().hex
+
+
 def get_invoke_context() -> InvokeContext:
     return InvokeContext(
         conversation_id="conversation_id",
         invoke_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
+        assistant_request_id=assistant_request_id,
     )
 
 
 def test_simple_hitl_assistant() -> None:
-    invoke_context = get_invoke_context()
 
     assistant = (
         SimpleHITLAssistant.builder()
@@ -71,9 +73,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(get_invoke_context(), input_data)
 
     print(output)
+
+    events = event_store.get_events()
+    print(len(events))
+    assert len(events) == 18
 
     human_input = [
         Message(
@@ -82,7 +88,11 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, human_input)
+    output = assistant.invoke(get_invoke_context(), human_input)
+
+    events = event_store.get_events()
+    print(len(events))
+    assert len(events) == 36
 
     human_input = [
         Message(
@@ -91,13 +101,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, human_input)
+    output = assistant.invoke(get_invoke_context(), human_input)
 
     print(output)
 
     events = event_store.get_events()
     print(len(events))
-    assert len(events) == 56
+    assert len(events) == 54
 
 
 test_simple_hitl_assistant()
