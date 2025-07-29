@@ -47,7 +47,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             is_streaming_event = False
             # Handle both single message and list of messages
             messages = event.data
-            if messages and messages[0].is_streaming:
+            if messages and len(messages) > 0 and messages[0].is_streaming:
                 is_streaming_event = True
 
             if is_streaming_event:
