@@ -64,12 +64,13 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             base_event = streaming_events[0]
 
             # Aggregate content from all streaming messages
-            aggregated_content = ""
+            aggregated_content_parts = []
             for event in streaming_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
                 for message in messages:
                     if message.content:
-                        aggregated_content += message.content
+                        aggregated_content_parts.append(message.content)
+            aggregated_content = "".join(aggregated_content_parts)
 
             # Create a new message with aggregated content
             # Copy properties from the first message but update content and streaming flag
