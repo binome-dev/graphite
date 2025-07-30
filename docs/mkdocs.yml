@@ -60,7 +60,9 @@ nav:
     - Topics:
       - Topic Base: user-guide/topics/topic_base.md
       - Topic Implementation: user-guide/topics/topic.md
+      - Input Topics: user-guide/topics/input_topics.md
       - Output Topics: user-guide/topics/output_topics.md
+      - Event Cache: user-guide/topics/topic_event_cache.md
       - Subscription Expressions: user-guide/topics/subscription_expression.md
     - Events:
       - Events System: user-guide/events/events.md

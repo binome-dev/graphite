@@ -8,8 +8,7 @@ from grafi.common.topics.topic_base import IN_WORKFLOW_OUTPUT_TOPIC_TYPE
 # OutputTopic handles sync and async publishing of messages to the agent output topic.
 class InWorkflowOutputTopic(OutputTopic):
     """
-    Handle in workflow topic events, for the cases that workflow need to pause and wait for
-    the input from the user or other agents.
+    Represents an output topic for in-workflow processing.
     """
 
     type: str = IN_WORKFLOW_OUTPUT_TOPIC_TYPE

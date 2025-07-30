@@ -16,6 +16,7 @@ The fields of the EventDrivenWorkflow are:
 | `_topics`           | `Dict[str, TopicBase]`            | Private dictionary storing all event topics managed by the workflow.                                  |
 | `_topic_nodes`      | `Dict[str, List[str]]`            | Private mapping of topic names to lists of node names subscribed to each topic.                       |
 | `_invoke_queue`     | `deque[Node]`                     | Private queue of nodes that are ready to execute, triggered by event availability.                    |
+| `_tracker`          | `AsyncNodeTracker`                | Tracks active nodes and workflow idle state for proper async termination.                             |
 
 ## Methods
 
@@ -28,15 +29,12 @@ The following table summarizes key methods within the EventDrivenWorkflow class,
 | `_add_topics`             | Sets up topic subscriptions and node-to-topic mappings from node configurations.                                                                         |
 | `_add_topic`              | Registers a topic within the workflow and sets default publish event handlers.                                                                           |
 | `_handle_function_calling_nodes` | Links function calling nodes with LLM nodes to enable function specification sharing.                                                             |
-| `_publish_events`         | Publishes events to designated workflow topics after a node completes synchronous execution.                                                             |
-| `_publish_agen_events`    | Handles publishing events for asynchronous generators, supporting streaming output.                                                                      |
-| `_get_consumed_events`    | Retrieves and returns consumed events from human request and agent output topics.                                                                        |
+| `_a_commit_events`        | Commits processed events to their respective topics, updating consumer offsets.                                                                          |
+| `_get_output_events`      | Retrieves and returns consumed events from agent output and in-workflow output topics.                                                                   |
 | `invoke`                  | Synchronous workflow execution that processes nodes from the invoke queue until completion.                                                              |
 | `a_invoke`                | Asynchronous workflow execution with streaming support and concurrent node processing.                                                                   |
-| `_process_all_nodes`      | Processes all nodes asynchronously without blocking event streaming, managing concurrent execution.                                                      |
-| `_record_consumed_events` | Records consumed output events to the event store with proper streaming handling.                                                                        |
 | `_invoke_node`            | Invokes a single node asynchronously with proper stream handling and error management.                                                                   |
-| `get_node_input`          | Collects and returns input events consumed by a node based on its subscribed topics.                                                                     |
+| `a_init_workflow`         | Asynchronously initializes workflow state, either restoring from stored events or creating new workflow with input data.                                |
 | `on_event`                | Event handler that responds to topic publish events, evaluates node readiness, and queues nodes for execution.                                          |
 | `initial_workflow`        | Initializes workflow state, either restoring from stored events or creating new workflow with input data.                                               |
 | `to_dict`                 | Serializes the workflow to a dictionary representation including nodes, topics, and topic-node mappings.                                                |
@@ -106,10 +104,20 @@ The EventDrivenWorkflow supports both synchronous (`invoke`) and asynchronous (`
 
 ### Asynchronous Execution (`a_invoke`)
 
-1. **Workflow Initialization**: Sets up initial state
-2. **Concurrent Processing**: Uses `_process_all_nodes` to handle nodes concurrently
-3. **Event Streaming**: Streams events as they arrive from `agent_output_topic.event_queue`
-4. **Task Management**: Manages running tasks and executing nodes to prevent conflicts
+The asynchronous execution model provides sophisticated event-driven processing with proper coordination:
+
+1. **Workflow Initialization**: Sets up initial state with `a_init_workflow`
+2. **Concurrent Node Processing**: Spawns individual tasks for each node using `_invoke_node`  
+3. **Output Listening**: Creates listeners for each output topic to capture results
+4. **Event Streaming**: Uses `MergeIdleQueue` to stream events as they become available
+5. **Proper Termination**: Coordinates workflow completion using `AsyncNodeTracker`
+
+#### Key Components
+
+- **AsyncNodeTracker**: Manages active node state and idle detection
+- **Output Listeners**: Monitor output topics for new events
+- **MergeIdleQueue**: Coordinates between event availability and workflow idle state
+- **Offset Management**: Commits events immediately to prevent duplicates
 
 ### Event-Driven Node Triggering
 
@@ -148,6 +156,146 @@ The system provides flexible subscription expressions through topic expressions 
 
 - **AND Logic**: Node executes when ALL subscription conditions are met
 - **OR Logic**: Node executes when ANY subscription condition is met
+
+## Async Flow Architecture
+
+The EventDrivenWorkflow implements a sophisticated async architecture that addresses the challenges of coordinating multiple concurrent nodes while ensuring proper workflow termination and data consistency.
+
+### AsyncNodeTracker
+
+The `AsyncNodeTracker` manages workflow state and coordination:
+
+```python
+class AsyncNodeTracker:
+    def __init__(self) -> None:
+        self._active: set[str] = set()
+        self._processing_count: Dict[str, int] = defaultdict(int)
+        self._cond = asyncio.Condition()
+        self._idle_event = asyncio.Event()
+```
+
+#### Key Features
+
+- **Active Node Tracking**: Maintains a set of currently processing nodes
+- **Processing Count**: Tracks total processing cycles to detect workflow progress
+- **Idle Detection**: Signals when no nodes are active
+- **Activity Monitoring**: Detects when new processing activity occurs
+
+### Output Listeners and MergeIdleQueue
+
+The async workflow uses output listeners to monitor topics and a merge queue to coordinate termination:
+
+```python
+# Launch one listener per output topic
+listener_tasks = [
+    asyncio.create_task(output_listener(t, queue, self.name, self._tracker))
+    for t in output_topics
+]
+
+# Coordinate between data availability and workflow idle state
+async for event in MergeIdleQueue(queue, self._tracker):
+    yield event.data
+```
+
+#### MergeIdleQueue Logic
+
+The `MergeIdleQueue` implements sophisticated termination logic:
+
+1. **Data Available**: If queue has data, yield it immediately
+2. **Idle Detection**: If workflow becomes idle, check for completion
+3. **Grace Period**: Allow time for downstream node activation
+4. **Activity Monitoring**: Track processing count to detect progress
+
+### Offset Management and Duplicate Prevention
+
+The async workflow implements proper offset management to prevent duplicate data:
+
+```python
+async for event in MergeIdleQueue(queue, self._tracker):
+    consumed_output_event = ConsumeFromTopicEvent(...)
+    
+    # Commit BEFORE yielding to prevent duplicate data
+    await self._a_commit_events(
+        consumer_name=self.name, events=[consumed_output_event]
+    )
+    
+    # Now yield the data after committing
+    yield event.data
+```
+
+#### Key Principles
+
+- **Immediate Consumption**: Consumed offset advanced on fetch
+- **Commit Before Yield**: Prevents duplicate data in output stream
+- **Atomic Operations**: Event processing and commitment are coordinated
+
+### Node Lifecycle in Async Mode
+
+Each node runs in its own async task with proper coordination:
+
+```python
+async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
+    buffer: Dict[str, List[TopicEvent]] = {}
+    
+    try:
+        while not self._stop_requested:
+            # Wait for node to have sufficient data
+            await wait_node_invoke(node)
+            
+            # Signal node is becoming active
+            await self._tracker.enter(node.name)
+            
+            try:
+                # Process events and publish results
+                async for msgs in node.a_invoke(invoke_context, consumed_events):
+                    published_events = await a_publish_events(...)
+                    # Notify downstream nodes immediately
+                    for event in published_events:
+                        if event.topic_name in self._topic_nodes:
+                            topic = self._topics[event.topic_name]
+                            async with topic.event_cache._cond:
+                                topic.event_cache._cond.notify_all()
+                
+                # Commit processed events
+                await self._a_commit_events(...)
+                
+            finally:
+                # Signal node is no longer active
+                await self._tracker.leave(node.name)
+                
+    except asyncio.CancelledError:
+        logger.info(f"Node {node.name} was cancelled")
+        raise
+```
+
+#### Node Coordination Features
+
+- **Buffer Management**: Each node maintains its own event buffer
+- **Activity Signaling**: Nodes signal when they become active/inactive
+- **Immediate Notification**: Downstream nodes notified immediately after publishing
+- **Proper Cleanup**: Resources cleaned up on cancellation
+
+### Workflow Termination Logic
+
+The workflow terminates when all conditions are met:
+
+1. **No Active Nodes**: `AsyncNodeTracker` reports idle state
+2. **No Pending Data**: Output topics have no unconsumed data
+3. **No Progress**: Activity count indicates no new processing cycles
+
+```python
+# Check for workflow completion
+if tracker.is_idle() and not topic.can_consume(consumer_name):
+    current_activity = tracker.get_activity_count()
+    
+    # If no new activity since last check, we're done
+    if current_activity == last_activity_count:
+        break
+    
+    last_activity_count = current_activity
+```
+
+This multi-layered approach ensures that workflows terminate cleanly without missing data or creating race conditions between upstream completion and downstream activation.
 - **Complex Expressions**: Combination of AND/OR operators for advanced logic
 
 **Important Consideration for OR Logic**: When using OR-based subscriptions, nodes are queued as soon as one condition is satisfied. Messages from other subscribed topics in the OR expression may not be available when `get_node_input` executes, potentially causing data inconsistencies. Careful design is recommended when implementing OR-based logic.
