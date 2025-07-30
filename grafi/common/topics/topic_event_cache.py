@@ -4,8 +4,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from loguru import logger
-
 from grafi.common.events.topic_events.topic_event import TopicEvent
 
 
@@ -23,8 +21,10 @@ class TopicEventCache:
         self._records: List[TopicEvent] = []  # contiguous log
 
         # Per‑consumer cursors
-        self._consumed: Dict[str, int] = defaultdict(int)  # next offset
-        self._committed: Dict[str, int] = defaultdict(lambda: -1)
+        self._consumed: Dict[str, int] = defaultdict(int)  # next offset to read
+        self._committed: Dict[str, int] = defaultdict(
+            lambda: -1
+        )  # last committed offset
 
         # For asynchronous operations
         self._cond: asyncio.Condition = asyncio.Condition()
@@ -62,6 +62,7 @@ class TopicEventCache:
 
     def can_consume(self, cid: str) -> bool:
         self._ensure_consumer(cid)
+        # Can consume if there are records beyond the consumed offset
         return self._consumed[cid] < len(self._records)
 
     def fetch(
@@ -70,33 +71,36 @@ class TopicEventCache:
         offset: Optional[int] = None,
     ) -> List[TopicEvent]:
         """
-        Blocking fetch of records newer than the consumer's current cursor.
-        Returns [] on timeout.
+        Fetch records newer than the consumer's consumed offset.
+        Immediately advances consumed offset to prevent duplicate fetches.
+        Returns [] if no new data available.
         """
         self._ensure_consumer(cid)
 
         if self.can_consume(cid):
-
             start = self._consumed[cid]
             if offset is not None:
-                end = max(start, offset)
+                end = min(len(self._records), offset + 1)
                 batch = self._records[start:end]
             else:
                 batch = self._records[start:]
 
-            self._consumed[cid] += len(batch)  # advance cursor
+            # Advance consumed offset immediately to prevent duplicate fetches
+            self._consumed[cid] += len(batch)
             return batch
-        
+
         return []
 
     def commit_to(self, cid: str, offset: int) -> int:
         """
-        Marks everything up to `consumed_offset‑1` as processed/durable
-        for this consumer. Triggers log‑compaction when possible.
+        Marks everything up to `offset` as processed/durable
+        for this consumer.
         Returns the new committed offset.
         """
         self._ensure_consumer(cid)
-        self._committed[cid] = offset
+        # Only commit if offset is greater than current committed
+        if offset > self._committed[cid]:
+            self._committed[cid] = offset
         return self._committed[cid]
 
     # ------------------------------ asynchronous methods ------------------------------
@@ -117,8 +121,9 @@ class TopicEventCache:
         timeout: Optional[float] = None,
     ) -> List[TopicEvent]:
         """
-        Await up to `max_records` fresh records newer than the consumer’s
-        cursor. Returns [] if `timeout` (seconds) elapses with no data.
+        Await fresh records newer than the consumer's consumed offset.
+        Immediately advances consumed offset to prevent duplicate fetches.
+        Returns [] if `timeout` (seconds) elapses with no data.
         """
         self._ensure_consumer(cid)
 
@@ -138,20 +143,20 @@ class TopicEventCache:
 
             start = self._consumed[cid]
             if offset is not None:
-                end = max(start, offset)
+                end = min(len(self._records), offset + 1)
                 batch = self._records[start:end]
             else:
                 batch = self._records[start:]
 
+            # Advance consumed offset immediately to prevent duplicate fetches
             self._consumed[cid] += len(batch)
-
-            logger.debug(
-                f"Consumer {cid} fetched {len(batch)} messages from cache, consumed up to offset {self._consumed[cid]}"
-            )
 
             return batch
 
     async def a_commit_to(self, cid: str, offset: int) -> None:
         """Commit all offsets up to and including the specified offset."""
-        self._ensure_consumer(cid)
-        self._committed[cid] = offset
+        async with self._cond:
+            self._ensure_consumer(cid)
+            # Only commit if offset is greater than current committed
+            if offset > self._committed[cid]:
+                self._committed[cid] = offset

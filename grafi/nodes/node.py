@@ -1,7 +1,6 @@
 from typing import Any
 from typing import List
 
-from loguru import logger
 
 from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
 from grafi.common.decorators.record_node_invoke import record_node_invoke
@@ -46,7 +45,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-        logger.debug(f"Executing Node with inputs: {node_input}")
 
         # Use the LLM's invoke method to get the response
         response = self.command.invoke(
@@ -63,9 +61,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        logger.debug(
-            f"Executing Node {self.name} with inputs: {[event.to_dict() for event in node_input]}"
-        )
 
         # Use the LLM's invoke method to get the response generator
         async for messages in self.command.a_invoke(

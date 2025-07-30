@@ -1,9 +1,8 @@
 import asyncio
+from collections import defaultdict
 from typing import Dict
 from typing import List
 from typing import Tuple
-
-from loguru import logger
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -172,9 +171,6 @@ async def a_publish_events(
         if event:
             published_events.append(event)
 
-    logger.debug(
-        f"Node {node.name} published {len(published_events)} events to topics: {[event.topic_name for event in published_events]}"
-    )
     return published_events
 
 
@@ -248,6 +244,9 @@ async def a_get_node_input(
 class AsyncNodeTracker:
     def __init__(self) -> None:
         self._active: set[str] = set()
+        self._processing_count: Dict[str, int] = defaultdict(
+            int
+        )  # Track how many times each node processed
         self._cond = asyncio.Condition()
         self._idle_event = asyncio.Event()
         # Set the event initially since we start in idle state
@@ -258,6 +257,7 @@ class AsyncNodeTracker:
         Reset the tracker to its initial state.
         """
         self._active: set[str] = set()
+        self._processing_count: Dict[str, int] = defaultdict(int)
         self._cond = asyncio.Condition()
         self._idle_event = asyncio.Event()
         # Set the event initially since we start in idle state
@@ -267,11 +267,10 @@ class AsyncNodeTracker:
         async with self._cond:
             self._idle_event.clear()
             self._active.add(node_name)
+            self._processing_count[node_name] += 1
 
     async def leave(self, node_name: str) -> None:
-        await asyncio.sleep(0.01)  # Yield control to allow other nodes to enter
         async with self._cond:
-            logger.debug(f"Node {node_name} finished processing")
             self._active.discard(node_name)
             if not self._active:
                 self._idle_event.set()
@@ -287,6 +286,10 @@ class AsyncNodeTracker:
     def is_idle(self) -> bool:
         return not self._active
 
+    def get_activity_count(self) -> int:
+        """Get total processing count across all nodes"""
+        return sum(self._processing_count.values())
+
 
 async def output_listener(
     topic: TopicBase,
@@ -296,12 +299,15 @@ async def output_listener(
 ):
     """
     Streams *matching* records from `topic` into `queue`.
-    Exits when the graph is idle *and* the topic has no more unseen data.
+    Exits when the graph is idle *and* the topic has no more unseen data,
+    with proper handling for downstream node activation.
     """
+    last_activity_count = 0
+
     while True:
-        # waiter 1: “some records arrived”
+        # waiter 1: "some records arrived"
         topic_task = asyncio.create_task(topic.a_consume(consumer_name))
-        # waiter 2: “graph just became idle”
+        # waiter 2: "graph just became idle"
         idle_event_waiter = asyncio.create_task(tracker.wait_idle_event())
 
         done, pending = await asyncio.wait(
@@ -312,19 +318,28 @@ async def output_listener(
         # ---- If records arrived -----------------------------------------
         if topic_task in done:
             output_events = topic_task.result()
+
             for output_event in output_events:
                 await queue.put(output_event)
 
-        # ---- If we became idle & no more data => finished ----------------
-        if tracker.is_idle() and not topic.can_consume(consumer_name):
-            # cancel an unfinished waiter (if any) to avoid warnings
-            for t in pending:
-                t.cancel()
-            break
+        # ---- Check for workflow completion ----------------
+        if idle_event_waiter in done and tracker.is_idle():
+            current_activity = tracker.get_activity_count()
 
-        # otherwise we loop again, keeping the still‑pending waiter alive
+            # If no new activity since last check and no data, we're done
+            if current_activity == last_activity_count and not topic.can_consume(
+                consumer_name
+            ):
+                # cancel an unfinished waiter (if any) to avoid warnings
+                for t in pending:
+                    t.cancel()
+                break
+
+            last_activity_count = current_activity
+
+        # Cancel the topic task since we're checking idle state
         for t in pending:
-            t.cancel()  # cheap cancel; we re‑create next loop
+            t.cancel()
 
 
 class MergeIdleQueue:

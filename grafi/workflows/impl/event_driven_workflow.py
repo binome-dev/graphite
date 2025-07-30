@@ -331,7 +331,9 @@ class EventDrivenWorkflow(Workflow):
         # Wait for either new data or completion, with a timeout to check stop flag
         try:
             async for event in MergeIdleQueue(queue, self._tracker):
+                # Now yield the data after committing
                 yield event.data
+
                 consumed_output_events.append(
                     ConsumeFromTopicEvent(
                         topic_name=event.topic_name,
@@ -347,7 +349,7 @@ class EventDrivenWorkflow(Workflow):
                 t.cancel()
             await asyncio.gather(*listener_tasks, return_exceptions=True)
 
-            # Commit consumed events
+            # Commit all consumed output events
             await self._a_commit_events(
                 consumer_name=self.name, events=consumed_output_events
             )
@@ -355,9 +357,8 @@ class EventDrivenWorkflow(Workflow):
             # 4. graceful shutdown all the nodes
             self.stop()
 
-            # process streaming events
+            # process events after stopping
             if consumed_output_events:
-                logger.debug(f"Committing {len(consumed_output_events)} output events")
                 container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
 
             # Wait for all node tasks to complete with proper error handling
@@ -658,9 +659,6 @@ class EventDrivenWorkflow(Workflow):
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:
-                logger.debug(
-                    f"Restoring topic {topic_event.topic_name} {topic_event.event_type}"
-                )
                 await self._topics[topic_event.topic_name].a_restore_topic(topic_event)
 
             publish_events = [

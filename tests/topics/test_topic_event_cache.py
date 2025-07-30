@@ -1,11 +1,9 @@
 import asyncio
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import pytest
 
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_event_cache import TopicEventCache
@@ -171,14 +169,14 @@ class TestTopicEventCache:
 
         # Fetch only up to offset 3
         result = cache.fetch("consumer1", offset=3)
-        assert len(result) == 3
-        assert result == events[:3]
-        assert cache._consumed["consumer1"] == 3
+        assert len(result) == 4
+        assert result == events[:4]
+        assert cache._consumed["consumer1"] == 4
 
         # Fetch remaining
         result = cache.fetch("consumer1")
-        assert len(result) == 2
-        assert result == events[3:]
+        assert len(result) == 1
+        assert result == events[4:]
 
     def test_multiple_consumers(self, cache, sample_event):
         cache.put(sample_event)
@@ -268,8 +266,8 @@ class TestTopicEventCache:
 
         # Fetch only up to offset 3
         result = await cache.a_fetch("consumer1", offset=3)
-        assert len(result) == 3
-        assert result == events[:3]
+        assert len(result) == 4
+        assert result == events[:4]
 
     @pytest.mark.asyncio
     async def test_a_commit_to(self, cache):
@@ -295,7 +293,11 @@ class TestTopicEventCache:
                     publisher_type="test_type",
                     consumed_event_ids=[],
                     invoke_context=invoke_context,
-                    data=[Message(role="user", content=f"producer {producer_id} message {i}")],
+                    data=[
+                        Message(
+                            role="user", content=f"producer {producer_id} message {i}"
+                        )
+                    ],
                     timestamp=datetime.now(),
                 )
                 await cache.a_put(event)
@@ -426,19 +428,13 @@ class TestTopicEventCache:
 
         # Consumer 1 fetches first 2 events
         result1 = cache.fetch("consumer1", offset=2)
-        assert len(result1) == 2
-        assert cache._consumed["consumer1"] == 2
+        assert len(result1) == 3
+        assert cache._consumed["consumer1"] == 3
 
         # Consumer 2 can still fetch all events
         result2 = cache.fetch("consumer2")
         assert len(result2) == 3
         assert cache._consumed["consumer2"] == 3
-
-        # Consumer 1 can fetch remaining event
-        assert cache.can_consume("consumer1")
-        result3 = cache.fetch("consumer1")
-        assert len(result3) == 1
-        assert result3[0] == events[2]
 
     def test_commit_before_consume(self, cache):
         # Commit before any consumption
@@ -510,13 +506,13 @@ class TestTopicEventCache:
 
         # Test offset = 0 (should return empty since start=0, end=max(0,0)=0)
         result = await cache.a_fetch("consumer1", offset=0)
-        assert len(result) == 0
-        assert cache._consumed["consumer1"] == 0
+        assert len(result) == 1
+        assert cache._consumed["consumer1"] == 1
 
         # Test offset equal to current position
         cache._consumed["consumer1"] = 2
         result = await cache.a_fetch("consumer1", offset=2)
-        assert len(result) == 0  # start=2, end=max(2,2)=2, so slice[2:2] is empty
+        assert len(result) == 1  # start=2, end=max(2,2)=2, so slice[2:2] is empty
 
         # Test offset less than current position (should still use current position)
         cache._consumed["consumer1"] = 3
@@ -524,7 +520,7 @@ class TestTopicEventCache:
         assert len(result) == 0  # start=3, end=max(3,1)=3, so slice[3:3] is empty
 
         # Test offset greater than available events
-        cache._consumed["consumer1"] = 0
+        cache._consumed["consumer1"] = 1
         result = await cache.a_fetch("consumer1", offset=10)
-        assert len(result) == 5  # Should get all 5 events
+        assert len(result) == 4  # Should get all 4 events
         assert cache._consumed["consumer1"] == 5
