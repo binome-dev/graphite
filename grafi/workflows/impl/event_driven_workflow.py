@@ -296,8 +296,6 @@ class EventDrivenWorkflow(Workflow):
 
         await self.a_init_workflow(invoke_context, input)
 
-        await asyncio.sleep(0.01)  # Yield control to allow listeners to start
-
         # Start a background task to process all nodes (including streaming generators)
         node_processing_task = [
             asyncio.create_task(
