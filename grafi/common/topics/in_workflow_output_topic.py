@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Self
 
 from grafi.common.topics.output_topic import OutputTopic
@@ -21,8 +22,7 @@ class InWorkflowOutputTopic(OutputTopic):
         """
         return InWorkflowOutputTopicBuilder(cls)
 
-    def to_dict(self):
-
+    def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
             "paired_in_workflow_input_topic_name": self.paired_in_workflow_input_topic_name,
@@ -37,7 +37,7 @@ class InWorkflowOutputTopicBuilder(OutputTopicBuilder[InWorkflowOutputTopic]):
     def paired_in_workflow_input_topic_name(
         self, paired_in_workflow_input_topic_name: str
     ) -> Self:
-        self.kwargs["paired_in_workflow_input_topic_name"] = (
-            paired_in_workflow_input_topic_name
-        )
+        self.kwargs[
+            "paired_in_workflow_input_topic_name"
+        ] = paired_in_workflow_input_topic_name
         return self

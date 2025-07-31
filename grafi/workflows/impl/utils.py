@@ -66,7 +66,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
                 for message in messages:
                     if message.content:
                         aggregated_content_parts.append(message.content)
-            aggregated_content = "".join(aggregated_content_parts)
+            aggregated_content = "".join(aggregated_content_parts)  # type: ignore[arg-type]
 
             # Create a new message with aggregated content
             # Copy properties from the first message but update content and streaming flag
@@ -82,7 +82,9 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             )
 
             # Create new event based on the base event type
-            aggregated_events = []
+            aggregated_events: List[
+                PublishToTopicEvent | OutputTopicEvent | ConsumeFromTopicEvent
+            ] = []
             if isinstance(base_event, PublishToTopicEvent):
                 aggregated_events = [
                     PublishToTopicEvent(
@@ -92,7 +94,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
                         invoke_context=base_event.invoke_context,
                         offset=base_event.offset,
                         data=[aggregated_message],
-                        consumed_events=getattr(base_event, "consumed_events", []),
+                        consumed_event_ids=base_event.consumed_event_ids,
                     )
                 ]
             elif isinstance(base_event, ConsumeFromTopicEvent):
@@ -115,7 +117,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
                         invoke_context=base_event.invoke_context,
                         offset=base_event.offset,
                         data=[aggregated_message],
-                        consumed_events=getattr(base_event, "consumed_events", []),
+                        consumed_event_ids=base_event.consumed_event_ids,
                     )
                 ]
 

@@ -21,8 +21,8 @@ class AsyncNodeTracker:
         """
         Reset the tracker to its initial state.
         """
-        self._active: set[str] = set()
-        self._processing_count: Dict[str, int] = defaultdict(int)
+        self._active = set()
+        self._processing_count = defaultdict(int)
         self._cond = asyncio.Condition()
         self._idle_event = asyncio.Event()
         # Set the event initially since we start in idle state

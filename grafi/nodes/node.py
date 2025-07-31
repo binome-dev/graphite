@@ -1,7 +1,6 @@
 from typing import Any
 from typing import List
 
-
 from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
 from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -45,7 +44,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-
         # Use the LLM's invoke method to get the response
         response = self.command.invoke(
             invoke_context,
@@ -61,7 +59,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-
         # Use the LLM's invoke method to get the response generator
         async for messages in self.command.a_invoke(
             invoke_context,

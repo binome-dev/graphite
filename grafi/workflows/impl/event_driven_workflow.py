@@ -264,7 +264,7 @@ class EventDrivenWorkflow(Workflow):
                         node, invoke_context, result, node_consumed_events
                     )
 
-                    container.event_store.record_events(events)
+                    container.event_store.record_events(events)  # type: ignore[arg-type]
 
             output: Messages = []
 
@@ -368,7 +368,7 @@ class EventDrivenWorkflow(Workflow):
                     )
                     logger.error(f"Node {node_name} ended with exception: {result}")
 
-    async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
+    async def _invoke_node(self, invoke_context: InvokeContext, node: Node) -> None:
         """Enhanced node invocation with better async patterns and error handling."""
         buffer: Dict[str, List[TopicEvent]] = {}
 
@@ -446,9 +446,9 @@ class EventDrivenWorkflow(Workflow):
                                 )
 
                     # publish before commit
-                    node_output_events: List[PublishToTopicEvent | OutputTopicEvent] = (
-                        []
-                    )
+                    node_output_events: List[
+                        PublishToTopicEvent | OutputTopicEvent
+                    ] = []
                     if consumed_events:
                         async for msgs in node.a_invoke(
                             invoke_context, consumed_events
@@ -593,12 +593,14 @@ class EventDrivenWorkflow(Workflow):
                         and publish_event.offset
                         >= paired_in_workflow_input_topic.event_cache.num_events()
                     ):
-                        event = paired_in_workflow_input_topic.publish_input_data(
-                            upstream_event=publish_event,
-                            data=input,
+                        paired_event = (
+                            paired_in_workflow_input_topic.publish_input_data(
+                                upstream_event=publish_event,
+                                data=input,
+                            )
                         )
-                        if event:
-                            container.event_store.record_event(event)
+                        if paired_event:
+                            container.event_store.record_event(paired_event)
 
                         for node_name in self._topic_nodes[
                             paired_in_workflow_input_topic.name
@@ -625,7 +627,6 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         if len(events) == 0:
-
             input_topics: List[TopicBase] = [
                 topic
                 for topic in self._topics.values()
@@ -678,14 +679,14 @@ class EventDrivenWorkflow(Workflow):
                         and publish_event.offset
                         >= paired_in_workflow_input_topic.event_cache.num_events()
                     ):
-                        event = (
+                        paired_event = (
                             await paired_in_workflow_input_topic.a_publish_input_data(
                                 upstream_event=publish_event,
                                 data=input,
                             )
                         )
-                        if event:
-                            container.event_store.record_event(event)
+                        if paired_event:
+                            container.event_store.record_event(paired_event)
 
     def to_dict(self) -> dict[str, Any]:
         return {

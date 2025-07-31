@@ -246,7 +246,7 @@ print(f"Sent request for review: {event.event_id}")
 class HumanApprovalWorkflow:
     def __init__(self):
         self.pending_approvals = {}
-        
+
         # Create workflow output topic for human interaction
         self.output_topic = InWorkflowOutputTopic(
             name="approval_output",
@@ -373,7 +373,7 @@ def test_workflow_output_topic():
     assert output_event is not None
     assert output_event.topic_name == "test_output"
     assert len(output_topic.event_cache._records) == 1
-    
+
     # Verify paired topic name is set
     assert output_topic.paired_in_workflow_input_topic_name == "test_input"
 ```

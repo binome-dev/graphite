@@ -92,7 +92,7 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     # Consumer 1 consumes both messages
     consumed_messages_1 = topic.consume("consumer_1")
     assert len(consumed_messages_1) == 2
-    
+
     # Consumer 1 has no more messages to consume
     assert not topic.can_consume("consumer_1")
     consumed_messages_1_again = topic.consume("consumer_1")
@@ -101,7 +101,7 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     # Consumer 2 starts fresh and should receive both messages
     consumed_messages_2 = topic.consume("consumer_2")
     assert len(consumed_messages_2) == 2
-    
+
     # Consumer 2 has no more messages to consume
     assert not topic.can_consume("consumer_2")
 

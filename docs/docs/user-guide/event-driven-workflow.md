@@ -196,12 +196,12 @@ The async workflow implements proper offset management to prevent duplicate data
 ```python
 async for event in MergeIdleQueue(queue, self._tracker):
     consumed_output_event = ConsumeFromTopicEvent(...)
-    
+
     # Commit BEFORE yielding to prevent duplicate data
     await self._a_commit_events(
         consumer_name=self.name, events=[consumed_output_event]
     )
-    
+
     # Now yield the data after committing
     yield event.data
 ```
@@ -219,15 +219,15 @@ Each node runs in its own async task with proper coordination:
 ```python
 async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
     buffer: Dict[str, List[TopicEvent]] = {}
-    
+
     try:
         while not self._stop_requested:
             # Wait for node to have sufficient data
             await wait_node_invoke(node)
-            
+
             # Signal node is becoming active
             await self._tracker.enter(node.name)
-            
+
             try:
                 # Process events and publish results
                 async for msgs in node.a_invoke(invoke_context, consumed_events):
@@ -238,14 +238,14 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
                             topic = self._topics[event.topic_name]
                             async with topic.event_cache._cond:
                                 topic.event_cache._cond.notify_all()
-                
+
                 # Commit processed events
                 await self._a_commit_events(...)
-                
+
             finally:
                 # Signal node is no longer active
                 await self._tracker.leave(node.name)
-                
+
     except asyncio.CancelledError:
         logger.info(f"Node {node.name} was cancelled")
         raise
@@ -270,11 +270,11 @@ The workflow terminates when all conditions are met:
 # Check for workflow completion
 if tracker.is_idle() and not topic.can_consume(consumer_name):
     current_activity = tracker.get_activity_count()
-    
+
     # If no new activity since last check, we're done
     if current_activity == last_activity_count:
         break
-    
+
     last_activity_count = current_activity
 ```
 

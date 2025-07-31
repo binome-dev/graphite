@@ -33,10 +33,10 @@ class TopicEventCache:
         """
         Reset the topic to its initial state.
         """
-        self._records: List[TopicEvent] = []
-        self._consumed: Dict[str, int] = defaultdict(int)
-        self._committed: Dict[str, int] = defaultdict(lambda: -1)
-        self._cond: asyncio.Condition = asyncio.Condition()
+        self._records = []
+        self._consumed = defaultdict(int)
+        self._committed = defaultdict(lambda: -1)
+        self._cond = asyncio.Condition()
 
     def num_events(self) -> int:
         """
@@ -133,7 +133,7 @@ class TopicEventCache:
 
         async with self._cond:
 
-            async def _wait():
+            async def _wait() -> None:
                 await self._cond.wait()
 
             while not self.can_consume(cid):

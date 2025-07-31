@@ -25,20 +25,20 @@ class AsyncOutputQueue:
         self.queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
         self.listener_tasks: List[asyncio.Task] = []
 
-    async def start_listeners(self):
+    async def start_listeners(self) -> None:
         """Start listener tasks for all output topics."""
         self.listener_tasks = [
             asyncio.create_task(self._output_listener(topic))
             for topic in self.output_topics
         ]
 
-    async def stop_listeners(self):
+    async def stop_listeners(self) -> None:
         """Stop all listener tasks."""
         for task in self.listener_tasks:
             task.cancel()
         await asyncio.gather(*self.listener_tasks, return_exceptions=True)
 
-    async def _output_listener(self, topic: TopicBase):
+    async def _output_listener(self, topic: TopicBase) -> None:
         """
         Streams *matching* records from `topic` into `queue`.
         Exits when the graph is idle *and* the topic has no more unseen data,

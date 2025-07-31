@@ -50,7 +50,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_simple_hitl_assistant() -> None:
-
     assistant = (
         SimpleHITLAssistant.builder()
         .name("SimpleHITLAssistant")

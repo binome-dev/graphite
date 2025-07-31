@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 
@@ -409,5 +408,3 @@ class TestGetNodeInput:
         # Verify OutputTopicEvent was ignored
         assert isinstance(ignored_events[0], ConsumeFromTopicEvent)
         assert ignored_events[0].data[0].content == "Output"
-
-

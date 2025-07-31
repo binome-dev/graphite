@@ -21,11 +21,11 @@ class TopicEventCache:
     def __init__(self, name: str = ""):
         self.name: str = name
         self._records: List[TopicEvent] = []  # contiguous log
-        
+
         # Per-consumer cursors
         self._consumed: Dict[str, int] = defaultdict(int)      # next offset to read
         self._committed: Dict[str, int] = defaultdict(lambda: -1)  # last committed offset
-        
+
         # For asynchronous operations
         self._cond: asyncio.Condition = asyncio.Condition()
 ```
@@ -97,7 +97,7 @@ def fetch(self, cid: str, offset: Optional[int] = None) -> List[TopicEvent]:
         # Advance consumed offset immediately to prevent duplicate fetches
         self._consumed[cid] += len(batch)
         return batch
-    
+
     return []
 ```
 
@@ -184,11 +184,11 @@ cache.put(event)
 consumer_id = "consumer_1"
 if cache.can_consume(consumer_id):
     events = cache.fetch(consumer_id)
-    
+
     # Process events
     for event in events:
         process_event(event)
-    
+
     # Commit after successful processing
     if events:
         last_offset = events[-1].offset
@@ -208,17 +208,17 @@ async def producer():
 async def consumer():
     cache = TopicEventCache("async_topic")
     consumer_id = "async_consumer"
-    
+
     while True:
         # Fetch with timeout
         events = await cache.a_fetch(consumer_id, timeout=1.0)
         if not events:
             break  # Timeout occurred
-            
+
         # Process events
         for event in events:
             await process_event_async(event)
-        
+
         # Commit after processing
         if events:
             last_offset = events[-1].offset
@@ -253,12 +253,12 @@ for consumer_id in consumers:
 async def robust_consumer():
     cache = TopicEventCache("robust_topic")
     consumer_id = "robust_consumer"
-    
+
     try:
         events = await cache.a_fetch(consumer_id, timeout=5.0)
         if not events:
             return  # No events or timeout
-            
+
         processed_events = []
         for event in events:
             try:
@@ -268,12 +268,12 @@ async def robust_consumer():
                 logger.error(f"Failed to process event {event.offset}: {e}")
                 # Decide whether to skip or retry
                 break
-        
+
         # Only commit successfully processed events
         if processed_events:
             last_offset = processed_events[-1].offset
             await cache.a_commit_to(consumer_id, last_offset)
-            
+
     except asyncio.TimeoutError:
         logger.info("No events available within timeout")
     except Exception as e:
@@ -292,25 +292,25 @@ async def robust_consumer():
 ```python
 async def test_cache_behavior():
     cache = TopicEventCache("test_topic")
-    
+
     # Test basic put/fetch
     event = create_test_event()
     await cache.a_put(event)
-    
+
     consumer_id = "test_consumer"
     assert cache.can_consume(consumer_id)
-    
+
     events = await cache.a_fetch(consumer_id)
     assert len(events) == 1
     assert events[0] == event
-    
+
     # Test duplicate fetch prevention
     events2 = await cache.a_fetch(consumer_id)
     assert len(events2) == 0  # Should be empty due to consumed offset
-    
+
     # Test commit and reset
     await cache.a_commit_to(consumer_id, 0)
-    
+
     cache.reset()
     assert len(cache._records) == 0
     assert cache._consumed[consumer_id] == 0
@@ -324,13 +324,13 @@ The TopicEventCache is used internally by all TopicBase implementations:
 ```python
 class TopicBase(BaseModel):
     event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
-    
+
     def can_consume(self, consumer_name: str) -> bool:
         return self.event_cache.can_consume(consumer_name)
-    
+
     async def a_consume(self, consumer_name: str, timeout: Optional[float] = None) -> List[TopicEvent]:
         return await self.event_cache.a_fetch(consumer_name, timeout=timeout)
-    
+
     async def a_commit(self, consumer_name: str, offset: int) -> None:
         await self.event_cache.a_commit_to(consumer_name, offset)
 ```

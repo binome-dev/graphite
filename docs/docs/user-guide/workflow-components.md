@@ -137,31 +137,31 @@ Each output topic gets its own listener that implements sophisticated terminatio
 ```python
 async def _output_listener(self, topic: TopicBase):
     last_activity_count = 0
-    
+
     while True:
         # Wait for either new data or idle state
         topic_task = asyncio.create_task(topic.a_consume(self.consumer_name))
         idle_event_waiter = asyncio.create_task(self.tracker.wait_idle_event())
-        
+
         done, pending = await asyncio.wait(
             {topic_task, idle_event_waiter},
             return_when=asyncio.FIRST_COMPLETED,
         )
-        
+
         # Process new events
         if topic_task in done:
             output_events = topic_task.result()
             for event in output_events:
                 await self.queue.put(event)
-        
+
         # Check for completion
         if idle_event_waiter in done and self.tracker.is_idle():
             current_activity = self.tracker.get_activity_count()
-            
+
             # No new activity and no data = done
             if current_activity == last_activity_count and not topic.can_consume(self.consumer_name):
                 break
-                
+
             last_activity_count = current_activity
 ```
 
@@ -174,21 +174,21 @@ async def __anext__(self) -> TopicEvent:
     while True:
         queue_task = asyncio.create_task(self.queue.get())
         idle_task = asyncio.create_task(self.tracker._idle_event.wait())
-        
+
         done, pending = await asyncio.wait(
             {queue_task, idle_task},
             return_when=asyncio.FIRST_COMPLETED,
         )
-        
+
         # Data available - return it
         if queue_task in done:
             idle_task.cancel()
             return queue_task.result()
-        
+
         # Workflow idle - check if we should stop
         queue_task.cancel()
         await asyncio.sleep(0)  # Allow downstream activation
-        
+
         if self.tracker.is_idle() and self.queue.empty():
             raise StopAsyncIteration
 ```
@@ -201,20 +201,20 @@ These components work together in the EventDrivenWorkflow's async execution:
 async def a_invoke(self, invoke_context: InvokeContext, input: Messages) -> MsgsAGen:
     # Initialize workflow
     await self.a_init_workflow(invoke_context, input)
-    
+
     # Start node processing tasks
     node_processing_tasks = [
         asyncio.create_task(self._invoke_node(invoke_context, node))
         for node in self.nodes.values()
     ]
-    
+
     # Create output queue for streaming results
-    output_topics = [t for t in self._topics.values() 
+    output_topics = [t for t in self._topics.values()
                      if t.type in (AGENT_OUTPUT_TOPIC_TYPE, IN_WORKFLOW_OUTPUT_TOPIC_TYPE)]
-    
+
     output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
     await output_queue.start_listeners()
-    
+
     try:
         # Stream results as they arrive
         async for event in output_queue:

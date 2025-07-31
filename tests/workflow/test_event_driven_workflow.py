@@ -1,10 +1,9 @@
 import asyncio
-from collections import deque
-from unittest.mock import AsyncMock
 from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -13,8 +12,8 @@ from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic import Topic
 from grafi.common.topics.output_topic import OutputTopic
+from grafi.common.topics.topic import Topic
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
 from grafi.common.topics.topic_expression import TopicExpr
@@ -22,17 +21,17 @@ from grafi.nodes.node import Node
 from grafi.tools.tool import Tool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
-from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 
 class InputTopic(Topic):
     """Input topic for testing."""
+
     type: str = AGENT_INPUT_TOPIC_TYPE
 
 
 class MockTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-    
+
     def invoke(self, invoke_context, input_data):
         return [Message(role="assistant", content="mock response")]
 
@@ -51,7 +50,7 @@ class TestEventDrivenWorkflowBuilder:
         # Create a complete workflow with required topics via builder
         input_topic = InputTopic(name="test_input")
         output_topic = OutputTopic(name="test_output")
-        
+
         mock_tool = MockTool()
         node = Node(
             name="test_node",
@@ -59,7 +58,7 @@ class TestEventDrivenWorkflowBuilder:
             subscribed_expressions=[TopicExpr(topic=input_topic)],
             publish_to=[output_topic],
         )
-        
+
         workflow = EventDrivenWorkflow.builder().node(node).build()
         assert isinstance(workflow, EventDrivenWorkflow)
 
@@ -68,7 +67,9 @@ class TestEventDrivenWorkflowInit:
     def test_default_initialization(self):
         """Test default initialization of EventDrivenWorkflow requires topics."""
         # EventDrivenWorkflow requires input and output topics, so default initialization should fail
-        with pytest.raises(ValueError, match="must have at least one topic of type 'agent_input_topic'"):
+        with pytest.raises(
+            ValueError, match="must have at least one topic of type 'agent_input_topic'"
+        ):
             EventDrivenWorkflow()
 
     def test_initialization_with_nodes_and_topics(self):
@@ -97,7 +98,9 @@ class TestEventDrivenWorkflowInit:
         """Test that missing agent input topic raises ValueError."""
         output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
         mock_tool = MockTool()
-        missing_topic = InputTopic(name="missing_input", type="unknown_type")  # Wrong type
+        missing_topic = InputTopic(
+            name="missing_input", type="unknown_type"
+        )  # Wrong type
         node = Node(
             name="test_node",
             tool=mock_tool,
@@ -196,7 +199,7 @@ class TestEventDrivenWorkflowEventHandling:
 
         # Publish the event to make the topic have consumable messages
         workflow_with_nodes._topics["test_input"].add_event(event)
-        
+
         # Call on_event - it should add node to invoke queue if node can invoke
         workflow_with_nodes.on_event(event)
 
@@ -280,10 +283,10 @@ class TestEventDrivenWorkflowOutputEvents:
         """Test _get_output_events method exists and returns list."""
         # Test that the method exists and can be called
         events = workflow_with_output_topics._get_output_events()
-        
+
         # Should return a list (may be empty depending on topic state)
         assert isinstance(events, list)
-        
+
         # Test that it returns ConsumeFromTopicEvent objects when events exist
         for event in events:
             assert isinstance(event, ConsumeFromTopicEvent)
@@ -329,12 +332,12 @@ class TestEventDrivenWorkflowInvoke:
     def test_invoke_attributes_exist(self, simple_workflow):
         """Test that invoke method and required attributes exist."""
         # Test that workflow has the required attributes
-        assert hasattr(simple_workflow, 'invoke')
-        assert hasattr(simple_workflow, '_topics')
-        assert hasattr(simple_workflow, '_topic_nodes')
-        assert hasattr(simple_workflow, '_invoke_queue')
-        assert hasattr(simple_workflow, '_stop_requested')
-        
+        assert hasattr(simple_workflow, "invoke")
+        assert hasattr(simple_workflow, "_topics")
+        assert hasattr(simple_workflow, "_topic_nodes")
+        assert hasattr(simple_workflow, "_invoke_queue")
+        assert hasattr(simple_workflow, "_stop_requested")
+
         # Test that workflow has been properly initialized
         assert "test_input" in simple_workflow._topics
         assert "test_output" in simple_workflow._topics
@@ -359,49 +362,53 @@ class TestEventDrivenWorkflowAsyncInvoke:
 
     def test_a_invoke_method_exists(self, async_workflow):
         """Test that a_invoke method exists and is async."""
-        assert hasattr(async_workflow, 'a_invoke')
+        assert hasattr(async_workflow, "a_invoke")
         assert callable(async_workflow.a_invoke)
-        
+
     @pytest.mark.asyncio
     async def test_a_invoke_basic_flow(self, async_workflow):
         """Test basic async invoke flow."""
         # This test verifies that the a_invoke method can be called
         # and properly sets up the async machinery
-        
+
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
         input_messages = [Message(role="user", content="test input")]
 
         # Mock the container to avoid real event store
-        with patch("grafi.workflows.impl.event_driven_workflow.container") as mock_container:
+        with patch(
+            "grafi.workflows.impl.event_driven_workflow.container"
+        ) as mock_container:
             mock_event_store = Mock()
             mock_container.event_store = mock_event_store
             mock_event_store.get_agent_events.return_value = []
             mock_event_store.record_events = Mock()
             mock_event_store.record_event = Mock()
-            
+
             # Create a timeout to avoid hanging
             try:
                 # Run async invoke with timeout
                 results = []
                 async with asyncio.timeout(0.5):
-                    async for msg in async_workflow.a_invoke(invoke_context, input_messages):
+                    async for msg in async_workflow.a_invoke(
+                        invoke_context, input_messages
+                    ):
                         results.append(msg)
             except asyncio.TimeoutError:
                 # Expected - the workflow will wait for output
                 pass
-            
+
             # The workflow should have been initialized
             mock_event_store.get_agent_events.assert_called_with("test")
-        
+
     @pytest.mark.asyncio
     async def test_a_invoke_with_async_output_queue(self, async_workflow):
         """Test that a_invoke uses AsyncOutputQueue."""
         # We can verify that the workflow has the necessary components
-        assert hasattr(async_workflow, '_tracker')
-        assert hasattr(async_workflow, '_topics')
-        
+        assert hasattr(async_workflow, "_tracker")
+        assert hasattr(async_workflow, "_topics")
+
         # The AsyncOutputQueue should be created during a_invoke execution
         # This is more of an integration test ensuring the components work together
 
@@ -425,7 +432,7 @@ class TestEventDrivenWorkflowInitialWorkflow:
 
     def test_initial_workflow_method_exists(self, workflow_for_initial_test):
         """Test that initial_workflow method exists."""
-        assert hasattr(workflow_for_initial_test, 'initial_workflow')
+        assert hasattr(workflow_for_initial_test, "initial_workflow")
         assert callable(workflow_for_initial_test.initial_workflow)
 
 
@@ -472,27 +479,28 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
-    
+
     def test_workflow_has_tracker(self, workflow_with_tracker):
         """Test that workflow has AsyncNodeTracker."""
-        assert hasattr(workflow_with_tracker, '_tracker')
+        assert hasattr(workflow_with_tracker, "_tracker")
         from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
+
         assert isinstance(workflow_with_tracker._tracker, AsyncNodeTracker)
-    
+
     @pytest.mark.asyncio
     async def test_tracker_reset_on_init(self, workflow_with_tracker):
         """Test that tracker is reset on workflow initialization."""
         # Add some activity to tracker
         await workflow_with_tracker._tracker.enter("test_node")
         assert not workflow_with_tracker._tracker.is_idle()
-        
+
         # Call a_init_workflow which should reset tracker
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
         with patch("grafi.common.containers.container.container"):
             await workflow_with_tracker.a_init_workflow(invoke_context, [])
-        
+
         # Tracker should be reset
         assert workflow_with_tracker._tracker.is_idle()
 
@@ -513,13 +521,13 @@ class TestEventDrivenWorkflowStopFlag:
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
-    
+
     def test_stop_sets_flag(self, stoppable_workflow):
         """Test that stop() sets the stop flag."""
         assert not stoppable_workflow._stop_requested
         stoppable_workflow.stop()
         assert stoppable_workflow._stop_requested
-    
+
     def test_reset_stop_flag(self, stoppable_workflow):
         """Test that reset_stop_flag() clears the flag."""
         stoppable_workflow.stop()

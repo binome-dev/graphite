@@ -155,7 +155,7 @@ workflow_output_topic = InWorkflowOutputTopic(
 )
 
 workflow_input_topic = InWorkflowInputTopic(
-    name="approval_input", 
+    name="approval_input",
     paired_in_workflow_output_topic_name="approval_output"
 )
 ```
@@ -193,13 +193,13 @@ async def human_approval_workflow():
         name="review_input",
         paired_in_workflow_output_topic_name="review_output"
     )
-    
+
     # Request human review
     review_request = [Message(
         role="assistant",
         content="Please review the following document..."
     )]
-    
+
     output_event = await output_topic.a_publish_data(
         invoke_context=context,
         publisher_name="review_system",
@@ -207,17 +207,17 @@ async def human_approval_workflow():
         data=review_request,
         consumed_events=[]
     )
-    
+
     # Wait for user response (in real system, this would be event-driven)
-    # ... 
-    
+    # ...
+
     # Process user response
     user_feedback = [Message(role="user", content="Looks good, approved!")]
     input_event = await input_topic.a_publish_input_data(
         upstream_event=output_event,
         data=user_feedback
     )
-    
+
     return input_event
 ```
 
@@ -243,7 +243,7 @@ async def human_approval_workflow():
 class HumanInLoopNode(Node):
     def __init__(self, approval_threshold: float = 0.8):
         self.approval_threshold = approval_threshold
-        
+
         # Create paired topics
         self.output_topic = InWorkflowOutputTopic(
             name=f"{self.name}_output",
@@ -253,7 +253,7 @@ class HumanInLoopNode(Node):
             name=f"{self.name}_input",
             paired_in_workflow_output_topic_name=f"{self.name}_output"
         )
-        
+
         super().__init__(
             name="human_approval_node",
             tool=self.approval_tool,
@@ -263,11 +263,11 @@ class HumanInLoopNode(Node):
             ],
             publish_to=[self.output_topic, next_processing_topic]
         )
-    
+
     async def approval_tool(self, context, events):
         # Process incoming data
         data_events = [e for e in events if e.topic_name == "data_topic"]
-        
+
         if self.needs_approval(data_events):
             # Request human approval
             approval_request = self.create_approval_request(data_events)
@@ -278,7 +278,7 @@ class HumanInLoopNode(Node):
                 data=approval_request,
                 consumed_events=events
             )
-            
+
             # Wait for human response via input_topic
             # (handled by workflow event loop)
 ```
@@ -290,7 +290,7 @@ async def test_input_topics():
     """Test input topic functionality."""
     # Test basic InputTopic
     input_topic = InputTopic(name="test_input")
-    
+
     messages = [Message(role="user", content="test input")]
     event = await input_topic.a_publish_data(
         invoke_context=InvokeContext(),
@@ -299,11 +299,11 @@ async def test_input_topics():
         data=messages,
         consumed_events=[]
     )
-    
+
     assert event is not None
     assert event.data == messages
     assert len(input_topic.event_cache._records) == 1
-    
+
     # Test InWorkflowInputTopic pairing
     output_topic = InWorkflowOutputTopic(
         name="test_output",
@@ -313,7 +313,7 @@ async def test_input_topics():
         name="test_input",
         paired_in_workflow_output_topic_name="test_output"
     )
-    
+
     # Simulate workflow output
     output_event = await output_topic.a_publish_data(
         invoke_context=InvokeContext(),
@@ -322,14 +322,14 @@ async def test_input_topics():
         data=[Message(role="assistant", content="Need input")],
         consumed_events=[]
     )
-    
+
     # Simulate user response
     user_response = [Message(role="user", content="Here's my input")]
     input_event = await workflow_input_topic.a_publish_input_data(
         upstream_event=output_event,
         data=user_response
     )
-    
+
     assert input_event is not None
     assert input_event.data == user_response
     assert input_event.consumed_events == [output_event]

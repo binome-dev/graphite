@@ -59,7 +59,7 @@ class Topic(TopicBase):
             # Add event to cache and update total_published
             event = self.add_event(event)
             if self.publish_event_handler:
-                self.publish_event_handler(event)
+                self.publish_event_handler(event)  # type: ignore[arg-type]
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )
