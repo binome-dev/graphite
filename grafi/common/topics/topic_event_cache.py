@@ -50,6 +50,8 @@ class TopicEventCache:
     # Producer
     # ------------------------------------------------------------------
     def put(self, event: TopicEvent) -> TopicEvent:
+        offset = len(self._records)
+        event.offset = offset  # Set the offset for the event
         self._records.append(event)
         return event
 
@@ -104,12 +106,14 @@ class TopicEventCache:
         return self._committed[cid]
 
     # ------------------------------ asynchronous methods ------------------------------
-    async def a_put(self, event: TopicEvent) -> int:
+    async def a_put(self, event: TopicEvent) -> TopicEvent:
         """
         Append a message to the log. Returns the offset of the appended message.
         Implements backpressure when cache is full.
         """
         async with self._cond:
+            offset = len(self._records)
+            event.offset = offset  # Set the offset for the event
             self._records.append(event)
             self._cond.notify_all()  # wake waiting consumers
             return event

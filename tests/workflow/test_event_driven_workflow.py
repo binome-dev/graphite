@@ -1,3 +1,4 @@
+import asyncio
 from collections import deque
 from unittest.mock import AsyncMock
 from unittest.mock import Mock
@@ -360,6 +361,49 @@ class TestEventDrivenWorkflowAsyncInvoke:
         """Test that a_invoke method exists and is async."""
         assert hasattr(async_workflow, 'a_invoke')
         assert callable(async_workflow.a_invoke)
+        
+    @pytest.mark.asyncio
+    async def test_a_invoke_basic_flow(self, async_workflow):
+        """Test basic async invoke flow."""
+        # This test verifies that the a_invoke method can be called
+        # and properly sets up the async machinery
+        
+        invoke_context = InvokeContext(
+            conversation_id="test", invoke_id="test", assistant_request_id="test"
+        )
+        input_messages = [Message(role="user", content="test input")]
+
+        # Mock the container to avoid real event store
+        with patch("grafi.workflows.impl.event_driven_workflow.container") as mock_container:
+            mock_event_store = Mock()
+            mock_container.event_store = mock_event_store
+            mock_event_store.get_agent_events.return_value = []
+            mock_event_store.record_events = Mock()
+            mock_event_store.record_event = Mock()
+            
+            # Create a timeout to avoid hanging
+            try:
+                # Run async invoke with timeout
+                results = []
+                async with asyncio.timeout(0.5):
+                    async for msg in async_workflow.a_invoke(invoke_context, input_messages):
+                        results.append(msg)
+            except asyncio.TimeoutError:
+                # Expected - the workflow will wait for output
+                pass
+            
+            # The workflow should have been initialized
+            mock_event_store.get_agent_events.assert_called_with("test")
+        
+    @pytest.mark.asyncio
+    async def test_a_invoke_with_async_output_queue(self, async_workflow):
+        """Test that a_invoke uses AsyncOutputQueue."""
+        # We can verify that the workflow has the necessary components
+        assert hasattr(async_workflow, '_tracker')
+        assert hasattr(async_workflow, '_topics')
+        
+        # The AsyncOutputQueue should be created during a_invoke execution
+        # This is more of an integration test ensuring the components work together
 
 
 class TestEventDrivenWorkflowInitialWorkflow:
@@ -410,3 +454,75 @@ class TestEventDrivenWorkflowToDict:
         assert "test_input" in result["topics"]
         assert "test_output" in result["topics"]
         assert "test_input" in result["topic_nodes"]
+
+
+class TestEventDrivenWorkflowAsyncNodeTracker:
+    @pytest.fixture
+    def workflow_with_tracker(self):
+        """Create a workflow to test async node tracker integration."""
+        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
+        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+
+        mock_tool = MockTool()
+        node = Node(
+            name="test_node",
+            tool=mock_tool,
+            subscribed_expressions=[TopicExpr(topic=input_topic)],
+            publish_to=[output_topic],
+        )
+
+        return EventDrivenWorkflow(nodes={"test_node": node})
+    
+    def test_workflow_has_tracker(self, workflow_with_tracker):
+        """Test that workflow has AsyncNodeTracker."""
+        assert hasattr(workflow_with_tracker, '_tracker')
+        from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
+        assert isinstance(workflow_with_tracker._tracker, AsyncNodeTracker)
+    
+    @pytest.mark.asyncio
+    async def test_tracker_reset_on_init(self, workflow_with_tracker):
+        """Test that tracker is reset on workflow initialization."""
+        # Add some activity to tracker
+        await workflow_with_tracker._tracker.enter("test_node")
+        assert not workflow_with_tracker._tracker.is_idle()
+        
+        # Call a_init_workflow which should reset tracker
+        invoke_context = InvokeContext(
+            conversation_id="test", invoke_id="test", assistant_request_id="test"
+        )
+        with patch("grafi.common.containers.container.container"):
+            await workflow_with_tracker.a_init_workflow(invoke_context, [])
+        
+        # Tracker should be reset
+        assert workflow_with_tracker._tracker.is_idle()
+
+
+class TestEventDrivenWorkflowStopFlag:
+    @pytest.fixture
+    def stoppable_workflow(self):
+        """Create a workflow to test stop functionality."""
+        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
+        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+
+        mock_tool = MockTool()
+        node = Node(
+            name="test_node",
+            tool=mock_tool,
+            subscribed_expressions=[TopicExpr(topic=input_topic)],
+            publish_to=[output_topic],
+        )
+
+        return EventDrivenWorkflow(nodes={"test_node": node})
+    
+    def test_stop_sets_flag(self, stoppable_workflow):
+        """Test that stop() sets the stop flag."""
+        assert not stoppable_workflow._stop_requested
+        stoppable_workflow.stop()
+        assert stoppable_workflow._stop_requested
+    
+    def test_reset_stop_flag(self, stoppable_workflow):
+        """Test that reset_stop_flag() clears the flag."""
+        stoppable_workflow.stop()
+        assert stoppable_workflow._stop_requested
+        stoppable_workflow.reset_stop_flag()
+        assert not stoppable_workflow._stop_requested

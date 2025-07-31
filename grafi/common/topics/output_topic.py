@@ -62,7 +62,7 @@ class OutputTopic(TopicBase):
                 offset=self.event_cache.num_events(),
             )
             # Add event to cache and update total_published
-            self.add_event(event)
+            event = self.add_event(event)
             if self.publish_event_handler:
                 self.publish_event_handler(event)
             logger.info(
@@ -94,8 +94,7 @@ class OutputTopic(TopicBase):
                 offset=self.event_cache.num_events(),
             )
 
-            await self.a_add_event(event)
-            return event
+            return await self.a_add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None

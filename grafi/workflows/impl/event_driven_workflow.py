@@ -23,7 +23,6 @@ from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
-from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
 from grafi.common.topics.topic_base import IN_WORKFLOW_OUTPUT_TOPIC_TYPE
@@ -32,12 +31,11 @@ from grafi.common.topics.topic_expression import extract_topics
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
-from grafi.workflows.impl.utils import AsyncNodeTracker
-from grafi.workflows.impl.utils import MergeIdleQueue
+from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
+from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
-from grafi.workflows.impl.utils import output_listener
 from grafi.workflows.impl.utils import publish_events
 from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
@@ -308,27 +306,23 @@ class EventDrivenWorkflow(Workflow):
             for node in self.nodes.values()
         ]
 
-        # Queue for fan‑in of output topics
-        queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
-
-        output_topics: list[OutputTopic] = [
+        # Get output topics
+        output_topics: list[TopicBase] = [
             topic
             for topic in self._topics.values()
             if topic.type == AGENT_OUTPUT_TOPIC_TYPE
             or topic.type == IN_WORKFLOW_OUTPUT_TOPIC_TYPE
         ]
 
-        # Launch one listener per output topic
-        listener_tasks = [
-            asyncio.create_task(output_listener(t, queue, self.name, self._tracker))
-            for t in output_topics
-        ]
+        # Create AsyncOutputQueue with output topics and tracker
+        output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+        await output_queue.start_listeners()
 
         consumed_output_events: List[ConsumeFromTopicEvent] = []
 
         # Wait for either new data or completion, with a timeout to check stop flag
         try:
-            async for event in MergeIdleQueue(queue, self._tracker):
+            async for event in output_queue:
                 # Now yield the data after committing
                 yield event.data
 
@@ -343,9 +337,7 @@ class EventDrivenWorkflow(Workflow):
                     )
                 )
         finally:
-            for t in listener_tasks:
-                t.cancel()
-            await asyncio.gather(*listener_tasks, return_exceptions=True)
+            await output_queue.stop_listeners()
 
             # Commit all consumed output events
             await self._a_commit_events(

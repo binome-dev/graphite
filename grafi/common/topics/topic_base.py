@@ -164,23 +164,21 @@ class TopicBase(BaseModel):
                 topic_event.consumer_name, topic_event.offset
             )
 
-    def add_event(self, event: TopicEvent) -> None:
+    def add_event(self, event: TopicEvent) -> TopicEvent:
         """f
         Add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
         """
         if isinstance(event, (PublishToTopicEvent, OutputTopicEvent)):
+            return self.event_cache.put(event)
 
-            self.event_cache.put(event)
-
-    async def a_add_event(self, event: TopicEvent) -> None:
+    async def a_add_event(self, event: TopicEvent) -> TopicEvent:
         """
         Asynchronously add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
         """
         if isinstance(event, (PublishToTopicEvent, OutputTopicEvent)):
-
-            await self.event_cache.a_put(event)
+            return await self.event_cache.a_put(event)
 
     def serialize_callable(self) -> dict:
         """

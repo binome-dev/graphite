@@ -1,3 +1,5 @@
+from typing import Optional
+
 from loguru import logger
 
 from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
@@ -22,7 +24,7 @@ class InWorkflowInputTopic(Topic):
         self,
         upstream_event: PublishToTopicEvent | OutputTopicEvent,
         data: Messages,
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         if self.condition(data):
             event = PublishToTopicEvent(
                 invoke_context=upstream_event.invoke_context,
@@ -34,8 +36,7 @@ class InWorkflowInputTopic(Topic):
                 offset=self.event_cache.num_events(),
             )
 
-            self.add_event(event)
-            return event
+            return self.add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
@@ -44,7 +45,7 @@ class InWorkflowInputTopic(Topic):
         self,
         upstream_event: PublishToTopicEvent | OutputTopicEvent,
         data: Messages,
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         if self.condition(data):
             event = PublishToTopicEvent(
                 invoke_context=upstream_event.invoke_context,
@@ -56,8 +57,7 @@ class InWorkflowInputTopic(Topic):
                 offset=self.event_cache.num_events(),
             )
 
-            await self.a_add_event(event)
-            return event
+            return await self.a_add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None

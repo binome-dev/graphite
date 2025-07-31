@@ -48,6 +48,7 @@ nav:
     - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
+    - Workflow Components: user-guide/workflow-components.md
     - Node: user-guide/node.md
     - Command: user-guide/command.md
     - Tools:

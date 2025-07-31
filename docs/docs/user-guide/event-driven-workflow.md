@@ -161,50 +161,33 @@ The system provides flexible subscription expressions through topic expressions 
 
 The EventDrivenWorkflow implements a sophisticated async architecture that addresses the challenges of coordinating multiple concurrent nodes while ensuring proper workflow termination and data consistency.
 
-### AsyncNodeTracker
+### Workflow Components
 
-The `AsyncNodeTracker` manages workflow state and coordination:
+The async workflow relies on two key components for coordination and output management:
 
-```python
-class AsyncNodeTracker:
-    def __init__(self) -> None:
-        self._active: set[str] = set()
-        self._processing_count: Dict[str, int] = defaultdict(int)
-        self._cond = asyncio.Condition()
-        self._idle_event = asyncio.Event()
-```
+#### AsyncNodeTracker
 
-#### Key Features
+The `AsyncNodeTracker` manages workflow state and coordination by tracking active nodes, monitoring processing cycles, and detecting idle states. It provides the foundation for proper workflow termination detection.
 
-- **Active Node Tracking**: Maintains a set of currently processing nodes
-- **Processing Count**: Tracks total processing cycles to detect workflow progress
-- **Idle Detection**: Signals when no nodes are active
-- **Activity Monitoring**: Detects when new processing activity occurs
+#### AsyncOutputQueue
 
-### Output Listeners and MergeIdleQueue
+The `AsyncOutputQueue` manages the collection and streaming of output events from multiple topics. It coordinates concurrent listeners and provides a unified async iterator interface for consuming events.
 
-The async workflow uses output listeners to monitor topics and a merge queue to coordinate termination:
+For detailed information about these components, see the [Workflow Components documentation](workflow-components.md).
+
+### Component Integration
+
+The async workflow integrates these components to provide robust event streaming:
 
 ```python
-# Launch one listener per output topic
-listener_tasks = [
-    asyncio.create_task(output_listener(t, queue, self.name, self._tracker))
-    for t in output_topics
-]
+# Create output queue with topics and tracker
+output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+await output_queue.start_listeners()
 
-# Coordinate between data availability and workflow idle state
-async for event in MergeIdleQueue(queue, self._tracker):
+# Stream events as they arrive
+async for event in output_queue:
     yield event.data
 ```
-
-#### MergeIdleQueue Logic
-
-The `MergeIdleQueue` implements sophisticated termination logic:
-
-1. **Data Available**: If queue has data, yield it immediately
-2. **Idle Detection**: If workflow becomes idle, check for completion
-3. **Grace Period**: Allow time for downstream node activation
-4. **Activity Monitoring**: Track processing count to detect progress
 
 ### Offset Management and Duplicate Prevention
 

@@ -40,7 +40,7 @@ class Topic(TopicBase):
         publisher_type: str,
         data: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         """
         Publishes a message's event ID to this topic if it meets the condition.
         """
@@ -57,7 +57,7 @@ class Topic(TopicBase):
                 offset=self.event_cache.num_events(),
             )
             # Add event to cache and update total_published
-            self.add_event(event)
+            event = self.add_event(event)
             if self.publish_event_handler:
                 self.publish_event_handler(event)
             logger.info(
@@ -75,7 +75,7 @@ class Topic(TopicBase):
         publisher_type: str,
         data: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         if self.condition(data):
             event = PublishToTopicEvent(
                 invoke_context=invoke_context,
@@ -89,8 +89,7 @@ class Topic(TopicBase):
                 offset=self.event_cache.num_events(),
             )
 
-            await self.a_add_event(event)
-            return event
+            return await self.a_add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
