@@ -93,7 +93,7 @@ jobs:
         set -e
         output=$(uv run python tests_integration/run_all.py)
         echo "$output"
-        
+
         # Check if there are any failed tests
         if echo "$output" | grep -q "Failed scripts:"; then
           echo "❌ Integration tests failed! Check the output above for details."

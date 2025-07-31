@@ -224,6 +224,15 @@ class TestTopicBaseCacheIntegration:
     def test_restore_topic_from_consume_event(
         self, topic, invoke_context, sample_messages
     ):
+        # First, publish an event
+        topic.publish_data(
+            invoke_context=invoke_context,
+            publisher_name="publisher",
+            publisher_type="test_publisher",
+            data=sample_messages,
+            consumed_events=[],
+        )
+
         # Create a consume event
         consume_event = ConsumeFromTopicEvent(
             event_id="consume-event-1",
