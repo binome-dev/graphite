@@ -14,18 +14,19 @@ While the platform is designed for maximum flexibility, certain conventions guid
 - **Final Responses**: All output events route to **agent_output_topic**, which the Assistant consumes to return data to the user or caller.
 - **Single Consumer**: Only the Assistant should subscribe to this topic, avoiding conflicting read operations.
 
-### Human Request Topic
+### InWorkflow Topics
 
-- **Human in the Loop**: Used when user intervention is required; the system posts an `OutputTopicEvent` here, which the Assistant can consume to display prompts or questions.
-- **User Response**: When the user replies, `append_user_input()` posts a `PublishToTopicEvent` (the user’s answer). This message is then read by downstream nodes.
-- **Assistant Role**: The Assistant only consumes `OutputTopicEvent` objects, while nodes consume both the question (`OutputTopicEvent`) and the final user reply (`PublishToTopicEvent`).
+- **Human in the Loop**: Used when user intervention is required within workflows; the system uses paired InWorkflowOutputTopic and InWorkflowInputTopic for coordinated human interactions.
+- **InWorkflowOutputTopic**: Posts `OutputTopicEvent` objects that require human interaction or review.
+- **InWorkflowInputTopic**: Receives user responses via `publish_input_data()` based on upstream events from the paired output topic.
+- **Workflow Coordination**: These topics work together to enable seamless human-in-the-loop workflows with proper event coordination.
 
 **Rationale**: Structuring input and output channels ensures clarity, preventing multiple consumers from inadvertently processing final outputs and providing a clear path for user-driven requests.
 
 ## OutputTopicEvent
 
-- **Dedicated for Assistant**: If a newly received event is an `OutputTopicEvent`, the workflow’s `on_event()` skips subscription checks, since only the Assistant should consume it.
-- **Exclusive Destination**: `OutputTopicEvent` can only be published to **agent_output_topic** or **human_request_topic**, ensuring a clear boundary for user-facing outputs.
+- **Dedicated for Assistant**: If a newly received event is an `OutputTopicEvent`, the workflow's `on_event()` skips subscription checks, since only the Assistant should consume it.
+- **Exclusive Destination**: `OutputTopicEvent` can only be published to **agent_output_topic** or **InWorkflowOutputTopic**, ensuring a clear boundary for user-facing outputs.
 
 **Rationale**: Limiting `OutputTopicEvent` usage avoids confusion over who should read final results, reinforcing the principle of single responsibility for returning data to the user.
 

@@ -36,7 +36,7 @@ class LLMPromptTemplateCommand(LLMCommand):
                     # Create a new message with the rendered template
                     new_message = Message(role="user", content=rendered_prompt)
 
-                    logger.info(f"Rendered prompt template with input...")
+                    logger.info("Rendered prompt template with input...")
                     return [new_message]
                 except Exception as e:
                     logger.error(f"Error rendering template: {e}")

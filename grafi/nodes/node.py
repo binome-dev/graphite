@@ -1,8 +1,6 @@
 from typing import Any
 from typing import List
 
-from loguru import logger
-
 from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
 from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -46,8 +44,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
-        logger.debug(f"Executing Node with inputs: {node_input}")
-
         # Use the LLM's invoke method to get the response
         response = self.command.invoke(
             invoke_context,
@@ -63,8 +59,6 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> MsgsAGen:
-        logger.debug(f"Executing Node with inputs: {node_input}")
-
         # Use the LLM's invoke method to get the response generator
         async for messages in self.command.a_invoke(
             invoke_context,
@@ -90,6 +84,22 @@ class Node(NodeBase):
 
         for expr in self.subscribed_expressions:
             if not evaluate_subscription(expr, list(topics_with_new_msgs)):
+                return False
+
+        return True
+
+    def can_invoke_with_topics(self, topics: List[str]) -> bool:
+        """
+        Check if this node can invoke given a list of topic names.
+        If ALL of the node's subscribed_expressions is True, we return True.
+        :param topics: List of topic names to check against the node's expressions.
+        :return: Boolean indicating whether the node should run.
+        """
+        if not self.subscribed_expressions:
+            return True
+
+        for expr in self.subscribed_expressions:
+            if not evaluate_subscription(expr, topics):
                 return False
 
         return True

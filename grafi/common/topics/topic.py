@@ -40,7 +40,7 @@ class Topic(TopicBase):
         publisher_type: str,
         data: Messages,
         consumed_events: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         """
         Publishes a message's event ID to this topic if it meets the condition.
         """
@@ -54,16 +54,42 @@ class Topic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=self.total_published,
+                offset=-1,
             )
             # Add event to cache and update total_published
-            self.add_event(event)
+            event = self.add_event(event)
             if self.publish_event_handler:
-                self.publish_event_handler(event)
+                self.publish_event_handler(event)  # type: ignore[arg-type]
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )
             return event
+        else:
+            logger.info(f"[{self.name}] Message NOT published (condition not met)")
+            return None
+
+    async def a_publish_data(
+        self,
+        invoke_context: InvokeContext,
+        publisher_name: str,
+        publisher_type: str,
+        data: Messages,
+        consumed_events: List[ConsumeFromTopicEvent],
+    ) -> Optional[PublishToTopicEvent]:
+        if self.condition(data):
+            event = PublishToTopicEvent(
+                invoke_context=invoke_context,
+                topic_name=self.name,
+                publisher_name=publisher_name,
+                publisher_type=publisher_type,
+                data=data,
+                consumed_event_ids=[
+                    consumed_event.event_id for consumed_event in consumed_events
+                ],
+                offset=-1,
+            )
+
+            return await self.a_add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None

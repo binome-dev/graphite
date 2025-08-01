@@ -48,6 +48,7 @@ nav:
     - Architecture Overview: user-guide/architecture.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
+    - Workflow Components: user-guide/workflow-components.md
     - Node: user-guide/node.md
     - Command: user-guide/command.md
     - Tools:
@@ -60,7 +61,9 @@ nav:
     - Topics:
       - Topic Base: user-guide/topics/topic_base.md
       - Topic Implementation: user-guide/topics/topic.md
+      - Input Topics: user-guide/topics/input_topics.md
       - Output Topics: user-guide/topics/output_topics.md
+      - Event Cache: user-guide/topics/topic_event_cache.md
       - Subscription Expressions: user-guide/topics/subscription_expression.md
     - Events:
       - Events System: user-guide/events/events.md

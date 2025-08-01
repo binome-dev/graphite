@@ -23,8 +23,8 @@ def test_publish_message(topic: Topic, invoke_context: InvokeContext):
         invoke_context, "test_publisher", "test_type", [message], []
     )
 
-    assert len(topic.event_cache) == 1  # Ensure the message was published
-    assert topic.event_cache.get(0).offset == 0  # First message should have offset 0
+    assert topic.event_cache.num_events() == 1  # Ensure the message was published
+    # The event_cache doesn't have a get() method, it manages events internally
     assert topic.publish_event_handler.called  # Ensure the publish handler was invoked
     assert event.publisher_name == "test_publisher"
     assert event.publisher_type == "test_type"
@@ -58,7 +58,9 @@ def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     assert len(consumed_messages) == 2  # Consumer should receive both messages
     assert consumed_messages[0].offset == 0
     assert consumed_messages[1].offset == 1
-    assert topic.consumption_offsets["consumer_1"] == 2  # Offset should be updated
+    # Consumption offsets are now managed internally by TopicEventCache
+    # Test that consumer can't consume again (has consumed all available messages)
+    assert not topic.can_consume("consumer_1")
 
 
 def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeContext):
@@ -83,14 +85,21 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(invoke_context, "test_publisher", "test_type", [message1], [])
     topic.publish_data(invoke_context, "test_publisher", "test_type", [message2], [])
 
-    # Consumer 1 consumes
-    topic.consume("consumer_1")
-    assert topic.consumption_offsets["consumer_1"] == 2
+    # Consumer 1 consumes both messages
+    consumed_messages_1 = topic.consume("consumer_1")
+    assert len(consumed_messages_1) == 2
+
+    # Consumer 1 has no more messages to consume
+    assert not topic.can_consume("consumer_1")
+    consumed_messages_1_again = topic.consume("consumer_1")
+    assert len(consumed_messages_1_again) == 0
 
     # Consumer 2 starts fresh and should receive both messages
     consumed_messages_2 = topic.consume("consumer_2")
     assert len(consumed_messages_2) == 2
-    assert topic.consumption_offsets["consumer_2"] == 2
+
+    # Consumer 2 has no more messages to consume
+    assert not topic.can_consume("consumer_2")
 
 
 # Ensure a topic can be created

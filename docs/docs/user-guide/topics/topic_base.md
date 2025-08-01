@@ -23,9 +23,9 @@ The base class for all topic implementations, providing core messaging functiona
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `str` | Unique identifier for the topic |
+| `type` | `str` | Topic type identifier |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `consumption_offsets` | `Dict[str, int]` | Tracks consumption progress per consumer |
-| `topic_events` | `List[TopicEvent]` | Chronological list of all topic events |
+| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
 | `publish_event_handler` | `Optional[Callable]` | Handler for publish events |
 
 #### Core Methods
@@ -33,10 +33,15 @@ The base class for all topic implementations, providing core messaging functiona
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publish messages to the topic (abstract) |
+| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data (abstract) |
 | `can_consume` | `(consumer_name: str) -> bool` | Check if consumer has unread messages |
 | `consume` | `(consumer_name: str) -> List[PublishToTopicEvent]` | Retrieve unread messages for consumer |
+| `a_consume` | `(consumer_name: str, timeout: Optional[float]) -> List[TopicEvent]` | Async version of consume with timeout |
+| `a_commit` | `(consumer_name: str, offset: int) -> None` | Commit processed messages up to offset |
 | `reset` | `() -> None` | Reset topic to initial state |
+| `a_reset` | `() -> None` | Async version of reset |
 | `restore_topic` | `(topic_event: TopicEvent) -> None` | Restore topic from event |
+| `a_restore_topic` | `(topic_event: TopicEvent) -> None` | Async version of restore_topic |
 
 #### Utility Methods
 
@@ -63,11 +68,14 @@ The system includes reserved topic names for internal agent operations:
 ```python
 AGENT_RESERVED_TOPICS = [
     "agent_input_topic",
-    "human_request_topic"
+    "agent_output_topic"
 ]
 ```
 
-These topics cannot be used for custom topic names to avoid conflicts with system functionality.
+These topics cannot be used for custom topic names to avoid conflicts with system functionality. Additionally, the system supports workflow-specific topic types:
+
+- `IN_WORKFLOW_INPUT_TOPIC_TYPE = "InWorkflowInput"`
+- `IN_WORKFLOW_OUTPUT_TOPIC_TYPE = "InWorkflowOutput"`
 
 ## Message Publishing
 
@@ -92,34 +100,53 @@ def publish_data(
 
 ## Message Consumption
 
+The topic system uses a sophisticated caching mechanism (`TopicEventCache`) that manages consumed and committed offsets separately for reliable message processing.
+
 ### Consumption Check
 
 ```python
 def can_consume(self, consumer_name: str) -> bool:
     """Check if consumer has unread messages."""
-    already_consumed = self.consumption_offsets.get(consumer_name, 0)
-    total_published = len(self.topic_events)
-    return already_consumed < total_published
+    return self.event_cache.can_consume(consumer_name)
 ```
 
 ### Message Retrieval
 
 ```python
-def consume(self, consumer_name: str) -> List[PublishToTopicEvent]:
+def consume(self, consumer_name: str) -> List[PublishToTopicEvent | OutputTopicEvent]:
     """Retrieve unread messages for consumer."""
-    already_consumed = self.consumption_offsets.get(consumer_name, 0)
-    total_published = len(self.topic_events)
+    # Get new events using the offset range
+    new_events = self.event_cache.fetch(consumer_name)
 
-    if already_consumed >= total_published:
-        return []
+    # Filter to only return PublishToTopicEvent instances for backward compatibility
+    return [
+        event
+        for event in new_events
+        if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
+    ]
+```
 
-    # Get new events
-    new_events = self.topic_events[already_consumed:]
+### Async Message Retrieval
 
-    # Update offset
-    self.consumption_offsets[consumer_name] = total_published
+```python
+async def a_consume(
+    self, consumer_name: str, timeout: Optional[float] = None
+) -> List[TopicEvent]:
+    """Asynchronously retrieve new/unconsumed messages for the given node."""
+    return await self.event_cache.a_fetch(consumer_name, timeout=timeout)
+```
 
-    return new_events
+### Offset Management
+
+The system maintains two types of offsets:
+
+- **Consumed Offset**: Tracks what has been fetched (advanced immediately on fetch)
+- **Committed Offset**: Tracks what has been fully processed (advanced after processing)
+
+```python
+async def a_commit(self, consumer_name: str, offset: int) -> None:
+    """Commit processed messages up to the specified offset."""
+    await self.event_cache.a_commit_to(consumer_name, offset)
 ```
 
 ## Message Filtering
@@ -168,8 +195,12 @@ def serialize_callable(self) -> dict:
 ```python
 def reset(self) -> None:
     """Reset the topic to its initial state."""
-    self.topic_events = []
-    self.consumption_offsets = {}
+    self.event_cache = TopicEventCache(self.name)
+
+async def a_reset(self) -> None:
+    """Asynchronously reset the topic to its initial state."""
+    self.event_cache.reset()
+    self.event_cache = TopicEventCache(self.name)
 ```
 
 ### Restore Topic
@@ -177,10 +208,30 @@ def reset(self) -> None:
 ```python
 def restore_topic(self, topic_event: TopicEvent) -> None:
     """Restore a topic from a topic event."""
-    if isinstance(topic_event, (PublishToTopicEvent, OutputTopicEvent)):
-        self.topic_events.append(topic_event)
+    if isinstance(topic_event, PublishToTopicEvent) or isinstance(
+        topic_event, OutputTopicEvent
+    ):
+        self.event_cache.put(topic_event)
     elif isinstance(topic_event, ConsumeFromTopicEvent):
-        self.consumption_offsets[topic_event.consumer_name] = topic_event.offset + 1
+        self.event_cache.fetch(
+            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
+        )
+        self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
+
+async def a_restore_topic(self, topic_event: TopicEvent) -> None:
+    """Asynchronously restore a topic from a topic event."""
+    if isinstance(topic_event, PublishToTopicEvent) or isinstance(
+        topic_event, OutputTopicEvent
+    ):
+        await self.event_cache.a_put(topic_event)
+    elif isinstance(topic_event, ConsumeFromTopicEvent):
+        # Fetch the events for the consumer and commit the offset
+        await self.event_cache.a_fetch(
+            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
+        )
+        await self.event_cache.a_commit_to(
+            topic_event.consumer_name, topic_event.offset
+        )
 ```
 
 ## Serialization

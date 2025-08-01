@@ -53,6 +53,11 @@ class NodeBase(BaseModel):
         """Set the internal command."""
         self._command = value
 
+    @property
+    def subscribed_topics(self) -> List[TopicBase]:
+        """Return a list of subscribed topics."""
+        return list(self._subscribed_topics.values())
+
     def invoke(
         self,
         invoke_context: InvokeContext,

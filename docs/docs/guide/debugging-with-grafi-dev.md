@@ -78,19 +78,19 @@ Create a `grafi-dev.config.js` file in your project root:
 module.exports = {
   // Port for the development server
   port: 3001,
-  
+
   // Path to your Graphite application
   appPath: './workflow.py',
-  
+
   // Enable hot reload
   hotReload: true,
-  
+
   // Event filtering (optional)
   eventFilters: [
     'user.*',
     'response.*'
   ],
-  
+
   // Debug settings
   debug: {
     pauseOnError: true,
@@ -480,14 +480,14 @@ Extend grafi-dev with custom plugins:
 // custom-plugin.js
 module.exports = {
   name: 'custom-metrics',
-  
+
   onEventProcessed(event, duration) {
     // Send metrics to external system
     metricsClient.timing('event.processed', duration, {
       event_type: event.type
     });
   },
-  
+
   onError(error, event) {
     // Custom error handling
     errorTracker.captureException(error, {
@@ -515,14 +515,14 @@ module.exports = {
     debug: { logLevel: 'debug' },
     hotReload: true
   },
-  
+
   staging: {
     port: 3002,
     debug: { logLevel: 'info' },
     hotReload: false,
     performance: { samplingRate: 0.5 }
   },
-  
+
   production: {
     port: 3003,
     debug: { logLevel: 'error' },

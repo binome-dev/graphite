@@ -1,13 +1,13 @@
 # Output Topics
 
-The Graphite output topic system provides specialized topic implementations for handling output events and human interactions. These topics support both synchronous and asynchronous message processing, streaming capabilities, and human-in-the-loop workflows.
+The Graphite output topic system provides specialized topic implementations for handling output events from workflows and nodes. These topics support both synchronous and asynchronous message processing, streaming capabilities, and human-in-the-loop workflows.
 
 ## Overview
 
 The output topic system includes:
 
 - **OutputTopic**: Handles agent output with async generator support and streaming
-- **HumanRequestTopic**: Manages human interactions and user input appending
+- **InWorkflowOutputTopic**: Handles workflow output that requires human interaction
 - **Async Processing**: Support for async generators and streaming responses
 - **Event Queuing**: Queue-based event management for real-time processing
 - **Reserved Topics**: Pre-configured topics for agent communication
@@ -46,28 +46,27 @@ A specialized topic for handling agent output with advanced async capabilities.
 |--------|-----------|-------------|
 | `_process_generator` | `(generator, data, invoke_context, publisher_name, publisher_type, consumed_events) -> None` | Process async generator internally |
 
-### HumanRequestTopic
+### InWorkflowOutputTopic
 
-A specialized topic for managing human interactions and user input.
+A specialized topic for handling workflow output that requires human interaction.
 
-#### HumanRequestTopic Fields
+#### InWorkflowOutputTopic Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | `str` | Topic name (defaults to "human_request_topic") |
-| `publish_to_human_event_handler` | `Optional[Callable[[OutputTopicEvent], None]]` | Handler for human-directed events |
-| `publish_event_handler` | `Optional[Callable[[PublishToTopicEvent], None]]` | Handler for regular publish events |
+| `name` | `str` | Topic name for workflow output |
+| `paired_in_workflow_input_topic_name` | `str` | Name of the paired input topic |
+| `type` | `str` | Topic type ("InWorkflowOutput") |
 
-*Inherits all fields from `TopicBase`: `condition`, `consumption_offsets`, `topic_events`*
+*Inherits all fields from `TopicBase`: `condition`, `event_cache`, etc.*
 
-#### HumanRequestTopic Methods
+#### InWorkflowOutputTopic Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `builder` | `() -> HumanRequestTopicBuilder` | Class method returning builder instance |
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Publish messages to human |
-| `append_user_input` | `(user_input_event, data) -> PublishToTopicEvent` | Append user input to conversation |
-| `can_append_user_input` | `(consumer_name, event) -> bool` | Check if user input can be appended |
+| `builder` | `() -> InWorkflowOutputTopicBuilder` | Class method returning builder instance |
+| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Publish workflow output data |
+| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Async version of publish_data |
 
 ### Builders
 
@@ -79,14 +78,13 @@ Enhanced builder for OutputTopic instances.
 |--------|-----------|-------------|
 | `publish_event_handler` | `(handler: Callable[[OutputTopicEvent], None]) -> Self` | Set event handler for publish operations |
 
-#### HumanRequestTopicBuilder
+#### InWorkflowOutputTopicBuilder
 
-Enhanced builder for HumanRequestTopic instances.
+Enhanced builder for InWorkflowOutputTopic instances.
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `publish_event_handler` | `(handler: Callable[[PublishToTopicEvent], None]) -> Self` | Set event handler for publish operations |
-| `publish_to_human_event_handler` | `(handler: Callable[[OutputTopicEvent], None]) -> Self` | Set handler for human-directed events |
+| `paired_in_workflow_input_topic_name` | `(name: str) -> Self` | Set the paired input topic name |
 
 ## Reserved Topics
 
@@ -94,14 +92,14 @@ The system includes pre-configured topic instances:
 
 ```python
 AGENT_OUTPUT_TOPIC = "agent_output_topic"
-HUMAN_REQUEST_TOPIC = "human_request_topic"
+IN_WORKFLOW_INPUT_TOPIC_TYPE = "InWorkflowInput"
+IN_WORKFLOW_OUTPUT_TOPIC_TYPE = "InWorkflowOutput"
 
-# Pre-configured instances
+# Example topic instances
 agent_output_topic = OutputTopic(name=AGENT_OUTPUT_TOPIC)
-human_request_topic = HumanRequestTopic(name=HUMAN_REQUEST_TOPIC)
 ```
 
-These are automatically added to the `AGENT_RESERVED_TOPICS` list.
+Workflow topics are typically created as pairs for human-in-the-loop interactions.
 
 ## OutputTopic Usage
 
@@ -205,60 +203,58 @@ async def managed_streaming():
     print("All generators completed")
 ```
 
-## HumanRequestTopic Usage
+## InWorkflowOutputTopic Usage
 
-### Publishing to Human
+### Publishing Workflow Output for Human Interaction
 
 ```python
-from grafi.common.topics.human_request_topic import HumanRequestTopic, human_request_topic
+from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.models.message import Message
 
-# Create message for human
-human_message = [Message(role="assistant", content="Please review this document.")]
+# Create workflow output topic (paired with an input topic)
+workflow_output_topic = InWorkflowOutputTopic(
+    name="review_output",
+    paired_in_workflow_input_topic_name="review_input"
+)
 
-# Publish to human request topic
-event = human_request_topic.publish_data(
+# Create message for human review
+review_message = [Message(role="assistant", content="Please review this document.")]
+
+# Publish to workflow output topic (triggers human interaction)
+event = workflow_output_topic.publish_data(
     invoke_context=context,
     publisher_name="document_reviewer",
     publisher_type="agent",
-    data=human_message,
+    data=review_message,
     consumed_events=[]
 )
 
-print(f"Sent request to human: {event.event_id}")
+print(f"Sent request for review: {event.event_id}")
 ```
 
-### Appending User Input
+### Integration with InWorkflowInputTopic
 
 ```python
-# Simulate user response
-user_response = [Message(role="user", content="The document looks good!")]
-
-# Check if input can be appended
-if human_request_topic.can_append_user_input("user_session", event):
-    # Append user input to the conversation
-    user_event = human_request_topic.append_user_input(
-        user_input_event=event,
-        data=user_response
-    )
-    print(f"User input appended: {user_event.event_id}")
-else:
-    print("Cannot append user input at this time")
+# InWorkflowOutputTopic works in tandem with InWorkflowInputTopic
+# When a human responds, the paired InWorkflowInputTopic receives the response
+# See input_topics.md for complete paired topic examples
 ```
 
-### Human-in-the-Loop Workflow
+### Human-in-the-Loop Workflow Example
 
 ```python
 class HumanApprovalWorkflow:
     def __init__(self):
         self.pending_approvals = {}
 
-        # Set up event handlers
-        human_request_topic.publish_to_human_event_handler = self.handle_human_request
-        human_request_topic.publish_event_handler = self.handle_user_response
+        # Create workflow output topic for human interaction
+        self.output_topic = InWorkflowOutputTopic(
+            name="approval_output",
+            paired_in_workflow_input_topic_name="approval_input"
+        )
 
-    def handle_human_request(self, event: OutputTopicEvent):
-        """Handle requests sent to human."""
+    def handle_workflow_output(self, event: OutputTopicEvent):
+        """Handle workflow output events (requests sent to human)."""
         self.pending_approvals[event.event_id] = {
             "event": event,
             "status": "pending",
@@ -266,24 +262,15 @@ class HumanApprovalWorkflow:
         }
         print(f"Approval request sent: {event.event_id}")
 
-    def handle_user_response(self, event: PublishToTopicEvent):
-        """Handle user responses."""
-        # Find the original request
-        for approval_id, approval in self.pending_approvals.items():
-            if event.invoke_context == approval["event"].invoke_context:
-                approval["status"] = "responded"
-                approval["response"] = event
-                print(f"User responded to: {approval_id}")
-                break
-
-    async def request_approval(self, document: str) -> bool:
+    async def request_approval(self, document: str) -> OutputTopicEvent:
         """Request human approval for a document."""
         approval_message = [Message(
             role="assistant",
             content=f"Please approve this document: {document}"
         )]
 
-        event = human_request_topic.publish_data(
+        # Publish to workflow output topic
+        event = await self.output_topic.a_publish_data(
             invoke_context=InvokeContext(),
             publisher_name="approval_system",
             publisher_type="workflow",
@@ -291,14 +278,11 @@ class HumanApprovalWorkflow:
             consumed_events=[]
         )
 
-        # Wait for response (simplified)
-        while True:
-            approval = self.pending_approvals.get(event.event_id)
-            if approval and approval["status"] == "responded":
-                response_content = approval["response"].data[0].content
-                return "approve" in response_content.lower()
+        self.handle_workflow_output(event)
+        return event
 
-            await asyncio.sleep(1)  # Poll for response
+# Note: User responses are handled via the paired InWorkflowInputTopic
+# See input_topics.md for complete workflow examples
 ```
 
 ## Best Practices
@@ -310,12 +294,12 @@ class HumanApprovalWorkflow:
 3. **Error Handling**: Implement proper error handling for async operations
 4. **Resource Cleanup**: Use reset() to properly clean up resources
 
-### Human Request Patterns
+### InWorkflowOutputTopic Patterns
 
-1. **Input Validation**: Always validate user input before appending
-2. **Session Management**: Use proper session tracking for multi-user scenarios
-3. **Timeout Handling**: Implement timeouts for human responses
-4. **State Tracking**: Track conversation state for complex workflows
+1. **Topic Pairing**: Always specify the paired InWorkflowInputTopic name
+2. **Event Publishing**: Use OutputTopicEvent for human-directed messages
+3. **State Tracking**: Track pending requests for human responses
+4. **Integration**: Coordinate with InWorkflowInputTopic for complete workflows
 
 ### Performance Optimization
 
@@ -368,13 +352,17 @@ async def test_output_topic():
     topic.reset()
     assert len(topic.active_generators) == 0
 
-def test_human_request_topic():
-    """Test human request topic functionality."""
-    topic = HumanRequestTopic(name="test_human")
+def test_workflow_output_topic():
+    """Test workflow output topic functionality."""
+    # Create workflow output topic
+    output_topic = InWorkflowOutputTopic(
+        name="test_output",
+        paired_in_workflow_input_topic_name="test_input"
+    )
 
-    # Test publishing to human
-    messages = [Message(role="assistant", content="Please help")]
-    event = topic.publish_data(
+    # Test publishing to workflow output
+    messages = [Message(role="assistant", content="Please review")]
+    output_event = output_topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",
@@ -382,20 +370,12 @@ def test_human_request_topic():
         consumed_events=[]
     )
 
-    assert event is not None
+    assert output_event is not None
+    assert output_event.topic_name == "test_output"
+    assert len(output_topic.event_cache._records) == 1
 
-    # Test user input appending
-    user_input = [Message(role="user", content="Sure, I'll help")]
-
-    assert topic.can_append_user_input("user1", event)
-
-    user_event = topic.append_user_input(
-        user_input_event=event,
-        data=user_input
-    )
-
-    assert user_event is not None
-    assert len(topic.topic_events) == 2
+    # Verify paired topic name is set
+    assert output_topic.paired_in_workflow_input_topic_name == "test_input"
 ```
 
-The output topic system provides powerful capabilities for handling agent outputs, streaming responses, and human interactions in Graphite applications, supporting both real-time and batch processing scenarios with comprehensive error handling and monitoring capabilities.
+The output topic system provides powerful capabilities for handling agent outputs, streaming responses, and workflow interactions in Graphite applications, supporting both real-time and batch processing scenarios with comprehensive error handling and monitoring capabilities. The new InWorkflow topics enable seamless human-in-the-loop workflows with proper event coordination and state management.

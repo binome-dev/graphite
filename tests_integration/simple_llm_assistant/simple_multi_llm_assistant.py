@@ -5,7 +5,8 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
-from grafi.common.topics.human_request_topic import HumanRequestTopic
+from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.output_topic import OutputTopic
 from grafi.common.topics.subscription_builder import SubscriptionBuilder
@@ -36,7 +37,11 @@ class SimpleMultiLLMAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        human_request_topic = HumanRequestTopic(name="human_request_topic")
+        in_workflow_input_topic = InWorkflowInputTopic(name="in_workflow_input_topic")
+        in_workflow_output_topic = InWorkflowOutputTopic(
+            name="in_workflow_output_topic",
+            paired_in_workflow_input_topic_name=in_workflow_input_topic.name,
+        )
         openai_function_call_topic = Topic(name="openai_function_call_topic")
         deepseek_function_call_topic = Topic(name="deepseek_function_call_topic")
         gemini_function_call_topic = Topic(name="gemini_function_call_topic")
@@ -121,7 +126,7 @@ class SimpleMultiLLMAssistant(Assistant):
                 .function(self.openai_function)
                 .build()
             )
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 
@@ -140,7 +145,7 @@ class SimpleMultiLLMAssistant(Assistant):
                 .function(self.deepseek_function)
                 .build()
             )
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 
@@ -157,7 +162,7 @@ class SimpleMultiLLMAssistant(Assistant):
                 .function(self.gemini_function)
                 .build()
             )
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 
@@ -174,7 +179,7 @@ class SimpleMultiLLMAssistant(Assistant):
                 .function(self.qwen_function)
                 .build()
             )
-            .publish_to(human_request_topic)
+            .publish_to(in_workflow_output_topic)
             .build()
         )
 
@@ -182,7 +187,9 @@ class SimpleMultiLLMAssistant(Assistant):
             Node.builder()
             .name("HumanRequestProcessNode")
             .type("FunctionNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(human_request_topic).build())
+            .subscribe(
+                SubscriptionBuilder().subscribed_to(in_workflow_input_topic).build()
+            )
             .tool(
                 FunctionTool.builder()
                 .name("HumanRequestProcessTool")

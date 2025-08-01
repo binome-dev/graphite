@@ -51,6 +51,8 @@ async def test_simple_llm_assistant_async() -> None:
     async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
         assert output is not None
+
+    print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 12
 
     input_data = [
@@ -63,6 +65,12 @@ async def test_simple_llm_assistant_async() -> None:
         print(output)
         assert output is not None
         assert "Grafi" in str(output[0].content)
+
+    # Output events to JSON file
+    # events = event_store.get_events()
+    # with open("events_output.json", "w") as f:
+    #     json.dump([event.to_dict() for event in events], f, indent=4, default=str)
+    print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 24
 
 
