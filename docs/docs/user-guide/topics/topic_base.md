@@ -214,7 +214,7 @@ def restore_topic(self, topic_event: TopicEvent) -> None:
         self.event_cache.put(topic_event)
     elif isinstance(topic_event, ConsumeFromTopicEvent):
         self.event_cache.fetch(
-            cid=topic_event.consumer_name, offset=topic_event.offset + 1
+            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
         )
         self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
 
@@ -227,7 +227,7 @@ async def a_restore_topic(self, topic_event: TopicEvent) -> None:
     elif isinstance(topic_event, ConsumeFromTopicEvent):
         # Fetch the events for the consumer and commit the offset
         await self.event_cache.a_fetch(
-            cid=topic_event.consumer_name, offset=topic_event.offset + 1
+            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
         )
         await self.event_cache.a_commit_to(
             topic_event.consumer_name, topic_event.offset

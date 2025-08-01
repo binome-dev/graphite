@@ -65,29 +65,29 @@ async def a_put(self, event: TopicEvent) -> TopicEvent:
 
 ### Event Consumption
 
-#### can_consume(cid: str) → bool
+#### can_consume(consumer_id: str) → bool
 Check if a consumer has unread messages.
 
 ```python
-def can_consume(self, cid: str) -> bool:
-    self._ensure_consumer(cid)
+def can_consume(self, consumer_id: str) -> bool:
+    self._ensure_consumer(consumer_id)
     # Can consume if there are records beyond the consumed offset
-    return self._consumed[cid] < len(self._records)
+    return self._consumed[consumer_id] < len(self._records)
 ```
 
-#### fetch(cid: str, offset: Optional[int] = None) → List[TopicEvent]
+#### fetch(consumer_id: str, offset: Optional[int] = None) → List[TopicEvent]
 Synchronously fetch unread events and advance consumed offset.
 
 ```python
-def fetch(self, cid: str, offset: Optional[int] = None) -> List[TopicEvent]:
+def fetch(self, consumer_id: str, offset: Optional[int] = None) -> List[TopicEvent]:
     """
     Fetch records newer than the consumer's consumed offset.
     Immediately advances consumed offset to prevent duplicate fetches.
     """
-    self._ensure_consumer(cid)
+    self._ensure_consumer(consumer_id)
 
-    if self.can_consume(cid):
-        start = self._consumed[cid]
+    if self.can_consume(consumer_id):
+        start = self._consumed[consumer_id]
         if offset is not None:
             end = min(len(self._records), offset + 1)
             batch = self._records[start:end]
@@ -95,19 +95,19 @@ def fetch(self, cid: str, offset: Optional[int] = None) -> List[TopicEvent]:
             batch = self._records[start:]
 
         # Advance consumed offset immediately to prevent duplicate fetches
-        self._consumed[cid] += len(batch)
+        self._consumed[consumer_id] += len(batch)
         return batch
 
     return []
 ```
 
-#### async a_fetch(cid: str, offset: Optional[int] = None, timeout: Optional[float] = None) → List[TopicEvent]
+#### async a_fetch(consumer_id: str, offset: Optional[int] = None, timeout: Optional[float] = None) → List[TopicEvent]
 Asynchronously fetch events with blocking and timeout support.
 
 ```python
 async def a_fetch(
     self,
-    cid: str,
+    consumer_id: str,
     offset: Optional[int] = None,
     timeout: Optional[float] = None,
 ) -> List[TopicEvent]:
@@ -115,11 +115,11 @@ async def a_fetch(
     Await fresh records newer than the consumer's consumed offset.
     Immediately advances consumed offset to prevent duplicate fetches.
     """
-    self._ensure_consumer(cid)
+    self._ensure_consumer(consumer_id)
 
     async with self._cond:
         # Wait for data to become available
-        while not self.can_consume(cid):
+        while not self.can_consume(consumer_id):
             if timeout is None:
                 await self._cond.wait()
             else:
@@ -128,7 +128,7 @@ async def a_fetch(
                 except asyncio.TimeoutError:
                     return []
 
-        start = self._consumed[cid]
+        start = self._consumed[consumer_id]
         if offset is not None:
             end = min(len(self._records), offset + 1)
             batch = self._records[start:end]
@@ -136,38 +136,38 @@ async def a_fetch(
             batch = self._records[start:]
 
         # Advance consumed offset immediately
-        self._consumed[cid] += len(batch)
+        self._consumed[consumer_id] += len(batch)
         return batch
 ```
 
 ### Offset Commitment
 
-#### commit_to(cid: str, offset: int) → int
+#### commit_to(consumer_id: str, offset: int) → int
 Synchronously commit processed messages up to the specified offset.
 
 ```python
-def commit_to(self, cid: str, offset: int) -> int:
+def commit_to(self, consumer_id: str, offset: int) -> int:
     """
     Marks everything up to `offset` as processed/durable
     for this consumer.
     """
-    self._ensure_consumer(cid)
+    self._ensure_consumer(consumer_id)
     # Only commit if offset is greater than current committed
-    if offset > self._committed[cid]:
-        self._committed[cid] = offset
-    return self._committed[cid]
+    if offset > self._committed[consumer_id]:
+        self._committed[consumer_id] = offset
+    return self._committed[consumer_id]
 ```
 
-#### async a_commit_to(cid: str, offset: int) → None
+#### async a_commit_to(consumer_id: str, offset: int) → None
 Asynchronously commit processed messages.
 
 ```python
-async def a_commit_to(self, cid: str, offset: int) -> None:
+async def a_commit_to(self, consumer_id: str, offset: int) -> None:
     """Commit all offsets up to and including the specified offset."""
     async with self._cond:
-        self._ensure_consumer(cid)
-        if offset > self._committed[cid]:
-            self._committed[cid] = offset
+        self._ensure_consumer(consumer_id)
+        if offset > self._committed[consumer_id]:
+            self._committed[consumer_id] = offset
 ```
 
 ## Usage Patterns

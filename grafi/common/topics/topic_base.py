@@ -124,14 +124,14 @@ class TopicBase(BaseModel):
         """
         Reset the topic to its initial state.
         """
-        self.event_cache = TopicEventCache(self.name)
+        self.event_cache = TopicEventCache()
 
     async def a_reset(self) -> None:
         """
         Asynchronously reset the topic to its initial state.
         """
         self.event_cache.reset()
-        self.event_cache = TopicEventCache(self.name)
+        self.event_cache = TopicEventCache()
 
     def restore_topic(self, topic_event: TopicEvent) -> None:
         """
@@ -143,7 +143,7 @@ class TopicBase(BaseModel):
             self.event_cache.put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             self.event_cache.fetch(
-                cid=topic_event.consumer_name, offset=topic_event.offset + 1
+                consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
             )
             self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
 
@@ -158,7 +158,7 @@ class TopicBase(BaseModel):
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             # Fetch the events for the consumer and commit the offset
             await self.event_cache.a_fetch(
-                cid=topic_event.consumer_name, offset=topic_event.offset + 1
+                consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
             )
             await self.event_cache.a_commit_to(
                 topic_event.consumer_name, topic_event.offset

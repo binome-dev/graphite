@@ -82,46 +82,10 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             )
 
             # Create new event based on the base event type
-            aggregated_events: List[
-                PublishToTopicEvent | OutputTopicEvent | ConsumeFromTopicEvent
-            ] = []
-            if isinstance(base_event, PublishToTopicEvent):
-                aggregated_events = [
-                    PublishToTopicEvent(
-                        topic_name=base_event.topic_name,
-                        publisher_name=base_event.publisher_name,
-                        publisher_type=base_event.publisher_type,
-                        invoke_context=base_event.invoke_context,
-                        offset=base_event.offset,
-                        data=[aggregated_message],
-                        consumed_event_ids=base_event.consumed_event_ids,
-                    )
-                ]
-            elif isinstance(base_event, ConsumeFromTopicEvent):
-                aggregated_events = [
-                    ConsumeFromTopicEvent(
-                        topic_name=base_event.topic_name,
-                        consumer_name=base_event.consumer_name,
-                        consumer_type=base_event.consumer_type,
-                        invoke_context=base_event.invoke_context,
-                        offset=base_event.offset,
-                        data=[aggregated_message],
-                    )
-                ]
-            elif isinstance(base_event, OutputTopicEvent):
-                aggregated_events = [
-                    OutputTopicEvent(
-                        topic_name=base_event.topic_name,
-                        publisher_name=base_event.publisher_name,
-                        publisher_type=base_event.publisher_type,
-                        invoke_context=base_event.invoke_context,
-                        offset=base_event.offset,
-                        data=[aggregated_message],
-                        consumed_event_ids=base_event.consumed_event_ids,
-                    )
-                ]
+            aggregated_event = base_event
+            aggregated_event.data = [aggregated_message]
 
-            output_events.extend(aggregated_events)
+            output_events.append(aggregated_event)
 
     return output_events
 

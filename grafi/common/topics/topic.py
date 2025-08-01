@@ -54,7 +54,7 @@ class Topic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=self.event_cache.num_events(),
+                offset=-1,
             )
             # Add event to cache and update total_published
             event = self.add_event(event)
@@ -86,7 +86,7 @@ class Topic(TopicBase):
                 consumed_event_ids=[
                     consumed_event.event_id for consumed_event in consumed_events
                 ],
-                offset=self.event_cache.num_events(),
+                offset=-1,
             )
 
             return await self.a_add_event(event)

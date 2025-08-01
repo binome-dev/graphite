@@ -5,20 +5,22 @@ from typing import List
 from typing import Optional
 
 from grafi.common.events.topic_events.topic_event import TopicEvent
-
-
-DEFAULT_MAX_CACHE_SIZE = 1000
+from grafi.common.models.default_id import default_id
 
 
 class TopicEventCache:
     """
-    A single-process, pure-Python component that behaves like a miniature,
-    in-memory Kafka partition with concurrent producers and consumers.
+    In memory message queue where multiple publishers send events to all subscribers.
+
+    A publisher consists in any object who generates message.
+    A subscriber consists in any object who can consume messages.
     """
 
-    def __init__(self, name: str = ""):
-        self.name: str = name
-        self._records: List[TopicEvent] = []  # contiguous log
+    def __init__(self):
+        self.id: str = default_id
+        self._records: List[TopicEvent] = (
+            []
+        )  # contiguous in memory log, persistent all the topic events generated from publishers
 
         # Per‑consumer cursors
         self._consumed: Dict[str, int] = defaultdict(int)  # next offset to read
@@ -27,7 +29,9 @@ class TopicEventCache:
         )  # last committed offset
 
         # For asynchronous operations
-        self._cond: asyncio.Condition = asyncio.Condition()
+        self._cond: asyncio.Condition = (
+            asyncio.Condition()
+        )  # condition variable for synchronization, all accesses to _records are protected by this condition variable
 
     def reset(self) -> None:
         """
@@ -55,21 +59,13 @@ class TopicEventCache:
         self._records.append(event)
         return event
 
-    # ------------------------------------------------------------------
-    # Consumer helpers
-    # ------------------------------------------------------------------
-    def _ensure_consumer(self, cid: str) -> None:
-        self._consumed.setdefault(cid, 0)
-        self._committed.setdefault(cid, -1)
-
-    def can_consume(self, cid: str) -> bool:
-        self._ensure_consumer(cid)
+    def can_consume(self, consumer_id: str) -> bool:
         # Can consume if there are records beyond the consumed offset
-        return self._consumed[cid] < len(self._records)
+        return self._consumed[consumer_id] < len(self._records)
 
     def fetch(
         self,
-        cid: str,
+        consumer_id: str,
         offset: Optional[int] = None,
     ) -> List[TopicEvent]:
         """
@@ -77,10 +73,8 @@ class TopicEventCache:
         Immediately advances consumed offset to prevent duplicate fetches.
         Returns [] if no new data available.
         """
-        self._ensure_consumer(cid)
-
-        if self.can_consume(cid):
-            start = self._consumed[cid]
+        if self.can_consume(consumer_id):
+            start = self._consumed[consumer_id]
             if offset is not None:
                 end = min(len(self._records), offset + 1)
                 batch = self._records[start:end]
@@ -88,22 +82,21 @@ class TopicEventCache:
                 batch = self._records[start:]
 
             # Advance consumed offset immediately to prevent duplicate fetches
-            self._consumed[cid] += len(batch)
+            self._consumed[consumer_id] += len(batch)
             return batch
 
         return []
 
-    def commit_to(self, cid: str, offset: int) -> int:
+    def commit_to(self, consumer_id: str, offset: int) -> int:
         """
         Marks everything up to `offset` as processed/durable
         for this consumer.
         Returns the new committed offset.
         """
-        self._ensure_consumer(cid)
         # Only commit if offset is greater than current committed
-        if offset > self._committed[cid]:
-            self._committed[cid] = offset
-        return self._committed[cid]
+        if offset > self._committed[consumer_id]:
+            self._committed[consumer_id] = offset
+        return self._committed[consumer_id]
 
     # ------------------------------ asynchronous methods ------------------------------
     async def a_put(self, event: TopicEvent) -> TopicEvent:
@@ -120,7 +113,7 @@ class TopicEventCache:
 
     async def a_fetch(
         self,
-        cid: str,
+        consumer_id: str,
         offset: Optional[int] = None,
         timeout: Optional[float] = None,
     ) -> List[TopicEvent]:
@@ -129,23 +122,15 @@ class TopicEventCache:
         Immediately advances consumed offset to prevent duplicate fetches.
         Returns [] if `timeout` (seconds) elapses with no data.
         """
-        self._ensure_consumer(cid)
 
         async with self._cond:
+            while not self.can_consume(consumer_id):
+                try:
+                    await asyncio.wait_for(self._cond.wait(), timeout)
+                except asyncio.TimeoutError:
+                    return []
 
-            async def _wait() -> None:
-                await self._cond.wait()
-
-            while not self.can_consume(cid):
-                if timeout is None:
-                    await _wait()
-                else:
-                    try:
-                        await asyncio.wait_for(_wait(), timeout)
-                    except asyncio.TimeoutError:
-                        return []
-
-            start = self._consumed[cid]
+            start = self._consumed[consumer_id]
             if offset is not None:
                 end = min(len(self._records), offset + 1)
                 batch = self._records[start:end]
@@ -153,14 +138,13 @@ class TopicEventCache:
                 batch = self._records[start:]
 
             # Advance consumed offset immediately to prevent duplicate fetches
-            self._consumed[cid] += len(batch)
+            self._consumed[consumer_id] += len(batch)
 
             return batch
 
-    async def a_commit_to(self, cid: str, offset: int) -> None:
+    async def a_commit_to(self, consumer_id: str, offset: int) -> None:
         """Commit all offsets up to and including the specified offset."""
         async with self._cond:
-            self._ensure_consumer(cid)
             # Only commit if offset is greater than current committed
-            if offset > self._committed[cid]:
-                self._committed[cid] = offset
+            if offset > self._committed[consumer_id]:
+                self._committed[consumer_id] = offset

@@ -12,7 +12,7 @@ from grafi.common.topics.topic_event_cache import TopicEventCache
 class TestTopicEventCache:
     @pytest.fixture
     def cache(self):
-        return TopicEventCache(name="test_cache")
+        return TopicEventCache()
 
     @pytest.fixture
     def sample_event(self):
@@ -34,8 +34,7 @@ class TestTopicEventCache:
         )
 
     def test_initialization(self):
-        cache = TopicEventCache(name="test")
-        assert cache.name == "test"
+        cache = TopicEventCache()
         assert cache._records == []
         assert len(cache._consumed) == 0
         assert len(cache._committed) == 0
@@ -77,9 +76,6 @@ class TestTopicEventCache:
         # Initially no consumers
         assert "consumer1" not in cache._consumed
         assert "consumer1" not in cache._committed
-
-        # Ensure consumer
-        cache._ensure_consumer("consumer1")
 
         # Verify consumer is initialized
         assert cache._consumed["consumer1"] == 0

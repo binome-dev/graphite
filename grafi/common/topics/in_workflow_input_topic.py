@@ -33,7 +33,7 @@ class InWorkflowInputTopic(Topic):
                 publisher_type=upstream_event.publisher_type,
                 data=data,
                 consumed_event_ids=upstream_event.consumed_event_ids,
-                offset=self.event_cache.num_events(),
+                offset=-1,
             )
 
             return self.add_event(event)
@@ -54,7 +54,7 @@ class InWorkflowInputTopic(Topic):
                 publisher_type=upstream_event.publisher_type,
                 data=data,
                 consumed_event_ids=upstream_event.consumed_event_ids,
-                offset=self.event_cache.num_events(),
+                offset=-1,
             )
 
             return await self.a_add_event(event)

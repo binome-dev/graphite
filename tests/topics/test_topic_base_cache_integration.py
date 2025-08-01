@@ -43,7 +43,7 @@ class TestTopicBaseCacheIntegration:
         topic = Topic(name="test")
         assert topic.name == "test"
         assert isinstance(topic.event_cache, TopicEventCache)
-        assert topic.event_cache.name == ""  # Default cache name is empty string
+        assert topic.event_cache.id is not None
         assert topic.event_cache.num_events() == 0
 
     def test_publish_and_consume_single_event(
