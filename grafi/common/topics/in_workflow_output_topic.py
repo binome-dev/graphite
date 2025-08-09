@@ -1,19 +1,20 @@
-from typing import Any
+from typing import Any, List
 from typing import Self
 
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.output_topic import OutputTopicBuilder
-from grafi.common.topics.topic_base import IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+from pydantic import Field
+
+from grafi.common.topics.topic import Topic, TopicBuilder
+from grafi.common.topics.topic_types import TopicType
 
 
 # OutputTopic handles sync and async publishing of messages to the agent output topic.
-class InWorkflowOutputTopic(OutputTopic):
+class InWorkflowOutputTopic(Topic):
     """
     Represents an output topic for in-workflow processing.
     """
 
-    type: str = IN_WORKFLOW_OUTPUT_TOPIC_TYPE
-    paired_in_workflow_input_topic_name: str
+    type: TopicType = Field(default=TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE)
+    paired_in_workflow_input_topic_names: List[str] = Field(default_factory=list)
 
     @classmethod
     def builder(cls) -> "InWorkflowOutputTopicBuilder":
@@ -25,11 +26,11 @@ class InWorkflowOutputTopic(OutputTopic):
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
-            "paired_in_workflow_input_topic_name": self.paired_in_workflow_input_topic_name,
+            "paired_in_workflow_input_topic_names": self.paired_in_workflow_input_topic_names,
         }
 
 
-class InWorkflowOutputTopicBuilder(OutputTopicBuilder[InWorkflowOutputTopic]):
+class InWorkflowOutputTopicBuilder(TopicBuilder[InWorkflowOutputTopic]):
     """
     Builder for creating instances of Topic.
     """
@@ -37,7 +38,9 @@ class InWorkflowOutputTopicBuilder(OutputTopicBuilder[InWorkflowOutputTopic]):
     def paired_in_workflow_input_topic_name(
         self, paired_in_workflow_input_topic_name: str
     ) -> Self:
-        self.kwargs[
-            "paired_in_workflow_input_topic_name"
-        ] = paired_in_workflow_input_topic_name
+        if "paired_in_workflow_input_topic_names" not in self.kwargs:
+            self.kwargs["paired_in_workflow_input_topic_names"] = []
+        self.kwargs["paired_in_workflow_input_topic_names"].append(
+            paired_in_workflow_input_topic_name
+        )
         return self

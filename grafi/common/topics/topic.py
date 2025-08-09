@@ -1,3 +1,4 @@
+from typing import TypeVar
 from typing import Any
 from typing import Callable
 from typing import List
@@ -7,9 +8,6 @@ from typing import Self
 from loguru import logger
 from pydantic import Field
 
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
@@ -39,7 +37,7 @@ class Topic(TopicBase):
         publisher_name: str,
         publisher_type: str,
         data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
+        consumed_event_ids: List[str],
     ) -> Optional[PublishToTopicEvent]:
         """
         Publishes a message's event ID to this topic if it meets the condition.
@@ -48,13 +46,12 @@ class Topic(TopicBase):
             event = PublishToTopicEvent(
                 invoke_context=invoke_context,
                 topic_name=self.name,
+                topic_type=self.type,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
                 data=data,
-                consumed_event_ids=[
-                    consumed_event.event_id for consumed_event in consumed_events
-                ],
-                offset=-1,
+                consumed_event_ids=consumed_event_ids,
+                offset=-1,  # Update when landed to topic message queue
             )
             # Add event to cache and update total_published
             event = self.add_event(event)
@@ -74,18 +71,17 @@ class Topic(TopicBase):
         publisher_name: str,
         publisher_type: str,
         data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
+        consumed_event_ids: List[str],
     ) -> Optional[PublishToTopicEvent]:
         if self.condition(data):
             event = PublishToTopicEvent(
                 invoke_context=invoke_context,
                 topic_name=self.name,
+                topic_type=self.type,
                 publisher_name=publisher_name,
                 publisher_type=publisher_type,
                 data=data,
-                consumed_event_ids=[
-                    consumed_event.event_id for consumed_event in consumed_events
-                ],
+                consumed_event_ids=consumed_event_ids,
                 offset=-1,
             )
 
@@ -103,7 +99,10 @@ class Topic(TopicBase):
         }
 
 
-class TopicBuilder(TopicBaseBuilder[Topic]):
+T_T = TypeVar("T_T", bound=Topic)
+
+
+class TopicBuilder(TopicBaseBuilder[T_T]):
     """
     Builder for creating instances of Topic.
     """

@@ -1,6 +1,6 @@
 import functools
 import json
-from typing import Callable
+from typing import Callable, List
 
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
@@ -19,13 +19,16 @@ from grafi.common.events.assistant_events.assistant_invoke_event import (
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 
 
 def record_assistant_invoke(
-    func: Callable[[T_A, InvokeContext, Messages], Messages],
-) -> Callable[[T_A, InvokeContext, Messages], Messages]:
+    func: Callable[[T_A, InvokeContext, Messages], List[ConsumeFromTopicEvent]],
+) -> Callable[[T_A, InvokeContext, Messages], List[ConsumeFromTopicEvent]]:
     """
     Decorator to record assistant invoke events and add tracing.
 
@@ -41,7 +44,7 @@ def record_assistant_invoke(
         self: T_A,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> Messages:
+    ) -> List[ConsumeFromTopicEvent]:
         assistant_id = self.assistant_id
         assistant_name = self.name or ""
         assistant_type = self.type or ""

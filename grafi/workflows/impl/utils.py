@@ -5,7 +5,6 @@ from typing import Tuple
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
@@ -95,15 +94,17 @@ def publish_events(
     invoke_context: InvokeContext,
     result: Messages,
     consumed_events: List[ConsumeFromTopicEvent],
-) -> List[PublishToTopicEvent | OutputTopicEvent]:
-    published_events: List[PublishToTopicEvent | OutputTopicEvent] = []
+) -> List[PublishToTopicEvent]:
+    published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
         event = topic.publish_data(
             invoke_context=invoke_context,
             publisher_name=node.name,
             publisher_type=node.type,
             data=result,
-            consumed_events=consumed_events,
+            consumed_event_ids=[
+                consumed_event.event_id for consumed_event in consumed_events
+            ],
         )
         if event:
             published_events.append(event)
@@ -120,15 +121,17 @@ async def a_publish_events(
     result: Messages,
     invoke_context: InvokeContext,
     consumed_events: List[ConsumeFromTopicEvent],
-) -> List[PublishToTopicEvent | OutputTopicEvent]:
-    published_events: List[PublishToTopicEvent | OutputTopicEvent] = []
+) -> List[PublishToTopicEvent]:
+    published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
         event = await topic.a_publish_data(
             data=result,
             invoke_context=invoke_context,
             publisher_name=node.name,
             publisher_type=node.type,
-            consumed_events=consumed_events,
+            consumed_event_ids=[
+                consumed_event.event_id for consumed_event in consumed_events
+            ],
         )
 
         if event:
@@ -151,6 +154,7 @@ def get_node_input(node: Node) -> List[ConsumeFromTopicEvent]:
                 consumed_event = ConsumeFromTopicEvent(
                     invoke_context=event.invoke_context,
                     topic_name=event.topic_name,
+                    topic_type=event.topic_type,
                     consumer_name=node.name,
                     consumer_type=node.type,
                     offset=event.offset,
@@ -175,27 +179,15 @@ async def a_get_node_input(
             # Get messages from topic and create consume events
             node_consumed_events = await subscribed_topic.a_consume(node.name)
             for event in node_consumed_events:
-                if isinstance(event, PublishToTopicEvent):
-                    consumed_event = ConsumeFromTopicEvent(
-                        invoke_context=event.invoke_context,
-                        topic_name=event.topic_name,
-                        consumer_name=node.name,
-                        consumer_type=node.type,
-                        offset=event.offset,
-                        data=event.data,
-                    )
-                    consumed_events.append(consumed_event)
-                else:
-                    # Ignore output events, they are not needed for node input
-                    ignored_events.append(
-                        ConsumeFromTopicEvent(
-                            invoke_context=event.invoke_context,
-                            topic_name=event.topic_name,
-                            consumer_name=node.name,
-                            consumer_type=node.type,
-                            offset=event.offset,
-                            data=event.data,
-                        )
-                    )
+                consumed_event = ConsumeFromTopicEvent(
+                    invoke_context=event.invoke_context,
+                    topic_name=event.topic_name,
+                    topic_type=event.topic_type,
+                    consumer_name=node.name,
+                    consumer_type=node.type,
+                    offset=event.offset,
+                    data=event.data,
+                )
+                consumed_events.append(consumed_event)
 
     return consumed_events, ignored_events

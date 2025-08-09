@@ -87,7 +87,10 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), human_input)
+    invoke_context = get_invoke_context()
+    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
+
+    output = assistant.invoke(invoke_context, human_input)
 
     events = event_store.get_events()
     print(len(events))
@@ -100,7 +103,10 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), human_input)
+    invoke_context = get_invoke_context()
+    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
+
+    output = assistant.invoke(invoke_context, human_input)
 
     print(output)
 

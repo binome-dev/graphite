@@ -1,13 +1,16 @@
 """Module for handling workflow response events in the workflow system."""
 
 import json
-from typing import Any
+from typing import Any, List
 from typing import Dict
 
 from pydantic import TypeAdapter
 from pydantic_core import to_jsonable_python
 
 from grafi.common.events.event import EventType
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.events.workflow_events.workflow_event import WorkflowEvent
 from grafi.common.models.message import Messages
 
@@ -17,7 +20,7 @@ class WorkflowRespondEvent(WorkflowEvent):
 
     event_type: EventType = EventType.WORKFLOW_RESPOND
     input_data: Messages
-    output_data: Messages
+    output_data: List[ConsumeFromTopicEvent]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -35,7 +38,7 @@ class WorkflowRespondEvent(WorkflowEvent):
         return cls(
             **base_event.model_dump(),
             input_data=TypeAdapter(Messages).validate_python(input_data_dict),
-            output_data=TypeAdapter(Messages).validate_python(
+            output_data=TypeAdapter(List[ConsumeFromTopicEvent]).validate_python(
                 json.loads(data["data"]["output_data"])
             ),
         )

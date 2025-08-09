@@ -61,7 +61,7 @@ class SimpleHITLAssistant(Assistant):
         in_workflow_input_topic = InWorkflowInputTopic(name="human_response_topic")
         in_workflow_output_topic = InWorkflowOutputTopic(
             name="human_request_topic",
-            paired_in_workflow_input_topic_name=in_workflow_input_topic.name,
+            paired_in_workflow_input_topic_names=[in_workflow_input_topic.name],
         )
 
         register_user_topic = Topic(

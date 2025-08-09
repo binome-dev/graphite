@@ -31,10 +31,8 @@ class EventType(Enum):
     ASSISTANT_FAILED = "AssistantFailed"
 
     TOPIC_EVENT = "TopicEvent"
-    STREAM_TOPIC_EVENT = "StreamTopicEvent"
     PUBLISH_TO_TOPIC = "PublishToTopic"
     CONSUME_FROM_TOPIC = "ConsumeFromTopic"
-    OUTPUT_TOPIC = "OutputTopic"
 
 
 EVENT_CONTEXT = "event_context"

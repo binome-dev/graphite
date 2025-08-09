@@ -1,10 +1,13 @@
 import json
 import os
-from typing import Any
+from typing import Any, List
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.decorators.record_assistant_a_invoke import record_assistant_a_invoke
 from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
@@ -20,7 +23,9 @@ class Assistant(AssistantBase):
     """
 
     @record_assistant_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
+    def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> List[ConsumeFromTopicEvent]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
@@ -35,9 +40,9 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        sorted_outputs = self.workflow.invoke(invoke_context, input_data)
+        events = self.workflow.invoke(invoke_context, input_data)
 
-        return sorted_outputs
+        return events
 
     @record_assistant_a_invoke
     async def a_invoke(

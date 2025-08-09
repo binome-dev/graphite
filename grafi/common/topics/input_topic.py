@@ -1,5 +1,6 @@
+from pydantic import Field
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
+from grafi.common.topics.topic_types import TopicType
 
 
 class InputTopic(Topic):
@@ -21,4 +22,4 @@ class InputTopic(Topic):
             `AGENT_INPUT_TOPIC_TYPE`.
     """
 
-    type: str = AGENT_INPUT_TOPIC_TYPE
+    type: TopicType = Field(default=TopicType.AGENT_INPUT_TOPIC_TYPE)

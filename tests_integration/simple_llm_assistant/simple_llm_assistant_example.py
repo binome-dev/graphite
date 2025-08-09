@@ -61,7 +61,7 @@ def test_simple_llm_assistant() -> None:
     output = assistant.invoke(get_invoke_context(), input_data)
     print(output)
     assert output is not None
-    assert "Grafi" in str(output[0].content)
+    assert "Grafi" in str(output[0].data[0].content)
     assert len(event_store.get_events()) == 24
 
 

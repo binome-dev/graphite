@@ -45,7 +45,8 @@ class LLMCommand(Command):
                 != invoke_context.assistant_request_id
             ):
                 all_messages.extend(event.input_data)
-                all_messages.extend(event.output_data)
+                for output_event in event.output_data:
+                    all_messages.extend(output_event.data)
 
         # Sort the messages by timestamp
         sorted_messages: Messages = sorted(
