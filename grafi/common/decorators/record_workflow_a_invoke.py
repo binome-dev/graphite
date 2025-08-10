@@ -47,6 +47,8 @@ def record_workflow_a_invoke(
         invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
+        print("RECORTD A_INVOKE DECORATOR\n")
+        print(self.__dict__)
         workflow_id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
         workflow_name: str = self.name or ""

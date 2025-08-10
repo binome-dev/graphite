@@ -1,5 +1,6 @@
 import asyncio
 from collections import deque
+import traceback
 from typing import Any
 from typing import Dict
 from typing import List
@@ -422,6 +423,8 @@ class EventDrivenWorkflow(Workflow):
 
                     for events in buffer.values():
                         for event in events:
+                            print("Events in buffer for node")
+                            print(event)
                             if isinstance(event, PublishToTopicEvent):
                                 consumed_event = ConsumeFromTopicEvent(
                                     invoke_context=event.invoke_context,
@@ -453,6 +456,11 @@ class EventDrivenWorkflow(Workflow):
                         async for msgs in node.a_invoke(
                             invoke_context, consumed_events
                         ):
+                            print("Node yielded messages in wflow")
+                            print(msgs)
+                            for a in msgs:
+                                print("MSG")
+                                print(a)
                             node_output_events.extend(
                                 await a_publish_events(
                                     node=node,
@@ -461,6 +469,8 @@ class EventDrivenWorkflow(Workflow):
                                     consumed_events=consumed_events,
                                 )
                             )
+                            print("NDOE OUTPUT")
+                            print(node_output_events)
 
                     await self._a_commit_events(
                         consumer_name=node.name, events=consumed_events
@@ -474,6 +484,7 @@ class EventDrivenWorkflow(Workflow):
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
                     # Don't break the loop, just log and continue
+                    traceback.print_exc()
                 finally:
                     await self._tracker.leave(node.name)
                     buffer.clear()  # Clear buffer for next iteration
