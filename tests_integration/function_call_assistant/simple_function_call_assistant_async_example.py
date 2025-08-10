@@ -47,6 +47,7 @@ async def test_simple_function_call_assistant_async() -> None:
         SimpleFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
+        .model("gpt-5-nano")
         .function_tool(WeatherMock(name="WeatherMock"))
         .build()
     )
@@ -57,8 +58,8 @@ async def test_simple_function_call_assistant_async() -> None:
     async for output in assistant.a_invoke(invoke_context, input_data):
         print(output)
         assert output is not None
-        assert "12345" in str(output[0].content)
-        assert "bad" in str(output[0].content)
+        assert "12345" in str(output.data[0].content)
+        assert "bad" in str(output.data[0].content)
 
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 24

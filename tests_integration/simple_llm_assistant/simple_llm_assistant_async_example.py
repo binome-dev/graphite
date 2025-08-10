@@ -64,7 +64,7 @@ async def test_simple_llm_assistant_async() -> None:
     async for output in assistant.a_invoke(get_invoke_context(), input_data):
         print(output)
         assert output is not None
-        assert "Grafi" in str(output[0].content)
+        assert "Grafi" in str(output.data[0].content)
 
     # Output events to JSON file
     # events = event_store.get_events()

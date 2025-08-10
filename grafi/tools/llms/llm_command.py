@@ -48,11 +48,6 @@ class LLMCommand(Command):
                 for output_event in event.output_data:
                     all_messages.extend(output_event.data)
 
-        # Sort the messages by timestamp
-        sorted_messages: Messages = sorted(
-            all_messages, key=lambda item: item.timestamp
-        )
-
         # Retrieve agent events related to the current assistant request
         agent_events = container.event_store.get_agent_events(
             invoke_context.assistant_request_id
@@ -70,23 +65,29 @@ class LLMCommand(Command):
             event_node.event for event_node in event_graph.get_topology_sorted_events()
         ]
 
-        messages: Messages = [msg for event in node_input_events for msg in event.data]
+        all_messages.extend([msg for event in node_input_events for msg in event.data])
 
         # Make sure the llm tool call message are followed by the function call messages
         # Step 1: get all the messages with tool_call_id and remove them from the messages list
         tool_call_messages = {
-            msg.tool_call_id: msg for msg in messages if msg.tool_call_id is not None
+            msg.tool_call_id: msg
+            for msg in all_messages
+            if msg.tool_call_id is not None
         }
-        messages = [msg for msg in messages if msg.tool_call_id is None]
+        all_messages = [msg for msg in all_messages if msg.tool_call_id is None]
+
+        sorted_messages: Messages = sorted(
+            all_messages, key=lambda item: item.timestamp
+        )
 
         # Step 2: loop over the messages again, find the llm messages with tool_calls, and append corresponding the tool_call_messages
         i = 0
-        while i < len(messages):
-            message = messages[i]
+        while i < len(sorted_messages):
+            message = sorted_messages[i]
             if message.tool_calls is not None:
                 for tool_call in message.tool_calls:
                     if tool_call.id in tool_call_messages:
-                        messages.insert(i + 1, tool_call_messages[tool_call.id])
+                        sorted_messages.insert(i + 1, tool_call_messages[tool_call.id])
                     else:
                         logger.warning(
                             f"Tool call message not found for id: {tool_call.id}, add an empty message"
@@ -96,11 +97,11 @@ class LLMCommand(Command):
                             "content": None,
                             "tool_call_id": tool_call.id,
                         }
-                        messages.insert(i + 1, Message.model_validate(message_args))
+                        sorted_messages.insert(
+                            i + 1, Message.model_validate(message_args)
+                        )
                 i += len(message.tool_calls) + 1
             else:
                 i += 1
-
-        sorted_messages.extend(messages)
 
         return sorted_messages

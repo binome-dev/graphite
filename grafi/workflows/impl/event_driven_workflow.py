@@ -152,6 +152,22 @@ class EventDrivenWorkflow(Workflow):
                     if topic.name not in published_topics_to_nodes:
                         published_topics_to_nodes[topic.name] = []
                     published_topics_to_nodes[topic.name].append(node)
+                    # If the topic is an in-workflow output topic,
+                    # we need to link its paired input topics with the function calling nodes
+                    if isinstance(topic, InWorkflowOutputTopic):
+                        for (
+                            in_workflow_input_topic_name
+                        ) in topic.paired_in_workflow_input_topic_names:
+                            if (
+                                in_workflow_input_topic_name
+                                not in published_topics_to_nodes
+                            ):
+                                published_topics_to_nodes[
+                                    in_workflow_input_topic_name
+                                ] = []
+                            published_topics_to_nodes[
+                                in_workflow_input_topic_name
+                            ].append(node)
 
         # If a function node subscribes to a topic that an Node publishes to,
         # we add the function specs to the LLM node.
@@ -298,19 +314,18 @@ class EventDrivenWorkflow(Workflow):
         try:
             async for event in output_queue:
                 # Now yield the data after committing
-                yield event.data
-
-                consumed_output_events.append(
-                    ConsumeFromTopicEvent(
-                        topic_name=event.topic_name,
-                        topic_type=event.topic_type,
-                        consumer_name=self.name,
-                        consumer_type=self.type,
-                        invoke_context=event.invoke_context,
-                        offset=event.offset,
-                        data=event.data,
-                    )
+                consumed_event = ConsumeFromTopicEvent(
+                    topic_name=event.topic_name,
+                    topic_type=event.topic_type,
+                    consumer_name=self.name,
+                    consumer_type=self.type,
+                    invoke_context=event.invoke_context,
+                    offset=event.offset,
+                    data=event.data,
                 )
+                yield consumed_event
+
+                consumed_output_events.append(consumed_event)
         finally:
             await output_queue.stop_listeners()
 
@@ -616,7 +631,7 @@ class EventDrivenWorkflow(Workflow):
                     publisher_name=self.name,
                     publisher_type=self.type,
                     data=input,
-                    consumed_events=[],
+                    consumed_event_ids=[],
                 )
                 if event:
                     events_to_record.append(event)
@@ -628,41 +643,55 @@ class EventDrivenWorkflow(Workflow):
             for topic_event in events:
                 await self._topics[topic_event.topic_name].a_restore_topic(topic_event)
 
-            publish_events = [
-                event for event in events if isinstance(event, PublishToTopicEvent)
-            ]
+            in_workflow_output_topic_names: Set[str] = set()
+            consumed_events: List[ConsumeFromTopicEvent] = []
+            if invoke_context.kwargs.get("consumed_event_ids"):
+                consumed_event_ids = invoke_context.kwargs["consumed_event_ids"]
+                consumed_events = [
+                    event for event in events if event.event_id in consumed_event_ids
+                ]
+                in_workflow_output_topic_names = set(
+                    [
+                        event.topic_name
+                        for event in consumed_events
+                        if event.topic_type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+                    ]
+                )
 
-            for publish_event in publish_events:
-                topic_name = publish_event.topic_name
-
-                topic = self._topics[topic_name]
-
-                # add human in the loop
-                if isinstance(topic, InWorkflowOutputTopic):
-                    paired_in_workflow_input_topic = self._topics.get(
-                        topic.paired_in_workflow_input_topic_name
-                    )
-                    if (
-                        paired_in_workflow_input_topic
-                        and paired_in_workflow_input_topic.event_cache.num_events()
-                        < topic.event_cache.num_events()
-                        and isinstance(
+            # Process in-workflow topics
+            for in_workflow_output_topic_name in in_workflow_output_topic_names:
+                in_workflow_output_topic = self._topics.get(
+                    in_workflow_output_topic_name
+                )
+                if in_workflow_output_topic and isinstance(
+                    in_workflow_output_topic, InWorkflowOutputTopic
+                ):
+                    # if the topic is human request topic, we need to produce a new topic event
+                    for (
+                        paired_in_workflow_input_topic_name
+                    ) in in_workflow_output_topic.paired_in_workflow_input_topic_names:
+                        paired_in_workflow_input_topic = self._topics.get(
+                            paired_in_workflow_input_topic_name
+                        )
+                        if paired_in_workflow_input_topic and isinstance(
                             paired_in_workflow_input_topic, InWorkflowInputTopic
-                        )
-                        and publish_event.offset
-                        >= paired_in_workflow_input_topic.event_cache.num_events()
-                    ):
-                        paired_event = (
-                            await paired_in_workflow_input_topic.a_publish_data(
-                                invoke_context=invoke_context,
-                                publisher_name=self.name,
-                                publisher_type=self.type,
-                                data=input,
-                                consumed_event_ids=publish_event.consumed_event_ids,
+                        ):
+                            paired_event = (
+                                await paired_in_workflow_input_topic.a_publish_data(
+                                    invoke_context=invoke_context,
+                                    publisher_name=self.name,
+                                    publisher_type=self.type,
+                                    data=input,
+                                    consumed_event_ids=[
+                                        event.event_id
+                                        for event in consumed_events
+                                        if event.topic_name
+                                        == in_workflow_output_topic_name
+                                    ],
+                                )
                             )
-                        )
-                        if paired_event:
-                            container.event_store.record_event(paired_event)
+                            if paired_event:
+                                container.event_store.record_event(paired_event)
 
     def to_dict(self) -> dict[str, Any]:
         return {

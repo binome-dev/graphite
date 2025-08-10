@@ -56,8 +56,8 @@ def test_simple_function_call_assistant() -> None:
     output = assistant.invoke(invoke_context, input_data)
     print(output)
     assert output is not None
-    assert "12345" in str(output[0].content)
-    assert "bad" in str(output[0].content)
+    assert "12345" in str(output[0].data[0].content)
+    assert "bad" in str(output[0].data[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 24
 
