@@ -79,8 +79,13 @@ def record_node_a_invoke(
                 # Invoke the node function
                 result_content = ""
                 is_streaming = False
+                print("invoking node")
                 async for data in func(self, invoke_context, input_data):
+                    print("DATA IN DECORATOR")
+                    print(data)
                     for message in data:
+                        print("RECV data")
+                        print(message)
                         if message.is_streaming:
                             if message.content is not None and isinstance(
                                 message.content, str

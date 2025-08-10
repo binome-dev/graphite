@@ -56,6 +56,7 @@ class Command(BaseModel):
         async for message in self.tool.a_invoke(
             invoke_context, self.get_tool_input(invoke_context, input_data)
         ):
+            print("Yielding messages from command")
             yield message
 
     def get_tool_input(

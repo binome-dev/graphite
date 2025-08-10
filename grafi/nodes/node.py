@@ -64,6 +64,7 @@ class Node(NodeBase):
             invoke_context,
             input_data=node_input,
         ):
+            print("Node INVOKER yieldfin messages")
             yield messages
 
     def can_invoke(self) -> bool:
