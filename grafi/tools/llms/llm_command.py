@@ -44,7 +44,7 @@ class LLMCommand(Command):
                 event.invoke_context.assistant_request_id
                 != invoke_context.assistant_request_id
             ):
-                all_messages.extend(event.input_data)
+                all_messages.extend(event.input_event.data)
                 for output_event in event.output_data:
                     all_messages.extend(output_event.data)
 

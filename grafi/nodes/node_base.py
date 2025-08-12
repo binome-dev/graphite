@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, AsyncGenerator
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -15,12 +15,11 @@ from pydantic import PrivateAttr
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import SubExpr
 from grafi.common.topics.topic_expression import TopicExpr
@@ -62,7 +61,7 @@ class NodeBase(BaseModel):
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> Messages:
+    ) -> PublishToTopicEvent:
         """
         Process the input data and return a response.
 
@@ -75,14 +74,14 @@ class NodeBase(BaseModel):
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
-    ) -> MsgsAGen:
+    ) -> AsyncGenerator[PublishToTopicEvent, None]:
         """
         Process the input data asynchronously and return a response generator.
 
         This method should be implemented by all subclasses to define
         the specific behavior of each node.
         """
-        yield []
+        yield None
         raise NotImplementedError("Subclasses must implement this method.")
 
     def to_dict(self) -> dict[str, Any]:

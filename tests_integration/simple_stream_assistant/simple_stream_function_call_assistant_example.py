@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -55,11 +56,13 @@ async def test_simple_function_call_assistant() -> None:
 
     content = ""
 
-    async for messages in assistant.a_invoke(
-        get_invoke_context(),
-        input_data,
+    async for event in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
     ):
-        for message in messages:
+        for message in event.data:
             assert message.role == "assistant"
             if message.content is not None:
                 content += str(message.content)

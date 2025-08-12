@@ -5,12 +5,11 @@ import pytest
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.output_topic import OutputTopicBuilder
-from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import TopicType
 from grafi.common.topics.topic_event_cache import TopicEventCache
 
 
@@ -102,7 +101,7 @@ class TestOutputTopic:
         topic = OutputTopic(name="agent_output_topic")
 
         assert topic.name == "agent_output_topic"
-        assert topic.type == AGENT_OUTPUT_TOPIC_TYPE
+        assert topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
         assert isinstance(topic.event_cache, TopicEventCache)
         assert topic.publish_event_handler is None
 
@@ -112,14 +111,6 @@ class TestOutputTopic:
 
         assert topic.name == "custom_topic"
 
-    def test_builder_pattern(self):
-        """Test using the builder pattern to create OutputTopic."""
-        builder = OutputTopic.builder()
-        assert isinstance(builder, OutputTopicBuilder)
-
-        topic = builder.build()
-        assert isinstance(topic, OutputTopic)
-
     def test_builder_with_publish_event_handler(self):
         """Test builder with publish event handler."""
         handler = Mock()
@@ -127,45 +118,6 @@ class TestOutputTopic:
         topic = OutputTopic.builder().publish_event_handler(handler).build()
 
         assert topic.publish_event_handler == handler
-
-    def test_reset(self, output_topic):
-        """Test resetting the topic state."""
-        # Add some mock tasks
-        mock_task1 = Mock()
-        mock_task1.done.return_value = False
-        mock_task2 = Mock()
-        mock_task2.done.return_value = True
-
-        # Mock tasks no longer needed as active_generators doesn't exist
-        # Add some events to the cache to test reset
-        from datetime import datetime
-
-        from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
-        from grafi.common.models.invoke_context import InvokeContext
-        from grafi.common.models.message import Message
-
-        mock_event = OutputTopicEvent(
-            event_id="test-event",
-            topic_name="test_topic",
-            offset=0,
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            consumed_event_ids=[],
-            invoke_context=InvokeContext(
-                conversation_id="test", invoke_id="test", assistant_request_id="test"
-            ),
-            data=[Message(role="user", content="test")],
-            timestamp=datetime.now(),
-        )
-        output_topic.event_cache.put(mock_event)
-
-        # Verify event was added
-        assert output_topic.event_cache.num_events() == 1
-
-        output_topic.reset()
-
-        # Verify that the event cache is reset
-        assert output_topic.event_cache.num_events() == 0
 
     def test_publish_data_with_condition_true(
         self,
@@ -179,15 +131,17 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=True)
 
         event = output_topic.publish_data(
-            invoke_context=sample_invoke_context,
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            data=sample_messages,
-            consumed_events=sample_consumed_events,
+            PublishToTopicEvent(
+                invoke_context=sample_invoke_context,
+                publisher_name="test_publisher",
+                publisher_type="test_type",
+                data=sample_messages,
+                consumed_event_ids=[event.event_id for event in sample_consumed_events],
+            )
         )
 
         assert event is not None
-        assert isinstance(event, OutputTopicEvent)
+        assert isinstance(event, PublishToTopicEvent)
         assert event.publisher_name == "test_publisher"
         assert event.publisher_type == "test_type"
         assert event.data == sample_messages
@@ -207,11 +161,13 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=False)
 
         event = output_topic.publish_data(
-            invoke_context=sample_invoke_context,
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            data=sample_messages,
-            consumed_events=sample_consumed_events,
+            PublishToTopicEvent(
+                invoke_context=sample_invoke_context,
+                publisher_name="test_publisher",
+                publisher_type="test_type",
+                data=sample_messages,
+                consumed_event_ids=[event.event_id for event in sample_consumed_events],
+            )
         )
 
         assert event is None
@@ -230,11 +186,13 @@ class TestOutputTopic:
         output_topic.condition = Mock(return_value=True)
 
         event = output_topic.publish_data(
-            invoke_context=sample_invoke_context,
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            data=sample_messages,
-            consumed_events=sample_consumed_events,
+            PublishToTopicEvent(
+                invoke_context=sample_invoke_context,
+                publisher_name="test_publisher",
+                publisher_type="test_type",
+                data=sample_messages,
+                consumed_event_ids=[event.event_id for event in sample_consumed_events],
+            )
         )
 
         handler.assert_called_once_with(event)

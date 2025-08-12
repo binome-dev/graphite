@@ -2,11 +2,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import TopicType
 
 
 @pytest.fixture
@@ -22,12 +23,19 @@ def test_publish_message(topic: Topic, invoke_context: InvokeContext):
     message = Message(role="assistant", content="Test Message")
 
     event = topic.publish_data(
-        invoke_context, "test_publisher", "test_type", [message], []
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message],
+        )
     )
 
     assert topic.event_cache.num_events() == 1  # Ensure the message was published
     assert topic.name == "agent_input_topic"
-    assert topic.type == AGENT_INPUT_TOPIC_TYPE
+    assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
     assert (
         topic.event_cache._records[0].offset == 0
     )  # First message should have offset 0
@@ -45,7 +53,16 @@ def test_can_consume(topic: Topic, invoke_context: InvokeContext):
     assert not topic.can_consume("consumer_1")
 
     # Publish a message
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message],
+        )
+    )
 
     # Now the consumer should be able to consume
     assert topic.can_consume("consumer_1")
@@ -56,8 +73,26 @@ def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message1], [])
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message2], [])
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message1],
+        )
+    )
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message2],
+        )
+    )
 
     consumed_messages = topic.consume("consumer_1")
 
@@ -71,7 +106,16 @@ def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeContext):
     """Ensure no messages are consumed when there are no new ones."""
     message = Message(role="assistant", content="Test Message")
 
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message],
+        )
+    )
 
     # First consume
     topic.consume("consumer_1")
@@ -86,8 +130,26 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message1], [])
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message2], [])
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message1],
+        )
+    )
+    topic.publish_data(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            topic_name="agent_input_topic",
+            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            publisher_name="test_publisher",
+            publisher_type="test_type",
+            data=[message2],
+        )
+    )
 
     # Consumer 1 consumes both messages
     consumed_messages_1 = topic.consume("consumer_1")

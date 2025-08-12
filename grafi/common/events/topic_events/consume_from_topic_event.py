@@ -15,8 +15,8 @@ from grafi.common.topics.topic_types import TopicType
 
 class ConsumeFromTopicEvent(TopicEvent):
     event_type: EventType = EventType.CONSUME_FROM_TOPIC
-    consumer_name: str
-    consumer_type: str
+    consumer_name: str = ""
+    consumer_type: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         event_context = {

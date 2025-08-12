@@ -4,9 +4,9 @@ import uuid
 from pathlib import Path
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
 from tests_integration.rag_assistant.simple_rag_assistant import SimpleRagAssistant
 
 
@@ -59,14 +59,16 @@ def test_rag_tool() -> None:
         api_key=api_key,
     )
 
-    result: Messages = simple_rag_assistant.invoke(
-        invoke_context,
-        [Message(role="user", content="What is AWS EC2?")],
+    result = simple_rag_assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=[Message(role="user", content="What is AWS EC2?")],
+        )
     )
 
     print(result)
-    assert "EC2" in str(result[0].content)
-    assert "computing" in str(result[0].content)
+    assert "EC2" in str(result[0].data[0].content)
+    assert "computing" in str(result[0].data[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 12
 

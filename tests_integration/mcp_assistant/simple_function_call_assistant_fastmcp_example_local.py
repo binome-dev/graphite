@@ -3,6 +3,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
@@ -51,7 +52,12 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     input_data = [Message(role="user", content="Hi my name is Graphite.")]
 
     # Invoke the assistant's function call
-    async for output in assistant.a_invoke(invoke_context, input_data):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    ):
         print(output)
         assert output is not None
 

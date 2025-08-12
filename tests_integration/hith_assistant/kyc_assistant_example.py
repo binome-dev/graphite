@@ -3,6 +3,7 @@ import os
 import uuid
 
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -71,17 +72,18 @@ user_info_extract_system_message = """
 Strictly follow these validation rules and do not assume missing details."
 """
 
+assistant_request_id = (uuid.uuid4().hex,)
+
 
 def get_invoke_context() -> InvokeContext:
     return InvokeContext(
         conversation_id="conversation_id",
         invoke_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
+        assistant_request_id=assistant_request_id,
     )
 
 
 def test_kyc_assistant() -> None:
-    invoke_context = get_invoke_context()
 
     assistant = (
         KycAssistant.builder()
@@ -105,7 +107,12 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    )
 
     print(output)
 
@@ -116,7 +123,12 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, human_input)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=human_input,
+        )
+    )
 
     print(output)
 

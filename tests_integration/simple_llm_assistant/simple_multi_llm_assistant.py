@@ -40,7 +40,7 @@ class SimpleMultiLLMAssistant(Assistant):
         in_workflow_input_topic = InWorkflowInputTopic(name="in_workflow_input_topic")
         in_workflow_output_topic = InWorkflowOutputTopic(
             name="in_workflow_output_topic",
-            paired_in_workflow_input_topic_name=in_workflow_input_topic.name,
+            paired_in_workflow_input_topic_names=[in_workflow_input_topic.name],
         )
         openai_function_call_topic = Topic(name="openai_function_call_topic")
         deepseek_function_call_topic = Topic(name="deepseek_function_call_topic")

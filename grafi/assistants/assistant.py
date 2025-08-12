@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, List
+from typing import Any, AsyncGenerator, List
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.decorators.record_assistant_a_invoke import record_assistant_a_invoke
@@ -8,9 +8,7 @@ from grafi.common.decorators.record_assistant_invoke import record_assistant_inv
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
 class Assistant(AssistantBase):
@@ -23,9 +21,7 @@ class Assistant(AssistantBase):
     """
 
     @record_assistant_invoke
-    def invoke(
-        self, invoke_context: InvokeContext, input_data: Messages
-    ) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
@@ -40,14 +36,14 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        events = self.workflow.invoke(invoke_context, input_data)
+        events = self.workflow.invoke(input_event)
 
         return events
 
     @record_assistant_a_invoke
     async def a_invoke(
-        self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+        self, input_event: PublishToTopicEvent
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
@@ -62,7 +58,7 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        async for output in self.workflow.a_invoke(invoke_context, input_data):
+        async for output in self.workflow.a_invoke(input_event):
             yield output
 
     def to_dict(self) -> dict[str, Any]:

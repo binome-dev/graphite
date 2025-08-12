@@ -6,6 +6,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -91,7 +92,12 @@ async def test_simple_multi_llm_assistant_async() -> None:
             role="user",
         )
     ]
-    async for output in assistant.a_invoke(invoke_context, input_data):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    ):
         print(output)
         assert output is not None
     print(len(event_store.get_events()))

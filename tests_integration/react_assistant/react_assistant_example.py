@@ -2,6 +2,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
@@ -42,7 +43,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_react_assistant() -> None:
-    invoke_context = get_invoke_context()
 
     # Set up the assistant with DuckDuckGoTool
     assistant = (
@@ -72,7 +72,12 @@ def test_react_assistant() -> None:
     ]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    )
     print("Assistant output:", output)
 
     # Assert that the output is valid and check event count

@@ -1,25 +1,22 @@
-import json
 from typing import Any
 from typing import Dict
 
-from pydantic import TypeAdapter
-from pydantic_core import to_jsonable_python
 
 from grafi.common.events.assistant_events.assistant_event import AssistantEvent
 from grafi.common.events.event import EventType
-from grafi.common.models.message import Messages
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
 class AssistantFailedEvent(AssistantEvent):
     event_type: EventType = EventType.ASSISTANT_FAILED
-    input_data: Messages
+    input_event: PublishToTopicEvent
     error: Any
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             **self.assistant_event_dict(),
             "data": {
-                "input_data": json.dumps(self.input_data, default=to_jsonable_python),
+                "input_event": self.input_event.to_dict(),
                 "error": self.error,
             },
         }
@@ -29,8 +26,6 @@ class AssistantFailedEvent(AssistantEvent):
         base_event = cls.assistant_event_base(data)
         return cls(
             **base_event.model_dump(),
-            input_data=TypeAdapter(Messages).validate_python(
-                json.loads(data["data"]["input_data"])
-            ),
+            input_event=PublishToTopicEvent.from_dict(data["data"]["input_event"]),
             error=data["data"]["error"],
         )

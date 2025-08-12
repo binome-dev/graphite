@@ -1,15 +1,19 @@
 import json
 import os
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
-from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.topic_types import TopicType
 from grafi.workflows.workflow import Workflow
+from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 
 class TestAssistant:
@@ -23,15 +27,31 @@ class TestAssistant:
         )
 
     @pytest.fixture
-    def mock_workflow(self):
+    def mock_workflow(self, invoke_context):
         """Create a mock Workflow instance."""
         mock_workflow = Mock(spec=Workflow)
         mock_workflow.invoke.return_value = [
-            Message(content="workflow response", role="assistant")
+            ConsumeFromTopicEvent(
+                invoke_context=invoke_context,
+                topic_name="agent_output",
+                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                consumer_name="test_consumer",
+                consumed_type="Workflow",
+                offset=0,
+                data=[Message(content="workflow response", role="assistant")],
+            )
         ]
 
         async def mock_a_invoke(*args, **kwargs):
-            yield [Message(content="async workflow response", role="assistant")]
+            yield ConsumeFromTopicEvent(
+                invoke_context=invoke_context,
+                topic_name="agent_output",
+                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                consumer_name="test_consumer",
+                consumed_type="Workflow",
+                offset=0,
+                data=[Message(content="async workflow response", role="assistant")],
+            )
 
         mock_workflow.a_invoke.return_value = mock_a_invoke()
         mock_workflow.to_dict.return_value = {"workflow": "data"}
@@ -101,16 +121,18 @@ class TestAssistant:
         # Setup the decorator to call the original function
         mock_decorator.side_effect = lambda func: func
 
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=input_messages
+        )
+
         # Invoke
-        result = mock_assistant.invoke(invoke_context, input_messages)
+        result = mock_assistant.invoke(input_event)
 
         # Verify
-        mock_assistant.workflow.invoke.assert_called_once_with(
-            invoke_context, input_messages
-        )
+        mock_assistant.workflow.invoke.assert_called_once_with(input_event)
         assert len(result) == 1
-        assert result[0].content == "workflow response"
-        assert result[0].role == "assistant"
+        assert result[0].data[0].content == "workflow response"
+        assert result[0].data[0].role == "assistant"
 
     @patch("grafi.assistants.assistant.record_assistant_invoke")
     def test_invoke_with_empty_messages(
@@ -120,11 +142,13 @@ class TestAssistant:
         mock_decorator.side_effect = lambda func: func
         empty_messages = []
 
-        result = mock_assistant.invoke(invoke_context, empty_messages)
-
-        mock_assistant.workflow.invoke.assert_called_once_with(
-            invoke_context, empty_messages
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=empty_messages
         )
+
+        result = mock_assistant.invoke(input_event)
+
+        mock_assistant.workflow.invoke.assert_called_once_with(input_event)
         assert len(result) == 1
 
     @patch("grafi.assistants.assistant.record_assistant_invoke")
@@ -135,8 +159,10 @@ class TestAssistant:
         mock_decorator.side_effect = lambda func: func
         mock_assistant.workflow.invoke.side_effect = ValueError("Workflow error")
 
+        input_event = PublishToTopicEvent(invoke_context=invoke_context, data=[])
+
         with pytest.raises(ValueError, match="Workflow error"):
-            mock_assistant.invoke(invoke_context, input_messages)
+            mock_assistant.invoke(input_event)
 
     # Test Async Invoke Method
     @pytest.mark.asyncio
@@ -148,18 +174,20 @@ class TestAssistant:
         # Setup the decorator to call the original function
         mock_decorator.side_effect = lambda func: func
 
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=input_messages
+        )
+
         # Invoke
-        result_messages = []
-        async for messages in mock_assistant.a_invoke(invoke_context, input_messages):
-            result_messages.extend(messages)
+        result_events = []
+        async for event in mock_assistant.a_invoke(input_event):
+            result_events.append(event)
 
         # Verify
-        mock_assistant.workflow.a_invoke.assert_called_once_with(
-            invoke_context, input_messages
-        )
-        assert len(result_messages) == 1
-        assert result_messages[0].content == "async workflow response"
-        assert result_messages[0].role == "assistant"
+        mock_assistant.workflow.a_invoke.assert_called_once_with(input_event)
+        assert len(result_events) == 1
+        assert result_events[0].data[0].content == "async workflow response"
+        assert result_events[0].data[0].role == "assistant"
 
     @pytest.mark.asyncio
     @patch("grafi.assistants.assistant.record_assistant_a_invoke")
@@ -170,14 +198,16 @@ class TestAssistant:
         mock_decorator.side_effect = lambda func: func
         empty_messages = []
 
-        result_messages = []
-        async for messages in mock_assistant.a_invoke(invoke_context, empty_messages):
-            result_messages.extend(messages)
-
-        mock_assistant.workflow.a_invoke.assert_called_once_with(
-            invoke_context, empty_messages
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=empty_messages
         )
-        assert len(result_messages) == 1
+
+        result_events = []
+        async for event in mock_assistant.a_invoke(input_event):
+            result_events.append(event)
+
+        mock_assistant.workflow.a_invoke.assert_called_once_with(input_event)
+        assert len(result_events) == 1
 
     @pytest.mark.asyncio
     @patch("grafi.assistants.assistant.record_assistant_a_invoke")
@@ -189,18 +219,38 @@ class TestAssistant:
 
         # Setup mock to yield multiple times
         async def mock_multi_yield(*args, **kwargs):
-            yield [Message(content="first response", role="assistant")]
-            yield [Message(content="second response", role="assistant")]
+            yield ConsumeFromTopicEvent(
+                invoke_context=invoke_context,
+                topic_name="agent_output",
+                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                consumer_name="test_consumer",
+                consumed_type="Workflow",
+                offset=0,
+                data=[Message(content="first response", role="assistant")],
+            )
+            yield ConsumeFromTopicEvent(
+                invoke_context=invoke_context,
+                topic_name="agent_output",
+                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                consumer_name="test_consumer",
+                consumed_type="Workflow",
+                offset=0,
+                data=[Message(content="second response", role="assistant")],
+            )
 
         mock_assistant.workflow.a_invoke.return_value = mock_multi_yield()
 
-        result_messages = []
-        async for messages in mock_assistant.a_invoke(invoke_context, input_messages):
-            result_messages.extend(messages)
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=input_messages
+        )
 
-        assert len(result_messages) == 2
-        assert result_messages[0].content == "first response"
-        assert result_messages[1].content == "second response"
+        result_events = []
+        async for event in mock_assistant.a_invoke(input_event):
+            result_events.append(event)
+
+        assert len(result_events) == 2
+        assert result_events[0].data[0].content == "first response"
+        assert result_events[1].data[0].content == "second response"
 
     @pytest.mark.asyncio
     @patch("grafi.assistants.assistant.record_assistant_a_invoke")
@@ -216,8 +266,12 @@ class TestAssistant:
 
         mock_assistant.workflow.a_invoke.return_value = mock_error_generator()
 
+        input_event = PublishToTopicEvent(
+            invoke_context=invoke_context, data=input_messages
+        )
+
         with pytest.raises(ValueError, match="Async workflow error"):
-            async for _ in mock_assistant.a_invoke(invoke_context, input_messages):
+            async for _ in mock_assistant.a_invoke(input_event):
                 pass
 
     # Test to_dict Method
@@ -346,10 +400,14 @@ class TestAssistant:
                 assistant_id="test_id", name="integration_test", workflow=mock_workflow
             )
 
+            input_event = PublishToTopicEvent(
+                invoke_context=invoke_context, data=input_messages
+            )
+
             # Test synchronous invoke
-            sync_result = assistant.invoke(invoke_context, input_messages)
+            sync_result = assistant.invoke(input_event)
             assert len(sync_result) == 1
-            assert sync_result[0].content == "workflow response"
+            assert sync_result[0].data[0].content == "workflow response"
 
             # Test to_dict
             dict_result = assistant.to_dict()
@@ -371,13 +429,17 @@ class TestAssistant:
         with patch.object(Assistant, "_construct_workflow"):
             assistant = Assistant(name="async_integration_test", workflow=mock_workflow)
 
+            input_event = PublishToTopicEvent(
+                invoke_context=invoke_context, data=input_messages
+            )
+
             # Test asynchronous invoke
             async_results = []
-            async for messages in assistant.a_invoke(invoke_context, input_messages):
-                async_results.extend(messages)
+            async for event in assistant.a_invoke(input_event):
+                async_results.append(event)
 
             assert len(async_results) == 1
-            assert async_results[0].content == "async workflow response"
+            assert async_results[0].data[0].content == "async workflow response"
 
     # Test Edge Cases
     def test_assistant_with_none_workflow(self):
@@ -409,8 +471,12 @@ class TestAssistant:
             )
             messages = [Message(content="test", role="user")]
 
-            assistant.invoke(invoke_context, messages)
-            assistant.invoke(invoke_context, messages)
+            input_event = PublishToTopicEvent(
+                invoke_context=invoke_context, data=messages
+            )
+
+            assistant.invoke(input_event)
+            assistant.invoke(input_event)
 
             # Verify workflow was called twice
             assert mock_workflow.invoke.call_count == 2

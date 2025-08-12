@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -55,7 +56,12 @@ async def test_simple_function_call_assistant_async() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
-    async for output in assistant.a_invoke(invoke_context, input_data):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    ):
         print(output)
         assert output is not None
         assert "12345" in str(output.data[0].content)

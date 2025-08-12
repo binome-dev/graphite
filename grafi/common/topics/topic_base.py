@@ -1,4 +1,3 @@
-from enum import Enum
 import inspect
 from typing import Any
 from typing import Callable
@@ -17,7 +16,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_event_cache import TopicEventCache
 from grafi.common.topics.topic_types import TopicType
@@ -41,14 +39,7 @@ class TopicBase(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_event_ids: List[str],
-    ) -> PublishToTopicEvent:
+    def publish_data(self, publish_event: PublishToTopicEvent) -> PublishToTopicEvent:
         """
         Publish data to the topic if it meets the condition.
         """
@@ -57,12 +48,7 @@ class TopicBase(BaseModel):
         )
 
     async def a_publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_event_ids: List[str],
+        self, publish_event: PublishToTopicEvent
     ) -> PublishToTopicEvent:
         """
         Publish data to the topic if it meets the condition.
@@ -195,7 +181,7 @@ class TopicBase(BaseModel):
         """
         return {
             "name": self.name,
-            "type": self.type,
+            "type": self.type.value,
             "condition": self.serialize_callable(),
         }
 
