@@ -142,8 +142,8 @@ async def test_llm_a_stream_node_deepseek() -> None:
     )
 
     content = ""
-    async for messages in llm_stream_node.a_invoke(invoke_context, [topic_event]):
-        for message in messages:
+    async for event in llm_stream_node.a_invoke(invoke_context, [topic_event]):
+        for message in event.data:
             assert message.role == "assistant"
             if message.content and isinstance(message.content, str):
                 content += message.content

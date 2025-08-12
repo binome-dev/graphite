@@ -72,7 +72,7 @@ user_info_extract_system_message = """
 Strictly follow these validation rules and do not assume missing details."
 """
 
-assistant_request_id = (uuid.uuid4().hex,)
+assistant_request_id = uuid.uuid4().hex
 
 
 def get_invoke_context() -> InvokeContext:

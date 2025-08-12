@@ -98,11 +98,11 @@ async def test_openrouter_tool_async() -> None:
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
-    async for msgs in or_tool.a_invoke(
+    async for messages in or_tool.a_invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-        for m in msgs:
+        for m in messages:
             assert m.role == "assistant"
             if isinstance(m.content, str):
                 content += m.content
@@ -137,8 +137,8 @@ async def test_llm_a_stream_node_openrouter() -> None:
     )
 
     content = ""
-    async for msgs in llm_stream_node.a_invoke(invoke_context, [topic_event]):
-        for m in msgs:
+    async for event in llm_stream_node.a_invoke(invoke_context, [topic_event]):
+        for m in event.data:
             assert m.role == "assistant"
             if isinstance(m.content, str):
                 content += m.content

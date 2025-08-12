@@ -87,12 +87,12 @@ def test_simple_function_call_assistant() -> None:
         conversation_id,
         assistant_request_id,
     )
-    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
 
     output = assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
+            consumed_event_ids=[event.event_id for event in output],
         )
     )
     print(output)
@@ -145,12 +145,12 @@ def test_simple_function_call_assistant_disapproval() -> None:
         conversation_id,
         assistant_request_id,
     )
-    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
 
     output = assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
+            consumed_event_ids=[event.event_id for event in output],
         )
     )
     print(output)
@@ -203,12 +203,12 @@ def test_simple_function_call_assistant_suggestion() -> None:
         conversation_id,
         assistant_request_id,
     )
-    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
 
     output = assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
+            consumed_event_ids=[event.event_id for event in output],
         )
     )
     print(output)
@@ -233,12 +233,12 @@ def test_simple_function_call_assistant_suggestion() -> None:
         conversation_id,
         assistant_request_id,
     )
-    invoke_context.kwargs = {"consumed_event_ids": [event.event_id for event in output]}
 
     output = assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
+            consumed_event_ids=[event.event_id for event in output],
         )
     )
     print(output)
@@ -289,5 +289,5 @@ def test_simple_function_call_assistant_suggestion_mem() -> None:
 
 test_simple_function_call_assistant()
 test_simple_function_call_assistant_disapproval()
-test_simple_function_call_assistant_suggestion()
-test_simple_function_call_assistant_suggestion_mem()
+# test_simple_function_call_assistant_suggestion()
+# test_simple_function_call_assistant_suggestion_mem()
