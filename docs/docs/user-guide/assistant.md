@@ -17,11 +17,20 @@ The `AssistantBase` class provides an abstract foundation for all assistants, de
 
 ```python
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages, MsgsAGen
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from typing import List, AsyncGenerator
 
 class MyAssistant(AssistantBase):
     def _construct_workflow(self):
+        # Implementation required
+        pass
+    
+    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+        # Implementation required
+        pass
+    
+    async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         # Implementation required
         pass
 ```
@@ -43,8 +52,8 @@ Subclasses must implement these abstract methods:
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `_construct_workflow` | `() -> AssistantBase` | Constructs and configures the assistant's workflow |
-| `invoke` | `(InvokeContext, Messages) -> Messages` | Synchronous message processing |
-| `a_invoke` | `(InvokeContext, Messages) -> MsgsAGen` | Asynchronous message processing with streaming support |
+| `invoke` | `(PublishToTopicEvent) -> List[ConsumeFromTopicEvent]` | Synchronous event processing |
+| `a_invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Asynchronous event processing with streaming support |
 
 ### Lifecycle
 
@@ -65,8 +74,8 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `invoke` | `(InvokeContext, Messages) -> Messages` | Processes input messages synchronously through the workflow |
-| `a_invoke` | `(InvokeContext, Messages) -> MsgsAGen` | Processes input messages asynchronously with streaming support |
+| `invoke` | `(PublishToTopicEvent) -> List[ConsumeFromTopicEvent]` | Processes input events synchronously through the workflow |
+| `a_invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Processes input events asynchronously with streaming support |
 | `to_dict` | `() -> dict[str, Any]` | Serializes the assistant's workflow configuration |
 | `generate_manifest` | `(output_dir: str = ".") -> str` | Generates a JSON manifest file for the assistant |
 
@@ -74,41 +83,39 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 #### invoke()
 
-Synchronously processes input messages through the configured workflow.
+Synchronously processes input events through the configured workflow.
 
 ```python
 @record_assistant_invoke
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-    sorted_outputs = self.workflow.invoke(invoke_context, input_data)
-    return sorted_outputs
+def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    events = self.workflow.invoke(input_event)
+    return events
 ```
 
 **Parameters**:
 
-- `invoke_context`: Context containing invocation metadata
-- `input_data`: List of input messages to process
+- `input_event`: A `PublishToTopicEvent` containing the data to be processed and context information
 
-**Returns**: List of response messages sorted by timestamp
+**Returns**: List of `ConsumeFromTopicEvent` objects representing the workflow output
 
 **Raises**: `ValueError` if required configuration (e.g., API keys) is missing
 
 #### a_invoke()
 
-Asynchronously processes input messages with support for streaming responses.
+Asynchronously processes input events with support for streaming responses.
 
 ```python
 @record_assistant_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
-    async for output in self.workflow.a_invoke(invoke_context, input_data):
+async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async for output in self.workflow.a_invoke(input_event):
         yield output
 ```
 
 **Parameters**:
 
-- `invoke_context`: Context containing invocation metadata  
-- `input_data`: List of input messages to process
+- `input_event`: A `PublishToTopicEvent` containing the data to be processed and context information
 
-**Returns**: Async generator yielding message batches
+**Returns**: Async generator yielding `ConsumeFromTopicEvent` objects
 
 **Use Cases**: Streaming responses, real-time processing, concurrent operations
 

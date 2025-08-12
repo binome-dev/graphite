@@ -33,6 +33,7 @@ Key features of the Node class include:
 
 - **Automatic Command Setup**: Creates commands automatically from tools during initialization
 - **Event-Driven Invocation**: Uses `can_invoke()` to determine readiness based on subscribed topics
+- **Event-Based Interface**: Consumes `ConsumeFromTopicEvent` objects and publishes `PublishToTopicEvent` objects
 - **Decorator Support**: Includes built-in instrumentation via `@record_node_invoke` and `@record_node_a_invoke`
 
 The following table describes each field within the Node class, highlighting its purpose and usage in the workflow:
@@ -56,9 +57,10 @@ The following table summarizes the methods available in the Node class, highligh
 |----------------------|----------------------------------------------------------------------------------------------------------|
 | `builder`           | Class method that returns a `NodeBaseBuilder` for fluent node construction.                              |
 | `model_post_init`   | Model post-initialization hook that sets up subscribed topics and auto-creates commands from tools during initialization. |
-| `invoke`            | Synchronously invokes the node's command with the provided input events and context.                     |
-| `a_invoke`          | Asynchronously invokes the node's command, yielding response messages as they become available.          |
-| `can_invoke`        | Evaluates subscription conditions to determine whether the node is ready to invoke based on new events. |
+| `invoke`            | Synchronously invokes the node's command with a list of `ConsumeFromTopicEvent` and returns a `PublishToTopicEvent`. |
+| `a_invoke`          | Asynchronously invokes the node's command, yielding `PublishToTopicEvent` objects as they become available. |
+| `can_invoke`        | Evaluates subscription conditions to determine whether the node is ready to invoke based on available topics. |
+| `can_invoke_with_topics` | Checks if the node can invoke given a specific list of topic names. |
 | `to_dict`            | Serializes node attributes to a dictionary, suitable for persistence or transmission.                    |
 
 ## NodeBaseBuilder
@@ -79,6 +81,10 @@ Available builder methods:
 Example usage:
 
 ```python
+from grafi.nodes.node import Node
+from grafi.common.topics.input_topic import InputTopic
+from grafi.common.topics.output_topic import OutputTopic
+
 node = Node.builder()
     .name("ProcessorNode")
     .type("DataProcessor")
@@ -86,4 +92,19 @@ node = Node.builder()
     .subscribe(input_topic)
     .publish_to(output_topic)
     .build()
+
+# Node invoke signature
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+
+# Synchronous invocation
+context = InvokeContext(session_id="session-123")
+input_events = [ConsumeFromTopicEvent(...)]  # List of consumed events
+output_event: PublishToTopicEvent = node.invoke(context, input_events)
+
+# Asynchronous invocation
+async for output_event in node.a_invoke(context, input_events):
+    # Process each PublishToTopicEvent as it's generated
+    pass
 ```
