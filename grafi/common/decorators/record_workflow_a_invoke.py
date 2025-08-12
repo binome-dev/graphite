@@ -2,8 +2,9 @@
 
 import functools
 import json
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
 from typing import Callable
+from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from openinference.semconv.trace import SpanAttributes

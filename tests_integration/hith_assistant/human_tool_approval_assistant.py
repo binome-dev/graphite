@@ -143,9 +143,9 @@ class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs["function_call_llm_system_message"] = (
-            function_call_llm_system_message
-        )
+        self.kwargs[
+            "function_call_llm_system_message"
+        ] = function_call_llm_system_message
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:
