@@ -2,7 +2,8 @@
 
 import functools
 import json
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator
+from typing import Callable
 from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -67,7 +68,6 @@ def record_node_a_invoke(
         )
 
         result: Messages = []
-        output_data: PublishToTopicEvent = None
         # Invoke the original function
         try:
             with container.tracer.start_as_current_span(f"{node_name}.invoke") as span:
@@ -107,7 +107,10 @@ def record_node_a_invoke(
                         deep=True,
                     )
 
-                span.set_attribute("output", output_data.to_dict())
+                span.set_attribute(
+                    "output",
+                    json.dumps(output_data.to_dict(), default=to_jsonable_python),
+                )
         except Exception as e:
             # Exception occurred during invoke
             span.set_attribute("error", str(e))

@@ -78,7 +78,9 @@ def record_node_invoke(
                 # Invoke the node function
                 result = func(self, invoke_context, input_data)
 
-                span.set_attribute("output", result.to_dict())
+                span.set_attribute(
+                    "output", json.dumps(result.to_dict(), default=to_jsonable_python)
+                )
 
         except Exception as e:
             # Exception occurred during invoke

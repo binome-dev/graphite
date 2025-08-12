@@ -57,7 +57,7 @@ def test_simple_image_llm_assistant() -> None:
                         "url": f"data:image/jpeg;base64,{graphite_image_base64}",
                     },
                 },
-            ],
+            ],  # type: ignore
             role="user",
         )
     ]

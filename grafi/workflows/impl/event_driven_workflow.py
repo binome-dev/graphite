@@ -1,8 +1,9 @@
 import asyncio
 from collections import deque
-from typing import Any, Set
+from typing import Any, AsyncGenerator
 from typing import Dict
 from typing import List
+from typing import Set
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -18,12 +19,11 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import MsgsAGen
 from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
-from grafi.common.topics.topic_types import TopicType
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
+from grafi.common.topics.topic_types import TopicType
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
@@ -260,7 +260,11 @@ class EventDrivenWorkflow(Workflow):
 
                     published_events = publish_events(node, result)
 
-                    container.event_store.record_events(node_consumed_events + published_events)  # type: ignore[arg-type]
+                    events: List[TopicEvent] = []
+                    events.extend(node_consumed_events)
+                    events.extend(published_events)
+
+                    container.event_store.record_events(events)  # type: ignore[arg-type]
 
             consumed_events = self._get_output_events()
 
@@ -270,7 +274,9 @@ class EventDrivenWorkflow(Workflow):
                 container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
 
     @record_workflow_a_invoke
-    async def a_invoke(self, input_event: PublishToTopicEvent) -> MsgsAGen:
+    async def a_invoke(
+        self, input_event: PublishToTopicEvent
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Run the workflow with streaming output.
         """
@@ -525,7 +531,7 @@ class EventDrivenWorkflow(Workflow):
             # If consumed_event_ids are present, get all the corresponding consumed events
 
             in_workflow_output_topic_names: Set[str] = set()
-            consumed_events: List[ConsumeFromTopicEvent] = [
+            consumed_events: List[TopicEvent] = [
                 event
                 for event in events
                 if event.event_id in input_event.consumed_event_ids

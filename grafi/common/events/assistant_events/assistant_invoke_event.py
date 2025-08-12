@@ -1,7 +1,6 @@
 from typing import Any
 from typing import Dict
 
-
 from grafi.common.events.assistant_events.assistant_event import AssistantEvent
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent

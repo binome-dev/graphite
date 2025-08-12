@@ -43,8 +43,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_react_assistant_async() -> None:
-    invoke_context = get_invoke_context()
-
     # Set up the assistant with DuckDuckGoTool
     assistant = (
         ReActAssistant.builder()

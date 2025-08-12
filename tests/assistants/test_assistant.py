@@ -1,8 +1,10 @@
 import json
 import os
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
+from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -13,7 +15,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_types import TopicType
 from grafi.workflows.workflow import Workflow
-from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 
 class TestAssistant:

@@ -101,7 +101,6 @@ def test_simple_function_call_assistant() -> None:
 
 
 def test_simple_function_call_assistant_disapproval() -> None:
-
     conversation_id = "test_conversation_id_disapprove"
     assistant_request_id = "test_assistant_request_id_disapprove"
     invoke_context = get_invoke_context(
@@ -159,7 +158,6 @@ def test_simple_function_call_assistant_disapproval() -> None:
 
 
 def test_simple_function_call_assistant_suggestion() -> None:
-
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_suggest"
     invoke_context = get_invoke_context(
@@ -247,7 +245,6 @@ def test_simple_function_call_assistant_suggestion() -> None:
 
 
 def test_simple_function_call_assistant_suggestion_mem() -> None:
-
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_mem"
     invoke_context = get_invoke_context(

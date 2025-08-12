@@ -1,5 +1,7 @@
-from typing import Any, AsyncGenerator, List
+from typing import Any
+from typing import AsyncGenerator
 from typing import Dict
+from typing import List
 from typing import Self
 from typing import TypeVar
 
@@ -54,7 +56,7 @@ class Workflow(BaseModel):
         self, input_event: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invokes the workflow with the given initial inputs."""
-        yield []  # Too keep mypy happy
+        yield None  # type: ignore
         raise NotImplementedError
 
     def initial_workflow(self, assistant_request_id: str) -> Any:

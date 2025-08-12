@@ -2,7 +2,8 @@
 
 import functools
 import json
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator, List
+from typing import Callable
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from openinference.semconv.trace import SpanAttributes
@@ -26,7 +27,6 @@ from grafi.common.events.workflow_events.workflow_respond_event import (
     WorkflowRespondEvent,
 )
 from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
 from grafi.workflows.workflow import T_W
 
 
@@ -67,7 +67,7 @@ def record_workflow_a_invoke(
         )
 
         # Invoke the original function
-        result: Messages = []
+        result: List[ConsumeFromTopicEvent] = []
         try:
             with container.tracer.start_as_current_span(
                 f"{workflow_name}.invoke"

@@ -84,7 +84,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_kyc_assistant() -> None:
-
     assistant = (
         KycAssistant.builder()
         .name("SimpleHITLAssistant")

@@ -27,7 +27,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_mimo_llm_assistant() -> None:
-    invoke_context = get_invoke_context()
     assistant = (
         MIMOLLMAssistant.builder()
         .name("MIMOLLMAssistant")

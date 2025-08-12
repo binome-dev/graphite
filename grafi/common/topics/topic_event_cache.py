@@ -16,7 +16,7 @@ class TopicEventCache:
     A subscriber consists in any object who can consume messages.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.id: str = default_id
         self._records: List[TopicEvent] = (
             []

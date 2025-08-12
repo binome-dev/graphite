@@ -89,7 +89,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
                 # Add documents with embeddings to the collection
                 collection.add(
                     documents=documents,
-                    metadatas=metadatas,
+                    metadatas=metadatas,  # type: ignore
                     ids=ids,
                     embeddings=embeddings,
                 )

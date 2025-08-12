@@ -1,4 +1,5 @@
-from typing import Any, AsyncGenerator
+from typing import Any
+from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -81,7 +82,7 @@ class NodeBase(BaseModel):
         This method should be implemented by all subclasses to define
         the specific behavior of each node.
         """
-        yield None
+        yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement this method.")
 
     def to_dict(self) -> dict[str, Any]:

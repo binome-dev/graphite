@@ -2,7 +2,8 @@
 
 import functools
 import json
-from typing import Callable, List
+from typing import Callable
+from typing import List
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from openinference.semconv.trace import SpanAttributes
@@ -25,7 +26,6 @@ from grafi.common.events.workflow_events.workflow_invoke_event import (
 from grafi.common.events.workflow_events.workflow_respond_event import (
     WorkflowRespondEvent,
 )
-from grafi.common.models.message import Messages
 from grafi.workflows.workflow import T_W
 
 
@@ -78,7 +78,7 @@ def record_workflow_invoke(
                 )
 
                 # Invoke the original function
-                result: Messages = func(self, input_event)
+                result: List[ConsumeFromTopicEvent] = func(self, input_event)
 
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
                 span.set_attribute("output", output_data_dict)

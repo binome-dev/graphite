@@ -1,6 +1,6 @@
-from typing import Any, List
+from typing import Any
 from typing import Dict
-
+from typing import List
 
 from grafi.common.events.assistant_events.assistant_event import AssistantEvent
 from grafi.common.events.event import EventType

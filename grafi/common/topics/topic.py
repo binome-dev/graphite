@@ -1,8 +1,8 @@
-from typing import TypeVar
 from typing import Any
 from typing import Callable
 from typing import Optional
 from typing import Self
+from typing import TypeVar
 
 from loguru import logger
 from pydantic import Field

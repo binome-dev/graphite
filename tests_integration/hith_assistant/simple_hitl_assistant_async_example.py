@@ -1,8 +1,8 @@
 import asyncio
 import json
 import os
-from typing import List
 import uuid
+from typing import List
 
 from loguru import logger
 
@@ -58,7 +58,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_simple_hitl_assistant() -> None:
-
     assistant = (
         SimpleHITLAssistant.builder()
         .name("SimpleHITLAssistant")

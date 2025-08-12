@@ -62,7 +62,7 @@ class HumanApprovalAssistant(Assistant):
         )
         in_workflow_input_disapproval_topic = InWorkflowInputTopic(
             name="human_disapproval_topic",
-            condition=lambda msgs: msgs[-1].content.startswith("NO"),
+            condition=lambda msgs: msgs[-1].content.startswith("NO"),  # type: ignore
         )
         in_workflow_output_topic = InWorkflowOutputTopic(
             name="human_tool_call_request_topic",

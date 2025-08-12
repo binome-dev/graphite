@@ -1,9 +1,11 @@
-from typing import Any, List
+from typing import Any
+from typing import List
 from typing import Self
 
 from pydantic import Field
 
-from grafi.common.topics.topic import Topic, TopicBuilder
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic import TopicBuilder
 from grafi.common.topics.topic_types import TopicType
 
 

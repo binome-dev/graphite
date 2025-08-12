@@ -124,7 +124,7 @@ class ReActAgent(Assistant):
 
     def get_input(
         self, question: str, invoke_context: Optional[InvokeContext] = None
-    ) -> tuple[list[Message], InvokeContext]:
+    ) -> PublishToTopicEvent:
         if invoke_context is None:
             logger.debug(
                 "Creating new InvokeContext with default conversation id for ReActAgent"
@@ -145,12 +145,7 @@ class ReActAgent(Assistant):
 
         return PublishToTopicEvent(
             invoke_context=invoke_context,
-            data=[
-                Message(
-                    role="user",
-                    content=question,
-                )
-            ],
+            data=input_data,
         )
 
     def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
@@ -161,7 +156,6 @@ class ReActAgent(Assistant):
     async def a_run(
         self, question: str, invoke_context: Optional[InvokeContext] = None
     ) -> AsyncGenerator[Message, None]:
-
         async for output in super().a_invoke(self.get_input(question, invoke_context)):
             for message in output.data:
                 yield message

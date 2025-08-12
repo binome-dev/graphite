@@ -1,6 +1,8 @@
 import functools
 import json
-from typing import AsyncGenerator, Callable, List
+from typing import AsyncGenerator
+from typing import Callable
+from typing import List
 
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python

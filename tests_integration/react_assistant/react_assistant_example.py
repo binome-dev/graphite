@@ -43,7 +43,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_react_assistant() -> None:
-
     # Set up the assistant with DuckDuckGoTool
     assistant = (
         ReActAssistant.builder()
@@ -87,12 +86,12 @@ def test_react_assistant() -> None:
         len(event_store.get_events()),
     )
 
-    import json
+    # import json
 
-    events_data = [event.to_dict() for event in event_store.get_events()]
-    with open("events.json", "w") as f:
-        json.dump(events_data, f, indent=4)
-    print(f"Saved  events to events.json")
+    # events_data = [event.to_dict() for event in event_store.get_events()]
+    # with open("events.json", "w") as f:
+    #     json.dump(events_data, f, indent=4)
+    # print(f"Saved  events to events.json")
 
 
 test_react_assistant()

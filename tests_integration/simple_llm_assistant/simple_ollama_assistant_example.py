@@ -23,7 +23,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_simple_llm_assistant() -> None:
-    invoke_context = get_invoke_context()
     assistant = (
         SimpleOllamaAssistant.builder()
         .name("SimpleOllamaAssistant")

@@ -72,8 +72,6 @@ def human_request_process_function(input_data: Messages) -> str:
 
 
 async def test_simple_multi_llm_assistant_async() -> None:
-    invoke_context = get_invoke_context()
-
     assistant = SimpleMultiLLMAssistant(
         name="SimpleMultiLLMAssistant",
         api_key=os.getenv("OPENROUTER_API_KEY", ""),

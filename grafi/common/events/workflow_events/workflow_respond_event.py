@@ -1,8 +1,8 @@
 """Module for handling workflow response events in the workflow system."""
 
-from typing import Any, List
+from typing import Any
 from typing import Dict
-
+from typing import List
 
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.consume_from_topic_event import (
