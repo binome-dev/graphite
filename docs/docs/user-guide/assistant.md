@@ -25,11 +25,11 @@ class MyAssistant(AssistantBase):
     def _construct_workflow(self):
         # Implementation required
         pass
-    
+
     def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         # Implementation required
         pass
-    
+
     async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         # Implementation required
         pass

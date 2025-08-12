@@ -85,9 +85,9 @@ class MyAssistant(Assistant):
         # Delegate to workflow
         events = self.workflow.invoke(input_event)
         return events
-    
+
     async def a_invoke(
-        self, 
+        self,
         input_event: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Asynchronous streaming of events."""
@@ -113,7 +113,7 @@ class ProcessorNode(Node):
         """Process consumed events and publish result."""
         # Execute command on input data
         response = self.command.invoke(invoke_context, node_input)
-        
+
         # Wrap response in PublishToTopicEvent
         return PublishToTopicEvent(
             publisher_name=self.name,
@@ -136,13 +136,13 @@ class MyWorkflow(Workflow):
         """Execute workflow synchronously."""
         # Initialize workflow with input event
         self.initial_workflow(input_event)
-        
+
         # Process nodes until completion
         while not self._invoke_queue.empty():
             node = self._invoke_queue.get()
             output = node.invoke(...)
             # Publish output to topics
-            
+
         # Return consumed events from output topics
         return self._get_output_events()
 ```

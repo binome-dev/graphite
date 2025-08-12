@@ -269,7 +269,7 @@ Topic events handle message passing and communication between components. These 
 
 Basic event for topic-related activities.
 
-#### TopicEvent Base Fields (Extended from Event) 
+#### TopicEvent Base Fields (Extended from Event)
 
 | Field        | Type           | Description                                        |
 |--------------|----------------|----------------------------------------------------|
