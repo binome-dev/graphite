@@ -42,7 +42,7 @@ def get_invoke_context(
     )
 
 
-def test_simple_function_call_assistant() -> None:
+def test_function_call_assistant() -> None:
     conversation_id = "test_conversation_id_approve"
     assistant_request_id = "test_assistant_request_id_approve"
 
@@ -100,7 +100,7 @@ def test_simple_function_call_assistant() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_simple_function_call_assistant_disapproval() -> None:
+def test_function_call_assistant_disapproval() -> None:
     conversation_id = "test_conversation_id_disapprove"
     assistant_request_id = "test_assistant_request_id_disapprove"
     invoke_context = get_invoke_context(
@@ -157,7 +157,7 @@ def test_simple_function_call_assistant_disapproval() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_simple_function_call_assistant_suggestion() -> None:
+def test_function_call_assistant_suggestion() -> None:
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_suggest"
     invoke_context = get_invoke_context(
@@ -244,7 +244,7 @@ def test_simple_function_call_assistant_suggestion() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_simple_function_call_assistant_suggestion_mem() -> None:
+def test_function_call_assistant_suggestion_mem() -> None:
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_mem"
     invoke_context = get_invoke_context(
@@ -284,7 +284,7 @@ def test_simple_function_call_assistant_suggestion_mem() -> None:
     assert parsed_args["db_name"] == "staging.product_backup"
 
 
-test_simple_function_call_assistant()
-test_simple_function_call_assistant_disapproval()
-# test_simple_function_call_assistant_suggestion()
-# test_simple_function_call_assistant_suggestion_mem()
+test_function_call_assistant()
+test_function_call_assistant_disapproval()
+# test_function_call_assistant_suggestion()
+# test_function_call_assistant_suggestion_mem()

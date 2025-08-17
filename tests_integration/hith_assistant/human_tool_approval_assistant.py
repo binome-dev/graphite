@@ -120,7 +120,7 @@ class HumanApprovalAssistant(Assistant):
         # Create a workflow and add the nodes
         self.workflow = (
             EventDrivenWorkflow.builder()
-            .name("simple_function_call_workflow")
+            .name("HumanApprovalWorkflow")
             .node(llm_input_node)
             .node(function_call_node)
             .build()
@@ -143,9 +143,9 @@ class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs[
-            "function_call_llm_system_message"
-        ] = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:
