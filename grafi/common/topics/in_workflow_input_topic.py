@@ -1,63 +1,29 @@
-from typing import Optional
+from pydantic import Field
 
-from loguru import logger
-
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.message import Messages
 from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_base import IN_WORKFLOW_INPUT_TOPIC_TYPE
+from grafi.common.topics.topic_types import TopicType
 
 
 class InWorkflowInputTopic(Topic):
     """
-    Represents an input topic for in-workflow processing.
+    Input topic for receiving messages DURING an active workflow.
+
+    Key differences from InputTopic (agent input):
+    - InputTopic: Starts a NEW workflow (e.g., initial user query)
+    - InWorkflowInputTopic: Continues EXISTING workflow (e.g., human approval, form response)
+
+    Use this when:
+    - Waiting for human responses mid-workflow
+    - Receiving async callbacks from external systems
+    - Implementing multi-step interactions
+
+    Example:
+        # Receive human approval during workflow execution
+        approval_topic = InWorkflowInputTopic(name="human_approval")
 
     Attributes:
         type (str): A constant indicating the type of the topic, set to
             `IN_WORKFLOW_INPUT_TOPIC_TYPE`.
     """
 
-    type: str = IN_WORKFLOW_INPUT_TOPIC_TYPE
-
-    def publish_input_data(
-        self,
-        upstream_event: PublishToTopicEvent | OutputTopicEvent,
-        data: Messages,
-    ) -> Optional[PublishToTopicEvent]:
-        if self.condition(data):
-            event = PublishToTopicEvent(
-                invoke_context=upstream_event.invoke_context,
-                topic_name=self.name,
-                publisher_name=upstream_event.publisher_name,
-                publisher_type=upstream_event.publisher_type,
-                data=data,
-                consumed_event_ids=upstream_event.consumed_event_ids,
-                offset=-1,
-            )
-
-            return self.add_event(event)
-        else:
-            logger.info(f"[{self.name}] Message NOT published (condition not met)")
-            return None
-
-    async def a_publish_input_data(
-        self,
-        upstream_event: PublishToTopicEvent | OutputTopicEvent,
-        data: Messages,
-    ) -> Optional[PublishToTopicEvent]:
-        if self.condition(data):
-            event = PublishToTopicEvent(
-                invoke_context=upstream_event.invoke_context,
-                topic_name=self.name,
-                publisher_name=upstream_event.publisher_name,
-                publisher_type=upstream_event.publisher_type,
-                data=data,
-                consumed_event_ids=upstream_event.consumed_event_ids,
-                offset=-1,
-            )
-
-            return await self.a_add_event(event)
-        else:
-            logger.info(f"[{self.name}] Message NOT published (condition not met)")
-            return None
+    type: TopicType = Field(default=TopicType.IN_WORKFLOW_INPUT_TOPIC_TYPE)

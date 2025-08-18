@@ -8,25 +8,17 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.input_topic import InputTopic
 from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_base import AGENT_INPUT_TOPIC_TYPE
-from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import TopicType
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
 from grafi.tools.tool import Tool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
-
-
-class InputTopic(Topic):
-    """Input topic for testing."""
-
-    type: str = AGENT_INPUT_TOPIC_TYPE
 
 
 class MockTool(Tool):
@@ -75,8 +67,8 @@ class TestEventDrivenWorkflowInit:
     def test_initialization_with_nodes_and_topics(self):
         """Test initialization with nodes that have topic subscriptions."""
         # Create mock topics
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         # Create mock node
         mock_tool = MockTool()
@@ -96,10 +88,10 @@ class TestEventDrivenWorkflowInit:
 
     def test_initialization_missing_input_topic_raises_error(self):
         """Test that missing agent input topic raises ValueError."""
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        output_topic = OutputTopic(name="test_output")
         mock_tool = MockTool()
         missing_topic = InputTopic(
-            name="missing_input", type="unknown_type"
+            name="missing_input", type=TopicType.NONE_TOPIC_TYPE
         )  # Wrong type
         node = Node(
             name="test_node",
@@ -115,7 +107,7 @@ class TestEventDrivenWorkflowInit:
 
     def test_initialization_missing_output_topic_raises_error(self):
         """Test that missing agent output topic raises ValueError."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
         mock_tool = MockTool()
         node = Node(
             name="test_node",
@@ -135,8 +127,8 @@ class TestEventDrivenWorkflowTopicManagement:
     @pytest.fixture
     def workflow_with_topics(self):
         """Create a workflow with input and output topics."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -158,7 +150,7 @@ class TestEventDrivenWorkflowTopicManagement:
         initial_topic_count = len(workflow_with_topics._topics)
 
         # Try to add the same topic again
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
         workflow_with_topics._add_topic(input_topic)
 
         assert len(workflow_with_topics._topics) == initial_topic_count
@@ -168,8 +160,8 @@ class TestEventDrivenWorkflowEventHandling:
     @pytest.fixture
     def workflow_with_nodes(self):
         """Create a workflow with nodes for testing event handling."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -206,50 +198,13 @@ class TestEventDrivenWorkflowEventHandling:
         # The behavior will depend on whether the node can actually invoke
         # This tests the integration without mocking internal methods
 
-    def test_on_event_ignores_non_publish_events(self, workflow_with_nodes):
-        """Test that on_event ignores non-PublishToTopicEvent events."""
-        # Create a mock output event
-        event = OutputTopicEvent(
-            topic_name="test_output",
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            invoke_context=InvokeContext(
-                conversation_id="test", invoke_id="test", assistant_request_id="test"
-            ),
-            data=[Message(role="assistant", content="test")],
-            consumed_event_ids=[],
-            offset=0,
-        )
-
-        workflow_with_nodes.on_event(event)
-
-        assert len(workflow_with_nodes._invoke_queue) == 0
-
-    def test_on_event_ignores_unknown_topics(self, workflow_with_nodes):
-        """Test that on_event ignores events for unknown topics."""
-        event = PublishToTopicEvent(
-            topic_name="unknown_topic",
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            invoke_context=InvokeContext(
-                conversation_id="test", invoke_id="test", assistant_request_id="test"
-            ),
-            data=[Message(role="user", content="test")],
-            consumed_events=[],
-            offset=0,
-        )
-
-        workflow_with_nodes.on_event(event)
-
-        assert len(workflow_with_nodes._invoke_queue) == 0
-
 
 class TestEventDrivenWorkflowOutputEvents:
     @pytest.fixture
     def workflow_with_output_topics(self):
         """Create a workflow with various output topics."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -262,7 +217,7 @@ class TestEventDrivenWorkflowOutputEvents:
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
 
         # Add some mock events to output topics
-        mock_event = OutputTopicEvent(
+        mock_event = PublishToTopicEvent(
             topic_name="test_output",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -296,8 +251,8 @@ class TestEventDrivenWorkflowInvoke:
     @pytest.fixture
     def simple_workflow(self):
         """Create a simple workflow for invoke testing."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -324,7 +279,9 @@ class TestEventDrivenWorkflowInvoke:
         )
         input_messages = [Message(role="user", content="test input")]
 
-        result = simple_workflow.invoke(invoke_context, input_messages)
+        result = simple_workflow.invoke(
+            PublishToTopicEvent(invoke_context=invoke_context, data=input_messages)
+        )
 
         assert isinstance(result, list)
         # The workflow executed successfully
@@ -347,8 +304,8 @@ class TestEventDrivenWorkflowAsyncInvoke:
     @pytest.fixture
     def async_workflow(self):
         """Create a workflow for async testing."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -392,7 +349,9 @@ class TestEventDrivenWorkflowAsyncInvoke:
                 results = []
                 async with asyncio.timeout(0.5):
                     async for msg in async_workflow.a_invoke(
-                        invoke_context, input_messages
+                        PublishToTopicEvent(
+                            invoke_context=invoke_context, data=input_messages
+                        )
                     ):
                         results.append(msg)
             except asyncio.TimeoutError:
@@ -417,8 +376,8 @@ class TestEventDrivenWorkflowInitialWorkflow:
     @pytest.fixture
     def workflow_for_initial_test(self):
         """Create workflow for initial workflow testing."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -439,8 +398,8 @@ class TestEventDrivenWorkflowInitialWorkflow:
 class TestEventDrivenWorkflowToDict:
     def test_to_dict_includes_topics_and_topic_nodes(self):
         """Test that to_dict includes topics and topic_nodes."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -467,8 +426,8 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
     @pytest.fixture
     def workflow_with_tracker(self):
         """Create a workflow to test async node tracker integration."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(
@@ -499,7 +458,9 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
         with patch("grafi.common.containers.container.container"):
-            await workflow_with_tracker.a_init_workflow(invoke_context, [])
+            await workflow_with_tracker.a_init_workflow(
+                PublishToTopicEvent(invoke_context=invoke_context, data=[])
+            )
 
         # Tracker should be reset
         assert workflow_with_tracker._tracker.is_idle()
@@ -509,8 +470,8 @@ class TestEventDrivenWorkflowStopFlag:
     @pytest.fixture
     def stoppable_workflow(self):
         """Create a workflow to test stop functionality."""
-        input_topic = InputTopic(name="test_input", type=AGENT_INPUT_TOPIC_TYPE)
-        output_topic = OutputTopic(name="test_output", type=AGENT_OUTPUT_TOPIC_TYPE)
+        input_topic = InputTopic(name="test_input")
+        output_topic = OutputTopic(name="test_output")
 
         mock_tool = MockTool()
         node = Node(

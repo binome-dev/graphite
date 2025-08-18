@@ -5,7 +5,6 @@ from typing import Optional
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
@@ -67,7 +66,7 @@ class EventStoreInMemory(EventStore):
             event
             for event in self.events
             if (
-                isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
+                isinstance(event, PublishToTopicEvent)
                 and hasattr(event, "topic_name")
                 and event.topic_name == topic_name
                 and event.offset in offset_set

@@ -2,12 +2,12 @@ import asyncio
 
 import pytest
 
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import AGENT_OUTPUT_TOPIC_TYPE
+from grafi.common.topics.topic_base import TopicType
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 
@@ -17,7 +17,7 @@ class MockOutputTopic(OutputTopic):
 
     def __init__(self, name: str):
         super().__init__(name=name)
-        self.type = AGENT_OUTPUT_TOPIC_TYPE
+        self.type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
         self._events = []
         self._consumed_offset = -1
 
@@ -100,7 +100,7 @@ class TestAsyncOutputQueue:
         await tracker.enter("test_node")
 
         # Add test event
-        test_event = OutputTopicEvent(
+        test_event = PublishToTopicEvent(
             topic_name="output1",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -133,7 +133,7 @@ class TestAsyncOutputQueue:
     async def test_async_iteration(self, output_queue, mock_topics, tracker):
         """Test async iteration over output events."""
         # Add test event
-        test_event = OutputTopicEvent(
+        test_event = PublishToTopicEvent(
             topic_name="output1",
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -233,7 +233,7 @@ class TestAsyncOutputQueue:
 
         # Add events to different topics
         for i, topic in enumerate(topics):
-            event = OutputTopicEvent(
+            event = PublishToTopicEvent(
                 topic_name=f"output{i}",
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -267,4 +267,4 @@ class TestAsyncOutputQueue:
 
         # Should have collected all events
         assert len(collected) == 3
-        assert all(isinstance(e, OutputTopicEvent) for e in collected)
+        assert all(isinstance(e, PublishToTopicEvent) for e in collected)

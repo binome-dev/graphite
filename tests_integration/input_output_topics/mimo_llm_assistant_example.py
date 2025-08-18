@@ -4,6 +4,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
 from grafi.common.models.invoke_context import InvokeContext
@@ -26,7 +27,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_mimo_llm_assistant() -> None:
-    invoke_context = get_invoke_context()
     assistant = (
         MIMOLLMAssistant.builder()
         .name("MIMOLLMAssistant")
@@ -51,7 +51,12 @@ def test_mimo_llm_assistant() -> None:
     # Test greeting input
     print("Testing greeting input...")
     greeting_input = [Message(content="Hello there! How are you?", role="user")]
-    greeting_output = assistant.invoke(invoke_context, greeting_input)
+    greeting_output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=greeting_input,
+        )
+    )
     print(f"Greeting Output: {greeting_output}")
     assert len(greeting_output) == 2
 
@@ -65,7 +70,12 @@ def test_mimo_llm_assistant() -> None:
             role="user",
         )
     ]
-    question_output = assistant.invoke(get_invoke_context(), question_input)
+    question_output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=question_input,
+        )
+    )
     print(f"Question Output: {question_output}")
     assert len(question_output) == 2
 
@@ -79,7 +89,12 @@ def test_mimo_llm_assistant() -> None:
             role="user",
         )
     ]
-    mixed_output = assistant.invoke(get_invoke_context(), mixed_input)
+    mixed_output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=mixed_input,
+        )
+    )
     print(f"Mixed Output: {mixed_output}")
     assert len(mixed_output) == 3
 

@@ -2,8 +2,10 @@ import pytest
 
 from grafi.common.events.event import EventType
 from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.topic_types import TopicType
 from tests.events.node_events.test_node_event import get_consumed_events
 
 
@@ -40,26 +42,37 @@ def node_respond_event(invoke_context) -> NodeRespondEvent:
                 )
             ]
         ),
-        output_data=[
-            Message(
-                message_id="ea72df51439b42e4a43b217c9bca63f5",
-                timestamp=1737138526189505000,
-                role="user",
-                content="Hello, my name is Grafi, how are you doing?",
-                name=None,
-                functions=None,
-                function_call=None,
-            ),
-            Message(
-                message_id="ea72df51439b42e4a43b217c9bca63f6",
-                timestamp=1737138526189605000,
-                role="assistant",
-                content="Hello, Grafi, I am doing well, thank you.",
-                name=None,
-                functions=None,
-                function_call=None,
-            ),
-        ],
+        output_data=PublishToTopicEvent(
+            event_id="test_id",
+            timestamp="2009-02-13T23:31:30+00:00",
+            invoke_context=invoke_context,
+            topic_name="test_output_topic",
+            topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            publisher_name="test_node",
+            publisher_type="test_type",
+            consumed_event_ids=["test_id"],
+            offset=3,
+            data=[
+                Message(
+                    message_id="ea72df51439b42e4a43b217c9bca63f5",
+                    timestamp=1737138526189505000,
+                    role="user",
+                    content="Hello, my name is Grafi, how are you doing?",
+                    name=None,
+                    functions=None,
+                    function_call=None,
+                ),
+                Message(
+                    message_id="ea72df51439b42e4a43b217c9bca63f6",
+                    timestamp=1737138526189605000,
+                    role="assistant",
+                    content="Hello, Grafi, I am doing well, thank you.",
+                    name=None,
+                    functions=None,
+                    function_call=None,
+                ),
+            ],
+        ),
         timestamp="2009-02-13T23:31:30+00:00",
     )
 
@@ -67,10 +80,10 @@ def node_respond_event(invoke_context) -> NodeRespondEvent:
 @pytest.fixture
 def node_respond_event_dict():
     return {
-        "event_version": "1.0",
         "event_id": "test_id",
-        "event_type": "NodeInvoke",
+        "event_version": "1.0",
         "assistant_request_id": "assistant_request_id",
+        "event_type": "NodeInvoke",
         "timestamp": "2009-02-13T23:31:30+00:00",
         "event_context": {
             "node_id": "test_node_id",
@@ -82,8 +95,8 @@ def node_respond_event_dict():
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",
                 "assistant_request_id": "assistant_request_id",
-                "kwargs": {},
                 "user_id": "",
+                "kwargs": {},
             },
         },
         "data": {
@@ -93,13 +106,14 @@ def node_respond_event_dict():
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
                         "topic_name": "test_topic",
+                        "topic_type": "NoneTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",
                             "invoke_id": "invoke_id",
                             "assistant_request_id": "assistant_request_id",
-                            "kwargs": {},
                             "user_id": "",
+                            "kwargs": {},
                         },
                     },
                     "event_id": "test_id",
@@ -110,7 +124,29 @@ def node_respond_event_dict():
                     "data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null, "is_streaming": false}]',
                 }
             ],
-            "output_data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null, "is_streaming": false}, {"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f6", "timestamp": 1737138526189605000, "content": "Hello, Grafi, I am doing well, thank you.", "refusal": null, "annotations": null, "audio": null, "role": "assistant", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null, "is_streaming": false}]',
+            "output_data": {
+                "event_context": {
+                    "consumed_event_ids": ["test_id"],
+                    "publisher_name": "test_node",
+                    "publisher_type": "test_type",
+                    "topic_name": "test_output_topic",
+                    "topic_type": "AgentOutputTopic",
+                    "offset": 3,
+                    "invoke_context": {
+                        "conversation_id": "conversation_id",
+                        "invoke_id": "invoke_id",
+                        "assistant_request_id": "assistant_request_id",
+                        "user_id": "",
+                        "kwargs": {},
+                    },
+                },
+                "event_id": "test_id",
+                "event_version": "1.0",
+                "assistant_request_id": "assistant_request_id",
+                "event_type": "PublishToTopic",
+                "timestamp": "2009-02-13T23:31:30+00:00",
+                "data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null, "is_streaming": false}, {"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f6", "timestamp": 1737138526189605000, "content": "Hello, Grafi, I am doing well, thank you.", "refusal": null, "annotations": null, "audio": null, "role": "assistant", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null, "is_streaming": false}]',
+            },
         },
     }
 

@@ -12,6 +12,7 @@ from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant import (
@@ -88,7 +89,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
                 # Add documents with embeddings to the collection
                 collection.add(
                     documents=documents,
-                    metadatas=metadatas,
+                    metadatas=metadatas,  # type: ignore
                     ids=ids,
                     embeddings=embeddings,
                 )
@@ -107,15 +108,17 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
     )
 
     async for output in simple_rag_assistant.a_invoke(
-        invoke_context,
-        [
-            Message(
-                role="user",
-                content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
-            )
-        ],
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=[
+                Message(
+                    role="user",
+                    content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
+                )
+            ],
+        )
     ):
-        assert "Amazon EC2" in str(output[0].content)
+        assert "Amazon EC2" in str(output.data[0].content)
 
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 12

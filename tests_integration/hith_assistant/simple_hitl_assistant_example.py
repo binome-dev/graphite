@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -72,7 +73,12 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), input_data)
+    input_event = PublishToTopicEvent(
+        invoke_context=get_invoke_context(),
+        data=input_data,
+    )
+
+    output = assistant.invoke(input_event)
 
     print(output)
 
@@ -87,7 +93,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), human_input)
+    input_event = PublishToTopicEvent(
+        invoke_context=get_invoke_context(),
+        data=human_input,
+        consumed_event_ids=[event.event_id for event in output],
+    )
+
+    output = assistant.invoke(input_event)
 
     events = event_store.get_events()
     print(len(events))
@@ -100,7 +112,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), human_input)
+    input_event = PublishToTopicEvent(
+        invoke_context=get_invoke_context(),
+        data=human_input,
+        consumed_event_ids=[event.event_id for event in output],
+    )
+
+    output = assistant.invoke(input_event)
 
     print(output)
 

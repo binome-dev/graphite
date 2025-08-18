@@ -1,19 +1,49 @@
 from typing import Any
+from typing import List
 from typing import Self
 
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.output_topic import OutputTopicBuilder
-from grafi.common.topics.topic_base import IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+from pydantic import Field
+
+from grafi.common.topics.topic import Topic
+from grafi.common.topics.topic import TopicBuilder
+from grafi.common.topics.topic_types import TopicType
 
 
 # OutputTopic handles sync and async publishing of messages to the agent output topic.
-class InWorkflowOutputTopic(OutputTopic):
+class InWorkflowOutputTopic(Topic):
     """
-    Represents an output topic for in-workflow processing.
+    Output topic for sending messages during an active workflow that expect responses.
+
+    In Graphite's workflow graph, this topic can pair with one or more InWorkflowInputTopics
+    to route responses correctly. When an event is sent through this output topic, any
+    response event knows which InWorkflowInputTopic(s) it should be routed to.
+
+    Attributes:
+        paired_in_workflow_input_topic_names: List of InWorkflowInputTopic names that
+            will receive responses. The system uses this to route response events to
+            the correct input topics in the workflow graph.
+
+    Use cases:
+        - Human approval workflows (route to approve/reject input topics)
+        - Multi-choice interactions (route to different paths based on response)
+        - External system callbacks (route responses to appropriate handlers)
+
+    Example:
+        # Single pairing for simple approval
+        output = InWorkflowOutputTopic(
+            name="approval_request",
+            paired_in_workflow_input_topic_names=["human_response"]
+        )
+
+        # Multiple pairings for different response paths
+        output = InWorkflowOutputTopic(
+            name="review_request",
+            paired_in_workflow_input_topic_names=["approve", "reject", "escalate"]
+        )
     """
 
-    type: str = IN_WORKFLOW_OUTPUT_TOPIC_TYPE
-    paired_in_workflow_input_topic_name: str
+    type: TopicType = Field(default=TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE)
+    paired_in_workflow_input_topic_names: List[str] = Field(default_factory=list)
 
     @classmethod
     def builder(cls) -> "InWorkflowOutputTopicBuilder":
@@ -25,11 +55,11 @@ class InWorkflowOutputTopic(OutputTopic):
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
-            "paired_in_workflow_input_topic_name": self.paired_in_workflow_input_topic_name,
+            "paired_in_workflow_input_topic_names": self.paired_in_workflow_input_topic_names,
         }
 
 
-class InWorkflowOutputTopicBuilder(OutputTopicBuilder[InWorkflowOutputTopic]):
+class InWorkflowOutputTopicBuilder(TopicBuilder[InWorkflowOutputTopic]):
     """
     Builder for creating instances of Topic.
     """
@@ -37,7 +67,9 @@ class InWorkflowOutputTopicBuilder(OutputTopicBuilder[InWorkflowOutputTopic]):
     def paired_in_workflow_input_topic_name(
         self, paired_in_workflow_input_topic_name: str
     ) -> Self:
-        self.kwargs[
-            "paired_in_workflow_input_topic_name"
-        ] = paired_in_workflow_input_topic_name
+        if "paired_in_workflow_input_topic_names" not in self.kwargs:
+            self.kwargs["paired_in_workflow_input_topic_names"] = []
+        self.kwargs["paired_in_workflow_input_topic_names"].append(
+            paired_in_workflow_input_topic_name
+        )
         return self

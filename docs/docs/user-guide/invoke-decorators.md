@@ -86,11 +86,13 @@ Records synchronous assistant invocations with event logging and tracing.
 
 ```python
 from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 
 @record_assistant_invoke
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
+def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
     # Assistant implementation
-    return processed_messages
+    return self.workflow.invoke(input_event)
 ```
 
 #### @record_assistant_a_invoke
@@ -110,11 +112,15 @@ Records asynchronous assistant invocations that return async generators.
 
 ```python
 from grafi.common.decorators.record_assistant_a_invoke import record_assistant_a_invoke
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from typing import AsyncGenerator
 
 @record_assistant_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async assistant implementation
-    yield messages_batch
+    async for output in self.workflow.a_invoke(input_event):
+        yield output
 ```
 
 ### Node Decorators
@@ -136,12 +142,23 @@ Records synchronous node invocations in event-driven workflows.
 
 ```python
 from grafi.common.decorators.record_node_invoke import record_node_invoke
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from typing import List
 
 @record_node_invoke
 def invoke(self, invoke_context: InvokeContext,
-           input_data: List[ConsumeFromTopicEvent]) -> Messages:
-    # Node processing logic
-    return processed_messages
+           node_input: List[ConsumeFromTopicEvent]) -> PublishToTopicEvent:
+    # Node processing logic - execute command and return PublishToTopicEvent
+    response = self.command.invoke(invoke_context, node_input)
+    return PublishToTopicEvent(
+        publisher_name=self.name,
+        publisher_type=self.type,
+        invoke_context=invoke_context,
+        consumed_event_ids=[event.event_id for event in node_input],
+        data=response
+    )
 ```
 
 #### @record_node_a_invoke
@@ -161,12 +178,23 @@ Records asynchronous node invocations that return async generators.
 
 ```python
 from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from typing import List, AsyncGenerator
 
 @record_node_a_invoke
 async def a_invoke(self, invoke_context: InvokeContext,
-                   input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
-    # Async node processing
-    yield processed_messages
+                   node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[PublishToTopicEvent, None]:
+    # Async node processing - execute command and yield PublishToTopicEvents
+    async for messages in self.command.a_invoke(invoke_context, node_input):
+        yield PublishToTopicEvent(
+            publisher_name=self.name,
+            publisher_type=self.type,
+            invoke_context=invoke_context,
+            consumed_event_ids=[event.event_id for event in node_input],
+            data=messages
+        )
 ```
 
 ### Tool Decorators
@@ -238,11 +266,15 @@ Records synchronous workflow invocations with comprehensive event logging.
 
 ```python
 from grafi.common.decorators.record_workflow_invoke import record_workflow_invoke
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from typing import List
 
 @record_workflow_invoke
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
+def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
     # Workflow orchestration logic
-    return workflow_results
+    # Initialize workflow, execute nodes, return consumed events
+    return output_events
 ```
 
 #### @record_workflow_a_invoke
@@ -262,11 +294,16 @@ Records asynchronous workflow invocations that return async generators.
 
 ```python
 from grafi.common.decorators.record_workflow_a_invoke import record_workflow_a_invoke
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from typing import AsyncGenerator
 
 @record_workflow_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async workflow orchestration
-    yield workflow_results
+    # Initialize workflow, execute nodes asynchronously, yield consumed events
+    async for output_event in self._execute_workflow(input_event):
+        yield output_event
 ```
 
 ## Common Features

@@ -3,6 +3,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -52,10 +53,15 @@ def test_simple_function_call_assistant() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, what is the aws EC2?")]
 
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    )
     print(output)
     assert output is not None
-    assert "EC2" in str(output[0].content)
+    assert "EC2" in str(output[0].data[0].content)
     print(len(event_store.get_events()))
     assert len(event_store.get_events()) == 12
 

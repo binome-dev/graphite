@@ -5,6 +5,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_llm_assistant import (
@@ -48,7 +49,12 @@ async def test_simple_llm_assistant_async() -> None:
             content="Hello, my name is Grafi, how are you?",
         )
     ]
-    async for output in assistant.a_invoke(invoke_context, input_data):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    ):
         print(output)
         assert output is not None
 
@@ -61,10 +67,15 @@ async def test_simple_llm_assistant_async() -> None:
             content="I felt stressful today. Can you help me address my stress by saying my name? It is important to me.",
         )
     ]
-    async for output in assistant.a_invoke(get_invoke_context(), input_data):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    ):
         print(output)
         assert output is not None
-        assert "Grafi" in str(output[0].content)
+        assert "Grafi" in str(output.data[0].content)
 
     # Output events to JSON file
     # events = event_store.get_events()

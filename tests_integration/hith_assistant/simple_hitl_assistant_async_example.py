@@ -2,11 +2,16 @@ import asyncio
 import json
 import os
 import uuid
+from typing import List
 
 from loguru import logger
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -41,17 +46,18 @@ class HumanInfo(FunctionCallTool):
         )
 
 
+assistant_request_id = uuid.uuid4().hex
+
+
 def get_invoke_context() -> InvokeContext:
     return InvokeContext(
         conversation_id="conversation_id",
         invoke_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
+        assistant_request_id=assistant_request_id,
     )
 
 
 async def test_simple_hitl_assistant() -> None:
-    invoke_context = get_invoke_context()
-
     assistant = (
         SimpleHITLAssistant.builder()
         .name("SimpleHITLAssistant")
@@ -74,7 +80,11 @@ async def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    async for output in assistant.a_invoke(invoke_context, input_data):
+    outputs: List[ConsumeFromTopicEvent] = []
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(invoke_context=get_invoke_context(), data=input_data)
+    ):
+        outputs.append(output)
         print(output)
 
     events = event_store.get_events()
@@ -90,7 +100,16 @@ async def test_simple_hitl_assistant() -> None:
 
     logger.info(f"Human input: {human_input}")
 
-    async for output in assistant.a_invoke(invoke_context, human_input):
+    outputs_1: List[ConsumeFromTopicEvent] = []
+
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=human_input,
+            consumed_event_ids=[event.event_id for event in outputs],
+        )
+    ):
+        outputs_1.append(output)
         print(output)
 
     events = event_store.get_events()
@@ -106,7 +125,13 @@ async def test_simple_hitl_assistant() -> None:
 
     logger.info(f"Human input: {human_input}")
 
-    async for output in assistant.a_invoke(invoke_context, human_input):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=human_input,
+            consumed_event_ids=[event.event_id for event in outputs_1],
+        )
+    ):
         print(output)
 
     events = event_store.get_events()

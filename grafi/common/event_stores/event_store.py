@@ -28,7 +28,6 @@ from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.events.workflow_events.workflow_failed_event import (
@@ -111,6 +110,5 @@ class EventStore:
             EventType.TOPIC_EVENT.value: TopicEvent,
             EventType.CONSUME_FROM_TOPIC.value: ConsumeFromTopicEvent,
             EventType.PUBLISH_TO_TOPIC.value: PublishToTopicEvent,
-            EventType.OUTPUT_TOPIC.value: OutputTopicEvent,
         }
         return event_classes.get(event_type)

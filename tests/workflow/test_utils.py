@@ -6,13 +6,12 @@ import pytest
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_base import TopicBase
+from grafi.common.topics.topic_types import TopicType
 from grafi.nodes.node import Node
-from grafi.workflows.impl.utils import a_get_node_input
 from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
@@ -179,7 +178,7 @@ class TestGetAsyncOutputEvents:
 
         streaming_msg = Message(role="assistant", content="Output", is_streaming=True)
 
-        event = OutputTopicEvent(
+        event = PublishToTopicEvent(
             topic_name="output",
             publisher_name="node1",
             publisher_type="test_node",
@@ -191,7 +190,7 @@ class TestGetAsyncOutputEvents:
 
         result = get_async_output_events([event])
         assert len(result) == 1
-        assert isinstance(result[0], OutputTopicEvent)
+        assert isinstance(result[0], PublishToTopicEvent)
         assert result[0].data[0].content == "Output"
         assert result[0].data[0].is_streaming is False
 
@@ -238,7 +237,18 @@ class TestPublishEvents:
         mock_topic1.publish_data.return_value = mock_event1
         mock_topic2.publish_data.return_value = mock_event2
 
-        all_events = publish_events(node, invoke_context, result, consumed_events)
+        publish_to_event = PublishToTopicEvent(
+            invoke_context=invoke_context,
+            publisher_name=node.name,
+            publisher_type=node.type,
+            data=result,
+            consumed_event_ids=[event.event_id for event in consumed_events],
+        )
+
+        all_events = publish_events(
+            node,
+            publish_to_event,
+        )
 
         # The function returns all_events which includes both consumed and published
         assert len(all_events) == 2  # 0 consumed + 2 published
@@ -246,13 +256,7 @@ class TestPublishEvents:
         assert mock_event2 in all_events
 
         # Verify topics were called correctly
-        mock_topic1.publish_data.assert_called_once_with(
-            invoke_context=invoke_context,
-            publisher_name=node.name,
-            publisher_type=node.type,
-            data=result,
-            consumed_events=consumed_events,
-        )
+        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
 
     @pytest.mark.asyncio
     async def test_a_publish_events(self):
@@ -288,21 +292,21 @@ class TestPublishEvents:
         mock_topic1.a_publish_data.return_value = mock_event1
         mock_topic2.a_publish_data.return_value = mock_event2
 
-        published_events = await a_publish_events(
-            node, result, invoke_context, consumed_events
+        publish_to_event = PublishToTopicEvent(
+            invoke_context=invoke_context,
+            publisher_name=node.name,
+            publisher_type=node.type,
+            data=result,
+            consumed_event_ids=[event.event_id for event in consumed_events],
         )
+
+        published_events = await a_publish_events(node, publish_to_event)
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
 
         # Verify topics were called correctly
-        mock_topic1.a_publish_data.assert_called_once_with(
-            data=result,
-            invoke_context=invoke_context,
-            publisher_name=node.name,
-            publisher_type=node.type,
-            consumed_events=consumed_events,
-        )
+        mock_topic1.a_publish_data.assert_called_once_with(publish_to_event)
 
 
 class TestGetNodeInput:
@@ -329,6 +333,7 @@ class TestGetNodeInput:
         mock_event = MagicMock()
         mock_event.invoke_context = invoke_context
         mock_event.topic_name = "topic1"
+        mock_event.topic_type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
         mock_event.offset = 0
         mock_event.data = [Message(role="user", content="Test")]
 
@@ -349,62 +354,3 @@ class TestGetNodeInput:
         # Verify consume was only called on topic1
         mock_topic1.consume.assert_called_once_with(node.name)
         mock_topic2.consume.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_a_get_node_input(self):
-        # Mock node and subscribed topics
-        mock_topic1 = AsyncMock(spec=TopicBase)
-        mock_topic2 = AsyncMock(spec=TopicBase)
-
-        node = MagicMock(spec=Node)
-        node.name = "test_node"
-        node.type = "test_type"
-        node._subscribed_topics = {"topic1": mock_topic1, "topic2": mock_topic2}
-
-        invoke_context = InvokeContext(
-            conversation_id="test-conversation",
-            invoke_id="test-invoke",
-            assistant_request_id="test-request",
-        )
-
-        # Mock can_consume and a_consume methods
-        mock_topic1.can_consume.return_value = True
-        mock_topic2.can_consume.return_value = True
-
-        # Create different types of events
-        publish_event = PublishToTopicEvent(
-            topic_name="topic1",
-            publisher_name="publisher",
-            publisher_type="test",
-            invoke_context=invoke_context,
-            offset=0,
-            data=[Message(role="user", content="Published")],
-            consumed_events=[],
-        )
-
-        output_event = OutputTopicEvent(
-            topic_name="topic2",
-            publisher_name="publisher",
-            publisher_type="test",
-            invoke_context=invoke_context,
-            offset=1,
-            data=[Message(role="assistant", content="Output")],
-            consumed_events=[],
-        )
-
-        mock_topic1.a_consume.return_value = [publish_event]
-        mock_topic2.a_consume.return_value = [output_event]
-
-        consumed_events, ignored_events = await a_get_node_input(node)
-
-        assert len(consumed_events) == 1
-        assert len(ignored_events) == 1
-
-        # Verify PublishToTopicEvent was converted to ConsumeFromTopicEvent
-        assert isinstance(consumed_events[0], ConsumeFromTopicEvent)
-        assert consumed_events[0].consumer_name == node.name
-        assert consumed_events[0].data[0].content == "Published"
-
-        # Verify OutputTopicEvent was ignored
-        assert isinstance(ignored_events[0], ConsumeFromTopicEvent)
-        assert ignored_events[0].data[0].content == "Output"

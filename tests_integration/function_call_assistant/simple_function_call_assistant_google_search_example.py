@@ -2,6 +2,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
@@ -43,7 +44,12 @@ def test_simple_function_call_assistant_with_tavily() -> None:
     input_data = [Message(role="user", content="What are the current AI trends?")]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    )
     print("Assistant output:", output)
 
     # Assert that the output is valid and check event count

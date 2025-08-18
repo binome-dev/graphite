@@ -4,6 +4,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
 from grafi.common.models.invoke_context import InvokeContext
@@ -79,9 +80,14 @@ def test_simple_llm_assistant() -> None:
             role="user",
         )
     ]
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    )
 
-    print(output[0].content)
+    print(output[0].data[0].content)
     assert output is not None
     assert len(event_store.get_events()) == 12
 

@@ -10,6 +10,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.input_topic import InputTopic
@@ -123,7 +124,7 @@ class ReActAgent(Assistant):
 
     def get_input(
         self, question: str, invoke_context: Optional[InvokeContext] = None
-    ) -> tuple[list[Message], InvokeContext]:
+    ) -> PublishToTopicEvent:
         if invoke_context is None:
             logger.debug(
                 "Creating new InvokeContext with default conversation id for ReActAgent"
@@ -142,22 +143,21 @@ class ReActAgent(Assistant):
             )
         ]
 
-        return input_data, invoke_context
+        return PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
 
     def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
-        input_data, invoke_context = self.get_input(question, invoke_context)
+        output = super().invoke(self.get_input(question, invoke_context))
 
-        output = super().invoke(invoke_context, input_data)
-
-        return output[0].content
+        return output[0].data[0].content
 
     async def a_run(
         self, question: str, invoke_context: Optional[InvokeContext] = None
     ) -> AsyncGenerator[Message, None]:
-        input_data, invoke_context = self.get_input(question, invoke_context)
-
-        async for output in super().a_invoke(invoke_context, input_data):
-            for message in output:
+        async for output in super().a_invoke(self.get_input(question, invoke_context)):
+            for message in output.data:
                 yield message
 
 

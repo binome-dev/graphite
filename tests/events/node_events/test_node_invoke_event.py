@@ -73,6 +73,7 @@ def node_invoke_event_dict():
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
                         "topic_name": "test_topic",
+                        "topic_type": "NoneTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",

@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
@@ -95,7 +96,12 @@ def test_react_assistant() -> None:
     ]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=input_data,
+        )
+    )
     print("Assistant output:", output)
 
 

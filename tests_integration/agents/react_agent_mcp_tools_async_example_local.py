@@ -17,7 +17,7 @@ async def run_agent() -> None:
     }
 
     react_agent = create_react_agent(
-        function_call_tool=await MCPTool.builder().connections(server_params).a_build()
+        function_call_tool=await MCPTool.builder().connections(server_params).a_build()  # type: ignore
     )
 
     async for output in react_agent.a_run(

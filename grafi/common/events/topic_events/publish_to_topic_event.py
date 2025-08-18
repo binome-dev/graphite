@@ -10,14 +10,14 @@ from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.common.topics.topic_types import TopicType
 
 
 class PublishToTopicEvent(TopicEvent):
     consumed_event_ids: List[str] = []
-    publisher_name: str
-    publisher_type: str
+    publisher_name: str = ""
+    publisher_type: str = ""
     event_type: EventType = EventType.PUBLISH_TO_TOPIC
 
     def to_dict(self) -> Dict[str, Any]:
@@ -26,6 +26,7 @@ class PublishToTopicEvent(TopicEvent):
             "publisher_name": self.publisher_name,
             "publisher_type": self.publisher_type,
             "topic_name": self.topic_name,
+            "topic_type": self.topic_type.value,
             "offset": self.offset,
             "invoke_context": self.invoke_context.model_dump(),
         }
@@ -45,10 +46,7 @@ class PublishToTopicEvent(TopicEvent):
         data_dict = json.loads(data["data"])
         base_event = cls.event_base(data)
 
-        if isinstance(data_dict, list):
-            data_obj = TypeAdapter(Messages).validate_python(data_dict)
-        else:
-            data_obj = [Message.model_validate(data_dict)]
+        data_obj = TypeAdapter(Messages).validate_python(data_dict)
 
         base_event = cls.event_base(data)
         return cls(
@@ -59,6 +57,7 @@ class PublishToTopicEvent(TopicEvent):
             publisher_name=data[EVENT_CONTEXT]["publisher_name"],
             publisher_type=data[EVENT_CONTEXT]["publisher_type"],
             topic_name=data[EVENT_CONTEXT]["topic_name"],
+            topic_type=TopicType(data[EVENT_CONTEXT]["topic_type"]),
             offset=data[EVENT_CONTEXT]["offset"],
             invoke_context=invoke_context,
             data=data_obj,

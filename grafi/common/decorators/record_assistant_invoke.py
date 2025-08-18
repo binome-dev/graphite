@@ -1,6 +1,7 @@
 import functools
 import json
 from typing import Callable
+from typing import List
 
 from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
@@ -19,13 +20,15 @@ from grafi.common.events.assistant_events.assistant_invoke_event import (
 from grafi.common.events.assistant_events.assistant_respond_event import (
     AssistantRespondEvent,
 )
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
 def record_assistant_invoke(
-    func: Callable[[T_A, InvokeContext, Messages], Messages],
-) -> Callable[[T_A, InvokeContext, Messages], Messages]:
+    func: Callable[[T_A, PublishToTopicEvent], List[ConsumeFromTopicEvent]],
+) -> Callable[[T_A, PublishToTopicEvent], List[ConsumeFromTopicEvent]]:
     """
     Decorator to record assistant invoke events and add tracing.
 
@@ -39,14 +42,12 @@ def record_assistant_invoke(
     @functools.wraps(func)
     def wrapper(
         self: T_A,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
+        input_event: PublishToTopicEvent,
+    ) -> List[ConsumeFromTopicEvent]:
         assistant_id = self.assistant_id
         assistant_name = self.name or ""
         assistant_type = self.type or ""
         model = getattr(self, "model", "")
-        input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
         # Record the 'invoke' event
         container.event_store.record_event(
@@ -54,8 +55,8 @@ def record_assistant_invoke(
                 assistant_id=assistant_id,
                 assistant_name=assistant_name,
                 assistant_type=assistant_type,
-                invoke_context=invoke_context,
-                input_data=input_data,
+                input_event=input_event,
+                invoke_context=input_event.invoke_context,
             )
         )
 
@@ -68,8 +69,7 @@ def record_assistant_invoke(
                 span.set_attribute(ASSISTANT_ID, assistant_id)
                 span.set_attribute(ASSISTANT_NAME, assistant_name)
                 span.set_attribute(ASSISTANT_TYPE, assistant_type)
-                span.set_attributes(invoke_context.model_dump())
-                span.set_attribute("input", input_data_dict)
+                span.set_attributes(input_event.to_dict())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     self.oi_span_type.value,
@@ -77,7 +77,7 @@ def record_assistant_invoke(
                 span.set_attribute("model", model)
 
                 # Invoke the original function
-                result = func(self, invoke_context, input_data)
+                result = func(self, input_event)
 
                 # Record the output data
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
@@ -90,8 +90,8 @@ def record_assistant_invoke(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
-                    invoke_context=invoke_context,
-                    input_data=input_data,
+                    input_event=input_event,
+                    invoke_context=input_event.invoke_context,
                     error=str(e),
                 )
             )
@@ -103,8 +103,8 @@ def record_assistant_invoke(
                     assistant_id=assistant_id,
                     assistant_name=assistant_name,
                     assistant_type=assistant_type,
-                    invoke_context=invoke_context,
-                    input_data=input_data,
+                    input_event=input_event,
+                    invoke_context=input_event.invoke_context,
                     output_data=result,
                 )
             )

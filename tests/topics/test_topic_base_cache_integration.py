@@ -6,7 +6,6 @@ import pytest
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -51,11 +50,13 @@ class TestTopicBaseCacheIntegration:
     ):
         # Publish an event
         event = topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher1",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher1",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
         assert event is not None
@@ -75,11 +76,13 @@ class TestTopicBaseCacheIntegration:
     def test_multiple_consumers(self, topic, invoke_context, sample_messages):
         # Publish an event
         event = topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher1",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher1",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
         # Multiple consumers can consume the same event
@@ -105,22 +108,26 @@ class TestTopicBaseCacheIntegration:
         # Message that meets condition
         user_messages = [Message(role="user", content="Hello")]
         event1 = topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher1",
-            publisher_type="test_publisher",
-            data=user_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher1",
+                publisher_type="test_publisher",
+                data=user_messages,
+                consumed_event_ids=[],
+            )
         )
         assert event1 is not None
 
         # Message that doesn't meet condition
         assistant_messages = [Message(role="assistant", content="Hi")]
         event2 = topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher1",
-            publisher_type="test_publisher",
-            data=assistant_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher1",
+                publisher_type="test_publisher",
+                data=assistant_messages,
+                consumed_event_ids=[],
+            )
         )
         assert event2 is None
 
@@ -131,11 +138,13 @@ class TestTopicBaseCacheIntegration:
         # Publish some events
         for i in range(3):
             topic.publish_data(
-                invoke_context=invoke_context,
-                publisher_name=f"publisher{i}",
-                publisher_type="test_publisher",
-                data=sample_messages,
-                consumed_events=[],
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    publisher_name=f"publisher{i}",
+                    publisher_type="test_publisher",
+                    data=sample_messages,
+                    consumed_event_ids=[],
+                )
             )
 
         # Consume some events
@@ -155,11 +164,13 @@ class TestTopicBaseCacheIntegration:
     ):
         # Async publish
         event = await topic.a_publish_data(
-            invoke_context=invoke_context,
-            publisher_name="async_publisher",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="async_publisher",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
         assert event is not None
@@ -184,11 +195,13 @@ class TestTopicBaseCacheIntegration:
 
         # Publish an event
         event = await topic.a_publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
         # Consumer should receive the event
@@ -226,11 +239,13 @@ class TestTopicBaseCacheIntegration:
     ):
         # First, publish an event
         topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
         # Create a consume event
@@ -295,11 +310,13 @@ class TestTopicBaseCacheIntegration:
                 Message(role="user", content=f"Message from publisher {pub_id}")
             ]
             return await topic.a_publish_data(
-                invoke_context=invoke_context,
-                publisher_name=f"publisher{pub_id}",
-                publisher_type="test_publisher",
-                data=messages,
-                consumed_events=[],
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    publisher_name=f"publisher{pub_id}",
+                    publisher_type="test_publisher",
+                    data=messages,
+                    consumed_event_ids=[],
+                )
             )
 
         # Run publishers concurrently
@@ -322,22 +339,24 @@ class TestTopicBaseCacheIntegration:
     def test_output_topic_integration(
         self, output_topic, invoke_context, sample_messages
     ):
-        # Test with OutputTopic which creates OutputTopicEvent
+        # Test with OutputTopic which creates PublishToTopicEvent
         event = output_topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="output_publisher",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=[],
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="output_publisher",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[],
+            )
         )
 
-        assert isinstance(event, OutputTopicEvent)
+        assert isinstance(event, PublishToTopicEvent)
         assert output_topic.event_cache.num_events() == 1
 
         # Consume the output event
         consumed = output_topic.consume("consumer1")
         assert len(consumed) == 1
-        assert isinstance(consumed[0], OutputTopicEvent)
+        assert isinstance(consumed[0], PublishToTopicEvent)
 
     def test_publish_event_handler(self, invoke_context, sample_messages):
         # Track published events
@@ -355,11 +374,13 @@ class TestTopicBaseCacheIntegration:
         # Publish events
         for i in range(3):
             topic.publish_data(
-                invoke_context=invoke_context,
-                publisher_name=f"publisher{i}",
-                publisher_type="test_publisher",
-                data=sample_messages,
-                consumed_events=[],
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    publisher_name=f"publisher{i}",
+                    publisher_type="test_publisher",
+                    data=sample_messages,
+                    consumed_event_ids=[],
+                )
             )
 
         # Verify handler was called
@@ -371,11 +392,13 @@ class TestTopicBaseCacheIntegration:
         # Publish multiple events
         for i in range(5):
             await topic.a_publish_data(
-                invoke_context=invoke_context,
-                publisher_name=f"publisher{i}",
-                publisher_type="test_publisher",
-                data=sample_messages,
-                consumed_events=[],
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    publisher_name=f"publisher{i}",
+                    publisher_type="test_publisher",
+                    data=sample_messages,
+                    consumed_event_ids=[],
+                )
             )
 
         # Consume some events
@@ -398,11 +421,13 @@ class TestTopicBaseCacheIntegration:
         # Add events
         for i in range(3):
             await topic.a_publish_data(
-                invoke_context=invoke_context,
-                publisher_name=f"publisher{i}",
-                publisher_type="test_publisher",
-                data=sample_messages,
-                consumed_events=[],
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    publisher_name=f"publisher{i}",
+                    publisher_type="test_publisher",
+                    data=sample_messages,
+                    consumed_event_ids=[],
+                )
             )
 
         # Consume some
@@ -433,11 +458,13 @@ class TestTopicBaseCacheIntegration:
 
         # Publish with consumed events
         event = topic.publish_data(
-            invoke_context=invoke_context,
-            publisher_name="publisher1",
-            publisher_type="test_publisher",
-            data=sample_messages,
-            consumed_events=consumed_events,
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                publisher_name="publisher1",
+                publisher_type="test_publisher",
+                data=sample_messages,
+                consumed_event_ids=[event.event_id for event in consumed_events],
+            )
         )
 
         # Verify consumed event IDs are tracked

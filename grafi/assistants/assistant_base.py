@@ -1,4 +1,6 @@
 from typing import Any
+from typing import AsyncGenerator
+from typing import List
 from typing import Self
 from typing import TypeVar
 
@@ -9,11 +11,12 @@ from pydantic import ConfigDict
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.workflows.workflow import Workflow
 
 
@@ -44,17 +47,15 @@ class AssistantBase(BaseModel):
 
     def invoke(
         self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
+        input_event: PublishToTopicEvent,
+    ) -> List[ConsumeFromTopicEvent]:
         """Invoke the assistant's workflow with the provided input data."""
         raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     async def a_invoke(
         self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> MsgsAGen:
+        input_event: PublishToTopicEvent,
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
         raise NotImplementedError("Subclasses must implement 'a_invoke'.")
 

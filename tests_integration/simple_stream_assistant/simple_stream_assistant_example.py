@@ -5,6 +5,7 @@ import os
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_stream_assistant.simple_stream_assistant import (
@@ -42,11 +43,17 @@ async def test_simple_llm_assistant() -> None:
 
     content = ""
 
-    async for messages in assistant.a_invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    async for event in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=[
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        )
     ):
-        for message in messages:
+        for message in event.data:
             assert message.role == "assistant"
             if message.content is not None:
                 content += str(message.content)

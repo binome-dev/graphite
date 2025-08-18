@@ -46,6 +46,7 @@ nav:
     - Connecting to an MCP Server: guide/connecting-to-an-mcp-server.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
+    - Event Interfaces: user-guide/event-interfaces.md
     - Assistant: user-guide/assistant.md
     - Event Driven Workflow: user-guide/event-driven-workflow.md
     - Workflow Components: user-guide/workflow-components.md

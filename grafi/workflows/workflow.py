@@ -1,5 +1,7 @@
 from typing import Any
+from typing import AsyncGenerator
 from typing import Dict
+from typing import List
 from typing import Self
 from typing import TypeVar
 
@@ -9,12 +11,13 @@ from pydantic import BaseModel
 from pydantic import PrivateAttr
 
 from grafi.common.events.event import Event
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 
 
@@ -45,15 +48,15 @@ class Workflow(BaseModel):
         """
         self._stop_requested = False
 
-    def invoke(self, invoke_context: InvokeContext, input: Messages) -> Messages:
+    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """Invokes the workflow with the given initial inputs."""
         raise NotImplementedError
 
     async def a_invoke(
-        self, invoke_context: InvokeContext, input: Messages
-    ) -> MsgsAGen:
+        self, input_event: PublishToTopicEvent
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invokes the workflow with the given initial inputs."""
-        yield []  # Too keep mypy happy
+        yield None  # type: ignore
         raise NotImplementedError
 
     def initial_workflow(self, assistant_request_id: str) -> Any:

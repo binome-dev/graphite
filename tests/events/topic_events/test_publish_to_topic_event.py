@@ -76,6 +76,7 @@ def publish_to_topic_event_dict():
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
+            "topic_type": "NoneTopic",
             "offset": 0,
             "publisher_name": "test_node",
             "publisher_type": "test_type",
@@ -102,6 +103,7 @@ def publish_to_topic_event_dict_message():
         "timestamp": "2009-02-13T23:31:30+00:00",
         EVENT_CONTEXT: {
             "topic_name": "test_topic",
+            "topic_type": "NoneTopic",
             "offset": 0,
             "publisher_name": "test_node",
             "publisher_type": "test_type",

@@ -152,8 +152,8 @@ async def test_llm_a_stream_node_claude() -> None:
     )
 
     content = ""
-    async for messages in llm_stream_node.a_invoke(invoke_context, [topic_event]):
-        for msg in messages:
+    async for event in llm_stream_node.a_invoke(invoke_context, [topic_event]):
+        for msg in event.data:
             assert msg.role == "assistant"
             if isinstance(msg.content, str):
                 content += msg.content

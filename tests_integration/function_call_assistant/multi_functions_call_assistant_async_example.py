@@ -4,6 +4,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -121,7 +122,12 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the weather in 12345?")
     ]
 
-    async for output in assistant.a_invoke(invoke_context_1, input_question_1):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context_1,
+            data=input_question_1,
+        )
+    ):
         print(output)
         assert output is not None
 
@@ -133,7 +139,12 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the population in 12345?"),
     ]
 
-    async for output in assistant.a_invoke(invoke_context_2, input_question_2):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context_2,
+            data=input_question_2,
+        )
+    ):
         print(output)
         assert output is not None
 
@@ -146,7 +157,12 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the house price in 12345?"),
     ]
 
-    async for output in assistant.a_invoke(invoke_context_3, input_question_3):
+    async for output in assistant.a_invoke(
+        PublishToTopicEvent(
+            invoke_context=invoke_context_3,
+            data=input_question_3,
+        )
+    ):
         print(output)
         assert output is not None
 

@@ -1,18 +1,13 @@
 from typing import Any
 from typing import Callable
-from typing import List
 from typing import Optional
 from typing import Self
+from typing import TypeVar
 
 from loguru import logger
 from pydantic import Field
 
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_base import TopicBaseBuilder
 
@@ -34,27 +29,18 @@ class Topic(TopicBase):
         return TopicBuilder(cls)
 
     def publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
+        self, publish_event: PublishToTopicEvent
     ) -> Optional[PublishToTopicEvent]:
         """
         Publishes a message's event ID to this topic if it meets the condition.
         """
-        if self.condition(data):
-            event = PublishToTopicEvent(
-                invoke_context=invoke_context,
-                topic_name=self.name,
-                publisher_name=publisher_name,
-                publisher_type=publisher_type,
-                data=data,
-                consumed_event_ids=[
-                    consumed_event.event_id for consumed_event in consumed_events
-                ],
-                offset=-1,
+        if self.condition(publish_event.data):
+            event = publish_event.model_copy(
+                update={
+                    "topic_name": self.name,
+                    "topic_type": self.type,
+                },
+                deep=True,
             )
             # Add event to cache and update total_published
             event = self.add_event(event)
@@ -69,26 +55,16 @@ class Topic(TopicBase):
             return None
 
     async def a_publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
+        self, publish_event: PublishToTopicEvent
     ) -> Optional[PublishToTopicEvent]:
-        if self.condition(data):
-            event = PublishToTopicEvent(
-                invoke_context=invoke_context,
-                topic_name=self.name,
-                publisher_name=publisher_name,
-                publisher_type=publisher_type,
-                data=data,
-                consumed_event_ids=[
-                    consumed_event.event_id for consumed_event in consumed_events
-                ],
-                offset=-1,
+        if self.condition(publish_event.data):
+            event = publish_event.model_copy(
+                update={
+                    "topic_name": self.name,
+                    "topic_type": self.type,
+                },
+                deep=True,
             )
-
             return await self.a_add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
@@ -103,7 +79,10 @@ class Topic(TopicBase):
         }
 
 
-class TopicBuilder(TopicBaseBuilder[Topic]):
+T_T = TypeVar("T_T", bound=Topic)
+
+
+class TopicBuilder(TopicBaseBuilder[T_T]):
     """
     Builder for creating instances of Topic.
     """

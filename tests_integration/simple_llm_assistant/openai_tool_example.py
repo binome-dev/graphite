@@ -162,11 +162,11 @@ async def test_llm_a_stream_node() -> None:
         ],
     )
 
-    async for messages in llm_stream_node.a_invoke(
+    async for event in llm_stream_node.a_invoke(
         invoke_context,
         [topic_event],
     ):
-        for message in messages:
+        for message in event.data:
             assert message.role == "assistant"
             if message.content is not None and isinstance(message.content, str):
                 content += message.content

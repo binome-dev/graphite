@@ -7,6 +7,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -255,7 +256,7 @@ class TestNode:
         result = node_with_tool.invoke(invoke_context, sample_consumed_events)
 
         # Verify we get a result (the actual implementation should work)
-        assert isinstance(result, list)
+        assert isinstance(result, PublishToTopicEvent)
 
     @patch("grafi.nodes.node.record_node_invoke")
     def test_invoke_without_tool_raises_error(

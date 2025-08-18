@@ -261,79 +261,45 @@ Emitted when a workflow execution fails.
 | `error_message` | `str` | Description of the error that occurred.       |
 | `error_type`    | `str` | Type/category of the error.                   |
 
-Topic events handle message passing and communication between components.
+## Topic Events
+
+Topic events handle message passing and communication between components. These are the primary events used for component interaction in the current architecture.
 
 ### TopicEvent (Base Class)
 
 Basic event for topic-related activities.
 
-#### TopicEvent Base Fields
+#### TopicEvent Base Fields (Extended from Event)
 
-| Field        | Type  | Description                                        |
-|--------------|-------|----------------------------------------------------|
-| `topic_name` | `str` | Name of the topic.                                |
-| `offset`     | `int` | Position/offset in the topic stream.              |
-| `data`       | `Any` | Data associated with the topic event.             |
+| Field        | Type           | Description                                        |
+|--------------|----------------|----------------------------------------------------|
+| `topic_name` | `str`          | Name of the topic.                                |
+| `topic_type` | `TopicType`    | Type of the topic.                                |
+| `offset`     | `int`          | Position/offset in the topic stream.              |
+| `data`       | `List[Message]`| Data associated with the topic event.             |
 
 ### PublishToTopicEvent
 
-Emitted when data is published to a topic.
+The primary event used for publishing data to topics. This is the output format for nodes and the input format for workflows and assistants.
 
-#### PublishToTopicEvent Fields
+#### PublishToTopicEvent Fields (Extended from TopicEvent)
 
 | Field                | Type        | Description                                    |
 |----------------------|-------------|------------------------------------------------|
-| `topic_name`         | `str`       | Name of the topic being published to.         |
-| `offset`             | `int`       | Position/offset in the topic stream.          |
-| `consumed_event_ids` | `List[str]` | IDs of events consumed before publishing.     |
 | `publisher_name`     | `str`       | Name of the component publishing the data.    |
 | `publisher_type`     | `str`       | Type of the component publishing the data.    |
-| `data`               | `Messages`  | Messages being published to the topic.        |
+| `consumed_event_ids` | `List[EventId]` | IDs of events consumed before publishing. |
 
 ### ConsumeFromTopicEvent
 
-Emitted when data is consumed from a topic.
+The primary event used when consuming data from topics. This is the input format for nodes and the output format for workflows and assistants.
 
-#### ConsumeFromTopicEvent Fields
-
-| Field                | Type        | Description                                    |
-|----------------------|-------------|------------------------------------------------|
-| `topic_name`         | `str`       | Name of the topic being consumed from.        |
-| `offset`             | `int`       | Position/offset in the topic stream.          |
-| `consumed_event_ids` | `List[str]` | IDs of events consumed.                        |
-| `publisher_name`     | `str`       | Name of the original publisher.               |
-| `publisher_type`     | `str`       | Type of the original publisher.               |
-| `data`               | `Messages`  | Messages consumed from the topic.             |
-
-### OutputTopicEvent
-
-Emitted for output topic operations.
-
-#### OutputTopicEvent Fields
+#### ConsumeFromTopicEvent Fields  (Extended from TopicEvent)
 
 | Field                | Type        | Description                                    |
 |----------------------|-------------|------------------------------------------------|
-| `topic_name`         | `str`       | Name of the output topic.                     |
-| `offset`             | `int`       | Position/offset in the topic stream.          |
-| `consumed_event_ids` | `List[str]` | IDs of events consumed before outputting.     |
-| `publisher_name`     | `str`       | Name of the component outputting the data.    |
-| `publisher_type`     | `str`       | Type of the component outputting the data.    |
-| `data`               | `Messages`  | Data being output to the topic.               |
-
-### OutputAsyncEvent
-
-Emitted for asynchronous output topic operations.
-
-#### OutputAsyncEvent Fields
-
-| Field                | Type        | Description                                    |
-|----------------------|-------------|------------------------------------------------|
-| `topic_name`         | `str`       | Name of the output topic.                     |
-| `offset`             | `int`       | Position/offset in the topic stream.          |
-| `consumed_event_ids` | `List[str]` | IDs of events consumed before outputting.     |
-| `publisher_name`     | `str`       | Name of the component outputting the data.    |
-| `publisher_type`     | `str`       | Type of the component outputting the data.    |
-| `data`               | `Messages`  | Data being output asynchronously.             |
+| `consumer_name`     | `str`       | Name of the original publisher.               |
+| `consumer_type`     | `str`       | Type of the original publisher.               |
 
 ## Event Usage Patterns
 
@@ -366,36 +332,6 @@ event_dict = event.to_dict()
 
 # Reconstruct event from dictionary
 reconstructed_event = ToolInvokeEvent.from_dict(event_dict)
-```
-
-### Event Handling
-
-```python
-def handle_tool_event(event: ToolEvent):
-    """Handle any tool-related event."""
-    print(f"Tool {event.tool_name} event: {event.event_type}")
-
-    if isinstance(event, ToolInvokeEvent):
-        print(f"Tool invoked with {len(event.input_data)} messages")
-    elif isinstance(event, ToolRespondEvent):
-        print(f"Tool responded with {len(event.output_data)} messages")
-    elif isinstance(event, ToolFailedEvent):
-        print(f"Tool failed: {event.error_message}")
-```
-
-### Topic Event Handling
-
-```python
-def handle_topic_event(event: TopicEvent):
-    """Handle topic-related events."""
-    print(f"Topic {event.topic_name} at offset {event.offset}")
-
-    if isinstance(event, PublishToTopicEvent):
-        print(f"Published by {event.publisher_name} ({event.publisher_type})")
-        print(f"Consumed events: {event.consumed_event_ids}")
-    elif isinstance(event, OutputTopicEvent):
-        print(f"Output from {event.publisher_name}")
-        print(f"Data: {len(event.data)} messages")
 ```
 
 ## Event Context and Metadata

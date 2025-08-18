@@ -19,7 +19,7 @@ from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
-class SimpleHITLAssistant(Assistant):
+class HumanApprovalAssistant(Assistant):
     """
     A simple assistant class that uses OpenAI's language model to process input,
     make function calls, and generate responses.
@@ -38,36 +38,42 @@ class SimpleHITLAssistant(Assistant):
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    name: str = Field(default="SimpleHITLAssistant")
-    type: str = Field(default="SimpleHITLAssistant")
+    name: str = Field(default="HumanApprovalAssistant")
+    type: str = Field(default="HumanApprovalAssistant")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default="gpt-4o-mini")
-    hitl_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    hitl_request: FunctionCallTool
+    model: str = Field(default="gpt-4o")
+    function_tool: FunctionCallTool
+    function_call_llm_system_message: Optional[str] = Field(default=None)
 
     @classmethod
-    def builder(cls) -> "SimpleHITLAssistantBuilder":
-        """Return a builder for SimpleHITLAssistant."""
-        return SimpleHITLAssistantBuilder(cls)
+    def builder(cls) -> "HumanApprovalAssistantBuilder":
+        """Return a builder for HumanApprovalAssistant."""
+        return HumanApprovalAssistantBuilder(cls)
 
-    def _construct_workflow(self) -> "SimpleHITLAssistant":
-        hitl_call_topic = Topic(
-            name="hitl_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls is not None,
-        )
+    def _construct_workflow(self) -> "HumanApprovalAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
-        agent_output_topic = OutputTopic(name="agent_output_topic")
-        in_workflow_input_topic = InWorkflowInputTopic(name="human_response_topic")
-        in_workflow_output_topic = InWorkflowOutputTopic(
-            name="human_request_topic",
-            paired_in_workflow_input_topic_names=[in_workflow_input_topic.name],
-        )
-
-        register_user_topic = Topic(
-            name="register_user_topic",
+        agent_output_topic = OutputTopic(
+            name="agent_output_topic",
             condition=lambda msgs: msgs[-1].tool_calls is None,
         )
+        in_workflow_input_approval_topic = InWorkflowInputTopic(
+            name="human_approval_topic",
+            condition=lambda msgs: msgs[-1].content == "YES",
+        )
+        in_workflow_input_disapproval_topic = InWorkflowInputTopic(
+            name="human_disapproval_topic",
+            condition=lambda msgs: msgs[-1].content.startswith("NO"),  # type: ignore
+        )
+        in_workflow_output_topic = InWorkflowOutputTopic(
+            name="human_tool_call_request_topic",
+            paired_in_workflow_input_topic_names=[
+                in_workflow_input_approval_topic.name,
+                in_workflow_input_disapproval_topic.name,
+            ],
+            condition=lambda msgs: msgs[-1].tool_calls is not None,
+        )
+
+        function_output_topic = Topic(name="human_tool_call_response_topic")
 
         llm_input_node = (
             Node.builder()
@@ -77,7 +83,9 @@ class SimpleHITLAssistant(Assistant):
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
                 .or_()
-                .subscribed_to(in_workflow_input_topic)
+                .subscribed_to(function_output_topic)
+                .or_()
+                .subscribed_to(in_workflow_input_disapproval_topic)
                 .build()
             )
             .tool(
@@ -85,11 +93,11 @@ class SimpleHITLAssistant(Assistant):
                 .name("UserInputLLM")
                 .api_key(self.api_key)
                 .model(self.model)
-                .system_message(self.hitl_llm_system_message)
+                .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(hitl_call_topic)
-            .publish_to(register_user_topic)
+            .publish_to(in_workflow_output_topic)
+            .publish_to(agent_output_topic)
             .build()
         )
 
@@ -99,45 +107,30 @@ class SimpleHITLAssistant(Assistant):
             Node.builder()
             .name("FunctionCallNode")
             .type("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
-            .tool(self.hitl_request)
-            .publish_to(in_workflow_output_topic)
-            .build()
-        )
-
-        # Create an output LLM node
-        llm_output_node = (
-            Node.builder()
-            .name("OpenAIOutputNode")
-            .type("LLMNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(register_user_topic).build())
-            .tool(
-                OpenAITool.builder()
-                .name("UserOutputLLM")
-                .api_key(self.api_key)
-                .model(self.model)
-                .system_message(self.summary_llm_system_message)
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(in_workflow_input_approval_topic)
                 .build()
             )
-            .publish_to(agent_output_topic)
+            .tool(self.function_tool)
+            .publish_to(function_output_topic)
             .build()
         )
 
         # Create a workflow and add the nodes
         self.workflow = (
             EventDrivenWorkflow.builder()
-            .name("simple_function_call_workflow")
+            .name("HumanApprovalWorkflow")
             .node(llm_input_node)
             .node(function_call_node)
-            .node(llm_output_node)
             .build()
         )
 
         return self
 
 
-class SimpleHITLAssistantBuilder(AssistantBaseBuilder[SimpleHITLAssistant]):
-    """Concrete builder for SimpleHITLAssistant."""
+class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]):
+    """Concrete builder for HumanApprovalAssistant."""
 
     def api_key(self, api_key: str) -> Self:
         self.kwargs["api_key"] = api_key
@@ -147,14 +140,14 @@ class SimpleHITLAssistantBuilder(AssistantBaseBuilder[SimpleHITLAssistant]):
         self.kwargs["model"] = model
         return self
 
-    def hitl_llm_system_message(self, hitl_llm_system_message: str) -> Self:
-        self.kwargs["hitl_llm_system_message"] = hitl_llm_system_message
+    def function_call_llm_system_message(
+        self, function_call_llm_system_message: str
+    ) -> Self:
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
-    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
-        return self
-
-    def hitl_request(self, hitl_request: FunctionCallTool) -> Self:
-        self.kwargs["hitl_request"] = hitl_request
+    def function_tool(self, function_tool: FunctionCallTool) -> Self:
+        self.kwargs["function_tool"] = function_tool
         return self

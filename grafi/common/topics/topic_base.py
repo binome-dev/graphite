@@ -13,22 +13,12 @@ from pydantic import Field
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.output_topic_event import OutputTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.common.topics.topic_event_cache import TopicEventCache
-
-
-AGENT_INPUT_TOPIC_TYPE = "AgentInput"
-AGENT_OUTPUT_TOPIC_TYPE = "AgentOutput"
-IN_WORKFLOW_INPUT_TOPIC_TYPE = "InWorkflowInput"
-IN_WORKFLOW_OUTPUT_TOPIC_TYPE = "InWorkflowOutput"
-
-# Topic cache configuration
-DEFAULT_MAX_CACHE_SIZE = 1000  # Maximum number of events to keep in cache
+from grafi.common.topics.topic_types import TopicType
 
 
 class TopicBase(BaseModel):
@@ -42,21 +32,14 @@ class TopicBase(BaseModel):
     """
 
     name: str = Field(default="")
-    type: str = Field(default="Topic")
+    type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
     condition: Callable[[Messages], bool] = Field(default=lambda _: True)
     event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
     publish_event_handler: Optional[Callable] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
+    def publish_data(self, publish_event: PublishToTopicEvent) -> PublishToTopicEvent:
         """
         Publish data to the topic if it meets the condition.
         """
@@ -65,12 +48,7 @@ class TopicBase(BaseModel):
         )
 
     async def a_publish_data(
-        self,
-        invoke_context: InvokeContext,
-        publisher_name: str,
-        publisher_type: str,
-        data: Messages,
-        consumed_events: List[ConsumeFromTopicEvent],
+        self, publish_event: PublishToTopicEvent
     ) -> PublishToTopicEvent:
         """
         Publish data to the topic if it meets the condition.
@@ -87,9 +65,7 @@ class TopicBase(BaseModel):
         """
         return self.event_cache.can_consume(consumer_name)
 
-    def consume(
-        self, consumer_name: str
-    ) -> List[PublishToTopicEvent | OutputTopicEvent]:
+    def consume(self, consumer_name: str) -> List[PublishToTopicEvent]:
         """
         Retrieve new/unconsumed messages for the given node by fetching them
         from the cache or event store. Once retrieved, the node's
@@ -103,11 +79,7 @@ class TopicBase(BaseModel):
         new_events = self.event_cache.fetch(consumer_name)
 
         # Filter to only return PublishToTopicEvent instances for backward compatibility
-        return [
-            event
-            for event in new_events
-            if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
-        ]
+        return [event for event in new_events if isinstance(event, PublishToTopicEvent)]
 
     async def a_consume(
         self, consumer_name: str, timeout: Optional[float] = None
@@ -137,9 +109,7 @@ class TopicBase(BaseModel):
         """
         Restore a topic from a topic event.
         """
-        if isinstance(topic_event, PublishToTopicEvent) or isinstance(
-            topic_event, OutputTopicEvent
-        ):
+        if isinstance(topic_event, PublishToTopicEvent):
             self.event_cache.put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             self.event_cache.fetch(
@@ -151,9 +121,7 @@ class TopicBase(BaseModel):
         """
         Asynchronously restore a topic from a topic event.
         """
-        if isinstance(topic_event, PublishToTopicEvent) or isinstance(
-            topic_event, OutputTopicEvent
-        ):
+        if isinstance(topic_event, PublishToTopicEvent):
             await self.event_cache.a_put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             # Fetch the events for the consumer and commit the offset
@@ -169,7 +137,7 @@ class TopicBase(BaseModel):
         Add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
         """
-        if isinstance(event, (PublishToTopicEvent, OutputTopicEvent)):
+        if isinstance(event, PublishToTopicEvent):
             return self.event_cache.put(event)
 
     async def a_add_event(self, event: TopicEvent) -> TopicEvent:
@@ -177,7 +145,7 @@ class TopicBase(BaseModel):
         Asynchronously add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
         """
-        if isinstance(event, (PublishToTopicEvent, OutputTopicEvent)):
+        if isinstance(event, PublishToTopicEvent):
             return await self.event_cache.a_put(event)
 
     def serialize_callable(self) -> dict:
@@ -213,7 +181,7 @@ class TopicBase(BaseModel):
         """
         return {
             "name": self.name,
-            "type": self.type,
+            "type": self.type.value,
             "condition": self.serialize_callable(),
         }
 

@@ -19,14 +19,16 @@ from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
 from grafi.nodes.node_base import T_N
 
 
 def record_node_invoke(
-    func: Callable[[T_N, InvokeContext, List[ConsumeFromTopicEvent]], Messages],
-) -> Callable[[T_N, InvokeContext, List[ConsumeFromTopicEvent]], Messages]:
+    func: Callable[
+        [T_N, InvokeContext, List[ConsumeFromTopicEvent]], PublishToTopicEvent
+    ],
+) -> Callable[[T_N, InvokeContext, List[ConsumeFromTopicEvent]], PublishToTopicEvent]:
     """Decorator to record node invoke events and tracing."""
 
     @functools.wraps(func)
@@ -34,7 +36,7 @@ def record_node_invoke(
         self: T_N,
         invoke_context: InvokeContext,
         input_data: List[ConsumeFromTopicEvent],
-    ) -> Messages:
+    ) -> PublishToTopicEvent:
         node_id: str = self.node_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
         publish_to_topics = [topic.name for topic in self.publish_to]
@@ -76,9 +78,9 @@ def record_node_invoke(
                 # Invoke the node function
                 result = func(self, invoke_context, input_data)
 
-                output_data_dict = json.dumps(result, default=to_jsonable_python)
-
-                span.set_attribute("output", output_data_dict)
+                span.set_attribute(
+                    "output", json.dumps(result.to_dict(), default=to_jsonable_python)
+                )
 
         except Exception as e:
             # Exception occurred during invoke

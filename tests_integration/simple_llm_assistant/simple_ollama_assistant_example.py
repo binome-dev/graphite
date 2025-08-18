@@ -3,6 +3,7 @@
 import uuid
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
@@ -22,7 +23,6 @@ def get_invoke_context() -> InvokeContext:
 
 
 def test_simple_llm_assistant() -> None:
-    invoke_context = get_invoke_context()
     assistant = (
         SimpleOllamaAssistant.builder()
         .name("SimpleOllamaAssistant")
@@ -44,7 +44,12 @@ def test_simple_llm_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(invoke_context, input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    )
 
     print(output)
     assert output is not None
@@ -57,11 +62,16 @@ def test_simple_llm_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(get_invoke_context(), input_data)
+    output = assistant.invoke(
+        PublishToTopicEvent(
+            invoke_context=get_invoke_context(),
+            data=input_data,
+        )
+    )
 
     print(output)
     assert output is not None
-    assert "Grafi" in str(output[0].content)
+    assert "Grafi" in str(output[0].data[0].content)
     assert len(event_store.get_events()) == 24
 
 
