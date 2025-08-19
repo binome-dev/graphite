@@ -47,14 +47,14 @@ class AssistantBase(BaseModel):
 
     def invoke(
         self,
-        input_event: PublishToTopicEvent,
+        input_data: PublishToTopicEvent,
     ) -> List[ConsumeFromTopicEvent]:
         """Invoke the assistant's workflow with the provided input data."""
         raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     async def a_invoke(
         self,
-        input_event: PublishToTopicEvent,
+        input_data: PublishToTopicEvent,
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
         raise NotImplementedError("Subclasses must implement 'a_invoke'.")

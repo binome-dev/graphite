@@ -80,18 +80,18 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import List, AsyncGenerator
 
 class MyAssistant(Assistant):
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """Synchronous processing of events."""
         # Delegate to workflow
-        events = self.workflow.invoke(input_event)
+        events = self.workflow.invoke(input_data)
         return events
 
     async def a_invoke(
         self,
-        input_event: PublishToTopicEvent
+        input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Asynchronous streaming of events."""
-        async for output in self.workflow.a_invoke(input_event):
+        async for output in self.workflow.a_invoke(input_data):
             yield output
 ```
 
@@ -132,10 +132,10 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 
 class MyWorkflow(Workflow):
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """Execute workflow synchronously."""
         # Initialize workflow with input event
-        self.initial_workflow(input_event)
+        self.initial_workflow(input_data)
 
         # Process nodes until completion
         while not self._invoke_queue.empty():
@@ -185,8 +185,8 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
 
 **New Pattern:**
 ```python
-def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-    return self.workflow.invoke(input_event)
+def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    return self.workflow.invoke(input_data)
 ```
 
 Key changes:

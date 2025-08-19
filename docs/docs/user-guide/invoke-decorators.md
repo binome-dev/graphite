@@ -90,9 +90,9 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 
 @record_assistant_invoke
-def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
     # Assistant implementation
-    return self.workflow.invoke(input_event)
+    return self.workflow.invoke(input_data)
 ```
 
 #### @record_assistant_a_invoke
@@ -117,9 +117,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import AsyncGenerator
 
 @record_assistant_a_invoke
-async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async assistant implementation
-    async for output in self.workflow.a_invoke(input_event):
+    async for output in self.workflow.a_invoke(input_data):
         yield output
 ```
 
@@ -271,7 +271,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import List
 
 @record_workflow_invoke
-def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
     # Workflow orchestration logic
     # Initialize workflow, execute nodes, return consumed events
     return output_events
@@ -299,10 +299,10 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import AsyncGenerator
 
 @record_workflow_a_invoke
-async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async workflow orchestration
     # Initialize workflow, execute nodes asynchronously, yield consumed events
-    async for output_event in self._execute_workflow(input_event):
+    async for output_event in self._execute_workflow(input_data):
         yield output_event
 ```
 

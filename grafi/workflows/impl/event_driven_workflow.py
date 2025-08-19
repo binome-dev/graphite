@@ -228,7 +228,7 @@ class EventDrivenWorkflow(Workflow):
             await self._topics[topic].a_commit(consumer_name, offset)
 
     @record_workflow_invoke
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """
         Invoke the workflow with the given context and input.
         Returns results when all nodes complete processing.
@@ -236,11 +236,11 @@ class EventDrivenWorkflow(Workflow):
         # Reset stop flag at the beginning of new execution
         self.reset_stop_flag()
 
-        invoke_context = input_event.invoke_context
+        invoke_context = input_data.invoke_context
 
         consumed_events: List[ConsumeFromTopicEvent] = []
         try:
-            self.initial_workflow(input_event)
+            self.initial_workflow(input_data)
 
             # Process nodes until invoke queue is empty or workflow is stopped
             while self._invoke_queue:
@@ -276,7 +276,7 @@ class EventDrivenWorkflow(Workflow):
 
     @record_workflow_a_invoke
     async def a_invoke(
-        self, input_event: PublishToTopicEvent
+        self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Run the workflow with streaming output.
@@ -284,9 +284,9 @@ class EventDrivenWorkflow(Workflow):
         # Reset stop flag at the beginning of new execution
         self.reset_stop_flag()
 
-        await self.a_init_workflow(input_event)
+        await self.a_init_workflow(input_data)
 
-        invoke_context = input_event.invoke_context
+        invoke_context = input_data.invoke_context
 
         # Start a background task to process all nodes (including streaming generators)
         node_processing_task = [
@@ -476,7 +476,7 @@ class EventDrivenWorkflow(Workflow):
             if node.can_invoke():
                 self._invoke_queue.append(node)
 
-    def initial_workflow(self, input_event: PublishToTopicEvent) -> Any:
+    def initial_workflow(self, input_data: PublishToTopicEvent) -> Any:
         """Restore the workflow state from stored events."""
 
         # Reset all the topics
@@ -484,7 +484,7 @@ class EventDrivenWorkflow(Workflow):
         for topic in self._topics.values():
             topic.reset()
 
-        invoke_context = input_event.invoke_context
+        invoke_context = input_data.invoke_context
 
         events = [
             event
@@ -507,7 +507,7 @@ class EventDrivenWorkflow(Workflow):
             events_to_record: List[Event] = []
             for input_topic in input_topics:
                 event = input_topic.publish_data(
-                    input_event.model_copy(
+                    input_data.model_copy(
                         update={
                             "publisher_name": self.name,
                             "publisher_type": self.type,
@@ -535,7 +535,7 @@ class EventDrivenWorkflow(Workflow):
             consumed_events: List[TopicEvent] = [
                 event
                 for event in events
-                if event.event_id in input_event.consumed_event_ids
+                if event.event_id in input_data.consumed_event_ids
             ]
             in_workflow_output_topic_names = set(
                 [
@@ -582,7 +582,7 @@ class EventDrivenWorkflow(Workflow):
                             paired_in_workflow_input_topic, InWorkflowInputTopic
                         ):
                             paired_event = paired_in_workflow_input_topic.publish_data(
-                                input_event.model_copy(
+                                input_data.model_copy(
                                     update={
                                         "publisher_name": self.name,
                                         "publisher_type": self.type,
@@ -601,13 +601,13 @@ class EventDrivenWorkflow(Workflow):
                                 if topic.can_consume(node_name) and node.can_invoke():
                                     self._invoke_queue.append(node)
 
-    async def a_init_workflow(self, input_event: PublishToTopicEvent) -> Any:
+    async def a_init_workflow(self, input_data: PublishToTopicEvent) -> Any:
         # 1 – initial seeding
         self._tracker.reset()
         for topic in self._topics.values():
             await topic.a_reset()
 
-        invoke_context = input_event.invoke_context
+        invoke_context = input_data.invoke_context
 
         events = [
             event
@@ -627,7 +627,7 @@ class EventDrivenWorkflow(Workflow):
             events_to_record: List[Event] = []
             for input_topic in input_topics:
                 event = await input_topic.a_publish_data(
-                    input_event.model_copy(
+                    input_data.model_copy(
                         update={
                             "publisher_name": self.name,
                             "publisher_type": self.type,
@@ -646,7 +646,7 @@ class EventDrivenWorkflow(Workflow):
                 await self._topics[topic_event.topic_name].a_restore_topic(topic_event)
 
             in_workflow_output_topic_names: Set[str] = set()
-            consumed_event_ids = input_event.consumed_event_ids
+            consumed_event_ids = input_data.consumed_event_ids
             consumed_events = [
                 event for event in events if event.event_id in consumed_event_ids
             ]
@@ -678,7 +678,7 @@ class EventDrivenWorkflow(Workflow):
                         ):
                             paired_event = (
                                 await paired_in_workflow_input_topic.a_publish_data(
-                                    input_event.model_copy(
+                                    input_data.model_copy(
                                         update={
                                             "publisher_name": self.name,
                                             "publisher_type": self.type,

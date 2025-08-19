@@ -9,9 +9,6 @@ from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
 from grafi.common.containers.container import container
-from grafi.common.events.tool_events.tool_event import TOOL_ID
-from grafi.common.events.tool_events.tool_event import TOOL_NAME
-from grafi.common.events.tool_events.tool_event import TOOL_TYPE
 from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
 from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
@@ -31,30 +28,30 @@ def record_tool_invoke(
         invoke_context: InvokeContext,
         input_data: Messages,
     ) -> Messages:
-        tool_id: str = self.tool_id
+        id: str = self.tool_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
-        tool_name: str = self.name or ""
-        tool_type: str = self.type or ""
+        name: str = self.name or ""
+        type: str = self.type or ""
 
         input_data_dict = json.dumps(input_data, default=to_jsonable_python)
 
         # Record the 'invoke' event
         container.event_store.record_event(
             ToolInvokeEvent(
-                tool_id=tool_id,
+                id=id,
                 invoke_context=invoke_context,
-                tool_type=tool_type,
-                tool_name=tool_name,
+                type=type,
+                name=name,
                 input_data=input_data,
             )
         )
 
         # Invoke the original function
         try:
-            with container.tracer.start_as_current_span(f"{tool_name}.invoke") as span:
-                span.set_attribute(TOOL_ID, tool_id)
-                span.set_attribute(TOOL_NAME, tool_name)
-                span.set_attribute(TOOL_TYPE, tool_type)
+            with container.tracer.start_as_current_span(f"{name}.invoke") as span:
+                span.set_attribute("id", id)
+                span.set_attribute("name", name)
+                span.set_attribute("type", type)
                 span.set_attributes(invoke_context.model_dump())
                 span.set_attribute("input", input_data_dict)
                 span.set_attribute(
@@ -73,10 +70,10 @@ def record_tool_invoke(
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 ToolFailedEvent(
-                    tool_id=tool_id,
+                    id=id,
                     invoke_context=invoke_context,
-                    tool_type=tool_type,
-                    tool_name=tool_name,
+                    type=type,
+                    name=name,
                     input_data=input_data,
                     error=str(e),
                 )
@@ -86,10 +83,10 @@ def record_tool_invoke(
             # Successful invoke
             container.event_store.record_event(
                 ToolRespondEvent(
-                    tool_id=tool_id,
+                    id=id,
                     invoke_context=invoke_context,
-                    tool_type=tool_type,
-                    tool_name=tool_name,
+                    type=type,
+                    name=name,
                     input_data=input_data,
                     output_data=result,
                 )

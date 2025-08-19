@@ -15,9 +15,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_ID
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_NAME
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_TYPE
 from grafi.common.events.workflow_events.workflow_failed_event import (
     WorkflowFailedEvent,
 )
@@ -49,34 +46,32 @@ def record_workflow_a_invoke(
     @functools.wraps(func)
     async def wrapper(
         self: T_W,
-        input_event: PublishToTopicEvent,
+        input_data: PublishToTopicEvent,
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        workflow_id: str = self.workflow_id
+        id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
-        workflow_name: str = self.name or ""
-        workflow_type: str = self.type or ""
+        name: str = self.name or ""
+        type: str = self.type or ""
 
         # Record the 'invoke' event
         container.event_store.record_event(
             WorkflowInvokeEvent(
-                workflow_id=workflow_id,
-                invoke_context=input_event.invoke_context,
-                workflow_type=workflow_type,
-                workflow_name=workflow_name,
-                input_event=input_event,
+                id=id,
+                invoke_context=input_data.invoke_context,
+                type=type,
+                name=name,
+                input_data=input_data,
             )
         )
 
         # Invoke the original function
         result: List[ConsumeFromTopicEvent] = []
         try:
-            with container.tracer.start_as_current_span(
-                f"{workflow_name}.invoke"
-            ) as span:
-                span.set_attribute(WORKFLOW_ID, workflow_id)
-                span.set_attribute(WORKFLOW_NAME, workflow_name)
-                span.set_attribute(WORKFLOW_TYPE, workflow_type)
-                span.set_attributes(input_event.model_dump())
+            with container.tracer.start_as_current_span(f"{name}.invoke") as span:
+                span.set_attribute("id", id)
+                span.set_attribute("name", name)
+                span.set_attribute("type", type)
+                span.set_attributes(input_data.model_dump())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     oi_span_type.value,
@@ -85,7 +80,7 @@ def record_workflow_a_invoke(
                 # Invoke the original function
                 result_content = ""
                 is_streaming = False
-                async for event in func(self, input_event):
+                async for event in func(self, input_data):
                     for message in event.data:
                         if message.is_streaming:
                             if message.content is not None and isinstance(
@@ -113,11 +108,11 @@ def record_workflow_a_invoke(
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 WorkflowFailedEvent(
-                    workflow_id=workflow_id,
-                    invoke_context=input_event.invoke_context,
-                    workflow_type=workflow_type,
-                    workflow_name=workflow_name,
-                    input_event=input_event,
+                    id=id,
+                    invoke_context=input_data.invoke_context,
+                    type=type,
+                    name=name,
+                    input_data=input_data,
                     error=str(e),
                 )
             )
@@ -126,11 +121,11 @@ def record_workflow_a_invoke(
             # Successful invoke
             container.event_store.record_event(
                 WorkflowRespondEvent(
-                    workflow_id=workflow_id,
-                    invoke_context=input_event.invoke_context,
-                    workflow_type=workflow_type,
-                    workflow_name=workflow_name,
-                    input_event=input_event,
+                    id=id,
+                    invoke_context=input_data.invoke_context,
+                    type=type,
+                    name=name,
+                    input_data=input_data,
                     output_data=result,
                 )
             )

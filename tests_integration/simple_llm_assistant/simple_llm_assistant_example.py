@@ -47,12 +47,12 @@ def test_simple_llm_assistant() -> None:
     input_data = [
         Message(content="Hello, my name is Grafi, how are you doing?", role="user")
     ]
-    input_event = PublishToTopicEvent(
+    input_data = PublishToTopicEvent(
         invoke_context=invoke_context,
         data=input_data,
     )
 
-    output = assistant.invoke(input_event)
+    output = assistant.invoke(input_data)
 
     print(output)
     assert output is not None
@@ -64,11 +64,11 @@ def test_simple_llm_assistant() -> None:
             content="I felt stressful today. Can you help me address my stress by saying my name? It is important to me.",
         )
     ]
-    input_event = PublishToTopicEvent(
+    input_data = PublishToTopicEvent(
         invoke_context=get_invoke_context(),
         data=input_data,
     )
-    output = assistant.invoke(input_event)
+    output = assistant.invoke(input_data)
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].data[0].content)

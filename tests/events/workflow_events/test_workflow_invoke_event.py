@@ -23,7 +23,7 @@ def workflow_invoke_event() -> WorkflowInvokeEvent:
             invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
-        input_event=PublishToTopicEvent(
+        input_data=PublishToTopicEvent(
             event_id="test_id",
             timestamp="2009-02-13T23:31:30+00:00",
             invoke_context=InvokeContext(
@@ -71,7 +71,7 @@ def workflow_invoke_event_dict():
             },
         },
         "data": {
-            "input_event": {
+            "input_data": {
                 "event_context": {
                     "consumed_event_ids": [],
                     "publisher_name": "test_assistant",

@@ -11,9 +11,6 @@ from openinference.semconv.trace import SpanAttributes
 from pydantic_core import to_jsonable_python
 
 from grafi.common.containers.container import container
-from grafi.common.events.node_events.node_event import NODE_ID
-from grafi.common.events.node_events.node_event import NODE_NAME
-from grafi.common.events.node_events.node_event import NODE_TYPE
 from grafi.common.events.node_events.node_failed_event import NodeFailedEvent
 from grafi.common.events.node_events.node_invoke_event import NodeInvokeEvent
 from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
@@ -44,11 +41,11 @@ def record_node_a_invoke(
         invoke_context: InvokeContext,
         input_data: List[ConsumeFromTopicEvent],
     ) -> AsyncGenerator[PublishToTopicEvent, None]:
-        node_id: str = self.node_id
+        id: str = self.node_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
         publish_to_topics = [topic.name for topic in self.publish_to]
-        node_name: str = self.name or ""
-        node_type: str = self.type or ""
+        name: str = self.name or ""
+        type: str = self.type or ""
 
         input_data_dict = [event.to_dict() for event in input_data]
 
@@ -57,12 +54,12 @@ def record_node_a_invoke(
         # Record the 'invoke' event
         container.event_store.record_event(
             NodeInvokeEvent(
-                node_id=node_id,
+                id=id,
                 subscribed_topics=subscribed_topics,
                 publish_to_topics=publish_to_topics,
                 invoke_context=invoke_context,
-                node_type=node_type,
-                node_name=node_name,
+                type=type,
+                name=name,
                 input_data=input_data,
             )
         )
@@ -70,10 +67,10 @@ def record_node_a_invoke(
         result: Messages = []
         # Invoke the original function
         try:
-            with container.tracer.start_as_current_span(f"{node_name}.invoke") as span:
-                span.set_attribute(NODE_ID, node_id)
-                span.set_attribute(NODE_NAME, node_name)
-                span.set_attribute(NODE_TYPE, node_type)
+            with container.tracer.start_as_current_span(f"{name}.invoke") as span:
+                span.set_attribute("id", id)
+                span.set_attribute("name", name)
+                span.set_attribute("type", type)
                 span.set_attributes(invoke_context.model_dump())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
@@ -116,12 +113,12 @@ def record_node_a_invoke(
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 NodeFailedEvent(
-                    node_id=node_id,
+                    id=id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
                     invoke_context=invoke_context,
-                    node_type=node_type,
-                    node_name=node_name,
+                    type=type,
+                    name=name,
                     input_data=input_data,
                     error=str(e),
                 )
@@ -131,12 +128,12 @@ def record_node_a_invoke(
             # Successful invoke
             container.event_store.record_event(
                 NodeRespondEvent(
-                    node_id=node_id,
+                    id=id,
                     subscribed_topics=subscribed_topics,
                     publish_to_topics=publish_to_topics,
                     invoke_context=invoke_context,
-                    node_type=node_type,
-                    node_name=node_name,
+                    type=type,
+                    name=name,
                     input_data=input_data,
                     output_data=output_data,
                 )

@@ -8,9 +8,6 @@ from pydantic_core import to_jsonable_python
 
 from grafi.assistants.assistant_base import T_A
 from grafi.common.containers.container import container
-from grafi.common.events.assistant_events.assistant_event import ASSISTANT_ID
-from grafi.common.events.assistant_events.assistant_event import ASSISTANT_NAME
-from grafi.common.events.assistant_events.assistant_event import ASSISTANT_TYPE
 from grafi.common.events.assistant_events.assistant_failed_event import (
     AssistantFailedEvent,
 )
@@ -42,34 +39,32 @@ def record_assistant_invoke(
     @functools.wraps(func)
     def wrapper(
         self: T_A,
-        input_event: PublishToTopicEvent,
+        input_data: PublishToTopicEvent,
     ) -> List[ConsumeFromTopicEvent]:
-        assistant_id = self.assistant_id
-        assistant_name = self.name or ""
-        assistant_type = self.type or ""
+        id = self.assistant_id
+        name = self.name or ""
+        type = self.type or ""
         model = getattr(self, "model", "")
 
         # Record the 'invoke' event
         container.event_store.record_event(
             AssistantInvokeEvent(
-                assistant_id=assistant_id,
-                assistant_name=assistant_name,
-                assistant_type=assistant_type,
-                input_event=input_event,
-                invoke_context=input_event.invoke_context,
+                id=id,
+                name=name,
+                type=type,
+                input_data=input_data,
+                invoke_context=input_data.invoke_context,
             )
         )
 
         # Invoke the original function
         try:
-            with container.tracer.start_as_current_span(
-                f"{assistant_name}.run"
-            ) as span:
+            with container.tracer.start_as_current_span(f"{name}.run") as span:
                 # Set span attributes of the assistant
-                span.set_attribute(ASSISTANT_ID, assistant_id)
-                span.set_attribute(ASSISTANT_NAME, assistant_name)
-                span.set_attribute(ASSISTANT_TYPE, assistant_type)
-                span.set_attributes(input_event.to_dict())
+                span.set_attribute("id", id)
+                span.set_attribute("name", name)
+                span.set_attribute("type", type)
+                span.set_attributes(input_data.to_dict())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     self.oi_span_type.value,
@@ -77,7 +72,7 @@ def record_assistant_invoke(
                 span.set_attribute("model", model)
 
                 # Invoke the original function
-                result = func(self, input_event)
+                result = func(self, input_data)
 
                 # Record the output data
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
@@ -87,11 +82,11 @@ def record_assistant_invoke(
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 AssistantFailedEvent(
-                    assistant_id=assistant_id,
-                    assistant_name=assistant_name,
-                    assistant_type=assistant_type,
-                    input_event=input_event,
-                    invoke_context=input_event.invoke_context,
+                    id=id,
+                    name=name,
+                    type=type,
+                    input_data=input_data,
+                    invoke_context=input_data.invoke_context,
                     error=str(e),
                 )
             )
@@ -100,11 +95,11 @@ def record_assistant_invoke(
             # Successful invoke
             container.event_store.record_event(
                 AssistantRespondEvent(
-                    assistant_id=assistant_id,
-                    assistant_name=assistant_name,
-                    assistant_type=assistant_type,
-                    input_event=input_event,
-                    invoke_context=input_event.invoke_context,
+                    id=id,
+                    name=name,
+                    type=type,
+                    input_data=input_data,
+                    invoke_context=input_data.invoke_context,
                     output_data=result,
                 )
             )

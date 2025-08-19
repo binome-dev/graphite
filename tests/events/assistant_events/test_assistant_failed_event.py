@@ -18,7 +18,7 @@ def assistant_failed_event() -> AssistantFailedEvent:
         assistant_id="test_id",
         assistant_name="test_assistant",
         assistant_type="test_type",
-        input_event=PublishToTopicEvent(
+        input_data=PublishToTopicEvent(
             event_id="test_id",
             timestamp="2009-02-13T23:31:30+00:00",
             invoke_context=InvokeContext(
@@ -69,7 +69,7 @@ def assistant_failed_event_dict():
             },
         },
         "data": {
-            "input_event": {
+            "input_data": {
                 "event_context": {
                     "consumed_event_ids": [],
                     "publisher_name": "test_assistant",

@@ -48,12 +48,12 @@ class Workflow(BaseModel):
         """
         self._stop_requested = False
 
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """Invokes the workflow with the given initial inputs."""
         raise NotImplementedError
 
     async def a_invoke(
-        self, input_event: PublishToTopicEvent
+        self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invokes the workflow with the given initial inputs."""
         yield None  # type: ignore

@@ -10,27 +10,20 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 
 
-NODE_ID = "node_id"
-NODE_NAME = "node_name"
-NODE_TYPE = "node_type"
-SUBSCRIBED_TOPICS = "subscribed_topics"
-PUBLISH_TO_TOPICS = "publish_to_topics"
-
-
 class NodeEvent(Event):
-    node_id: str = default_id
+    id: str = default_id
     subscribed_topics: List[str] = Field(default_factory=list)
     publish_to_topics: List[str] = Field(default_factory=list)
-    node_name: str
-    node_type: str
+    name: str
+    type: str
 
     def node_event_dict(self) -> Dict[str, Any]:
         event_context = {
-            NODE_ID: self.node_id,
-            SUBSCRIBED_TOPICS: self.subscribed_topics,
-            PUBLISH_TO_TOPICS: self.publish_to_topics,
-            NODE_NAME: self.node_name,
-            NODE_TYPE: self.node_type,
+            "id": self.id,
+            "subscribed_topics": self.subscribed_topics,
+            "publish_to_topics": self.publish_to_topics,
+            "name": self.name,
+            "type": self.type,
             "invoke_context": self.invoke_context.model_dump(),
         }
         return {
@@ -40,11 +33,11 @@ class NodeEvent(Event):
 
     @classmethod
     def node_event_base(cls, node_event_dict: Dict[str, Any]) -> "NodeEvent":
-        node_id = node_event_dict[EVENT_CONTEXT][NODE_ID]
-        subscribed_topics = node_event_dict[EVENT_CONTEXT][SUBSCRIBED_TOPICS]
-        publish_to_topics = node_event_dict[EVENT_CONTEXT][PUBLISH_TO_TOPICS]
-        node_name = node_event_dict[EVENT_CONTEXT][NODE_NAME]
-        node_type = node_event_dict[EVENT_CONTEXT][NODE_TYPE]
+        id = node_event_dict[EVENT_CONTEXT]["id"]
+        subscribed_topics = node_event_dict[EVENT_CONTEXT]["subscribed_topics"]
+        publish_to_topics = node_event_dict[EVENT_CONTEXT]["publish_to_topics"]
+        name = node_event_dict[EVENT_CONTEXT]["name"]
+        type = node_event_dict[EVENT_CONTEXT]["type"]
         invoke_context = InvokeContext.model_validate(
             node_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
@@ -53,10 +46,10 @@ class NodeEvent(Event):
             event_id=event_base[0],
             event_type=event_base[1],
             timestamp=event_base[2],
-            node_id=node_id,
+            id=id,
             subscribed_topics=subscribed_topics,
             publish_to_topics=publish_to_topics,
-            node_name=node_name,
-            node_type=node_type,
+            name=name,
+            type=type,
             invoke_context=invoke_context,
         )

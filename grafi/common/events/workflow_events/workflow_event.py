@@ -7,21 +7,16 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 
 
-WORKFLOW_ID = "workflow_id"
-WORKFLOW_NAME = "workflow_name"
-WORKFLOW_TYPE = "workflow_type"
-
-
 class WorkflowEvent(Event):
-    workflow_id: str = default_id
-    workflow_name: str
-    workflow_type: str
+    id: str = default_id
+    name: str
+    type: str
 
     def workflow_event_dict(self) -> Dict[str, Any]:
         event_context = {
-            WORKFLOW_ID: self.workflow_id,
-            WORKFLOW_NAME: self.workflow_name,
-            WORKFLOW_TYPE: self.workflow_type,
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
             "invoke_context": self.invoke_context.model_dump(),
         }
         return {
@@ -33,9 +28,9 @@ class WorkflowEvent(Event):
     def workflow_event_base(
         cls, workflow_event_dict: Dict[str, Any]
     ) -> "WorkflowEvent":
-        workflow_id = workflow_event_dict[EVENT_CONTEXT][WORKFLOW_ID]
-        workflow_name = workflow_event_dict[EVENT_CONTEXT][WORKFLOW_NAME]
-        workflow_type = workflow_event_dict[EVENT_CONTEXT][WORKFLOW_TYPE]
+        id = workflow_event_dict[EVENT_CONTEXT]["id"]
+        name = workflow_event_dict[EVENT_CONTEXT]["name"]
+        type = workflow_event_dict[EVENT_CONTEXT]["type"]
         invoke_context = InvokeContext.model_validate(
             workflow_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
@@ -44,8 +39,8 @@ class WorkflowEvent(Event):
             event_id=event_base[0],
             event_type=event_base[1],
             timestamp=event_base[2],
-            workflow_id=workflow_id,
-            workflow_name=workflow_name,
-            workflow_type=workflow_type,
+            id=id,
+            name=name,
+            type=type,
             invoke_context=invoke_context,
         )

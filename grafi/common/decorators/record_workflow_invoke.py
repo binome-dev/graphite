@@ -14,9 +14,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_ID
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_NAME
-from grafi.common.events.workflow_events.workflow_event import WORKFLOW_TYPE
 from grafi.common.events.workflow_events.workflow_failed_event import (
     WorkflowFailedEvent,
 )
@@ -45,40 +42,38 @@ def record_workflow_invoke(
     @functools.wraps(func)
     def wrapper(
         self: T_W,
-        input_event: PublishToTopicEvent,
+        input_data: PublishToTopicEvent,
     ) -> List[ConsumeFromTopicEvent]:
-        workflow_id: str = self.workflow_id
+        id: str = self.workflow_id
         oi_span_type: OpenInferenceSpanKindValues = self.oi_span_type
-        workflow_name: str = self.name or ""
-        workflow_type: str = self.type or ""
+        name: str = self.name or ""
+        type: str = self.type or ""
 
         # Record the 'invoke' event
         container.event_store.record_event(
             WorkflowInvokeEvent(
-                workflow_id=workflow_id,
-                workflow_type=workflow_type,
-                workflow_name=workflow_name,
-                invoke_context=input_event.invoke_context,
-                input_event=input_event,
+                id=id,
+                type=type,
+                name=name,
+                invoke_context=input_data.invoke_context,
+                input_data=input_data,
             )
         )
 
         # Invoke the original function
         try:
-            with container.tracer.start_as_current_span(
-                f"{workflow_name}.invoke"
-            ) as span:
-                span.set_attribute(WORKFLOW_ID, workflow_id)
-                span.set_attribute(WORKFLOW_NAME, workflow_name)
-                span.set_attribute(WORKFLOW_TYPE, workflow_type)
-                span.set_attributes(input_event.to_dict())
+            with container.tracer.start_as_current_span(f"{name}.invoke") as span:
+                span.set_attribute("id", id)
+                span.set_attribute("name", name)
+                span.set_attribute("type", type)
+                span.set_attributes(input_data.to_dict())
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,
                     oi_span_type.value,
                 )
 
                 # Invoke the original function
-                result: List[ConsumeFromTopicEvent] = func(self, input_event)
+                result: List[ConsumeFromTopicEvent] = func(self, input_data)
 
                 output_data_dict = json.dumps(result, default=to_jsonable_python)
                 span.set_attribute("output", output_data_dict)
@@ -88,11 +83,11 @@ def record_workflow_invoke(
             span.set_attribute("error", str(e))
             container.event_store.record_event(
                 WorkflowFailedEvent(
-                    workflow_id=workflow_id,
-                    workflow_type=workflow_type,
-                    workflow_name=workflow_name,
-                    input_event=input_event,
-                    invoke_context=input_event.invoke_context,
+                    id=id,
+                    type=type,
+                    name=name,
+                    input_data=input_data,
+                    invoke_context=input_data.invoke_context,
                     error=str(e),
                 )
             )
@@ -101,11 +96,11 @@ def record_workflow_invoke(
             # Successful invoke
             container.event_store.record_event(
                 WorkflowRespondEvent(
-                    workflow_id=workflow_id,
-                    workflow_type=workflow_type,
-                    workflow_name=workflow_name,
-                    input_event=input_event,
-                    invoke_context=input_event.invoke_context,
+                    id=id,
+                    type=type,
+                    name=name,
+                    input_data=input_data,
+                    invoke_context=input_data.invoke_context,
                     output_data=result,
                 )
             )

@@ -22,8 +22,8 @@ class ConsumeFromTopicEvent(TopicEvent):
         event_context = {
             "consumer_name": self.consumer_name,
             "consumer_type": self.consumer_type,
-            "topic_name": self.topic_name,
-            "topic_type": self.topic_type.value,
+            "name": self.name,
+            "type": self.type.value,
             "offset": self.offset,
             "invoke_context": self.invoke_context.model_dump(),
         }
@@ -51,8 +51,8 @@ class ConsumeFromTopicEvent(TopicEvent):
             timestamp=base_event[2],
             consumer_name=data[EVENT_CONTEXT]["consumer_name"],
             consumer_type=data[EVENT_CONTEXT]["consumer_type"],
-            topic_name=data[EVENT_CONTEXT]["topic_name"],
-            topic_type=TopicType(data[EVENT_CONTEXT]["topic_type"]),
+            name=data[EVENT_CONTEXT]["name"],
+            type=TopicType(data[EVENT_CONTEXT]["type"]),
             offset=data[EVENT_CONTEXT]["offset"],
             invoke_context=invoke_context,
             data=data_obj,

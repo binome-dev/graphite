@@ -23,7 +23,7 @@ class Assistant(AssistantBase):
     """
 
     @record_assistant_invoke
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
         Args:
@@ -38,13 +38,13 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        events = self.workflow.invoke(input_event)
+        events = self.workflow.invoke(input_data)
 
         return events
 
     @record_assistant_a_invoke
     async def a_invoke(
-        self, input_event: PublishToTopicEvent
+        self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
@@ -60,7 +60,7 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        async for output in self.workflow.a_invoke(input_event):
+        async for output in self.workflow.a_invoke(input_data):
             yield output
 
     def to_dict(self) -> dict[str, Any]:

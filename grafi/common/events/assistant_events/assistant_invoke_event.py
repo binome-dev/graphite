@@ -8,13 +8,13 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 
 class AssistantInvokeEvent(AssistantEvent):
     event_type: EventType = EventType.ASSISTANT_INVOKE
-    input_event: PublishToTopicEvent
+    input_data: PublishToTopicEvent
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             **self.assistant_event_dict(),
             "data": {
-                "input_event": self.input_event.to_dict(),
+                "input_data": self.input_data.to_dict(),
             },
         }
 
@@ -23,5 +23,5 @@ class AssistantInvokeEvent(AssistantEvent):
         base_event = cls.assistant_event_base(data)
         return cls(
             **base_event.model_dump(),
-            input_event=PublishToTopicEvent.from_dict(data["data"]["input_event"]),
+            input_data=PublishToTopicEvent.from_dict(data["data"]["input_data"]),
         )

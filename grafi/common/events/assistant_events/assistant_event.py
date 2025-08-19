@@ -7,21 +7,16 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 
 
-ASSISTANT_ID = "assistant_id"
-ASSISTANT_NAME = "assistant_name"
-ASSISTANT_TYPE = "assistant_type"
-
-
 class AssistantEvent(Event):
-    assistant_id: str = default_id
-    assistant_name: str
-    assistant_type: str
+    id: str = default_id
+    name: str
+    type: str
 
     def assistant_event_dict(self) -> Dict[str, Any]:
         event_context = {
-            ASSISTANT_ID: self.assistant_id,
-            ASSISTANT_NAME: self.assistant_name,
-            ASSISTANT_TYPE: self.assistant_type,
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
             "invoke_context": self.invoke_context.model_dump(),
         }
         return {
@@ -33,9 +28,9 @@ class AssistantEvent(Event):
     def assistant_event_base(
         cls, assistant_event_dict: Dict[str, Any]
     ) -> "AssistantEvent":
-        assistant_id = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_ID]
-        assistant_name = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_NAME]
-        assistant_type = assistant_event_dict[EVENT_CONTEXT][ASSISTANT_TYPE]
+        id = assistant_event_dict[EVENT_CONTEXT]["id"]
+        name = assistant_event_dict[EVENT_CONTEXT]["name"]
+        type = assistant_event_dict[EVENT_CONTEXT]["type"]
         invoke_context = InvokeContext.model_validate(
             assistant_event_dict[EVENT_CONTEXT]["invoke_context"]
         )
@@ -44,8 +39,8 @@ class AssistantEvent(Event):
             event_id=event_base[0],
             event_type=event_base[1],
             timestamp=event_base[2],
-            assistant_id=assistant_id,
-            assistant_name=assistant_name,
-            assistant_type=assistant_type,
+            id=id,
+            name=name,
+            type=type,
             invoke_context=invoke_context,
         )

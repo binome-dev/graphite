@@ -174,7 +174,7 @@ output_event = workflow_output_topic.publish_data(
 
 # When user responds, publish to paired input topic
 user_response = [Message(role="user", content="Approved")]
-input_event = workflow_input_topic.publish_input_data(
+input_data = workflow_input_topic.publish_input_data(
     upstream_event=output_event,
     data=user_response
 )
@@ -213,12 +213,12 @@ async def human_approval_workflow():
 
     # Process user response
     user_feedback = [Message(role="user", content="Looks good, approved!")]
-    input_event = await input_topic.a_publish_input_data(
+    input_data = await input_topic.a_publish_input_data(
         upstream_event=output_event,
         data=user_feedback
     )
 
-    return input_event
+    return input_data
 ```
 
 ## Best Practices
@@ -325,14 +325,14 @@ async def test_input_topics():
 
     # Simulate user response
     user_response = [Message(role="user", content="Here's my input")]
-    input_event = await workflow_input_topic.a_publish_input_data(
+    input_data = await workflow_input_topic.a_publish_input_data(
         upstream_event=output_event,
         data=user_response
     )
 
-    assert input_event is not None
-    assert input_event.data == user_response
-    assert input_event.consumed_events == [output_event]
+    assert input_data is not None
+    assert input_data.data == user_response
+    assert input_data.consumed_events == [output_event]
 ```
 
 ## Topic Type Constants

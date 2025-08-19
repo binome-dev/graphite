@@ -8,14 +8,14 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 
 class AssistantFailedEvent(AssistantEvent):
     event_type: EventType = EventType.ASSISTANT_FAILED
-    input_event: PublishToTopicEvent
+    input_data: PublishToTopicEvent
     error: Any
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             **self.assistant_event_dict(),
             "data": {
-                "input_event": self.input_event.to_dict(),
+                "input_data": self.input_data.to_dict(),
                 "error": self.error,
             },
         }
@@ -25,6 +25,6 @@ class AssistantFailedEvent(AssistantEvent):
         base_event = cls.assistant_event_base(data)
         return cls(
             **base_event.model_dump(),
-            input_event=PublishToTopicEvent.from_dict(data["data"]["input_event"]),
+            input_data=PublishToTopicEvent.from_dict(data["data"]["input_data"]),
             error=data["data"]["error"],
         )

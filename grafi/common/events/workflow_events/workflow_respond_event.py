@@ -16,14 +16,14 @@ class WorkflowRespondEvent(WorkflowEvent):
     """Represents a workflow response event in the workflow system."""
 
     event_type: EventType = EventType.WORKFLOW_RESPOND
-    input_event: PublishToTopicEvent
+    input_data: PublishToTopicEvent
     output_data: List[ConsumeFromTopicEvent]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             **self.workflow_event_dict(),
             "data": {
-                "input_event": self.input_event.to_dict(),
+                "input_data": self.input_data.to_dict(),
                 "output_data": [event.to_dict() for event in self.output_data],
             },
         }
@@ -31,10 +31,10 @@ class WorkflowRespondEvent(WorkflowEvent):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorkflowRespondEvent":
         base_event = cls.workflow_event_base(data)
-        input_event = PublishToTopicEvent.from_dict(data["data"]["input_event"])
+        input_data = PublishToTopicEvent.from_dict(data["data"]["input_data"])
         return cls(
             **base_event.model_dump(),
-            input_event=input_event,
+            input_data=input_data,
             output_data=[
                 ConsumeFromTopicEvent.from_dict(event)
                 for event in data["data"]["output_data"]
