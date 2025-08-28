@@ -3,28 +3,24 @@ Unified module for all record decorators.
 This replaces 8 separate files with a single, maintainable module.
 """
 
-from typing import List, Union
+from typing import List
+from typing import Union
 
-from grafi.common.decorators.record_base import (
-    EventContext,
-    ComponentConfig,
-    create_sync_decorator,
-    create_async_decorator,
-)
+from grafi.common.decorators.record_base import ComponentConfig
+from grafi.common.decorators.record_base import EventContext
+from grafi.common.decorators.record_base import create_async_decorator
+from grafi.common.decorators.record_base import create_sync_decorator
 
 # Import event types
 from grafi.common.events.component_events import AssistantFailedEvent
 from grafi.common.events.component_events import AssistantInvokeEvent
 from grafi.common.events.component_events import AssistantRespondEvent
-
 from grafi.common.events.component_events import NodeFailedEvent
 from grafi.common.events.component_events import NodeInvokeEvent
 from grafi.common.events.component_events import NodeRespondEvent
-
 from grafi.common.events.component_events import ToolFailedEvent
 from grafi.common.events.component_events import ToolInvokeEvent
 from grafi.common.events.component_events import ToolRespondEvent
-
 from grafi.common.events.component_events import WorkflowFailedEvent
 from grafi.common.events.component_events import WorkflowInvokeEvent
 from grafi.common.events.component_events import WorkflowRespondEvent

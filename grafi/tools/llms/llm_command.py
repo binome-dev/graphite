@@ -3,9 +3,7 @@ from typing import List
 from loguru import logger
 
 from grafi.common.containers.container import container
-from grafi.common.events.component_events import (
-    AssistantRespondEvent,
-)
+from grafi.common.events.component_events import AssistantRespondEvent
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,

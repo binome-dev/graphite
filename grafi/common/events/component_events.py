@@ -3,20 +3,21 @@ Simplified event implementations using the base event framework.
 This module replaces 20+ separate event files with a single, maintainable module.
 """
 
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
-from grafi.common.events.component_base_events import (
-    NodeEventBase,
-    ToolEventBase,
-    WorkflowEventBase,
-    AssistantEventBase,
-    create_component_events,
-)
-from grafi.common.models.message import Message, Messages
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.component_base_events import AssistantEventBase
+from grafi.common.events.component_base_events import NodeEventBase
+from grafi.common.events.component_base_events import ToolEventBase
+from grafi.common.events.component_base_events import WorkflowEventBase
+from grafi.common.events.component_base_events import create_component_events
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
 
 
 # ============================================================================
@@ -94,17 +95,19 @@ ToolInvokeEvent, ToolRespondEvent, ToolFailedEvent = create_component_events(
 # WORKFLOW EVENTS
 # ============================================================================
 
-WorkflowInvokeEvent, WorkflowRespondEvent, WorkflowFailedEvent = (
-    create_component_events(
-        base_class=WorkflowEventBase,
-        component_name="WORKFLOW",
-        input_type=PublishToTopicEvent,
-        output_type=List[ConsumeFromTopicEvent],
-        serialize_input_fn=serialize_topic_event,
-        serialize_output_fn=serialize_consume_events,
-        deserialize_input_fn=deserialize_topic_event,
-        deserialize_output_fn=deserialize_consume_events,
-    )
+(
+    WorkflowInvokeEvent,
+    WorkflowRespondEvent,
+    WorkflowFailedEvent,
+) = create_component_events(
+    base_class=WorkflowEventBase,
+    component_name="WORKFLOW",
+    input_type=PublishToTopicEvent,
+    output_type=List[ConsumeFromTopicEvent],
+    serialize_input_fn=serialize_topic_event,
+    serialize_output_fn=serialize_consume_events,
+    deserialize_input_fn=deserialize_topic_event,
+    deserialize_output_fn=deserialize_consume_events,
 )
 
 
@@ -112,17 +115,19 @@ WorkflowInvokeEvent, WorkflowRespondEvent, WorkflowFailedEvent = (
 # ASSISTANT EVENTS
 # ============================================================================
 
-AssistantInvokeEvent, AssistantRespondEvent, AssistantFailedEvent = (
-    create_component_events(
-        base_class=AssistantEventBase,
-        component_name="ASSISTANT",
-        input_type=PublishToTopicEvent,
-        output_type=List[ConsumeFromTopicEvent],
-        serialize_input_fn=serialize_topic_event,
-        serialize_output_fn=serialize_consume_events,
-        deserialize_input_fn=deserialize_topic_event,
-        deserialize_output_fn=deserialize_consume_events,
-    )
+(
+    AssistantInvokeEvent,
+    AssistantRespondEvent,
+    AssistantFailedEvent,
+) = create_component_events(
+    base_class=AssistantEventBase,
+    component_name="ASSISTANT",
+    input_type=PublishToTopicEvent,
+    output_type=List[ConsumeFromTopicEvent],
+    serialize_input_fn=serialize_topic_event,
+    serialize_output_fn=serialize_consume_events,
+    deserialize_input_fn=deserialize_topic_event,
+    deserialize_output_fn=deserialize_consume_events,
 )
 
 

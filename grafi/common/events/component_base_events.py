@@ -3,12 +3,21 @@ Simplified event base classes with clear hierarchy.
 Reduces code duplication and provides consistent patterns for all events.
 """
 
-from typing import Any, Dict, Generic, List, Optional, Tuple, Type, TypeVar
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
+from typing import Any
+from typing import Dict
+from typing import Generic
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Type
+from typing import TypeVar
 
 from pydantic import Field
 
-from grafi.common.events.event import Event, EventType
+from grafi.common.events.event import Event
+from grafi.common.events.event import EventType
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 

@@ -1,6 +1,6 @@
 import pytest
 
-from grafi.common.events.assistant_events.assistant_failed_event import (
+from grafi.common.events.component_events import (
     AssistantFailedEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
@@ -10,7 +10,7 @@ from grafi.common.topics.topic_types import TopicType
 
 
 @pytest.fixture
-def assistant_failed_event() -> AssistantFailedEvent:
+def assistant_failed_event():
     return AssistantFailedEvent(
         event_id="test_id",
         event_type="AssistantFailed",
@@ -98,7 +98,7 @@ def assistant_failed_event_dict():
 
 
 def test_assistant_failed_event_dict(
-    assistant_failed_event: AssistantFailedEvent, assistant_failed_event_dict
+    assistant_failed_event, assistant_failed_event_dict
 ):
     assert assistant_failed_event.to_dict() == assistant_failed_event_dict
 
