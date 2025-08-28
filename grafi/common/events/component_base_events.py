@@ -5,7 +5,7 @@ Reduces code duplication and provides consistent patterns for all events.
 
 from abc import ABC
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Callable
 from typing import Dict
 from typing import Generic
 from typing import List
@@ -204,10 +204,10 @@ def create_component_events(
     component_name: str,
     input_type: Type,
     output_type: Type,
-    serialize_input_fn: callable,
-    serialize_output_fn: callable,
-    deserialize_input_fn: callable,
-    deserialize_output_fn: callable,
+    serialize_input_fn: Callable,
+    serialize_output_fn: Callable,
+    deserialize_input_fn: Callable,
+    deserialize_output_fn: Callable,
 ) -> Tuple[Type[InvokeEvent], Type[RespondEvent], Type[FailedEvent]]:
     """
     Factory to create a set of Invoke, Respond, and Failed events for a component.
@@ -219,11 +219,11 @@ def create_component_events(
     class ComponentInvokeEvent(InvokeEvent[input_type], base_class):
         event_type: EventType = EventType[f"{component_name.upper()}_INVOKE"]
 
-        def _serialize_input(self, data):
+        def _serialize_input(self, data: Any) -> Any:
             return serialize_input_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data):
+        def _deserialize_input(cls, data: Any) -> input_type:
             return deserialize_input_fn(data)
 
         @classmethod
@@ -250,18 +250,18 @@ def create_component_events(
     class ComponentRespondEvent(RespondEvent[input_type, output_type], base_class):
         event_type: EventType = EventType[f"{component_name.upper()}_RESPOND"]
 
-        def _serialize_input(self, data):
+        def _serialize_input(self, data: Any) -> Any:
             return serialize_input_fn(data)
 
-        def _serialize_output(self, data):
+        def _serialize_output(self, data: Any) -> Any:
             return serialize_output_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data):
+        def _deserialize_input(cls, data: Any) -> input_type:
             return deserialize_input_fn(data)
 
         @classmethod
-        def _deserialize_output(cls, data):
+        def _deserialize_output(cls, data: Any) -> output_type:
             return deserialize_output_fn(data)
 
         @classmethod
@@ -289,11 +289,11 @@ def create_component_events(
     class ComponentFailedEvent(FailedEvent[input_type], base_class):
         event_type: EventType = EventType[f"{component_name.upper()}_FAILED"]
 
-        def _serialize_input(self, data):
+        def _serialize_input(self, data: Any) -> Any:
             return serialize_input_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data):
+        def _deserialize_input(cls, data: Any) -> input_type:
             return deserialize_input_fn(data)
 
         @classmethod

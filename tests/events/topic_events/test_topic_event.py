@@ -1,8 +1,8 @@
-from datetime import datetime
-from datetime import timezone
+import datetime
 
 import pytest
 
+from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 
@@ -68,11 +68,14 @@ def test_event_dict(topic_event: TopicEvent, topic_event_dict):
 
 
 def test_topic_event_base(topic_event_dict, topic_event):
-    assert TopicEvent.event_base(topic_event_dict)[0] == "test_id"
-    assert TopicEvent.event_base(topic_event_dict)[1].value == "TopicEvent"
-    assert TopicEvent.event_base(topic_event_dict)[2] == datetime(
-        2009, 2, 13, 23, 31, 30, tzinfo=timezone.utc
-    )
+    assert TopicEvent.event_base(topic_event_dict) == {
+        "event_id": "test_id",
+        "event_type": EventType.TOPIC_EVENT,
+        "event_version": "1.0",
+        "timestamp": datetime.datetime(
+            2009, 2, 13, 23, 31, 30, tzinfo=datetime.timezone.utc
+        ),
+    }
 
 
 def test_topic_event_dict_message(

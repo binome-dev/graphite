@@ -1,8 +1,6 @@
 import pytest
 
-from grafi.common.events.component_events import (
-    AssistantFailedEvent,
-)
+from grafi.common.events.component_events import AssistantFailedEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -15,9 +13,9 @@ def assistant_failed_event():
         event_id="test_id",
         event_type="AssistantFailed",
         timestamp="2009-02-13T23:31:30+00:00",
-        assistant_id="test_id",
-        assistant_name="test_assistant",
-        assistant_type="test_type",
+        id="test_id",
+        name="test_assistant",
+        type="test_type",
         input_data=PublishToTopicEvent(
             event_id="test_id",
             timestamp="2009-02-13T23:31:30+00:00",
@@ -57,9 +55,9 @@ def assistant_failed_event_dict():
         "event_type": "AssistantFailed",
         "timestamp": "2009-02-13T23:31:30+00:00",
         "event_context": {
-            "assistant_id": "test_id",
-            "assistant_name": "test_assistant",
-            "assistant_type": "test_type",
+            "id": "test_id",
+            "name": "test_assistant",
+            "type": "test_type",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",

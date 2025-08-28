@@ -1,12 +1,10 @@
 import pytest
 
+from grafi.common.events.component_events import WorkflowRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.workflow_events.workflow_respond_event import (
-    WorkflowRespondEvent,
-)
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.topic_types import TopicType
@@ -18,9 +16,9 @@ def workflow_respond_event() -> WorkflowRespondEvent:
         event_id="test_id",
         event_type="WorkflowRespond",
         timestamp="2009-02-13T23:31:30+00:00",
-        workflow_id="test_id",
-        workflow_name="test_workflow",
-        workflow_type="test_type",
+        id="test_id",
+        name="test_workflow",
+        type="test_type",
         invoke_context=InvokeContext(
             conversation_id="conversation_id",
             invoke_id="invoke_id",
@@ -55,7 +53,6 @@ def workflow_respond_event() -> WorkflowRespondEvent:
                 event_id="test_id",
                 name="test_topic",
                 type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
-                node_id="test_node_id",
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=-1,
@@ -99,9 +96,9 @@ def workflow_respond_event_dict():
         "event_type": "WorkflowRespond",
         "timestamp": "2009-02-13T23:31:30+00:00",
         "event_context": {
-            "workflow_id": "test_id",
-            "workflow_name": "test_workflow",
-            "workflow_type": "test_type",
+            "id": "test_id",
+            "name": "test_workflow",
+            "type": "test_type",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",

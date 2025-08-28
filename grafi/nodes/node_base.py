@@ -22,7 +22,7 @@ from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import SubExpr
+from grafi.common.topics.topic_expression import SubExpr, evaluate_subscription
 from grafi.common.topics.topic_expression import TopicExpr
 from grafi.tools.tool import Tool
 
@@ -84,6 +84,44 @@ class NodeBase(BaseModel):
         """
         yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def can_invoke(self) -> bool:
+        """
+        Check if this node can invoke given which topics currently have new data.
+        If ALL of the node's subscribed_expressions is True, we return True.
+        :return: Boolean indicating whether the node should run.
+        """
+        if not self.subscribed_expressions:
+            return True
+
+        topics_with_new_msgs = set()
+
+        # Evaluate each expression; if any is satisfied, we can invoke.
+        for topic in self._subscribed_topics.values():
+            if topic.can_consume(self.name):
+                topics_with_new_msgs.add(topic.name)
+
+        for expr in self.subscribed_expressions:
+            if not evaluate_subscription(expr, list(topics_with_new_msgs)):
+                return False
+
+        return True
+
+    def can_invoke_with_topics(self, topics: List[str]) -> bool:
+        """
+        Check if this node can invoke given a list of topic names.
+        If ALL of the node's subscribed_expressions is True, we return True.
+        :param topics: List of topic names to check against the node's expressions.
+        :return: Boolean indicating whether the node should run.
+        """
+        if not self.subscribed_expressions:
+            return True
+
+        for expr in self.subscribed_expressions:
+            if not evaluate_subscription(expr, topics):
+                return False
+
+        return True
 
     def to_dict(self) -> dict[str, Any]:
         return {

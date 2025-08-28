@@ -7,7 +7,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
-from grafi.nodes.node import Node
+from grafi.nodes.node_base import NodeBase
 
 
 def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
@@ -87,7 +87,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
 
 
 def publish_events(
-    node: Node, publish_event: PublishToTopicEvent
+    node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
@@ -99,7 +99,7 @@ def publish_events(
 
 
 async def a_publish_events(
-    node: Node, publish_event: PublishToTopicEvent
+    node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
@@ -111,7 +111,7 @@ async def a_publish_events(
     return published_events
 
 
-def get_node_input(node: Node) -> List[ConsumeFromTopicEvent]:
+def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
     consumed_events: List[ConsumeFromTopicEvent] = []
 
     node_subscribed_topics = node._subscribed_topics.values()

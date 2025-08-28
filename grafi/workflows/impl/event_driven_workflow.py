@@ -25,7 +25,7 @@ from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.topics.topic_base import TopicBase
 from grafi.common.topics.topic_expression import extract_topics
 from grafi.common.topics.topic_types import TopicType
-from grafi.nodes.node import Node
+from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
@@ -60,7 +60,7 @@ class EventDrivenWorkflow(Workflow):
 
     # Event graph for this workflow
     # Queue of nodes that are ready to invoke (in response to published events)
-    _invoke_queue: deque[Node] = PrivateAttr(default=deque())
+    _invoke_queue: deque[NodeBase] = PrivateAttr(default=deque())
 
     _tracker: AsyncNodeTracker = AsyncNodeTracker()
 
@@ -141,7 +141,7 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         # Map each topic -> the nodes that publish to it
-        published_topics_to_nodes: Dict[str, List[Node]] = {}
+        published_topics_to_nodes: Dict[str, List[NodeBase]] = {}
 
         published_topics_to_nodes = {}
 
@@ -362,7 +362,7 @@ class EventDrivenWorkflow(Workflow):
                     )
                     logger.error(f"Node {node_name} ended with exception: {result}")
 
-    async def _invoke_node(self, invoke_context: InvokeContext, node: Node) -> None:
+    async def _invoke_node(self, invoke_context: InvokeContext, node: NodeBase) -> None:
         """Enhanced node invocation with better async patterns and error handling."""
         buffer: Dict[str, List[TopicEvent]] = {}
 
@@ -383,7 +383,7 @@ class EventDrivenWorkflow(Workflow):
             except asyncio.CancelledError:
                 pass
 
-        async def wait_node_invoke(node: Node) -> None:
+        async def wait_node_invoke(node: NodeBase) -> None:
             while not node.can_invoke_with_topics(list(buffer.keys())):
                 # for every topic that *doesn't* have data yet, start one waiter
                 tasks = [

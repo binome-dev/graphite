@@ -1,8 +1,6 @@
 import pytest
 
-from grafi.common.events.assistant_events.assistant_respond_event import (
-    AssistantRespondEvent,
-)
+from grafi.common.events.component_events import AssistantRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -18,9 +16,9 @@ def assistant_respond_event() -> AssistantRespondEvent:
         event_id="test_id",
         event_type="AssistantRespond",
         timestamp="2009-02-13T23:31:30+00:00",
-        assistant_id="test_id",
-        assistant_name="test_assistant",
-        assistant_type="test_type",
+        id="test_id",
+        name="test_assistant",
+        type="test_type",
         input_data=PublishToTopicEvent(
             event_id="test_id",
             timestamp="2009-02-13T23:31:30+00:00",
@@ -50,7 +48,6 @@ def assistant_respond_event() -> AssistantRespondEvent:
                 event_id="test_id",
                 name="test_topic",
                 type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
-                node_id="test_node_id",
                 consumer_name="test_node",
                 consumer_type="test_type",
                 offset=-1,
@@ -99,9 +96,9 @@ def assistant_respond_event_dict():
         "event_type": "AssistantRespond",
         "timestamp": "2009-02-13T23:31:30+00:00",
         "event_context": {
-            "assistant_id": "test_id",
-            "assistant_name": "test_assistant",
-            "assistant_type": "test_type",
+            "id": "test_id",
+            "name": "test_assistant",
+            "type": "test_type",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",
