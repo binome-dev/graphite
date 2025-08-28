@@ -3,8 +3,8 @@ from typing import Dict
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message

@@ -46,8 +46,8 @@ def node_respond_event(invoke_context) -> NodeRespondEvent:
             event_id="test_id",
             timestamp="2009-02-13T23:31:30+00:00",
             invoke_context=invoke_context,
-            topic_name="test_output_topic",
-            topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            name="test_output_topic",
+            type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
             publisher_name="test_node",
             publisher_type="test_type",
             consumed_event_ids=["test_id"],
@@ -105,8 +105,8 @@ def node_respond_event_dict():
                     "event_context": {
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
-                        "topic_name": "test_topic",
-                        "topic_type": "NoneTopic",
+                        "name": "test_topic",
+                        "type": "NoneTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",
@@ -129,8 +129,8 @@ def node_respond_event_dict():
                     "consumed_event_ids": ["test_id"],
                     "publisher_name": "test_node",
                     "publisher_type": "test_type",
-                    "topic_name": "test_output_topic",
-                    "topic_type": "AgentOutputTopic",
+                    "name": "test_output_topic",
+                    "type": "AgentOutputTopic",
                     "offset": 3,
                     "invoke_context": {
                         "conversation_id": "conversation_id",

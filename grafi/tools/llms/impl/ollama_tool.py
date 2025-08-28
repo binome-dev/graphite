@@ -12,8 +12,8 @@ from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -199,9 +199,9 @@ class OllamaTool(LLM):
             raw_tool_calls = message_data.tool_calls
 
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:

@@ -2,8 +2,8 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import List
 
-from grafi.common.decorators.record_node_a_invoke import record_node_a_invoke
-from grafi.common.decorators.record_node_invoke import record_node_invoke
+from grafi.common.decorators.record_decorators import record_node_a_invoke
+from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )

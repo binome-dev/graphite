@@ -111,7 +111,7 @@ class TestNodeBase:
         return [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="test_node",
                 consumer_type="NodeBase",
                 offset=0,

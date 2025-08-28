@@ -59,7 +59,8 @@ Created when data is consumed from a topic:
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 
 event = ConsumeFromTopicEvent(
-    topic_name="output_topic",
+    name="output_topic",
+    type=TopicType.DEFAULT_TOPIC_TYPE,
     offset=42,
     publisher_name="ProcessorNode",  # Original publisher
     publisher_type="node",

@@ -12,8 +12,8 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.command import use_command
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs

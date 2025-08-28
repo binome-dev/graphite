@@ -46,9 +46,7 @@ class ConsumeFromTopicEvent(TopicEvent):
 
         base_event = cls.event_base(data)
         return cls(
-            event_id=base_event[0],
-            event_type=base_event[1],
-            timestamp=base_event[2],
+            **base_event,
             consumer_name=data[EVENT_CONTEXT]["consumer_name"],
             consumer_type=data[EVENT_CONTEXT]["consumer_type"],
             name=data[EVENT_CONTEXT]["name"],

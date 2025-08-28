@@ -5,8 +5,8 @@ from typing import AsyncGenerator
 from typing import List
 
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.decorators.record_assistant_a_invoke import record_assistant_a_invoke
-from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
+from grafi.common.decorators.record_decorators import record_assistant_a_invoke
+from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )

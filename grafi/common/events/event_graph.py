@@ -68,9 +68,9 @@ class EventGraph(BaseModel):
         self.nodes.clear()
         self.root_nodes.clear()
 
-        # Create a mapping of "topic_name::offset" -> publish event
+        # Create a mapping of "name::offset" -> publish event
         topic_offset_to_publish = {
-            f"{event.topic_name}::{event.offset}": event
+            f"{event.name}::{event.offset}": event
             for event in topic_events.values()
             if isinstance(event, PublishToTopicEvent)
         }
@@ -87,7 +87,7 @@ class EventGraph(BaseModel):
             current_node = self._add_event(consume_event)
 
             # Find the corresponding publish event
-            publish_key = f"{consume_event.topic_name}::{consume_event.offset}"
+            publish_key = f"{consume_event.name}::{consume_event.offset}"
             publish_event = topic_offset_to_publish.get(publish_key)
 
             if publish_event:

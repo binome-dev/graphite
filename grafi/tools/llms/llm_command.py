@@ -3,7 +3,7 @@ from typing import List
 from loguru import logger
 
 from grafi.common.containers.container import container
-from grafi.common.events.assistant_events.assistant_respond_event import (
+from grafi.common.events.component_events import (
     AssistantRespondEvent,
 )
 from grafi.common.events.event_graph import EventGraph

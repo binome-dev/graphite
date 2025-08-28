@@ -1,0 +1,214 @@
+[
+  {
+    "event_id": "13761a3ffe264f5ebe992ce2e60aa600",
+    "event_version": "1.0",
+    "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+    "event_type": "NodeInvoke",
+    "timestamp": "2025-08-28T10:15:17.192532+00:00",
+    "event_context": {
+      "id": "1d3a3c2c91c347eabf17b1f3f71a7cb1",
+      "name": "Node",
+      "type": "Node",
+      "invoke_context": {
+        "conversation_id": "conversation_id",
+        "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+        "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+        "user_id": "",
+        "kwargs": {}
+      },
+      "subscribed_topics": [],
+      "publish_to_topics": []
+    },
+    "data": {
+      "input_data": [
+        {
+          "event_context": {
+            "consumer_name": "Node",
+            "consumer_type": "Node",
+            "name": "test_topic",
+            "type": "Topic",
+            "offset": -1,
+            "invoke_context": {
+              "conversation_id": "conversation_id",
+              "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+              "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+              "user_id": "",
+              "kwargs": {}
+            }
+          },
+          "event_id": "c25665a52edd43648b6862928ef3675d",
+          "event_version": "1.0",
+          "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+          "event_type": "ConsumeFromTopic",
+          "timestamp": "2025-08-28T10:15:17.192461+00:00",
+          "data": "[{\"name\": null, \"message_id\": \"638ab6c9561c44cd83f160062b92cbcf\", \"timestamp\": 1756376117192432000, \"content\": \"Hello, my name is Grafi, how are you doing?\", \"refusal\": null, \"annotations\": null, \"audio\": null, \"role\": \"user\", \"tool_call_id\": null, \"tools\": null, \"function_call\": null, \"tool_calls\": null, \"is_streaming\": false}]"
+        }
+      ]
+    }
+  },
+  {
+    "event_id": "381c927b01484c868311aa2554565516",
+    "event_version": "1.0",
+    "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+    "event_type": "ToolInvoke",
+    "timestamp": "2025-08-28T10:15:17.192764+00:00",
+    "event_context": {
+      "id": "35ef4d98f7bb418dbdf9a4cd85292f3c",
+      "name": "OpenAITool",
+      "type": "OpenAITool",
+      "invoke_context": {
+        "conversation_id": "conversation_id",
+        "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+        "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+        "user_id": "",
+        "kwargs": {}
+      }
+    },
+    "data": {
+      "input_data": [
+        {
+          "name": null,
+          "message_id": "638ab6c9561c44cd83f160062b92cbcf",
+          "timestamp": 1756376117192432000,
+          "content": "Hello, my name is Grafi, how are you doing?",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "role": "user",
+          "tool_call_id": null,
+          "tools": null,
+          "function_call": null,
+          "tool_calls": null,
+          "is_streaming": false
+        }
+      ]
+    }
+  },
+  {
+    "event_id": "5907d51f61614bbeadf2067ba696c760",
+    "event_version": "1.0",
+    "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+    "event_type": "ToolRespond",
+    "timestamp": "2025-08-28T10:15:18.814459+00:00",
+    "event_context": {
+      "id": "35ef4d98f7bb418dbdf9a4cd85292f3c",
+      "name": "OpenAITool",
+      "type": "OpenAITool",
+      "invoke_context": {
+        "conversation_id": "conversation_id",
+        "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+        "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+        "user_id": "",
+        "kwargs": {}
+      }
+    },
+    "data": {
+      "input_data": [
+        {
+          "name": null,
+          "message_id": "638ab6c9561c44cd83f160062b92cbcf",
+          "timestamp": 1756376117192432000,
+          "content": "Hello, my name is Grafi, how are you doing?",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "role": "user",
+          "tool_call_id": null,
+          "tools": null,
+          "function_call": null,
+          "tool_calls": null,
+          "is_streaming": false
+        }
+      ],
+      "output_data": [
+        {
+          "name": null,
+          "message_id": "c36f186d448e4f77a972170a41d136ec",
+          "timestamp": 1756376118814334000,
+          "content": "Hello, Grafi! I'm just a program, so I don't have feelings, but I'm here and ready to help you with anything you need. How can I assist you today?",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "role": "assistant",
+          "tool_call_id": null,
+          "tools": null,
+          "function_call": null,
+          "tool_calls": null,
+          "is_streaming": false
+        }
+      ]
+    }
+  },
+  {
+    "event_id": "1c7633a406f1425a8ebe65a910804829",
+    "event_version": "1.0",
+    "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+    "event_type": "NodeRespond",
+    "timestamp": "2025-08-28T10:15:18.814858+00:00",
+    "event_context": {
+      "id": "1d3a3c2c91c347eabf17b1f3f71a7cb1",
+      "name": "Node",
+      "type": "Node",
+      "invoke_context": {
+        "conversation_id": "conversation_id",
+        "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+        "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+        "user_id": "",
+        "kwargs": {}
+      },
+      "subscribed_topics": [],
+      "publish_to_topics": []
+    },
+    "data": {
+      "input_data": [
+        {
+          "event_context": {
+            "consumer_name": "Node",
+            "consumer_type": "Node",
+            "name": "test_topic",
+            "type": "Topic",
+            "offset": -1,
+            "invoke_context": {
+              "conversation_id": "conversation_id",
+              "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+              "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+              "user_id": "",
+              "kwargs": {}
+            }
+          },
+          "event_id": "c25665a52edd43648b6862928ef3675d",
+          "event_version": "1.0",
+          "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+          "event_type": "ConsumeFromTopic",
+          "timestamp": "2025-08-28T10:15:17.192461+00:00",
+          "data": "[{\"name\": null, \"message_id\": \"638ab6c9561c44cd83f160062b92cbcf\", \"timestamp\": 1756376117192432000, \"content\": \"Hello, my name is Grafi, how are you doing?\", \"refusal\": null, \"annotations\": null, \"audio\": null, \"role\": \"user\", \"tool_call_id\": null, \"tools\": null, \"function_call\": null, \"tool_calls\": null, \"is_streaming\": false}]"
+        }
+      ],
+      "output_data": {
+        "event_context": {
+          "consumed_event_ids": [
+            "c25665a52edd43648b6862928ef3675d"
+          ],
+          "publisher_name": "Node",
+          "publisher_type": "Node",
+          "name": "",
+          "type": "NoneTopic",
+          "offset": -1,
+          "invoke_context": {
+            "conversation_id": "conversation_id",
+            "invoke_id": "96ca2a916e274e86882eb2eb83468c59",
+            "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+            "user_id": "",
+            "kwargs": {}
+          }
+        },
+        "event_id": "5f099251fca0481fa061fb2795ff0ed9",
+        "event_version": "1.0",
+        "assistant_request_id": "f3cc1d6bb5a74b548f2691ed50e97757",
+        "event_type": "PublishToTopic",
+        "timestamp": "2025-08-28T10:15:18.813750+00:00",
+        "data": "[{\"name\": null, \"message_id\": \"0e043f75151a41e5b5db4481f8d4d642\", \"timestamp\": 1756376118814566000, \"content\": \"Hello, Grafi! I'm just a program, so I don't have feelings, but I'm here and ready to help you with anything you need. How can I assist you today?\", \"refusal\": null, \"annotations\": null, \"audio\": null, \"role\": \"assistant\", \"tool_call_id\": null, \"tools\": null, \"function_call\": null, \"tool_calls\": null, \"is_streaming\": false}]"
+      }
+    }
+  }
+]

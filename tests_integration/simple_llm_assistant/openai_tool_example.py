@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import uuid
 
@@ -10,6 +11,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.topics.topic_types import TopicType
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 
@@ -141,7 +143,7 @@ async def test_openai_tool_async() -> None:
 
 async def test_llm_a_stream_node() -> None:
     event_store.clear_events()
-    llm_stream_node = (
+    llm_stream_node: Node = (
         Node.builder()
         .tool(OpenAITool.builder().is_streaming(True).api_key(api_key).build())
         .build()
@@ -153,7 +155,8 @@ async def test_llm_a_stream_node() -> None:
 
     topic_event = ConsumeFromTopicEvent(
         invoke_context=invoke_context,
-        topic_name="test_topic",
+        name="test_topic",
+        type=TopicType.DEFAULT_TOPIC_TYPE,
         consumer_name="Node",
         consumer_type="Node",
         offset=-1,
@@ -183,3 +186,7 @@ test_openai_tool_with_structured_output()
 asyncio.run(test_openai_tool_a_stream())
 asyncio.run(test_openai_tool_async())
 asyncio.run(test_llm_a_stream_node())
+
+events_data = [event.to_dict() for event in event_store.get_events()]
+with open("logging_events.json", "w") as f:
+    f.write(json.dumps(events_data, indent=2))

@@ -20,8 +20,8 @@ from typing import Self
 from google.genai import types
 from pydantic import Field
 
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -235,9 +235,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided

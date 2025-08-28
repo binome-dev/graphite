@@ -73,8 +73,8 @@ def node_failed_event_dict():
                     "event_context": {
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
-                        "topic_name": "test_topic",
-                        "topic_type": "NoneTopic",
+                        "name": "test_topic",
+                        "type": "NoneTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",

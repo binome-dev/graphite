@@ -3,7 +3,6 @@ from datetime import timezone
 from enum import Enum
 from typing import Any
 from typing import Dict
-from typing import Tuple
 from typing import Type
 from typing import TypeVar
 
@@ -60,12 +59,18 @@ class Event(BaseModel):
         return base_dict
 
     @classmethod
-    def event_base(cls, event_dict: dict) -> Tuple[str, EventType, datetime]:
+    def event_base(cls, event_dict: dict) -> Dict[str, Any]:
         event_id = event_dict["event_id"]
         event_type = EventType(event_dict["event_type"])
+        event_version = event_dict["event_version"]
         timestamp = datetime.fromisoformat(event_dict["timestamp"])
 
-        return event_id, event_type, timestamp
+        return {
+            "event_id": event_id,
+            "event_type": event_type,
+            "event_version": event_version,
+            "timestamp": timestamp,
+        }
 
     def to_dict(self) -> Dict[str, Any]:
         # Return a dictionary representation of the event

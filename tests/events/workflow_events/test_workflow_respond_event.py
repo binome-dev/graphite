@@ -34,8 +34,8 @@ def workflow_respond_event() -> WorkflowRespondEvent:
                 invoke_id="invoke_id",
                 assistant_request_id="assistant_request_id",
             ),
-            topic_name="test_output_topic",
-            topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            name="test_output_topic",
+            type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
             publisher_name="test_assistant",
             publisher_type="test_type",
             data=[
@@ -53,8 +53,8 @@ def workflow_respond_event() -> WorkflowRespondEvent:
         output_data=[
             ConsumeFromTopicEvent(
                 event_id="test_id",
-                topic_name="test_topic",
-                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                name="test_topic",
+                type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
                 node_id="test_node_id",
                 consumer_name="test_node",
                 consumer_type="test_type",
@@ -116,8 +116,8 @@ def workflow_respond_event_dict():
                     "consumed_event_ids": [],
                     "publisher_name": "test_assistant",
                     "publisher_type": "test_type",
-                    "topic_name": "test_output_topic",
-                    "topic_type": "AgentOutputTopic",
+                    "name": "test_output_topic",
+                    "type": "AgentOutputTopic",
                     "offset": -1,
                     "invoke_context": {
                         "conversation_id": "conversation_id",
@@ -139,8 +139,8 @@ def workflow_respond_event_dict():
                     "event_context": {
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
-                        "topic_name": "test_topic",
-                        "topic_type": "AgentOutputTopic",
+                        "name": "test_topic",
+                        "type": "AgentOutputTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",

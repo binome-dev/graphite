@@ -25,8 +25,8 @@ def test_publish_message(topic: Topic, invoke_context: InvokeContext):
     event = topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message],
@@ -56,8 +56,8 @@ def test_can_consume(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message],
@@ -76,8 +76,8 @@ def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message1],
@@ -86,8 +86,8 @@ def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message2],
@@ -109,8 +109,8 @@ def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message],
@@ -133,8 +133,8 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message1],
@@ -143,8 +143,8 @@ def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeContext):
     topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name="agent_input_topic",
-            topic_type=TopicType.AGENT_INPUT_TOPIC_TYPE,
+            name="agent_input_topic",
+            type=TopicType.AGENT_INPUT_TOPIC_TYPE,
             publisher_name="test_publisher",
             publisher_type="test_type",
             data=[message2],

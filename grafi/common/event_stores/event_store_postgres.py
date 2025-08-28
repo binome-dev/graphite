@@ -223,7 +223,7 @@ class EventStorePostgres(EventStore):
         finally:
             session.close()
 
-    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets using JSONB operators."""
         if not offsets:
             return []
@@ -235,8 +235,8 @@ class EventStorePostgres(EventStore):
                 session.query(EventModel).filter(
                     # Filter by event type
                     EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
-                    # Use JSONB ->> operator to extract topic_name and compare
-                    EventModel.event_context.op("->>")("topic_name") == topic_name,
+                    # Use JSONB ->> operator to extract name and compare
+                    EventModel.event_context.op("->>")("name") == name,
                     # Use JSONB -> operator to extract offset and check if it's in our list
                     # Cast the JSONB value to integer for comparison
                     EventModel.event_context.op("->")("offset")
@@ -266,7 +266,7 @@ class EventStorePostgres(EventStore):
             return events
 
         except Exception as e:
-            logger.error(f"Failed to get topic events for {topic_name}: {e}")
+            logger.error(f"Failed to get topic events for {name}: {e}")
             raise e
         finally:
             session.close()

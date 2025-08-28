@@ -50,9 +50,7 @@ class PublishToTopicEvent(TopicEvent):
 
         base_event = cls.event_base(data)
         return cls(
-            event_id=base_event[0],
-            event_type=base_event[1],
-            timestamp=base_event[2],
+            **base_event,
             consumed_event_ids=data[EVENT_CONTEXT]["consumed_event_ids"],
             publisher_name=data[EVENT_CONTEXT]["publisher_name"],
             publisher_type=data[EVENT_CONTEXT]["publisher_type"],

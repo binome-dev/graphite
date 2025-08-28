@@ -15,7 +15,7 @@ def get_consumed_events(messages: Messages) -> List[ConsumeFromTopicEvent]:
     return [
         ConsumeFromTopicEvent(
             event_id="test_id",
-            topic_name="test_topic",
+            name="test_topic",
             node_id="test_node_id",
             consumer_name="test_node",
             consumer_type="test_type",

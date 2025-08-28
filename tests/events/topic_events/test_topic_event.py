@@ -18,7 +18,7 @@ def topic_event() -> TopicEvent:
             invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
-        topic_name="test_topic",
+        name="test_topic",
         offset=0,
         data=[],
     )
@@ -35,7 +35,7 @@ def topic_event_message() -> TopicEvent:
             invoke_id="invoke_id",
             assistant_request_id="assistant_request_id",
         ),
-        topic_name="test_topic",
+        name="test_topic",
         offset=0,
         data=[],
     )

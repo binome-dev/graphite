@@ -11,8 +11,8 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_workflow_a_invoke import record_workflow_a_invoke
-from grafi.common.decorators.record_workflow_invoke import record_workflow_invoke
+from grafi.common.decorators.record_decorators import record_workflow_a_invoke
+from grafi.common.decorators.record_decorators import record_workflow_invoke
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -199,8 +199,8 @@ class EventDrivenWorkflow(Workflow):
                 for event in events:
                     consumed_events.append(
                         ConsumeFromTopicEvent(
-                            topic_name=event.topic_name,
-                            topic_type=event.topic_type,
+                            name=event.name,
+                            type=event.type,
                             consumer_name=self.name,
                             consumer_type=self.type,
                             invoke_context=event.invoke_context,
@@ -212,16 +212,16 @@ class EventDrivenWorkflow(Workflow):
         return consumed_events
 
     async def _a_commit_events(
-        self, consumer_name: str, events: List[ConsumeFromTopicEvent]
+        self, consumer_name: str, topic_events: List[ConsumeFromTopicEvent]
     ) -> None:
-        if not events:
+        if not topic_events:
             return
         # commit all consumed events
         topic_max_offset: Dict[str, int] = {}
 
-        for event in events:
-            topic_max_offset[event.topic_name] = max(
-                topic_max_offset.get(event.topic_name, 0), event.offset
+        for topic_event in topic_events:
+            topic_max_offset[topic_event.name] = max(
+                topic_max_offset.get(topic_event.name, 0), topic_event.offset
             )
 
         for topic, offset in topic_max_offset.items():
@@ -319,8 +319,8 @@ class EventDrivenWorkflow(Workflow):
             async for event in output_queue:
                 # Now yield the data after committing
                 consumed_event = ConsumeFromTopicEvent(
-                    topic_name=event.topic_name,
-                    topic_type=event.topic_type,
+                    name=event.name,
+                    type=event.type,
                     consumer_name=self.name,
                     consumer_type=self.type,
                     invoke_context=event.invoke_context,
@@ -335,7 +335,7 @@ class EventDrivenWorkflow(Workflow):
 
             # Commit all consumed output events
             await self._a_commit_events(
-                consumer_name=self.name, events=consumed_output_events
+                consumer_name=self.name, topic_events=consumed_output_events
             )
 
             # 4. graceful shutdown all the nodes
@@ -417,8 +417,8 @@ class EventDrivenWorkflow(Workflow):
                         for event in events:
                             consumed_event = ConsumeFromTopicEvent(
                                 invoke_context=event.invoke_context,
-                                topic_name=event.topic_name,
-                                topic_type=event.topic_type,
+                                name=event.name,
+                                type=event.type,
                                 consumer_name=node.name,
                                 consumer_type=node.type,
                                 offset=event.offset,
@@ -437,7 +437,7 @@ class EventDrivenWorkflow(Workflow):
                             )
 
                     await self._a_commit_events(
-                        consumer_name=node.name, events=consumed_events
+                        consumer_name=node.name, topic_events=consumed_events
                     )
                     container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
                     container.event_store.record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
@@ -463,12 +463,12 @@ class EventDrivenWorkflow(Workflow):
         if not isinstance(event, PublishToTopicEvent):
             return
 
-        topic_name = event.topic_name
-        if topic_name not in self._topic_nodes:
+        name = event.name
+        if name not in self._topic_nodes:
             return
 
         # Get all nodes subscribed to this topic
-        subscribed_nodes = self._topic_nodes[topic_name]
+        subscribed_nodes = self._topic_nodes[name]
 
         for node_name in subscribed_nodes:
             node = self.nodes[node_name]
@@ -523,7 +523,7 @@ class EventDrivenWorkflow(Workflow):
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:
-                self._topics[topic_event.topic_name].restore_topic(topic_event)
+                self._topics[topic_event.name].restore_topic(topic_event)
 
             publish_events = [
                 event for event in events if isinstance(event, PublishToTopicEvent)
@@ -539,15 +539,15 @@ class EventDrivenWorkflow(Workflow):
             ]
             in_workflow_output_topic_names = set(
                 [
-                    event.topic_name
+                    event.name
                     for event in consumed_events
-                    if event.topic_type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+                    if event.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
                 ]
             )
 
             # restore the topics
             for publish_event in publish_events:
-                topic_name = publish_event.topic_name
+                topic_name = publish_event.name
 
                 if topic_name not in self._topic_nodes:
                     continue
@@ -643,7 +643,7 @@ class EventDrivenWorkflow(Workflow):
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:
-                await self._topics[topic_event.topic_name].a_restore_topic(topic_event)
+                await self._topics[topic_event.name].a_restore_topic(topic_event)
 
             in_workflow_output_topic_names: Set[str] = set()
             consumed_event_ids = input_data.consumed_event_ids
@@ -652,9 +652,9 @@ class EventDrivenWorkflow(Workflow):
             ]
             in_workflow_output_topic_names = set(
                 [
-                    event.topic_name
+                    event.name
                     for event in consumed_events
-                    if event.topic_type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+                    if event.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
                 ]
             )
 

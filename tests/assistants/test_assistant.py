@@ -34,8 +34,8 @@ class TestAssistant:
         mock_workflow.invoke.return_value = [
             ConsumeFromTopicEvent(
                 invoke_context=invoke_context,
-                topic_name="agent_output",
-                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                name="agent_output",
+                type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
                 consumer_name="test_consumer",
                 consumed_type="Workflow",
                 offset=0,
@@ -46,8 +46,8 @@ class TestAssistant:
         async def mock_a_invoke(*args, **kwargs):
             yield ConsumeFromTopicEvent(
                 invoke_context=invoke_context,
-                topic_name="agent_output",
-                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                name="agent_output",
+                type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
                 consumer_name="test_consumer",
                 consumed_type="Workflow",
                 offset=0,
@@ -222,8 +222,8 @@ class TestAssistant:
         async def mock_multi_yield(*args, **kwargs):
             yield ConsumeFromTopicEvent(
                 invoke_context=invoke_context,
-                topic_name="agent_output",
-                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                name="agent_output",
+                type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
                 consumer_name="test_consumer",
                 consumed_type="Workflow",
                 offset=0,
@@ -231,8 +231,8 @@ class TestAssistant:
             )
             yield ConsumeFromTopicEvent(
                 invoke_context=invoke_context,
-                topic_name="agent_output",
-                topic_type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                name="agent_output",
+                type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
                 consumer_name="test_consumer",
                 consumed_type="Workflow",
                 offset=0,

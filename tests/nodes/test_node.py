@@ -98,7 +98,7 @@ class TestNode:
         return [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="test_node",
                 consumer_type="Node",
                 offset=0,
@@ -468,7 +468,7 @@ class TestNode:
         sample_events = [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="async_workflow_node",
                 consumer_type="Node",
                 offset=0,

@@ -68,7 +68,7 @@ def publish_data(
     if self.condition(data):
         event = PublishToTopicEvent(
             invoke_context=invoke_context,
-            topic_name=self.name,
+            name=self.name,
             publisher_name=publisher_name,
             publisher_type=publisher_type,
             data=data,
@@ -119,7 +119,7 @@ topic = (Topic.builder()
 
 ```python
 def on_message_published(event: PublishToTopicEvent):
-    print(f"Published message to {event.topic_name}: {event.data}")
+    print(f"Published message to {event.name}: {event.data}")
 
 topic = (Topic.builder()
     .name("alerts")

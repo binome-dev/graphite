@@ -201,7 +201,7 @@ async def a_invoke(self, invoke_context: InvokeContext,
 
 #### @record_tool_invoke
 
-**Location**: `grafi.common.decorators.record_tool_invoke`
+**Location**: `grafi.common.decorators.record_decorators`
 
 Records synchronous tool invocations with event logging and tracing.
 
@@ -215,7 +215,7 @@ Records synchronous tool invocations with event logging and tracing.
 **Usage**:
 
 ```python
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 
 @record_tool_invoke
 def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
@@ -225,7 +225,7 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
 
 #### @record_tool_a_invoke
 
-**Location**: `grafi.common.decorators.record_tool_a_invoke`
+**Location**: `grafi.common.decorators.record_decorators`
 
 Records asynchronous tool invocations that return async generators.
 
@@ -239,7 +239,7 @@ Records asynchronous tool invocations that return async generators.
 **Usage**:
 
 ```python
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
 
 @record_tool_a_invoke
 async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
