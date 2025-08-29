@@ -17,7 +17,7 @@ from pydantic_core import to_jsonable_python
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
-from grafi.common.events.component_base_events import ComponentEvent
+from grafi.common.events.component_base import ComponentEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )

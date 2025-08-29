@@ -216,18 +216,18 @@ def create_component_events(
         Tuple of (InvokeEvent, RespondEvent, FailedEvent) classes
     """
 
-    class ComponentInvokeEvent(InvokeEvent[input_type], base_class):
+    class ComponentInvokeEvent(InvokeEvent[input_type], base_class):  # type: ignore
         event_type: EventType = EventType[f"{component_name.upper()}_INVOKE"]
 
         def _serialize_input(self, data: Any) -> Any:
             return serialize_input_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data: Any) -> input_type:
+        def _deserialize_input(cls, data: Any) -> Any:
             return deserialize_input_fn(data)
 
         @classmethod
-        def from_dict(cls, data: Dict[str, Any]):
+        def from_dict(cls, data: Dict[str, Any]) -> "ComponentInvokeEvent":
             base_fields = cls.event_base(data)
             event_context = data["event_context"]
             return cls(
@@ -247,7 +247,7 @@ def create_component_events(
                 },
             )
 
-    class ComponentRespondEvent(RespondEvent[input_type, output_type], base_class):
+    class ComponentRespondEvent(RespondEvent[input_type, output_type], base_class):  # type: ignore
         event_type: EventType = EventType[f"{component_name.upper()}_RESPOND"]
 
         def _serialize_input(self, data: Any) -> Any:
@@ -257,15 +257,15 @@ def create_component_events(
             return serialize_output_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data: Any) -> input_type:
+        def _deserialize_input(cls, data: Any) -> Any:
             return deserialize_input_fn(data)
 
         @classmethod
-        def _deserialize_output(cls, data: Any) -> output_type:
+        def _deserialize_output(cls, data: Any) -> Any:
             return deserialize_output_fn(data)
 
         @classmethod
-        def from_dict(cls, data: Dict[str, Any]):
+        def from_dict(cls, data: Dict[str, Any]) -> "ComponentRespondEvent":
             base_fields = cls.event_base(data)
             event_context = data["event_context"]
             return cls(
@@ -286,18 +286,18 @@ def create_component_events(
                 },
             )
 
-    class ComponentFailedEvent(FailedEvent[input_type], base_class):
+    class ComponentFailedEvent(FailedEvent[input_type], base_class):  # type: ignore
         event_type: EventType = EventType[f"{component_name.upper()}_FAILED"]
 
         def _serialize_input(self, data: Any) -> Any:
             return serialize_input_fn(data)
 
         @classmethod
-        def _deserialize_input(cls, data: Any) -> input_type:
+        def _deserialize_input(cls, data: Any) -> Any:
             return deserialize_input_fn(data)
 
         @classmethod
-        def from_dict(cls, data: Dict[str, Any]):
+        def from_dict(cls, data: Dict[str, Any]) -> "ComponentFailedEvent":
             base_fields = cls.event_base(data)
             event_context = data["event_context"]
             return cls(

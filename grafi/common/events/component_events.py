@@ -7,11 +7,11 @@ from typing import Any
 from typing import Dict
 from typing import List
 
-from grafi.common.events.component_base_events import AssistantEventBase
-from grafi.common.events.component_base_events import NodeEventBase
-from grafi.common.events.component_base_events import ToolEventBase
-from grafi.common.events.component_base_events import WorkflowEventBase
-from grafi.common.events.component_base_events import create_component_events
+from grafi.common.events.component_base import AssistantEventBase
+from grafi.common.events.component_base import NodeEventBase
+from grafi.common.events.component_base import ToolEventBase
+from grafi.common.events.component_base import WorkflowEventBase
+from grafi.common.events.component_base import create_component_events
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
