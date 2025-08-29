@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import WorkflowInvokeEvent
@@ -8,7 +10,7 @@ from grafi.common.topics.topic_types import TopicType
 
 
 @pytest.fixture
-def workflow_invoke_event() -> WorkflowInvokeEvent:
+def workflow_invoke_event() -> Any:
     return WorkflowInvokeEvent(
         event_id="test_id",
         event_type="WorkflowInvoke",
@@ -97,7 +99,7 @@ def workflow_invoke_event_dict():
 
 
 def test_workflow_invoke_event_to_dict(
-    workflow_invoke_event: WorkflowInvokeEvent, workflow_invoke_event_dict
+    workflow_invoke_event, workflow_invoke_event_dict
 ):
     assert workflow_invoke_event.to_dict() == workflow_invoke_event_dict
 

@@ -22,8 +22,9 @@ from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import SubExpr, evaluate_subscription
+from grafi.common.topics.topic_expression import SubExpr
 from grafi.common.topics.topic_expression import TopicExpr
+from grafi.common.topics.topic_expression import evaluate_subscription
 from grafi.tools.tool import Tool
 
 

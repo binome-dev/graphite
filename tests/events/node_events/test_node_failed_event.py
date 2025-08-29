@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import NodeFailedEvent
@@ -17,7 +19,7 @@ def invoke_context():
 
 
 @pytest.fixture
-def node_failed_event(invoke_context) -> NodeFailedEvent:
+def node_failed_event(invoke_context) -> Any:
     return NodeFailedEvent(
         event_id="test_id",
         event_type=EventType.NODE_INVOKE,
@@ -98,9 +100,7 @@ def node_failed_event_dict():
     }
 
 
-def test_node_failed_event_to_dict(
-    node_failed_event: NodeFailedEvent, node_failed_event_dict
-):
+def test_node_failed_event_to_dict(node_failed_event, node_failed_event_dict):
     assert node_failed_event.to_dict() == node_failed_event_dict
 
 

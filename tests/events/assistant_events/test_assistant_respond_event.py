@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import AssistantRespondEvent
@@ -11,7 +13,7 @@ from grafi.common.topics.topic_types import TopicType
 
 
 @pytest.fixture
-def assistant_respond_event() -> AssistantRespondEvent:
+def assistant_respond_event() -> Any:
     return AssistantRespondEvent(
         event_id="test_id",
         event_type="AssistantRespond",
@@ -160,7 +162,7 @@ def assistant_respond_event_dict():
 
 
 def test_assistant_respond_event_dict(
-    assistant_respond_event: AssistantRespondEvent, assistant_respond_event_dict
+    assistant_respond_event, assistant_respond_event_dict
 ):
     assert assistant_respond_event.to_dict() == assistant_respond_event_dict
 

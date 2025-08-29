@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import ToolRespondEvent
@@ -7,7 +9,7 @@ from grafi.common.models.message import Message
 
 
 @pytest.fixture
-def tool_respond_event() -> ToolRespondEvent:
+def tool_respond_event() -> Any:
     return ToolRespondEvent(
         event_id="test_id",
         event_type="ToolRespond",
@@ -55,7 +57,7 @@ def tool_respond_event() -> ToolRespondEvent:
 
 
 @pytest.fixture
-def tool_respond_event_message() -> ToolRespondEvent:
+def tool_respond_event_message() -> Any:
     return ToolRespondEvent(
         event_id="test_id",
         event_type="ToolRespond",
@@ -226,9 +228,7 @@ def tool_respond_event_dict_message():
     }
 
 
-def test_tool_respond_event_to_dict(
-    tool_respond_event: ToolRespondEvent, tool_respond_event_dict
-):
+def test_tool_respond_event_to_dict(tool_respond_event, tool_respond_event_dict):
     assert tool_respond_event.to_dict() == tool_respond_event_dict
 
 
@@ -237,7 +237,7 @@ def test_tool_respond_event_from_dict(tool_respond_event_dict, tool_respond_even
 
 
 def test_tool_respond_event_message_to_dict(
-    tool_respond_event_message: ToolRespondEvent, tool_respond_event_dict_message
+    tool_respond_event_message, tool_respond_event_dict_message
 ):
     assert tool_respond_event_message.to_dict() == tool_respond_event_dict_message
 

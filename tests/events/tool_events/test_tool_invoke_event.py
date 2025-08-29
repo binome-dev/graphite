@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import ToolInvokeEvent
@@ -6,7 +8,7 @@ from grafi.common.models.message import Message
 
 
 @pytest.fixture
-def tool_invoke_event() -> ToolInvokeEvent:
+def tool_invoke_event() -> Any:
     return ToolInvokeEvent(
         event_id="test_id",
         event_type="ToolInvoke",
@@ -34,7 +36,7 @@ def tool_invoke_event() -> ToolInvokeEvent:
 
 
 @pytest.fixture
-def tool_invoke_event_message() -> ToolInvokeEvent:
+def tool_invoke_event_message() -> Any:
     return ToolInvokeEvent(
         event_id="test_id",
         event_type="ToolInvoke",
@@ -145,9 +147,7 @@ def tool_invoke_event_dict_message():
     }
 
 
-def test_tool_invoke_event_to_dict(
-    tool_invoke_event: ToolInvokeEvent, tool_invoke_event_dict
-):
+def test_tool_invoke_event_to_dict(tool_invoke_event, tool_invoke_event_dict):
     assert tool_invoke_event.to_dict() == tool_invoke_event_dict
 
 
@@ -156,7 +156,7 @@ def test_tool_invoke_event_from_dict(tool_invoke_event_dict, tool_invoke_event):
 
 
 def test_tool_invoke_event_message_to_dict(
-    tool_invoke_event_message: ToolInvokeEvent, tool_invoke_event_dict_message
+    tool_invoke_event_message, tool_invoke_event_dict_message
 ):
     assert tool_invoke_event_message.to_dict() == tool_invoke_event_dict_message
 

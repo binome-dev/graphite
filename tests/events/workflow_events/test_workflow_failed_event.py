@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import WorkflowFailedEvent
@@ -8,7 +10,7 @@ from grafi.common.topics.topic_types import TopicType
 
 
 @pytest.fixture
-def workflow_failed_event() -> WorkflowFailedEvent:
+def workflow_failed_event() -> Any:
     return WorkflowFailedEvent(
         event_id="test_id",
         event_type="WorkflowFailed",
@@ -96,7 +98,7 @@ def workflow_failed_event_dict():
 
 
 def test_workflow_failed_event_to_dict(
-    workflow_failed_event: WorkflowFailedEvent, workflow_failed_event_dict
+    workflow_failed_event, workflow_failed_event_dict
 ):
     assert workflow_failed_event.to_dict() == workflow_failed_event_dict
 

@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import WorkflowRespondEvent
@@ -11,7 +13,7 @@ from grafi.common.topics.topic_types import TopicType
 
 
 @pytest.fixture
-def workflow_respond_event() -> WorkflowRespondEvent:
+def workflow_respond_event() -> Any:
     return WorkflowRespondEvent(
         event_id="test_id",
         event_type="WorkflowRespond",
@@ -160,7 +162,7 @@ def workflow_respond_event_dict():
 
 
 def test_workflow_respond_event_to_dict(
-    workflow_respond_event: WorkflowRespondEvent, workflow_respond_event_dict
+    workflow_respond_event, workflow_respond_event_dict
 ):
     assert workflow_respond_event.to_dict() == workflow_respond_event_dict
 

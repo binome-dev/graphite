@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from grafi.common.events.component_events import ToolFailedEvent
@@ -6,7 +8,7 @@ from grafi.common.models.message import Message
 
 
 @pytest.fixture
-def tool_failed_event() -> ToolFailedEvent:
+def tool_failed_event() -> Any:
     return ToolFailedEvent(
         event_id="test_id",
         event_type="ToolFailed",
@@ -77,9 +79,7 @@ def tool_failed_event_dict():
     }
 
 
-def test_tool_failed_event_to_dict(
-    tool_failed_event: ToolFailedEvent, tool_failed_event_dict
-):
+def test_tool_failed_event_to_dict(tool_failed_event, tool_failed_event_dict):
     assert tool_failed_event.to_dict() == tool_failed_event_dict
 
 
