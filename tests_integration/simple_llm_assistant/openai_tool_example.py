@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import uuid
 
@@ -186,7 +185,3 @@ test_openai_tool_with_structured_output()
 asyncio.run(test_openai_tool_a_stream())
 asyncio.run(test_openai_tool_async())
 asyncio.run(test_llm_a_stream_node())
-
-events_data = [event.to_dict() for event in event_store.get_events()]
-with open("logging_events.json", "w") as f:
-    f.write(json.dumps(events_data, indent=2))
