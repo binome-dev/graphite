@@ -5,7 +5,8 @@ Reduces code duplication and provides consistent patterns for all events.
 
 from abc import ABC
 from abc import abstractmethod
-from typing import Any, Callable
+from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Generic
 from typing import List
