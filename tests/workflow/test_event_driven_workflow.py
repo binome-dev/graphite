@@ -178,7 +178,7 @@ class TestEventDrivenWorkflowEventHandling:
         """Test that on_event correctly handles PublishToTopicEvent."""
         # Create a mock publish event
         event = PublishToTopicEvent(
-            topic_name="test_input",
+            name="test_input",
             publisher_name="test_publisher",
             publisher_type="test_type",
             invoke_context=InvokeContext(
@@ -218,7 +218,7 @@ class TestEventDrivenWorkflowOutputEvents:
 
         # Add some mock events to output topics
         mock_event = PublishToTopicEvent(
-            topic_name="test_output",
+            name="test_output",
             publisher_name="test_publisher",
             publisher_type="test_type",
             invoke_context=InvokeContext(

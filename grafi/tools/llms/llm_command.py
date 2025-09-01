@@ -3,9 +3,7 @@ from typing import List
 from loguru import logger
 
 from grafi.common.containers.container import container
-from grafi.common.events.assistant_events.assistant_respond_event import (
-    AssistantRespondEvent,
-)
+from grafi.common.events.component_events import AssistantRespondEvent
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -44,7 +42,7 @@ class LLMCommand(Command):
                 event.invoke_context.assistant_request_id
                 != invoke_context.assistant_request_id
             ):
-                all_messages.extend(event.input_event.data)
+                all_messages.extend(event.input_data.data)
                 for output_event in event.output_data:
                     all_messages.extend(output_event.data)
 
@@ -61,11 +59,11 @@ class LLMCommand(Command):
         event_graph = EventGraph()
         event_graph.build_graph(node_input, topic_events)
 
-        node_input_events = [
+        node_input_datas = [
             event_node.event for event_node in event_graph.get_topology_sorted_events()
         ]
 
-        all_messages.extend([msg for event in node_input_events for msg in event.data])
+        all_messages.extend([msg for event in node_input_datas for msg in event.data])
 
         # Make sure the llm tool call message are followed by the function call messages
         # Step 1: get all the messages with tool_call_id and remove them from the messages list

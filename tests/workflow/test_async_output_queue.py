@@ -101,7 +101,7 @@ class TestAsyncOutputQueue:
 
         # Add test event
         test_event = PublishToTopicEvent(
-            topic_name="output1",
+            name="output1",
             publisher_name="test_publisher",
             publisher_type="test_type",
             invoke_context=InvokeContext(
@@ -134,7 +134,7 @@ class TestAsyncOutputQueue:
         """Test async iteration over output events."""
         # Add test event
         test_event = PublishToTopicEvent(
-            topic_name="output1",
+            name="output1",
             publisher_name="test_publisher",
             publisher_type="test_type",
             invoke_context=InvokeContext(
@@ -234,7 +234,7 @@ class TestAsyncOutputQueue:
         # Add events to different topics
         for i, topic in enumerate(topics):
             event = PublishToTopicEvent(
-                topic_name=f"output{i}",
+                name=f"output{i}",
                 publisher_name="test_publisher",
                 publisher_type="test_type",
                 invoke_context=InvokeContext(

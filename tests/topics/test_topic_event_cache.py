@@ -23,7 +23,7 @@ class TestTopicEventCache:
         )
         return PublishToTopicEvent(
             event_id="event-1",
-            topic_name="test_topic",
+            name="test_topic",
             offset=0,
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -123,7 +123,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -151,7 +151,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -248,7 +248,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -283,7 +283,7 @@ class TestTopicEventCache:
                 )
                 event = PublishToTopicEvent(
                     event_id=f"producer-{producer_id}-event-{i}",
-                    topic_name="test_topic",
+                    name="test_topic",
                     offset=i,
                     publisher_name=f"producer-{producer_id}",
                     publisher_type="test_type",
@@ -319,7 +319,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -366,7 +366,7 @@ class TestTopicEventCache:
                 )
                 event = PublishToTopicEvent(
                     event_id=f"event-{i}",
-                    topic_name="test_topic",
+                    name="test_topic",
                     offset=i,
                     publisher_name="producer",
                     publisher_type="test_type",
@@ -410,7 +410,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",
@@ -459,7 +459,7 @@ class TestTopicEventCache:
         )
         event = PublishToTopicEvent(
             event_id="event-1",
-            topic_name="test_topic",
+            name="test_topic",
             offset=0,
             publisher_name="test_publisher",
             publisher_type="test_type",
@@ -488,7 +488,7 @@ class TestTopicEventCache:
             )
             event = PublishToTopicEvent(
                 event_id=f"event-{i}",
-                topic_name="test_topic",
+                name="test_topic",
                 offset=i,
                 publisher_name="test_publisher",
                 publisher_type="test_type",

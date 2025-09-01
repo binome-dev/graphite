@@ -198,7 +198,7 @@ async def __anext__(self) -> TopicEvent:
 These components work together in the EventDrivenWorkflow's async execution:
 
 ```python
-async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Initialize workflow
     await self.a_init_workflow(invoke_context, input)
 

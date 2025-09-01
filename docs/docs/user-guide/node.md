@@ -100,11 +100,11 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 
 # Synchronous invocation
 context = InvokeContext(session_id="session-123")
-input_events = [ConsumeFromTopicEvent(...)]  # List of consumed events
-output_event: PublishToTopicEvent = node.invoke(context, input_events)
+input_datas = [ConsumeFromTopicEvent(...)]  # List of consumed events
+output_event: PublishToTopicEvent = node.invoke(context, input_datas)
 
 # Asynchronous invocation
-async for output_event in node.a_invoke(context, input_events):
+async for output_event in node.a_invoke(context, input_datas):
     # Process each PublishToTopicEvent as it's generated
     pass
 ```

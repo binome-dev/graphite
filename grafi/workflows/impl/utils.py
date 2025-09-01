@@ -7,12 +7,12 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
-from grafi.nodes.node import Node
+from grafi.nodes.node_base import NodeBase
 
 
 def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     """
-    Process a list of TopicEvents, grouping by topic_name and aggregating streaming messages.
+    Process a list of TopicEvents, grouping by name and aggregating streaming messages.
 
     Args:
         events: List of TopicEvents to process
@@ -20,12 +20,12 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     Returns:
         List of processed TopicEvents with streaming messages aggregated
     """
-    # Group events by topic_name
+    # Group events by name
     events_by_topic: Dict[str, List[TopicEvent]] = {}
     for event in events:
-        if event.topic_name not in events_by_topic:
-            events_by_topic[event.topic_name] = []
-        events_by_topic[event.topic_name].append(event)
+        if event.name not in events_by_topic:
+            events_by_topic[event.name] = []
+        events_by_topic[event.name].append(event)
 
     output_events: List[TopicEvent] = []
 
@@ -87,7 +87,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
 
 
 def publish_events(
-    node: Node, publish_event: PublishToTopicEvent
+    node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
@@ -99,7 +99,7 @@ def publish_events(
 
 
 async def a_publish_events(
-    node: Node, publish_event: PublishToTopicEvent
+    node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
@@ -111,7 +111,7 @@ async def a_publish_events(
     return published_events
 
 
-def get_node_input(node: Node) -> List[ConsumeFromTopicEvent]:
+def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
     consumed_events: List[ConsumeFromTopicEvent] = []
 
     node_subscribed_topics = node._subscribed_topics.values()
@@ -124,8 +124,8 @@ def get_node_input(node: Node) -> List[ConsumeFromTopicEvent]:
             for event in node_consumed_events:
                 consumed_event = ConsumeFromTopicEvent(
                     invoke_context=event.invoke_context,
-                    topic_name=event.topic_name,
-                    topic_type=event.topic_type,
+                    name=event.name,
+                    type=event.type,
                     consumer_name=node.name,
                     consumer_type=node.type,
                     offset=event.offset,

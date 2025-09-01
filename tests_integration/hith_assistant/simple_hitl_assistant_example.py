@@ -73,12 +73,12 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    input_event = PublishToTopicEvent(
+    input_data = PublishToTopicEvent(
         invoke_context=get_invoke_context(),
         data=input_data,
     )
 
-    output = assistant.invoke(input_event)
+    output = assistant.invoke(input_data)
 
     print(output)
 
@@ -93,13 +93,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    input_event = PublishToTopicEvent(
+    input_data = PublishToTopicEvent(
         invoke_context=get_invoke_context(),
         data=human_input,
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = assistant.invoke(input_event)
+    output = assistant.invoke(input_data)
 
     events = event_store.get_events()
     print(len(events))
@@ -112,13 +112,13 @@ def test_simple_hitl_assistant() -> None:
         )
     ]
 
-    input_event = PublishToTopicEvent(
+    input_data = PublishToTopicEvent(
         invoke_context=get_invoke_context(),
         data=human_input,
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = assistant.invoke(input_event)
+    output = assistant.invoke(input_data)
 
     print(output)
 

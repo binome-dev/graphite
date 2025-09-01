@@ -77,7 +77,7 @@ graph TD
 ```python
 # Create mapping for efficient lookup
 topic_offset_to_publish = {
-    f"{event.topic_name}::{event.offset}": event
+    f"{event.name}::{event.offset}": event
     for event in topic_events.values()
     if isinstance(event, PublishToTopicEvent)
 }
@@ -94,7 +94,7 @@ def build_node_relations(consume_event: ConsumeFromTopicEvent) -> None:
     current_node = self._add_event(consume_event)
 
     # Find corresponding publish event
-    publish_key = f"{consume_event.topic_name}::{consume_event.offset}"
+    publish_key = f"{consume_event.name}::{consume_event.offset}"
     publish_event = topic_offset_to_publish.get(publish_key)
 
     if publish_event:
@@ -278,7 +278,7 @@ def find_root_causes(graph: EventGraph):
         {
             "event_id": node.event_id,
             "timestamp": node.event.timestamp,
-            "topic_name": node.event.topic_name,
+            "name": node.event.name,
             "downstream_count": len(node.downstream_events)
         }
         for node in root_nodes
@@ -401,7 +401,7 @@ def save_graph_to_event_store(graph: EventGraph, event_store: EventStore):
     from grafi.common.events.topic_events.topic_event import TopicEvent
 
     graph_event = TopicEvent(
-        topic_name="event_graph_analysis",
+        name="event_graph_analysis",
         offset=0,
         data=graph.to_dict()
     )

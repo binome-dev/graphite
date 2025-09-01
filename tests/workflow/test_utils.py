@@ -32,7 +32,7 @@ class TestGetAsyncOutputEvents:
         message = Message(role="assistant", content="Hello", is_streaming=False)
 
         event1 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -42,7 +42,7 @@ class TestGetAsyncOutputEvents:
         )
 
         event2 = PublishToTopicEvent(
-            topic_name="topic2",
+            name="topic2",
             publisher_name="node2",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -67,7 +67,7 @@ class TestGetAsyncOutputEvents:
         streaming_msg2 = Message(role="assistant", content="World", is_streaming=True)
 
         event1 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -77,7 +77,7 @@ class TestGetAsyncOutputEvents:
         )
 
         event2 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -104,7 +104,7 @@ class TestGetAsyncOutputEvents:
         )
 
         event1 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -114,7 +114,7 @@ class TestGetAsyncOutputEvents:
         )
 
         event2 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -146,7 +146,7 @@ class TestGetAsyncOutputEvents:
         streaming_msg2 = Message(role="assistant", content="Part2", is_streaming=True)
 
         event1 = ConsumeFromTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             consumer_name="consumer1",
             consumer_type="test_consumer",
             invoke_context=invoke_context,
@@ -155,7 +155,7 @@ class TestGetAsyncOutputEvents:
         )
 
         event2 = ConsumeFromTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             consumer_name="consumer1",
             consumer_type="test_consumer",
             invoke_context=invoke_context,
@@ -179,7 +179,7 @@ class TestGetAsyncOutputEvents:
         streaming_msg = Message(role="assistant", content="Output", is_streaming=True)
 
         event = PublishToTopicEvent(
-            topic_name="output",
+            name="output",
             publisher_name="node1",
             publisher_type="test_node",
             invoke_context=invoke_context,
@@ -216,7 +216,7 @@ class TestPublishEvents:
 
         # Mock publish_data to return events
         mock_event1 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name=node.name,
             publisher_type=node.type,
             invoke_context=invoke_context,
@@ -225,7 +225,7 @@ class TestPublishEvents:
             consumed_events=consumed_events,
         )
         mock_event2 = PublishToTopicEvent(
-            topic_name="topic2",
+            name="topic2",
             publisher_name=node.name,
             publisher_type=node.type,
             invoke_context=invoke_context,
@@ -279,7 +279,7 @@ class TestPublishEvents:
 
         # Mock a_publish_data to return events
         mock_event1 = PublishToTopicEvent(
-            topic_name="topic1",
+            name="topic1",
             publisher_name=node.name,
             publisher_type=node.type,
             invoke_context=invoke_context,
@@ -332,8 +332,8 @@ class TestGetNodeInput:
 
         mock_event = MagicMock()
         mock_event.invoke_context = invoke_context
-        mock_event.topic_name = "topic1"
-        mock_event.topic_type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
+        mock_event.name = "topic1"
+        mock_event.type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
         mock_event.offset = 0
         mock_event.data = [Message(role="user", content="Test")]
 
@@ -345,7 +345,7 @@ class TestGetNodeInput:
         assert isinstance(consumed_events[0], ConsumeFromTopicEvent)
         assert consumed_events[0].consumer_name == node.name
         assert consumed_events[0].consumer_type == node.type
-        assert consumed_events[0].topic_name == "topic1"
+        assert consumed_events[0].name == "topic1"
 
         # Verify can_consume was called
         mock_topic1.can_consume.assert_called_once_with(node.name)

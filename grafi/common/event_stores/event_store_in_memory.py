@@ -56,7 +56,7 @@ class EventStoreInMemory(EventStore):
             if event.invoke_context.conversation_id == conversation_id
         ]
 
-    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets."""
 
         # Convert offsets to a set for faster lookup
@@ -67,8 +67,8 @@ class EventStoreInMemory(EventStore):
             for event in self.events
             if (
                 isinstance(event, PublishToTopicEvent)
-                and hasattr(event, "topic_name")
-                and event.topic_name == topic_name
+                and hasattr(event, "name")
+                and event.name == name
                 and event.offset in offset_set
             )
         ]

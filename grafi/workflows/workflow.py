@@ -18,7 +18,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
-from grafi.nodes.node import Node
+from grafi.nodes.node_base import NodeBase
 
 
 class Workflow(BaseModel):
@@ -28,7 +28,7 @@ class Workflow(BaseModel):
     workflow_id: str = default_id
     name: str = "Workflow"
     type: str = "Workflow"
-    nodes: Dict[str, Node] = {}
+    nodes: Dict[str, NodeBase] = {}
 
     # Stop flag to control workflow execution
     _stop_requested: bool = PrivateAttr(default=False)
@@ -48,12 +48,12 @@ class Workflow(BaseModel):
         """
         self._stop_requested = False
 
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         """Invokes the workflow with the given initial inputs."""
         raise NotImplementedError
 
     async def a_invoke(
-        self, input_event: PublishToTopicEvent
+        self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invokes the workflow with the given initial inputs."""
         yield None  # type: ignore
@@ -100,7 +100,7 @@ class WorkflowBuilder(BaseBuilder[T_W]):
         self.kwargs["type"] = type_name
         return self
 
-    def node(self, node: Node) -> Self:
+    def node(self, node: NodeBase) -> Self:
         if "nodes" not in self.kwargs:
             self.kwargs["nodes"] = {}
         if node.name in self.kwargs["nodes"]:

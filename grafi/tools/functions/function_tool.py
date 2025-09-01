@@ -10,8 +10,8 @@ import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
-from grafi.common.decorators.record_tool_a_invoke import record_tool_a_invoke
-from grafi.common.decorators.record_tool_invoke import record_tool_invoke
+from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.command import Command
 from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext

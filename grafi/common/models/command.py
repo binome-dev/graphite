@@ -53,10 +53,10 @@ class Command(BaseModel):
     async def a_invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
-        async for message in self.tool.a_invoke(
+        async for messages in self.tool.a_invoke(
             invoke_context, self.get_tool_input(invoke_context, input_data)
         ):
-            yield message
+            yield messages
 
     def get_tool_input(
         self,

@@ -98,7 +98,7 @@ class TestNode:
         return [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="test_node",
                 consumer_type="Node",
                 offset=0,
@@ -333,41 +333,6 @@ class TestNode:
         ):
             assert node.can_invoke() is True
 
-    def test_can_invoke_with_subscriptions_not_satisfied(self, mock_topic: MockTopic):
-        """Test can_invoke returns False when subscription expressions are not satisfied."""
-        topic_expr = TopicExpr(topic=mock_topic)
-        node = Node(
-            name="test_node",
-            subscribed_expressions=[topic_expr],
-        )
-
-        # Mock evaluate_subscription to return False
-        with patch(
-            "grafi.nodes.node.evaluate_subscription",
-            return_value=False,
-        ):
-            assert node.can_invoke() is False
-
-    def test_can_invoke_with_multiple_subscriptions(self):
-        """Test can_invoke with multiple subscription expressions."""
-        topic1 = MockTopic(name="topic1")
-        topic2 = MockTopic(name="topic2")
-
-        expr1 = TopicExpr(topic=topic1)
-        expr2 = TopicExpr(topic=topic2)
-
-        node = Node(
-            name="test_node",
-            subscribed_expressions=[expr1, expr2],
-        )
-
-        # Both expressions evaluate to True - should return True
-        with patch(
-            "grafi.nodes.node.evaluate_subscription",
-            return_value=True,
-        ):
-            assert node.can_invoke() is True
-
     # Test to_dict Method
     def test_to_dict_basic_node(self, basic_node: Node):
         """Test to_dict for a basic Node."""
@@ -468,7 +433,7 @@ class TestNode:
         sample_events = [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="async_workflow_node",
                 consumer_type="Node",
                 offset=0,

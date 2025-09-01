@@ -37,8 +37,8 @@ class Topic(TopicBase):
         if self.condition(publish_event.data):
             event = publish_event.model_copy(
                 update={
-                    "topic_name": self.name,
-                    "topic_type": self.type,
+                    "name": self.name,
+                    "type": self.type,
                 },
                 deep=True,
             )
@@ -60,8 +60,8 @@ class Topic(TopicBase):
         if self.condition(publish_event.data):
             event = publish_event.model_copy(
                 update={
-                    "topic_name": self.name,
-                    "topic_type": self.type,
+                    "name": self.name,
+                    "type": self.type,
                 },
                 deep=True,
             )

@@ -26,11 +26,11 @@ class MyAssistant(AssistantBase):
         # Implementation required
         pass
 
-    def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
         # Implementation required
         pass
 
-    async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         # Implementation required
         pass
 ```
@@ -87,14 +87,14 @@ Synchronously processes input events through the configured workflow.
 
 ```python
 @record_assistant_invoke
-def invoke(self, input_event: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-    events = self.workflow.invoke(input_event)
+def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    events = self.workflow.invoke(input_data)
     return events
 ```
 
 **Parameters**:
 
-- `input_event`: A `PublishToTopicEvent` containing the data to be processed and context information
+- `input_data`: A `PublishToTopicEvent` containing the data to be processed and context information
 
 **Returns**: List of `ConsumeFromTopicEvent` objects representing the workflow output
 
@@ -106,14 +106,14 @@ Asynchronously processes input events with support for streaming responses.
 
 ```python
 @record_assistant_a_invoke
-async def a_invoke(self, input_event: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-    async for output in self.workflow.a_invoke(input_event):
+async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async for output in self.workflow.a_invoke(input_data):
         yield output
 ```
 
 **Parameters**:
 
-- `input_event`: A `PublishToTopicEvent` containing the data to be processed and context information
+- `input_data`: A `PublishToTopicEvent` containing the data to be processed and context information
 
 **Returns**: Async generator yielding `ConsumeFromTopicEvent` objects
 

@@ -234,8 +234,8 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
                     published_events = await a_publish_events(...)
                     # Notify downstream nodes immediately
                     for event in published_events:
-                        if event.topic_name in self._topic_nodes:
-                            topic = self._topics[event.topic_name]
+                        if event.name in self._topic_nodes:
+                            topic = self._topics[event.name]
                             async with topic.event_cache._cond:
                                 topic.event_cache._cond.notify_all()
 

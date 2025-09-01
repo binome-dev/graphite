@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -111,7 +112,7 @@ class TestNodeBase:
         return [
             ConsumeFromTopicEvent(
                 event_id="event_1",
-                topic_name="test_topic",
+                name="test_topic",
                 consumer_name="test_node",
                 consumer_type="NodeBase",
                 offset=0,
@@ -890,3 +891,38 @@ class TestNodeBaseBuilder:
         assert isinstance(node, ConcreteNodeBase)
         assert node.name == "custom_node"
         assert node.custom_field == "default"
+
+    def test_can_invoke_with_subscriptions_not_satisfied(self, mock_topic: MockTopic):
+        """Test can_invoke returns False when subscription expressions are not satisfied."""
+        topic_expr = TopicExpr(topic=mock_topic)
+        node = NodeBase(
+            name="test_node",
+            subscribed_expressions=[topic_expr],
+        )
+
+        # Mock evaluate_subscription to return False
+        with patch(
+            "grafi.nodes.node_base.evaluate_subscription",
+            return_value=False,
+        ):
+            assert node.can_invoke() is False
+
+    def test_can_invoke_with_multiple_subscriptions(self):
+        """Test can_invoke with multiple subscription expressions."""
+        topic1 = MockTopic(name="topic1")
+        topic2 = MockTopic(name="topic2")
+
+        expr1 = TopicExpr(topic=topic1)
+        expr2 = TopicExpr(topic=topic2)
+
+        node = NodeBase(
+            name="test_node",
+            subscribed_expressions=[expr1, expr2],
+        )
+
+        # Both expressions evaluate to True - should return True
+        with patch(
+            "grafi.nodes.node_base.evaluate_subscription",
+            return_value=True,
+        ):
+            assert node.can_invoke() is True

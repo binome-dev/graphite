@@ -22,7 +22,7 @@ class MockTopic(TopicBase):
     ):
         event = PublishToTopicEvent(
             event_id="event_2",
-            topic_name="topic1",
+            name="topic1",
             offset=0,
             publisher_name=publisher_name,
             publisher_type=publisher_type,
@@ -62,7 +62,7 @@ def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
     """Ensure topic restores correctly from events."""
     event = PublishToTopicEvent(
         event_id="event_1",
-        topic_name="topic1",
+        name="topic1",
         offset=0,
         publisher_name="publisher1",
         publisher_type="test",

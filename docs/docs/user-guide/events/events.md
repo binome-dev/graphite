@@ -273,8 +273,8 @@ Basic event for topic-related activities.
 
 | Field        | Type           | Description                                        |
 |--------------|----------------|----------------------------------------------------|
-| `topic_name` | `str`          | Name of the topic.                                |
-| `topic_type` | `TopicType`    | Type of the topic.                                |
+| `name`       | `str`          | Name of the topic.                                |
+| `type`       | `TopicType`    | Type of the topic.                                |
 | `offset`     | `int`          | Position/offset in the topic stream.              |
 | `data`       | `List[Message]`| Data associated with the topic event.             |
 
@@ -370,7 +370,8 @@ Each event type includes structured context information:
     "consumed_event_ids": ["event_1", "event_2"],
     "publisher_name": "Data Processor",
     "publisher_type": "ProcessingNode",
-    "topic_name": "output_topic",
+    "name": "output_topic",
+    "type": "topic",
     "offset": 42,
     "invoke_context": {...}
 }

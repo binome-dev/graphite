@@ -61,11 +61,13 @@ def setup_tracing(
 
         OpenAIInstrumentor().instrument()
     elif tracing_options == TracingOptions.PHOENIX:
+        phoenix_endpoint = os.getenv("PHOENIX_ENDPOINT", collector_endpoint)
+        phoenix_port = os.getenv("PHOENIX_PORT", collector_port)
         # check if the local collector is available
-        collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
-        if not is_local_endpoint_available(collector_endpoint, collector_port):
+        collector_endpoint_url = f"{phoenix_endpoint}:{phoenix_port}"
+        if not is_local_endpoint_available(phoenix_endpoint, phoenix_port):
             raise ValueError(
-                f"OTLP endpoint {collector_endpoint} is not available. "
+                f"OTLP endpoint {phoenix_endpoint} is not available. "
                 "Please ensure the collector is running or check the endpoint configuration."
             )
 
@@ -88,8 +90,10 @@ def setup_tracing(
         OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
         set_tracer_provider(tracer_provider)
     elif tracing_options == TracingOptions.AUTO:
-        collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
+        phoenix_endpoint = os.getenv("PHOENIX_ENDPOINT", collector_endpoint)
+        phoenix_port = os.getenv("PHOENIX_PORT", collector_port)
         if is_local_endpoint_available(collector_endpoint, collector_port):
+            collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
             tracer_provider = phoenix.otel.register(
                 endpoint=collector_endpoint_url,
                 project_name=project_name,
@@ -102,6 +106,28 @@ def setup_tracing(
             )
             logger.info(
                 f"OTLP endpoint {collector_endpoint_url} is available. Using OTLPSpanExporter."
+            )
+
+            # Use SimpleSpanProcessor or BatchSpanProcessor as needed
+            span_processor = SimpleSpanProcessor(span_exporter)
+            tracer_provider.add_span_processor(span_processor)
+
+            OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+            set_tracer_provider(tracer_provider)
+        elif phoenix_endpoint and phoenix_port:
+            phoenix_endpoint_url = f"{phoenix_endpoint}:{phoenix_port}"
+            tracer_provider = phoenix.otel.register(
+                endpoint=phoenix_endpoint_url,
+                project_name=project_name,
+                set_global_tracer_provider=False,
+            )
+
+            # Use OTLPSpanExporter if the endpoint is available
+            span_exporter = OTLPSpanExporter(
+                endpoint=phoenix_endpoint_url, insecure=True
+            )
+            logger.info(
+                f"Phoenix OTLP endpoint {phoenix_endpoint_url} is available. Using OTLPSpanExporter."
             )
 
             # Use SimpleSpanProcessor or BatchSpanProcessor as needed

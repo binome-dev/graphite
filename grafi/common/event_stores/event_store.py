@@ -8,37 +8,23 @@ from typing import Type
 
 from loguru import logger
 
-from grafi.common.events.assistant_events.assistant_failed_event import (
-    AssistantFailedEvent,
-)
-from grafi.common.events.assistant_events.assistant_invoke_event import (
-    AssistantInvokeEvent,
-)
-from grafi.common.events.assistant_events.assistant_respond_event import (
-    AssistantRespondEvent,
-)
+from grafi.common.events.component_events import AssistantFailedEvent
+from grafi.common.events.component_events import AssistantInvokeEvent
+from grafi.common.events.component_events import AssistantRespondEvent
+from grafi.common.events.component_events import ConsumeFromTopicEvent
+from grafi.common.events.component_events import NodeFailedEvent
+from grafi.common.events.component_events import NodeInvokeEvent
+from grafi.common.events.component_events import NodeRespondEvent
+from grafi.common.events.component_events import ToolFailedEvent
+from grafi.common.events.component_events import ToolInvokeEvent
+from grafi.common.events.component_events import ToolRespondEvent
+from grafi.common.events.component_events import WorkflowFailedEvent
+from grafi.common.events.component_events import WorkflowInvokeEvent
+from grafi.common.events.component_events import WorkflowRespondEvent
 from grafi.common.events.event import Event
 from grafi.common.events.event import EventType
-from grafi.common.events.node_events.node_failed_event import NodeFailedEvent
-from grafi.common.events.node_events.node_invoke_event import NodeInvokeEvent
-from grafi.common.events.node_events.node_respond_event import NodeRespondEvent
-from grafi.common.events.tool_events.tool_failed_event import ToolFailedEvent
-from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
-from grafi.common.events.tool_events.tool_respond_event import ToolRespondEvent
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.events.workflow_events.workflow_failed_event import (
-    WorkflowFailedEvent,
-)
-from grafi.common.events.workflow_events.workflow_invoke_event import (
-    WorkflowInvokeEvent,
-)
-from grafi.common.events.workflow_events.workflow_respond_event import (
-    WorkflowRespondEvent,
-)
 
 
 class EventStore:
@@ -72,7 +58,7 @@ class EventStore:
         """Get all events for a given conversation ID."""
         raise NotImplementedError
 
-    def get_topic_events(self, topic_name: str, offsets: List[int]) -> List[Event]:
+    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name."""
         raise NotImplementedError
 

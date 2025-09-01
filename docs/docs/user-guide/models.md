@@ -104,7 +104,7 @@ from grafi.tools.tool import Tool
 command = Command.for_tool(my_tool)
 
 # Invoke the command
-response = command.invoke(invoke_context, input_events)
+response = command.invoke(invoke_context, input_datas)
 ```
 
 ## FunctionSpec

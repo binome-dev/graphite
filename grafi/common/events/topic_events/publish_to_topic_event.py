@@ -25,8 +25,8 @@ class PublishToTopicEvent(TopicEvent):
             "consumed_event_ids": self.consumed_event_ids,
             "publisher_name": self.publisher_name,
             "publisher_type": self.publisher_type,
-            "topic_name": self.topic_name,
-            "topic_type": self.topic_type.value,
+            "name": self.name,
+            "type": self.type.value,
             "offset": self.offset,
             "invoke_context": self.invoke_context.model_dump(),
         }
@@ -50,14 +50,12 @@ class PublishToTopicEvent(TopicEvent):
 
         base_event = cls.event_base(data)
         return cls(
-            event_id=base_event[0],
-            event_type=base_event[1],
-            timestamp=base_event[2],
+            **base_event,
             consumed_event_ids=data[EVENT_CONTEXT]["consumed_event_ids"],
             publisher_name=data[EVENT_CONTEXT]["publisher_name"],
             publisher_type=data[EVENT_CONTEXT]["publisher_type"],
-            topic_name=data[EVENT_CONTEXT]["topic_name"],
-            topic_type=TopicType(data[EVENT_CONTEXT]["topic_type"]),
+            name=data[EVENT_CONTEXT]["name"],
+            type=TopicType(data[EVENT_CONTEXT]["type"]),
             offset=data[EVENT_CONTEXT]["offset"],
             invoke_context=invoke_context,
             data=data_obj,

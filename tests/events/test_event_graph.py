@@ -31,7 +31,7 @@ def mock_events():
     # Create consume events
     consume_1 = ConsumeFromTopicEvent(
         event_id="event_1",
-        topic_name="topic1",
+        name="topic1",
         offset=0,
         consumer_name="consumer1",
         consumer_type="test",
@@ -42,7 +42,7 @@ def mock_events():
 
     consume_2 = ConsumeFromTopicEvent(
         event_id="event_3",
-        topic_name="topic2",
+        name="topic2",
         offset=0,
         consumer_name="consumer2",
         consumer_type="test",
@@ -54,7 +54,7 @@ def mock_events():
     # Create publish event that depends on consume_1
     publish = PublishToTopicEvent(
         event_id="event_2",
-        topic_name="topic1",
+        name="topic1",
         offset=0,
         publisher_name="publisher1",
         publisher_type="test",

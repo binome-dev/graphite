@@ -1,7 +1,9 @@
+from typing import Any
+
 import pytest
 
+from grafi.common.events.component_events import NodeFailedEvent
 from grafi.common.events.event import EventType
-from grafi.common.events.node_events.node_failed_event import NodeFailedEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests.events.node_events.test_node_event import get_consumed_events
@@ -17,13 +19,13 @@ def invoke_context():
 
 
 @pytest.fixture
-def node_failed_event(invoke_context) -> NodeFailedEvent:
+def node_failed_event(invoke_context) -> Any:
     return NodeFailedEvent(
         event_id="test_id",
         event_type=EventType.NODE_INVOKE,
-        node_id="test_node_id",
-        node_name="test_node",
-        node_type="test_type",
+        id="test_node_id",
+        name="test_node",
+        type="test_type",
         subscribed_topics=["test_topic_1", "test_topic_2"],
         publish_to_topics=["test_topic_3", "test_topic_4"],
         invoke_context=invoke_context,
@@ -38,7 +40,8 @@ def node_failed_event(invoke_context) -> NodeFailedEvent:
                     functions=None,
                     function_call=None,
                 )
-            ]
+            ],
+            invoke_context,
         ),
         error="error",
         timestamp="2009-02-13T23:31:30+00:00",
@@ -54,11 +57,11 @@ def node_failed_event_dict():
         "assistant_request_id": "assistant_request_id",
         "timestamp": "2009-02-13T23:31:30+00:00",
         "event_context": {
-            "node_id": "test_node_id",
+            "id": "test_node_id",
             "subscribed_topics": ["test_topic_1", "test_topic_2"],
             "publish_to_topics": ["test_topic_3", "test_topic_4"],
-            "node_name": "test_node",
-            "node_type": "test_type",
+            "name": "test_node",
+            "type": "test_type",
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",
@@ -73,8 +76,8 @@ def node_failed_event_dict():
                     "event_context": {
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
-                        "topic_name": "test_topic",
-                        "topic_type": "NoneTopic",
+                        "name": "test_topic",
+                        "type": "AgentOutputTopic",
                         "offset": -1,
                         "invoke_context": {
                             "conversation_id": "conversation_id",
@@ -97,9 +100,7 @@ def node_failed_event_dict():
     }
 
 
-def test_node_failed_event_to_dict(
-    node_failed_event: NodeFailedEvent, node_failed_event_dict
-):
+def test_node_failed_event_to_dict(node_failed_event, node_failed_event_dict):
     assert node_failed_event.to_dict() == node_failed_event_dict
 
 

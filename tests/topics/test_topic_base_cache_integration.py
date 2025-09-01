@@ -60,7 +60,7 @@ class TestTopicBaseCacheIntegration:
         )
 
         assert event is not None
-        assert event.topic_name == "test_topic"
+        assert event.name == "test_topic"
         assert event.data == sample_messages
         assert topic.event_cache.num_events() == 1
 
@@ -215,7 +215,7 @@ class TestTopicBaseCacheIntegration:
         # Create a publish event
         event = PublishToTopicEvent(
             event_id="restore-event-1",
-            topic_name="test_topic",
+            name="test_topic",
             offset=0,
             publisher_name="restore_publisher",
             publisher_type="test_publisher",
@@ -251,7 +251,7 @@ class TestTopicBaseCacheIntegration:
         # Create a consume event
         consume_event = ConsumeFromTopicEvent(
             event_id="consume-event-1",
-            topic_name="test_topic",
+            name="test_topic",
             consumer_name="consumer1",
             consumer_type="test_consumer",
             offset=0,
@@ -273,7 +273,7 @@ class TestTopicBaseCacheIntegration:
         # Create events
         publish_event = PublishToTopicEvent(
             event_id="async-restore-1",
-            topic_name="test_topic",
+            name="test_topic",
             offset=0,
             publisher_name="restore_publisher",
             publisher_type="test_publisher",
@@ -285,7 +285,7 @@ class TestTopicBaseCacheIntegration:
 
         consume_event = ConsumeFromTopicEvent(
             event_id="async-consume-1",
-            topic_name="test_topic",
+            name="test_topic",
             consumer_name="consumer1",
             consumer_type="test_consumer",
             offset=0,
@@ -446,7 +446,7 @@ class TestTopicBaseCacheIntegration:
         for i in range(2):
             consumed_event = ConsumeFromTopicEvent(
                 event_id=f"consumed-{i}",
-                topic_name="previous_topic",
+                name="previous_topic",
                 consumer_name="node1",
                 consumer_type="test_node",
                 offset=i,
@@ -476,7 +476,7 @@ class TestTopicBaseCacheIntegration:
         # Try to add a ConsumeFromTopicEvent (should be ignored)
         consume_event = ConsumeFromTopicEvent(
             event_id="consume-1",
-            topic_name="test_topic",
+            name="test_topic",
             consumer_name="consumer1",
             consumer_type="test_consumer",
             offset=0,
@@ -496,7 +496,7 @@ class TestTopicBaseCacheIntegration:
         # But PublishToTopicEvent should be added
         publish_event = PublishToTopicEvent(
             event_id="publish-1",
-            topic_name="test_topic",
+            name="test_topic",
             offset=0,
             publisher_name="publisher",
             publisher_type="test_publisher",
