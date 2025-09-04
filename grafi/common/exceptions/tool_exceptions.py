@@ -2,6 +2,7 @@
 Tool-related exception classes.
 """
 
+from typing import Any
 from typing import Optional
 
 from grafi.common.exceptions.base import GrafiError
@@ -17,8 +18,8 @@ class ToolInvocationError(GrafiError):
         message: str,
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(message, invoke_context, cause, **kwargs)
         self.tool_name = tool_name
 
@@ -33,8 +34,8 @@ class LLMToolException(ToolInvocationError):
         message: str = "LLM tool operation failed",
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(tool_name, message, invoke_context, cause, **kwargs)
         self.model = model
         self.type = "LLM"
@@ -50,8 +51,8 @@ class FunctionCallException(ToolInvocationError):
         message: str = "Function call operation failed",
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(tool_name, message, invoke_context, cause, **kwargs)
         self.function_name = function_name
         self.type = "FunctionCall"
@@ -67,8 +68,8 @@ class FunctionToolException(ToolInvocationError):
         message: str = "Function tool operation failed",
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(tool_name, message, invoke_context, cause, **kwargs)
         self.operation = operation
         self.type = "Function"

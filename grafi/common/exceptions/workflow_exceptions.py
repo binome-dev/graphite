@@ -2,6 +2,7 @@
 Workflow and node-related exception classes.
 """
 
+from typing import Any
 from typing import Optional
 
 from grafi.common.exceptions.base import GrafiError
@@ -23,7 +24,7 @@ class NodeExecutionError(WorkflowError):
         message: str,
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(message, invoke_context, cause, **kwargs)
         self.node_name = node_name

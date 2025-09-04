@@ -2,6 +2,7 @@
 Event store and topic-related exception classes.
 """
 
+from typing import Any
 from typing import Optional
 
 from grafi.common.exceptions.base import GrafiError
@@ -35,8 +36,8 @@ class TopicError(GrafiError):
         message: str,
         invoke_context: Optional[InvokeContext] = None,
         cause: Optional[Exception] = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(message, invoke_context, cause, **kwargs)
         self.topic_name = topic_name
 

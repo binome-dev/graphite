@@ -33,6 +33,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -123,8 +124,22 @@ class DeepseekTool(LLM):
                 **self.chat_params,
             )
             return self.to_messages(resp)
+        except OpenAIError as exc:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"DeepSeek API call failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
         except Exception as exc:
-            raise RuntimeError(f"DeepSeek API error: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during DeepSeek API call: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
     # ------------------------------------------------------------------ #
     # Async call                                                         #
@@ -165,8 +180,21 @@ class DeepseekTool(LLM):
         except asyncio.CancelledError:
             raise  # let caller handle
         except OpenAIError as exc:
-            # turn client‑specific exceptions into your domain error
-            raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"DeepSeek API streaming failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
+        except Exception as exc:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during DeepSeek streaming: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
     # ------------------------------------------------------------------ #
     # Response converters                                                #
