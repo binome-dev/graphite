@@ -62,7 +62,7 @@ def setup_tracing(
         OpenAIInstrumentor().instrument()
     elif tracing_options == TracingOptions.PHOENIX:
         phoenix_endpoint = os.getenv("PHOENIX_ENDPOINT", collector_endpoint)
-        phoenix_port = os.getenv("PHOENIX_PORT", collector_port)
+        phoenix_port = int(os.getenv("PHOENIX_PORT", collector_port))
         # check if the local collector is available
         collector_endpoint_url = f"{phoenix_endpoint}:{phoenix_port}"
         if not is_local_endpoint_available(phoenix_endpoint, phoenix_port):
@@ -91,7 +91,7 @@ def setup_tracing(
         set_tracer_provider(tracer_provider)
     elif tracing_options == TracingOptions.AUTO:
         phoenix_endpoint = os.getenv("PHOENIX_ENDPOINT", collector_endpoint)
-        phoenix_port = os.getenv("PHOENIX_PORT", collector_port)
+        phoenix_port = int(os.getenv("PHOENIX_PORT", collector_port))
         if is_local_endpoint_available(collector_endpoint, collector_port):
             collector_endpoint_url = f"{collector_endpoint}:{collector_port}"
             tracer_provider = phoenix.otel.register(

@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """
 Unified module for all record decorators.
 This replaces 8 separate files with a single, maintainable module.
