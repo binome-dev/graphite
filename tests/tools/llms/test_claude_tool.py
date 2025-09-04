@@ -135,7 +135,9 @@ def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
     mock_client.messages.create.side_effect = _raise
     monkeypatch.setattr(cl_module, "Anthropic", MagicMock(return_value=mock_client))
 
-    with pytest.raises(RuntimeError, match="Anthropic API error: Boom"):
+    from grafi.common.exceptions import LLMToolException
+
+    with pytest.raises(LLMToolException, match="Boom"):
         claude_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 

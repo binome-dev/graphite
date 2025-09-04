@@ -163,7 +163,9 @@ def test_invoke_with_missing_args(function_instance, invoke_context):
             ],
         )
     ]
-    with pytest.raises(TypeError):
+    from grafi.common.exceptions import FunctionCallException
+
+    with pytest.raises(FunctionCallException):
         function_instance.invoke(invoke_context, input_data)
 
 

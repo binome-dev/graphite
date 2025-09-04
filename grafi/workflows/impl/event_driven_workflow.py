@@ -1,23 +1,26 @@
 import asyncio
 from collections import deque
-from typing import Any, AsyncGenerator, Dict, List, Set
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
+from typing import List
+from typing import Set
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_decorators import (
-    record_workflow_a_invoke,
-    record_workflow_invoke,
-)
+from grafi.common.decorators.record_decorators import record_workflow_a_invoke
+from grafi.common.decorators.record_decorators import record_workflow_invoke
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.exceptions import NodeExecutionError, WorkflowError
+from grafi.common.exceptions import NodeExecutionError
+from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
@@ -29,13 +32,12 @@ from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
-from grafi.workflows.impl.utils import (
-    a_publish_events,
-    get_async_output_events,
-    get_node_input,
-    publish_events,
-)
-from grafi.workflows.workflow import Workflow, WorkflowBuilder
+from grafi.workflows.impl.utils import a_publish_events
+from grafi.workflows.impl.utils import get_async_output_events
+from grafi.workflows.impl.utils import get_node_input
+from grafi.workflows.impl.utils import publish_events
+from grafi.workflows.workflow import Workflow
+from grafi.workflows.workflow import WorkflowBuilder
 
 
 class EventDrivenWorkflow(Workflow):
@@ -342,21 +344,27 @@ class EventDrivenWorkflow(Workflow):
                             try:
                                 result = task.result()
                             except Exception as task_error:
-                                node_name = list(self.nodes.keys())[i] if i < len(self.nodes) else f"node_{i}"
-                                logger.error(f"Node {node_name} failed during execution: {task_error}")
+                                node_name = (
+                                    list(self.nodes.keys())[i]
+                                    if i < len(self.nodes)
+                                    else f"node_{i}"
+                                )
+                                logger.error(
+                                    f"Node {node_name} failed during execution: {task_error}"
+                                )
                                 # Cancel remaining tasks and stop workflow
                                 for t in node_processing_task:
                                     if not t.done():
                                         t.cancel()
                                 self.stop()
-                                
+
                                 raise NodeExecutionError(
                                     node_name=node_name,
                                     message=f"Node {node_name} execution failed during workflow: {task_error}",
                                     invoke_context=invoke_context,
-                                    cause=task_error
+                                    cause=task_error,
                                 ) from task_error
-                    
+
                     # Now yield the data after committing
                     consumed_event = ConsumeFromTopicEvent(
                         name=event.name,
@@ -394,18 +402,22 @@ class EventDrivenWorkflow(Workflow):
 
                 # Check for exceptions from node tasks and raise NodeExecutionError
                 for i, result in enumerate(node_results):
-                    if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                    if isinstance(result, Exception) and not isinstance(
+                        result, asyncio.CancelledError
+                    ):
                         node_name = (
                             list(self.nodes.keys())[i]
                             if i < len(self.nodes)
                             else f"node_{i}"
                         )
-                        logger.error(f"Node {node_name} failed with exception: {result}")
+                        logger.error(
+                            f"Node {node_name} failed with exception: {result}"
+                        )
                         raise NodeExecutionError(
                             node_name=node_name,
                             message=f"Node {node_name} execution failed: {result}",
                             invoke_context=invoke_context,
-                            cause=result
+                            cause=result,
                         ) from result
         except NodeExecutionError:
             raise  # Re-raise NodeExecutionError as-is

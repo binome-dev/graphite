@@ -149,6 +149,8 @@ async def test_error_handling(duckduckgo_tool):
             )
         ]
 
-        with pytest.raises(Exception) as excinfo:
+        from grafi.common.exceptions import FunctionCallException
+
+        with pytest.raises(FunctionCallException) as excinfo:
             duckduckgo_tool.invoke(invoke_context, input_message)
-        assert str(excinfo.value) == "Search failed"
+        assert "Search failed" in str(excinfo.value)

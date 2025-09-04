@@ -177,7 +177,9 @@ def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
 
     monkeypatch.setattr(or_module, "OpenAI", _raise)
 
-    with pytest.raises(RuntimeError, match="OpenRouter API error: Error code"):
+    from grafi.common.exceptions import LLMToolException
+
+    with pytest.raises(LLMToolException, match="Error code"):
         openrouter_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 
