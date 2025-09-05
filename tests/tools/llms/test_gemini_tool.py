@@ -143,7 +143,9 @@ def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
 
-    with pytest.raises(RuntimeError, match="Gemini API error: Failure"):
+    from grafi.common.exceptions import LLMToolException
+
+    with pytest.raises(LLMToolException, match="Failure"):
         gemini_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 

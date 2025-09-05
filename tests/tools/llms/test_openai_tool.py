@@ -167,7 +167,9 @@ def test_invoke_function_call(monkeypatch, openai_instance, invoke_context):
 
 
 def test_invoke_api_error(openai_instance, invoke_context):
-    with pytest.raises(RuntimeError, match="OpenAI API error: Error code"):
+    from grafi.common.exceptions import LLMToolException
+
+    with pytest.raises(LLMToolException, match="Error code"):
         openai_instance.invoke(invoke_context, [Message(role="user", content="Hello")])
 
 

@@ -22,6 +22,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -157,7 +158,13 @@ class GeminiTool(LLM):
                 config=cfg,
             )
         except Exception as exc:
-            raise RuntimeError(f"Gemini API error: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Gemini API call failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
         return self.to_messages(response)
 
@@ -202,7 +209,13 @@ class GeminiTool(LLM):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            raise RuntimeError(f"Gemini async call failed: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Gemini async call failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
     # --------------------------------------------------------------------- #
     # Response conversion helpers

@@ -26,6 +26,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -124,8 +125,22 @@ class OpenRouterTool(LLM):
                 **self.chat_params,
             )
             return self.to_messages(resp)
+        except OpenAIError as exc:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"OpenRouter API call failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
         except Exception as exc:
-            raise RuntimeError(f"OpenRouter API error: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during OpenRouter API call: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
     # ------------------------------------------------------------------ #
     # Async call                                                         #
@@ -163,7 +178,21 @@ class OpenRouterTool(LLM):
         except asyncio.CancelledError:
             raise
         except OpenAIError as exc:
-            raise RuntimeError(f"OpenRouter async call failed: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"OpenRouter async call failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
+        except Exception as exc:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during OpenRouter async call: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
 
     # ------------------------------------------------------------------ #
     # Response converters                                                #

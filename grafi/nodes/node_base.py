@@ -17,6 +17,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
@@ -177,8 +178,9 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
         elif isinstance(subscribe_to, SubExpr):
             self.kwargs["subscribed_expressions"].append(subscribe_to)
         else:
-            raise ValueError(
-                f"Expected a Topic or SubExpr, but got {type(subscribe_to)}"
+            raise NodeExecutionError(
+                node_name=self.kwargs.get("name", "unknown"),
+                message=f"Invalid subscription: Expected a Topic or SubExpr, but got {type(subscribe_to)}",
             )
         return self
 

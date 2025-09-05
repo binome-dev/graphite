@@ -19,6 +19,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.exceptions import NodeExecutionError
+from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
@@ -110,12 +112,14 @@ class EventDrivenWorkflow(Workflow):
         )
 
         if not has_input_topic:
-            raise ValueError(
-                "EventDrivenWorkflow must have at least one topic of type 'agent_input_topic'."
+            raise WorkflowError(
+                message="EventDrivenWorkflow must have at least one topic of type 'agent_input_topic'.",
+                severity="CRITICAL",
             )
         if not has_output_topic:
-            raise ValueError(
-                "EventDrivenWorkflow must have at least one topic of type 'agent_output_topic'."
+            raise WorkflowError(
+                message="EventDrivenWorkflow must have at least one topic of type 'agent_output_topic'.",
+                severity="CRITICAL",
             )
 
     def _add_topic(self, topic: TopicBase) -> None:
@@ -257,19 +261,35 @@ class EventDrivenWorkflow(Workflow):
 
                 # Invoke node with collected inputs
                 if node_consumed_events:
-                    result = node.invoke(invoke_context, node_consumed_events)
+                    try:
+                        result = node.invoke(invoke_context, node_consumed_events)
 
-                    published_events = publish_events(node, result)
+                        published_events = publish_events(node, result)
 
-                    events: List[TopicEvent] = []
-                    events.extend(node_consumed_events)
-                    events.extend(published_events)
+                        events: List[TopicEvent] = []
+                        events.extend(node_consumed_events)
+                        events.extend(published_events)
 
-                    container.event_store.record_events(events)  # type: ignore[arg-type]
+                        container.event_store.record_events(events)  # type: ignore[arg-type]
+                    except Exception as e:
+                        raise NodeExecutionError(
+                            node_name=node.name,
+                            message=f"Node execution failed: {e}",
+                            invoke_context=invoke_context,
+                            cause=e,
+                        ) from e
 
             consumed_events = self._get_output_events()
 
             return consumed_events
+        except NodeExecutionError:
+            raise  # Re-raise NodeExecutionError as-is
+        except Exception as e:
+            raise WorkflowError(
+                message=f"Workflow {self.name} execution failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
         finally:
             if consumed_events:
                 container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
@@ -281,86 +301,132 @@ class EventDrivenWorkflow(Workflow):
         """
         Run the workflow with streaming output.
         """
-        # Reset stop flag at the beginning of new execution
-        self.reset_stop_flag()
-
-        await self.a_init_workflow(input_data)
-
         invoke_context = input_data.invoke_context
 
-        # Start a background task to process all nodes (including streaming generators)
-        node_processing_task = [
-            asyncio.create_task(
-                self._invoke_node(
-                    invoke_context=invoke_context,
-                    node=node,
-                ),
-                name=node.name,
-            )
-            for node in self.nodes.values()
-        ]
-
-        # Get output topics
-        output_topics: list[TopicBase] = [
-            topic
-            for topic in self._topics.values()
-            if topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
-            or topic.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
-        ]
-
-        # Create AsyncOutputQueue with output topics and tracker
-        output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
-        await output_queue.start_listeners()
-
-        consumed_output_events: List[ConsumeFromTopicEvent] = []
-
-        # Wait for either new data or completion, with a timeout to check stop flag
         try:
-            async for event in output_queue:
-                # Now yield the data after committing
-                consumed_event = ConsumeFromTopicEvent(
-                    name=event.name,
-                    type=event.type,
-                    consumer_name=self.name,
-                    consumer_type=self.type,
-                    invoke_context=event.invoke_context,
-                    offset=event.offset,
-                    data=event.data,
+            # Reset stop flag at the beginning of new execution
+            self.reset_stop_flag()
+
+            await self.a_init_workflow(input_data)
+
+            # Start a background task to process all nodes (including streaming generators)
+            node_processing_task = [
+                asyncio.create_task(
+                    self._invoke_node(
+                        invoke_context=invoke_context,
+                        node=node,
+                    ),
+                    name=node.name,
                 )
-                yield consumed_event
+                for node in self.nodes.values()
+            ]
 
-                consumed_output_events.append(consumed_event)
-        finally:
-            await output_queue.stop_listeners()
+            # Get output topics
+            output_topics: list[TopicBase] = [
+                topic
+                for topic in self._topics.values()
+                if topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
+                or topic.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+            ]
 
-            # Commit all consumed output events
-            await self._a_commit_events(
-                consumer_name=self.name, topic_events=consumed_output_events
-            )
+            # Create AsyncOutputQueue with output topics and tracker
+            output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+            await output_queue.start_listeners()
 
-            # 4. graceful shutdown all the nodes
-            self.stop()
+            consumed_output_events: List[ConsumeFromTopicEvent] = []
 
-            # process events after stopping
-            if consumed_output_events:
-                container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+            # Wait for either new data or completion, with a timeout to check stop flag
+            try:
+                async for event in output_queue:
+                    # Check if any node task has failed before yielding events
+                    for i, task in enumerate(node_processing_task):
+                        if task.done() and not task.cancelled():
+                            try:
+                                result = task.result()
+                            except Exception as task_error:
+                                node_name = (
+                                    list(self.nodes.keys())[i]
+                                    if i < len(self.nodes)
+                                    else f"node_{i}"
+                                )
+                                logger.error(
+                                    f"Node {node_name} failed during execution: {task_error}"
+                                )
+                                # Cancel remaining tasks and stop workflow
+                                for t in node_processing_task:
+                                    if not t.done():
+                                        t.cancel()
+                                self.stop()
 
-            # Wait for all node tasks to complete with proper error handling
-            for t in node_processing_task:
-                t.cancel()
-            node_results = await asyncio.gather(
-                *node_processing_task, return_exceptions=True
-            )
+                                raise NodeExecutionError(
+                                    node_name=node_name,
+                                    message=f"Node {node_name} execution failed during workflow: {task_error}",
+                                    invoke_context=invoke_context,
+                                    cause=task_error,
+                                ) from task_error
 
-            # Log any exceptions from node tasks
-            for i, result in enumerate(node_results):
-                if isinstance(result, Exception):
-                    node_name = (
-                        list(self.nodes.keys())[i]
-                        if i < len(self.nodes)
-                        else f"node_{i}"
+                    # Now yield the data after committing
+                    consumed_event = ConsumeFromTopicEvent(
+                        name=event.name,
+                        type=event.type,
+                        consumer_name=self.name,
+                        consumer_type=self.type,
+                        invoke_context=event.invoke_context,
+                        offset=event.offset,
+                        data=event.data,
                     )
-                    logger.error(f"Node {node_name} ended with exception: {result}")
+                    yield consumed_event
+
+                    consumed_output_events.append(consumed_event)
+            finally:
+                await output_queue.stop_listeners()
+
+                # Commit all consumed output events
+                await self._a_commit_events(
+                    consumer_name=self.name, topic_events=consumed_output_events
+                )
+
+                # 4. graceful shutdown all the nodes
+                self.stop()
+
+                # process events after stopping
+                if consumed_output_events:
+                    container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+
+                # Wait for all node tasks to complete with proper error handling
+                for t in node_processing_task:
+                    t.cancel()
+                node_results = await asyncio.gather(
+                    *node_processing_task, return_exceptions=True
+                )
+
+                # Check for exceptions from node tasks and raise NodeExecutionError
+                for i, result in enumerate(node_results):
+                    if isinstance(result, Exception) and not isinstance(
+                        result, asyncio.CancelledError
+                    ):
+                        node_name = (
+                            list(self.nodes.keys())[i]
+                            if i < len(self.nodes)
+                            else f"node_{i}"
+                        )
+                        logger.error(
+                            f"Node {node_name} failed with exception: {result}"
+                        )
+                        raise NodeExecutionError(
+                            node_name=node_name,
+                            message=f"Node {node_name} execution failed: {result}",
+                            invoke_context=invoke_context,
+                            cause=result,
+                        ) from result
+        except NodeExecutionError:
+            raise  # Re-raise NodeExecutionError as-is
+        except Exception as e:
+            raise WorkflowError(
+                message=f"Workflow {self.name} async execution failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     async def _invoke_node(self, invoke_context: InvokeContext, node: NodeBase) -> None:
         """Enhanced node invocation with better async patterns and error handling."""
@@ -444,7 +510,12 @@ class EventDrivenWorkflow(Workflow):
 
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
-                    # Don't break the loop, just log and continue
+                    raise NodeExecutionError(
+                        node_name=node.name,
+                        message=f"Async node execution failed: {node_error}",
+                        invoke_context=invoke_context,
+                        cause=node_error,
+                    ) from node_error
                 finally:
                     await self._tracker.leave(node.name)
                     buffer.clear()  # Clear buffer for next iteration
@@ -452,9 +523,16 @@ class EventDrivenWorkflow(Workflow):
         except asyncio.CancelledError:
             logger.info(f"Node {node.name} was cancelled")
             raise
+        except NodeExecutionError:
+            raise  # Re-raise NodeExecutionError as-is
         except Exception as e:
             logger.error(f"Fatal error in node {node.name} execution: {e}")
-            raise
+            raise NodeExecutionError(
+                node_name=node.name,
+                message=f"Fatal error in node execution: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
         finally:
             buffer.clear()  # Clear buffer for next iteration
 
@@ -502,7 +580,10 @@ class EventDrivenWorkflow(Workflow):
                 if topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
             ]
             if not input_topics:
-                raise ValueError("Agent input topic not found in workflow topics.")
+                raise WorkflowError(
+                    message="Agent input topic not found in workflow topics.",
+                    severity="CRITICAL",
+                )
 
             events_to_record: List[Event] = []
             for input_topic in input_topics:

@@ -648,7 +648,9 @@ class TestNodeBaseBuilder:
 
     def test_builder_subscribe_method_invalid_type(self, builder: NodeBaseBuilder):
         """Test the subscribe() builder method with invalid type."""
-        with pytest.raises(ValueError, match="Expected a Topic or SubExpr"):
+        from grafi.common.exceptions import NodeExecutionError
+
+        with pytest.raises(NodeExecutionError, match="Expected a Topic or SubExpr"):
             builder.subscribe("invalid_subscription")
 
     def test_builder_subscribe_method_multiple_calls(

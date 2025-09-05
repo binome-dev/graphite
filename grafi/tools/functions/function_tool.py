@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.command import Command
 from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
@@ -43,19 +44,36 @@ class FunctionTool(Tool):
 
     @record_tool_invoke
     def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        response = self.function(input_data)
-
-        return self.to_messages(response=response)
+        try:
+            response = self.function(input_data)
+            return self.to_messages(response=response)
+        except Exception as e:
+            raise FunctionToolException(
+                tool_name=self.name,
+                operation="invoke",
+                message=f"Function execution failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     @record_tool_a_invoke
     async def a_invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
-        response = self.function(input_data)
-        if inspect.isawaitable(response):
-            response = await response
+        try:
+            response = self.function(input_data)
+            if inspect.isawaitable(response):
+                response = await response
 
-        yield self.to_messages(response=response)
+            yield self.to_messages(response=response)
+        except Exception as e:
+            raise FunctionToolException(
+                tool_name=self.name,
+                operation="a_invoke",
+                message=f"Async function execution failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     def to_messages(self, response: OutputType) -> Messages:
         response_str = ""

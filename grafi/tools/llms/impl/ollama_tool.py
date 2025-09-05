@@ -14,6 +14,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -109,7 +110,13 @@ class OllamaTool(LLM):
             return self.to_messages(response)
         except Exception as e:
             logger.error("Ollama API error: %s", e)
-            raise RuntimeError(f"Ollama API error: {e}") from e
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Ollama API call failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     @record_tool_a_invoke
     async def a_invoke(
@@ -144,7 +151,13 @@ class OllamaTool(LLM):
                 yield self.to_messages(response)
         except Exception as e:
             logger.error("Ollama API error: %s", e)
-            raise RuntimeError(f"Ollama API error: {e}") from e
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Ollama async call failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     def to_stream_messages(self, chunk: ChatResponse | dict[str, Any]) -> Messages:
         """

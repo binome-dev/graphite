@@ -14,6 +14,7 @@ from pydantic import Field
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import FunctionCallException
 from grafi.common.models.command import use_command
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
@@ -122,14 +123,23 @@ class FunctionCallTool(Tool):
         for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
             if tool_call.function.name in self.functions:
                 func = self.functions[tool_call.function.name]
-                response = func(
-                    self,
-                    **json.loads(tool_call.function.arguments),
-                )
+                try:
+                    response = func(
+                        self,
+                        **json.loads(tool_call.function.arguments),
+                    )
 
-                messages.extend(
-                    self.to_messages(response=response, tool_call_id=tool_call.id)
-                )
+                    messages.extend(
+                        self.to_messages(response=response, tool_call_id=tool_call.id)
+                    )
+                except Exception as e:
+                    raise FunctionCallException(
+                        tool_name=self.name,
+                        function_name=tool_call.function.name,
+                        message=f"Function call failed: {e}",
+                        invoke_context=invoke_context,
+                        cause=e,
+                    ) from e
 
         return messages
 
@@ -161,13 +171,22 @@ class FunctionCallTool(Tool):
         for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
             if tool_call.function.name in self.functions:
                 func = self.functions[tool_call.function.name]
-                response = func(self, **json.loads(tool_call.function.arguments))
-                if inspect.isawaitable(response):
-                    response = await response
+                try:
+                    response = func(self, **json.loads(tool_call.function.arguments))
+                    if inspect.isawaitable(response):
+                        response = await response
 
-                messages.extend(
-                    self.to_messages(response=response, tool_call_id=tool_call.id)
-                )
+                    messages.extend(
+                        self.to_messages(response=response, tool_call_id=tool_call.id)
+                    )
+                except Exception as e:
+                    raise FunctionCallException(
+                        tool_name=self.name,
+                        function_name=tool_call.function.name,
+                        message=f"Async function call failed: {e}",
+                        invoke_context=invoke_context,
+                        cause=e,
+                    ) from e
 
         yield messages
 

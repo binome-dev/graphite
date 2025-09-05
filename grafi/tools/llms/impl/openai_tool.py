@@ -21,6 +21,7 @@ from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -141,8 +142,22 @@ class OpenAITool(LLM):
             # Return the raw response
             return self.to_messages(response)
 
+        except OpenAIError as e:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"OpenAI API call failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
         except Exception as e:
-            raise RuntimeError(f"OpenAI API error: {e}") from e
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during OpenAI API call: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     @record_tool_a_invoke
     async def a_invoke(
@@ -180,8 +195,21 @@ class OpenAITool(LLM):
         except asyncio.CancelledError:
             raise  # let caller handle
         except OpenAIError as exc:
-            # turn client‑specific exceptions into your domain error
-            raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"OpenAI API streaming failed: {exc}",
+                invoke_context=invoke_context,
+                cause=exc,
+            ) from exc
+        except Exception as e:
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"Unexpected error during OpenAI streaming: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """

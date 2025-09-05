@@ -179,7 +179,9 @@ def test_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
 
     monkeypatch.setattr(dst_module, "OpenAI", _raise)
 
-    with pytest.raises(RuntimeError, match="DeepSeek API error: Error code"):
+    from grafi.common.exceptions import LLMToolException
+
+    with pytest.raises(LLMToolException, match="Error code"):
         deepseek_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
 
 

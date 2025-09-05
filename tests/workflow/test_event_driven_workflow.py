@@ -9,6 +9,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.topics.input_topic import InputTopic
@@ -60,7 +61,8 @@ class TestEventDrivenWorkflowInit:
         """Test default initialization of EventDrivenWorkflow requires topics."""
         # EventDrivenWorkflow requires input and output topics, so default initialization should fail
         with pytest.raises(
-            ValueError, match="must have at least one topic of type 'agent_input_topic'"
+            WorkflowError,
+            match="must have at least one topic of type 'agent_input_topic'",
         ):
             EventDrivenWorkflow()
 
@@ -87,7 +89,7 @@ class TestEventDrivenWorkflowInit:
         assert workflow._topic_nodes["test_input"] == ["test_node"]
 
     def test_initialization_missing_input_topic_raises_error(self):
-        """Test that missing agent input topic raises ValueError."""
+        """Test that missing agent input topic raises WorkflowError."""
         output_topic = OutputTopic(name="test_output")
         mock_tool = MockTool()
         missing_topic = InputTopic(
@@ -101,12 +103,13 @@ class TestEventDrivenWorkflowInit:
         )
 
         with pytest.raises(
-            ValueError, match="must have at least one topic of type 'agent_input_topic'"
+            WorkflowError,
+            match="must have at least one topic of type 'agent_input_topic'",
         ):
             EventDrivenWorkflow(nodes={"test_node": node})
 
     def test_initialization_missing_output_topic_raises_error(self):
-        """Test that missing agent output topic raises ValueError."""
+        """Test that missing agent output topic raises WorkflowError."""
         input_topic = InputTopic(name="test_input")
         mock_tool = MockTool()
         node = Node(
@@ -117,7 +120,7 @@ class TestEventDrivenWorkflowInit:
         )
 
         with pytest.raises(
-            ValueError,
+            WorkflowError,
             match="must have at least one topic of type 'agent_output_topic'",
         ):
             EventDrivenWorkflow(nodes={"test_node": node})

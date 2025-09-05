@@ -198,6 +198,8 @@ async def test_error_handling(google_search_tool):
             )
         ]
 
-        with pytest.raises(Exception) as excinfo:
+        from grafi.common.exceptions import FunctionCallException
+
+        with pytest.raises(FunctionCallException) as excinfo:
             google_search_tool.invoke(invoke_context, message_with_call)
-        assert str(excinfo.value) == "Search failed"
+        assert "Search failed" in str(excinfo.value)
