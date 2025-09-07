@@ -17,7 +17,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.message import Messages
-from grafi.topics.topic_event_cache import TopicEventCache
+from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
 
 
@@ -34,7 +34,7 @@ class TopicBase(BaseModel):
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
     condition: Callable[[Messages], bool] = Field(default=lambda _: True)
-    event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
+    event_cache: TopicEventQueue = Field(default_factory=TopicEventQueue)
     publish_event_handler: Optional[Callable] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -96,14 +96,14 @@ class TopicBase(BaseModel):
         """
         Reset the topic to its initial state.
         """
-        self.event_cache = TopicEventCache()
+        self.event_cache = TopicEventQueue()
 
     async def a_reset(self) -> None:
         """
         Asynchronously reset the topic to its initial state.
         """
         self.event_cache.reset()
-        self.event_cache = TopicEventCache()
+        self.event_cache = TopicEventQueue()
 
     def restore_topic(self, topic_event: TopicEvent) -> None:
         """

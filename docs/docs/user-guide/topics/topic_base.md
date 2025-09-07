@@ -25,7 +25,7 @@ The base class for all topic implementations, providing core messaging functiona
 | `name` | `str` | Unique identifier for the topic |
 | `type` | `str` | Topic type identifier |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
+| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
 | `publish_event_handler` | `Optional[Callable]` | Handler for publish events |
 
 #### Core Methods
@@ -100,7 +100,7 @@ def publish_data(
 
 ## Message Consumption
 
-The topic system uses a sophisticated caching mechanism (`TopicEventCache`) that manages consumed and committed offsets separately for reliable message processing.
+The topic system uses a sophisticated caching mechanism (`TopicEventQueue`) that manages consumed and committed offsets separately for reliable message processing.
 
 ### Consumption Check
 
@@ -195,12 +195,12 @@ def serialize_callable(self) -> dict:
 ```python
 def reset(self) -> None:
     """Reset the topic to its initial state."""
-    self.event_cache = TopicEventCache(self.name)
+    self.event_cache = TopicEventQueue(self.name)
 
 async def a_reset(self) -> None:
     """Asynchronously reset the topic to its initial state."""
     self.event_cache.reset()
-    self.event_cache = TopicEventCache(self.name)
+    self.event_cache = TopicEventQueue(self.name)
 ```
 
 ### Restore Topic

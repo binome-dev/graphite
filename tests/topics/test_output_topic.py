@@ -10,7 +10,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.topics.output_topic import OutputTopic
 from grafi.topics.topic_base import TopicType
-from grafi.topics.topic_event_cache import TopicEventCache
+from grafi.topics.topic_event_queue import TopicEventQueue
 
 
 agent_output_topic = OutputTopic(name="agent_output_topic")
@@ -102,7 +102,7 @@ class TestOutputTopic:
 
         assert topic.name == "agent_output_topic"
         assert topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
-        assert isinstance(topic.event_cache, TopicEventCache)
+        assert isinstance(topic.event_cache, TopicEventQueue)
         assert topic.publish_event_handler is None
 
     def test_output_topic_with_custom_name(self):

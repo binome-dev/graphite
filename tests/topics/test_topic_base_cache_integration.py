@@ -11,7 +11,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.topics.output_topic import OutputTopic
 from grafi.topics.topic import Topic
-from grafi.topics.topic_event_cache import TopicEventCache
+from grafi.topics.topic_event_queue import TopicEventQueue
 
 
 class TestTopicBaseCacheIntegration:
@@ -41,7 +41,7 @@ class TestTopicBaseCacheIntegration:
     def test_topic_initialization_with_cache(self):
         topic = Topic(name="test")
         assert topic.name == "test"
-        assert isinstance(topic.event_cache, TopicEventCache)
+        assert isinstance(topic.event_cache, TopicEventQueue)
         assert topic.event_cache.id is not None
         assert topic.event_cache.num_events() == 0
 

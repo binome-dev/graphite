@@ -89,7 +89,7 @@ def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     assert len(consumed_messages) == 2  # Consumer should receive both messages
     assert consumed_messages[0].offset == 0
     assert consumed_messages[1].offset == 1
-    # Consumption offsets are now managed internally by TopicEventCache
+    # Consumption offsets are now managed internally by TopicEventQueue
     # Test that consumer can't consume again (has consumed all available messages)
     assert not topic.can_consume("consumer_1")
 

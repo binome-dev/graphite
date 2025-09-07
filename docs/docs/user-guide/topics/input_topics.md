@@ -24,7 +24,7 @@ The foundational topic for receiving initial input into a workflow.
 | `name` | `str` | Topic name (typically "agent_input_topic") |
 | `type` | `str` | Topic type identifier ("AgentInput") |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
+| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
 
 *Inherits all fields from `TopicBase`*
 
@@ -48,7 +48,7 @@ A specialized input topic for managing human-in-the-loop interactions within run
 | `type` | `str` | Topic type identifier ("InWorkflowInput") |
 | `paired_in_workflow_output_topic_name` | `str` | Name of the paired output topic |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
+| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
 
 *Inherits all fields from `TopicBase`*
 

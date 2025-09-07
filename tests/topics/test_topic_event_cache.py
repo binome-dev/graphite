@@ -6,13 +6,13 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.topics.topic_event_cache import TopicEventCache
+from grafi.topics.topic_event_queue import TopicEventQueue
 
 
-class TestTopicEventCache:
+class TestTopicEventQueue:
     @pytest.fixture
     def cache(self):
-        return TopicEventCache()
+        return TopicEventQueue()
 
     @pytest.fixture
     def sample_event(self):
@@ -34,7 +34,7 @@ class TestTopicEventCache:
         )
 
     def test_initialization(self):
-        cache = TopicEventCache()
+        cache = TopicEventQueue()
         assert cache._records == []
         assert len(cache._consumed) == 0
         assert len(cache._committed) == 0

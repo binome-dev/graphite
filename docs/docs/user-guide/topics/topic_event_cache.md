@@ -1,10 +1,10 @@
 # Topic Event Cache
 
-The TopicEventCache is a sophisticated in-memory caching system that provides Kafka-like functionality for managing topic events, consumer offsets, and reliable message processing in Graphite workflows. It acts as a miniature message broker within each topic, supporting concurrent producers and consumers with proper offset management.
+The TopicEventQueue is a sophisticated in-memory caching system that provides Kafka-like functionality for managing topic events, consumer offsets, and reliable message processing in Graphite workflows. It acts as a miniature message broker within each topic, supporting concurrent producers and consumers with proper offset management.
 
 ## Overview
 
-The TopicEventCache implements:
+The TopicEventQueue implements:
 
 - **Event Storage**: Contiguous log of topic events with offset-based indexing
 - **Consumer Tracking**: Per-consumer offset management (consumed and committed)
@@ -17,7 +17,7 @@ The TopicEventCache implements:
 ### Core Components
 
 ```python
-class TopicEventCache:
+class TopicEventQueue:
     def __init__(self, name: str = ""):
         self.name: str = name
         self._records: List[TopicEvent] = []  # contiguous log
@@ -176,7 +176,7 @@ async def a_commit_to(self, consumer_id: str, offset: int) -> None:
 
 ```python
 # Producer
-cache = TopicEventCache("my_topic")
+cache = TopicEventQueue("my_topic")
 event = PublishToTopicEvent(...)
 cache.put(event)
 
@@ -199,14 +199,14 @@ if cache.can_consume(consumer_id):
 
 ```python
 async def producer():
-    cache = TopicEventCache("async_topic")
+    cache = TopicEventQueue("async_topic")
     for i in range(10):
         event = create_event(i)
         await cache.a_put(event)
         await asyncio.sleep(0.1)
 
 async def consumer():
-    cache = TopicEventCache("async_topic")
+    cache = TopicEventQueue("async_topic")
     consumer_id = "async_consumer"
 
     while True:
@@ -228,7 +228,7 @@ async def consumer():
 ### Multiple Consumers
 
 ```python
-cache = TopicEventCache("shared_topic")
+cache = TopicEventQueue("shared_topic")
 
 # Each consumer tracks its own offsets
 consumers = ["consumer_1", "consumer_2", "consumer_3"]
@@ -251,7 +251,7 @@ for consumer_id in consumers:
 
 ```python
 async def robust_consumer():
-    cache = TopicEventCache("robust_topic")
+    cache = TopicEventQueue("robust_topic")
     consumer_id = "robust_consumer"
 
     try:
@@ -291,7 +291,7 @@ async def robust_consumer():
 
 ```python
 async def test_cache_behavior():
-    cache = TopicEventCache("test_topic")
+    cache = TopicEventQueue("test_topic")
 
     # Test basic put/fetch
     event = create_test_event()
@@ -319,11 +319,11 @@ async def test_cache_behavior():
 
 ## Integration with Topics
 
-The TopicEventCache is used internally by all TopicBase implementations:
+The TopicEventQueue is used internally by all TopicBase implementations:
 
 ```python
 class TopicBase(BaseModel):
-    event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
+    event_cache: TopicEventQueue = Field(default_factory=TopicEventQueue)
 
     def can_consume(self, consumer_name: str) -> bool:
         return self.event_cache.can_consume(consumer_name)

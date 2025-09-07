@@ -55,7 +55,7 @@ def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     topic.reset()
 
     assert topic.event_cache.num_events() == 0  # All messages should be cleared
-    # Consumption offsets are now managed internally by TopicEventCache
+    # Consumption offsets are now managed internally by TopicEventQueue
 
 
 def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):

@@ -8,7 +8,7 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.default_id import default_id
 
 
-class TopicEventCache:
+class TopicEventQueue:
     """
     In memory message queue where multiple publishers send events to all subscribers.
 
@@ -18,9 +18,7 @@ class TopicEventCache:
 
     def __init__(self) -> None:
         self.id: str = default_id
-        self._records: List[
-            TopicEvent
-        ] = (
+        self._records: List[TopicEvent] = (
             []
         )  # contiguous in memory log, persistent all the topic events generated from publishers
 
