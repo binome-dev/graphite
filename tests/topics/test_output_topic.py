@@ -8,9 +8,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import TopicType
-from grafi.common.topics.topic_event_cache import TopicEventCache
+from grafi.topics.output_topic import OutputTopic
+from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_event_cache import TopicEventCache
 
 
 agent_output_topic = OutputTopic(name="agent_output_topic")

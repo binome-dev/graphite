@@ -13,14 +13,14 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
+from grafi.topics.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 

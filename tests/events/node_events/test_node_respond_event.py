@@ -7,7 +7,7 @@ from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_types import TopicType
+from grafi.topics.topic_types import TopicType
 from tests.events.node_events.test_node_event import get_consumed_events
 
 

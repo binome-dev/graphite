@@ -82,8 +82,8 @@ Example usage:
 
 ```python
 from grafi.nodes.node import Node
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
 
 node = Node.builder()
     .name("ProcessorNode")

@@ -11,12 +11,12 @@ from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import SubExpr
-from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
 from grafi.tools.tool import Tool
+from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_expression import SubExpr
+from grafi.topics.topic_expression import TopicExpr
 
 
 class MockTool(Tool):

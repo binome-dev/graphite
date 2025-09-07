@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from typing import List
 
 from grafi.common.events.topic_events.topic_event import TopicEvent
-from grafi.common.topics.topic_base import TopicBase
+from grafi.topics.topic_base import TopicBase
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
 

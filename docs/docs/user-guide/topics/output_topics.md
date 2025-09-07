@@ -106,7 +106,7 @@ Workflow topics are typically created as pairs for human-in-the-loop interaction
 ### Basic Output Publishing
 
 ```python
-from grafi.common.topics.output_topic import OutputTopic, agent_output_topic
+from grafi.topics.output_topic import OutputTopic, agent_output_topic
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
 
@@ -208,7 +208,7 @@ async def managed_streaming():
 ### Publishing Workflow Output for Human Interaction
 
 ```python
-from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.common.models.message import Message
 
 # Create workflow output topic (paired with an input topic)

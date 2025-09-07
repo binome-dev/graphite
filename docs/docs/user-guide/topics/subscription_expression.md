@@ -138,8 +138,8 @@ This function traverses the expression tree and collects all referenced topics, 
 ### Simple Topic Subscription
 
 ```python
-from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic
+from grafi.topics.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic import Topic
 
 # Create topics
 notifications = Topic(name="notifications")
@@ -210,7 +210,7 @@ right_expr = (SubscriptionBuilder()
     .build())
 
 # Combine manually
-from grafi.common.topics.topic_expression import CombinedExpr, LogicalOp
+from grafi.topics.topic_expression import CombinedExpr, LogicalOp
 complex_expr = CombinedExpr(
     op=LogicalOp.AND,
     left=left_expr,
@@ -223,7 +223,7 @@ complex_expr = CombinedExpr(
 ### Basic Evaluation
 
 ```python
-from grafi.common.topics.topic_expression import evaluate_subscription
+from grafi.topics.topic_expression import evaluate_subscription
 
 # Topics with new messages
 topics_with_msgs = ["notifications", "errors"]

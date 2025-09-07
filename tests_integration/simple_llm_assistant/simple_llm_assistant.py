@@ -7,8 +7,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow

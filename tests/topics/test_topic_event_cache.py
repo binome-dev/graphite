@@ -6,7 +6,7 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_event_cache import TopicEventCache
+from grafi.topics.topic_event_cache import TopicEventCache
 
 
 class TestTopicEventCache:

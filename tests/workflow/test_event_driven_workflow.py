@@ -12,12 +12,12 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import TopicType
-from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
 from grafi.tools.tool import Tool
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
+from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_expression import TopicExpr
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
 

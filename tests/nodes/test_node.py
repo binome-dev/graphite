@@ -12,11 +12,11 @@ from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import NodeBaseBuilder
 from grafi.tools.tool import Tool
+from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_expression import TopicExpr
 
 
 class MockTool(Tool):
@@ -328,7 +328,7 @@ class TestNode:
 
         # The MockTopic already has can_consume method that returns True
         with patch(
-            "grafi.common.topics.topic_expression.evaluate_subscription",
+            "grafi.topics.topic_expression.evaluate_subscription",
             return_value=True,
         ):
             assert node.can_invoke() is True

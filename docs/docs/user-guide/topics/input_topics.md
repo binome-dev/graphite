@@ -86,7 +86,7 @@ Builder for constructing InWorkflowInputTopic instances.
 ### Basic Input Publishing
 
 ```python
-from grafi.common.topics.topic import InputTopic
+from grafi.topics.topic import InputTopic
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
 
@@ -145,8 +145,8 @@ workflow = (WorkflowBuilder()
 ### Creating Paired Topics
 
 ```python
-from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
-from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
 
 # Create paired topics for human-in-the-loop
 workflow_output_topic = InWorkflowOutputTopic(

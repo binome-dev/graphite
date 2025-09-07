@@ -9,9 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_types import TopicType
 from grafi.nodes.node import Node
+from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input

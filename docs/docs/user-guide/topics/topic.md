@@ -103,7 +103,7 @@ def publish_data(
 ### Basic Topic Creation
 
 ```python
-from grafi.common.topics.topic import Topic
+from grafi.topics.topic import Topic
 
 # Create simple topic
 topic = Topic(name="notifications")
@@ -204,7 +204,7 @@ all_messages_topic = Topic(name="all_messages")
 The module provides a pre-configured topic for agent input:
 
 ```python
-from grafi.common.topics.topic import agent_input_topic
+from grafi.topics.topic import agent_input_topic
 
 # Use the predefined agent input topic
 event = agent_input_topic.publish_data(

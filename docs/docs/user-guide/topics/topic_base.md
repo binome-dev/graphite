@@ -248,7 +248,7 @@ def to_dict(self) -> dict[str, Any]:
 ### Basic Topic Creation
 
 ```python
-from grafi.common.topics.topic_base import TopicBaseBuilder
+from grafi.topics.topic_base import TopicBaseBuilder
 
 # Create topic with builder
 topic = (TopicBaseBuilder()
