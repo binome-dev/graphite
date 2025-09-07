@@ -5,6 +5,7 @@ from typing import List
 from typing import Type
 
 from pydantic import BaseModel
+from typing_extensions import deprecated
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -43,6 +44,7 @@ class Command(BaseModel):
         # If no command found, return the base Command class
         return cls(tool=tool)
 
+    @deprecated("invoke will be replaced with a_invoke.")
     def invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> Messages:

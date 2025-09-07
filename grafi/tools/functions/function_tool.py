@@ -13,12 +13,12 @@ from pydantic import BaseModel
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
-from grafi.common.models.command import Command
-from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.command import Command
+from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 

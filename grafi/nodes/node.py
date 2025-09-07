@@ -8,10 +8,10 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
+from grafi.tools.command import Command
 from grafi.topics.topic_expression import extract_topics
 
 

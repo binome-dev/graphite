@@ -15,13 +15,13 @@ from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionCallException
-from grafi.common.models.command import use_command
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.command import use_command
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder

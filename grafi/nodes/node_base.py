@@ -19,9 +19,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.tools.command import Command
 from grafi.tools.tool import Tool
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_expression import SubExpr

@@ -5,11 +5,11 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
-from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
 from tests_integration.rag_assistant.tools.rags.rag_response_command import (
     RagResponseCommand,
