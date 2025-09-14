@@ -58,6 +58,7 @@ class Topic(TopicBase):
         self, publish_event: PublishToTopicEvent
     ) -> Optional[PublishToTopicEvent]:
         if self.condition(publish_event.data):
+            print("PUBLUSHING")
             event = publish_event.model_copy(
                 update={
                     "name": self.name,

@@ -375,6 +375,7 @@ class EventDrivenWorkflow(Workflow):
                         offset=event.offset,
                         data=event.data,
                     )
+                    print(consumed_event)
                     yield consumed_event
 
                     consumed_output_events.append(consumed_event)
@@ -495,12 +496,14 @@ class EventDrivenWorkflow(Workflow):
                     # publish before commit
                     node_output_events: List[PublishToTopicEvent] = []
                     if consumed_events:
+                        print(node.name)
                         async for event in node.a_invoke(
                             invoke_context, consumed_events
                         ):
                             node_output_events.extend(
                                 await a_publish_events(node=node, publish_event=event)
                             )
+                        print(node_output_events)
 
                     await self._a_commit_events(
                         consumer_name=node.name, topic_events=consumed_events
@@ -540,13 +543,19 @@ class EventDrivenWorkflow(Workflow):
         """Handle topic publish events and trigger node invoke if conditions are met."""
         if not isinstance(event, PublishToTopicEvent):
             return
+        
+        print("EVENT RECEIVED")
 
         name = event.name
+        print(name)
         if name not in self._topic_nodes:
+            print("No nodes subscribed to this topic")
             return
 
         # Get all nodes subscribed to this topic
         subscribed_nodes = self._topic_nodes[name]
+        print("NODES")
+        print(subscribed_nodes)
 
         for node_name in subscribed_nodes:
             node = self.nodes[node_name]
