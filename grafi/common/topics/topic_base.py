@@ -146,6 +146,7 @@ class TopicBase(BaseModel):
         This method should be used by subclasses when publishing events.
         """
         if isinstance(event, PublishToTopicEvent):
+            print("ADDING EVENT" + str(event))
             return await self.event_cache.a_put(event)
 
     def serialize_callable(self) -> dict:

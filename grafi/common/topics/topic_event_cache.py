@@ -110,6 +110,7 @@ class TopicEventCache:
             offset = len(self._records)
             event.offset = offset  # Set the offset for the event
             self._records.append(event)
+            print("APPENDED!")
             self._cond.notify_all()  # wake waiting consumers
             return event
 

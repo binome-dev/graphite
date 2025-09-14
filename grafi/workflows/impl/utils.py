@@ -103,8 +103,10 @@ async def a_publish_events(
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
+        print(topic.name)
+        print(publish_event)
         event = await topic.a_publish_data(publish_event)
-
+        print(event)
         if event:
             published_events.append(event)
 
