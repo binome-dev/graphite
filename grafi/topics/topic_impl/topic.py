@@ -28,7 +28,7 @@ class Topic(TopicBase):
         """
         return TopicBuilder(cls)
 
-    def publish_data(
+    async def publish_data(
         self, publish_event: PublishToTopicEvent
     ) -> Optional[PublishToTopicEvent]:
         """
@@ -43,9 +43,9 @@ class Topic(TopicBase):
                 deep=True,
             )
             # Add event to cache and update total_published
-            event = self.add_event(event)
+            event = await self.a_add_event(event)
             if self.publish_event_handler:
-                self.publish_event_handler(event)  # type: ignore[arg-type]
+                await self.publish_event_handler(event)  # type: ignore[arg-type]
             logger.info(
                 f"[{self.name}] Message published with event_id: {event.event_id}"
             )

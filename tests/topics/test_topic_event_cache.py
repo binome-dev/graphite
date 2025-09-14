@@ -6,7 +6,7 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.topics.topic_event_queue import TopicEventQueue
+from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
 
 
 class TestTopicEventQueue:

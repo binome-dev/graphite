@@ -14,10 +14,10 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.tools.tool import Tool
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
+from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicType
-from grafi.topics.topic_expression import TopicExpr
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
 

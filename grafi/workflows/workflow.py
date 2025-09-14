@@ -48,7 +48,9 @@ class Workflow(BaseModel):
         """
         self._stop_requested = False
 
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    async def invoke(
+        self, input_data: PublishToTopicEvent
+    ) -> List[ConsumeFromTopicEvent]:
         """Invokes the workflow with the given initial inputs."""
         raise NotImplementedError
 
@@ -59,11 +61,11 @@ class Workflow(BaseModel):
         yield None  # type: ignore
         raise NotImplementedError
 
-    def initial_workflow(self, assistant_request_id: str) -> Any:
+    async def initial_workflow(self, assistant_request_id: str) -> Any:
         """Initial workflow state, and replays events from an unfinished request to resume invoke."""
         raise NotImplementedError
 
-    def on_event(self, event: "Event") -> None:
+    async def on_event(self, event: "Event") -> None:
         """Handle events dispatched from nodes and tools."""
         raise NotImplementedError
 

@@ -9,9 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.topics.output_topic import OutputTopic
-from grafi.topics.topic import Topic
-from grafi.topics.topic_event_queue import TopicEventQueue
+from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.topic_impl.topic import Topic
 
 
 class TestTopicBaseCacheIntegration:

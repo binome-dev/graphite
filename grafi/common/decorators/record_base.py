@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """Base decorator utilities for recording component invoke events and tracing."""
 
 import functools

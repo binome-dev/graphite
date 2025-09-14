@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from grafi.topics.topic import Topic
+from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_types import TopicType
 
 

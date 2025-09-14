@@ -17,6 +17,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.message import Messages
+from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
 
@@ -27,19 +28,21 @@ class TopicBase(BaseModel):
     Manages both publishing and consumption of message event IDs using a FIFO cache.
     - name: string (the topic's name)
     - condition: function to determine if a message should be published
-    - event_cache: FIFO cache for recently accessed events
+    - event_queue: FIFO cache for recently accessed events
     - total_published: total number of events published to this topic
     """
 
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
     condition: Callable[[Messages], bool] = Field(default=lambda _: True)
-    event_cache: TopicEventQueue = Field(default_factory=TopicEventQueue)
+    event_queue: TopicEventQueue = Field(default_factory=InMemTopicEventQueue)
     publish_event_handler: Optional[Callable] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def publish_data(self, publish_event: PublishToTopicEvent) -> PublishToTopicEvent:
+    async def publish_data(
+        self, publish_event: PublishToTopicEvent
+    ) -> PublishToTopicEvent:
         """
         Publish data to the topic if it meets the condition.
         """
@@ -57,29 +60,13 @@ class TopicBase(BaseModel):
             "Method 'publish_data' must be implemented in subclasses."
         )
 
-    def can_consume(self, consumer_name: str) -> bool:
+    async def a_can_consume(self, consumer_name: str) -> bool:
         """
         Checks whether the given node can consume any new/unread messages
         from this topic (i.e., if there are event IDs that the node hasn't
         already consumed).
         """
-        return self.event_cache.can_consume(consumer_name)
-
-    def consume(self, consumer_name: str) -> List[PublishToTopicEvent]:
-        """
-        Retrieve new/unconsumed messages for the given node by fetching them
-        from the cache or event store. Once retrieved, the node's
-        consumption offset is updated so these messages won't be retrieved again.
-
-        :param consumer_name: A unique identifier for the consuming node.
-        :return: A list of new messages that were not yet consumed by this node.
-        """
-
-        # Get the new events using the offset range
-        new_events = self.event_cache.fetch(consumer_name)
-
-        # Filter to only return PublishToTopicEvent instances for backward compatibility
-        return [event for event in new_events if isinstance(event, PublishToTopicEvent)]
+        return await self.event_queue.a_can_consume(consumer_name)
 
     async def a_consume(
         self, consumer_name: str, timeout: Optional[float] = None
@@ -87,58 +74,31 @@ class TopicBase(BaseModel):
         """
         Asynchronously retrieve new/unconsumed messages for the given node by fetching them
         """
-        return await self.event_cache.a_fetch(consumer_name, timeout=timeout)
+        return await self.event_queue.a_fetch(consumer_name, timeout=timeout)
 
     async def a_commit(self, consumer_name: str, offset: int) -> None:
-        await self.event_cache.a_commit_to(consumer_name, offset)
-
-    def reset(self) -> None:
-        """
-        Reset the topic to its initial state.
-        """
-        self.event_cache = TopicEventQueue()
+        await self.event_queue.a_commit_to(consumer_name, offset)
 
     async def a_reset(self) -> None:
         """
         Asynchronously reset the topic to its initial state.
         """
-        self.event_cache.reset()
-        self.event_cache = TopicEventQueue()
-
-    def restore_topic(self, topic_event: TopicEvent) -> None:
-        """
-        Restore a topic from a topic event.
-        """
-        if isinstance(topic_event, PublishToTopicEvent):
-            self.event_cache.put(topic_event)
-        elif isinstance(topic_event, ConsumeFromTopicEvent):
-            self.event_cache.fetch(
-                consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
-            )
-            self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
+        await self.event_queue.a_reset()
 
     async def a_restore_topic(self, topic_event: TopicEvent) -> None:
         """
         Asynchronously restore a topic from a topic event.
         """
         if isinstance(topic_event, PublishToTopicEvent):
-            await self.event_cache.a_put(topic_event)
+            await self.event_queue.a_put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             # Fetch the events for the consumer and commit the offset
-            await self.event_cache.a_fetch(
+            await self.event_queue.a_fetch(
                 consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
             )
-            await self.event_cache.a_commit_to(
+            await self.event_queue.a_commit_to(
                 topic_event.consumer_name, topic_event.offset
             )
-
-    def add_event(self, event: TopicEvent) -> TopicEvent:
-        """f
-        Add an event to the topic cache and update total_published.
-        This method should be used by subclasses when publishing events.
-        """
-        if isinstance(event, PublishToTopicEvent):
-            return self.event_cache.put(event)
 
     async def a_add_event(self, event: TopicEvent) -> TopicEvent:
         """
@@ -146,7 +106,7 @@ class TopicBase(BaseModel):
         This method should be used by subclasses when publishing events.
         """
         if isinstance(event, PublishToTopicEvent):
-            return await self.event_cache.a_put(event)
+            return await self.event_queue.a_put(event)
 
     def serialize_callable(self) -> dict:
         """

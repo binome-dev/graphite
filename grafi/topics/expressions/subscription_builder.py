@@ -3,11 +3,11 @@ from typing import Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
+from grafi.topics.expressions.topic_expression import CombinedExpr
+from grafi.topics.expressions.topic_expression import LogicalOp
+from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_expression import CombinedExpr
-from grafi.topics.topic_expression import LogicalOp
-from grafi.topics.topic_expression import SubExpr
-from grafi.topics.topic_expression import TopicExpr
 
 
 class SubscriptionBuilder(BaseModel):

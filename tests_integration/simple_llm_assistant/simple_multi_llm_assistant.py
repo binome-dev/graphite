@@ -5,15 +5,15 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
-from grafi.topics.in_workflow_input_topic import InWorkflowInputTopic
-from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
-from grafi.topics.subscription_builder import SubscriptionBuilder
-from grafi.topics.topic import Topic
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
+from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 

@@ -6,8 +6,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.topics.output_topic import OutputTopic
 from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 

@@ -25,10 +25,10 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
-from grafi.topics.in_workflow_input_topic import InWorkflowInputTopic
-from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.topics.expressions.topic_expression import extract_topics
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_expression import extract_topics
+from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
@@ -187,7 +187,7 @@ class EventDrivenWorkflow(Workflow):
 
     # Workflow invoke methods
 
-    def _get_output_events(self) -> List[ConsumeFromTopicEvent]:
+    async def _get_output_events(self) -> List[ConsumeFromTopicEvent]:
         consumed_events: List[ConsumeFromTopicEvent] = []
 
         output_topics = [
@@ -198,8 +198,8 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         for output_topic in output_topics:
-            if output_topic.can_consume(self.name):
-                events = output_topic.consume(self.name)
+            if await output_topic.a_can_consume(self.name):
+                events = await output_topic.a_consume(self.name)
                 for event in events:
                     consumed_events.append(
                         ConsumeFromTopicEvent(
@@ -232,7 +232,9 @@ class EventDrivenWorkflow(Workflow):
             await self._topics[topic].a_commit(consumer_name, offset)
 
     @record_workflow_invoke
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+    async def invoke(
+        self, input_data: PublishToTopicEvent
+    ) -> List[ConsumeFromTopicEvent]:
         """
         Invoke the workflow with the given context and input.
         Returns results when all nodes complete processing.
@@ -244,7 +246,7 @@ class EventDrivenWorkflow(Workflow):
 
         consumed_events: List[ConsumeFromTopicEvent] = []
         try:
-            self.initial_workflow(input_data)
+            await self.initial_workflow(input_data)
 
             # Process nodes until invoke queue is empty or workflow is stopped
             while self._invoke_queue:
@@ -257,20 +259,22 @@ class EventDrivenWorkflow(Workflow):
 
                 # Given node, collect all the messages can be linked to it
 
-                node_consumed_events: List[ConsumeFromTopicEvent] = get_node_input(node)
+                node_consumed_events: List[ConsumeFromTopicEvent] = (
+                    await get_node_input(node)
+                )
 
                 # Invoke node with collected inputs
                 if node_consumed_events:
                     try:
                         result = node.invoke(invoke_context, node_consumed_events)
 
-                        published_events = publish_events(node, result)
+                        published_events = await publish_events(node, result)
 
                         events: List[TopicEvent] = []
                         events.extend(node_consumed_events)
                         events.extend(published_events)
 
-                        container.event_store.record_events(events)  # type: ignore[arg-type]
+                        await container.event_store.a_record_events(events)  # type: ignore[arg-type]
                     except Exception as e:
                         raise NodeExecutionError(
                             node_name=node.name,
@@ -292,7 +296,7 @@ class EventDrivenWorkflow(Workflow):
             ) from e
         finally:
             if consumed_events:
-                container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
+                await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
 
     @record_workflow_a_invoke
     async def a_invoke(
@@ -391,7 +395,7 @@ class EventDrivenWorkflow(Workflow):
 
                 # process events after stopping
                 if consumed_output_events:
-                    container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+                    await container.event_store.a_record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
 
                 # Wait for all node tasks to complete with proper error handling
                 for t in node_processing_task:
@@ -505,8 +509,8 @@ class EventDrivenWorkflow(Workflow):
                     await self._a_commit_events(
                         consumer_name=node.name, topic_events=consumed_events
                     )
-                    container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
-                    container.event_store.record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
+                    await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
+                    await container.event_store.a_record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
 
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
@@ -536,7 +540,7 @@ class EventDrivenWorkflow(Workflow):
         finally:
             buffer.clear()  # Clear buffer for next iteration
 
-    def on_event(self, event: TopicEvent) -> None:
+    async def on_event(self, event: TopicEvent) -> None:
         """Handle topic publish events and trigger node invoke if conditions are met."""
         if not isinstance(event, PublishToTopicEvent):
             return
@@ -551,22 +555,22 @@ class EventDrivenWorkflow(Workflow):
         for node_name in subscribed_nodes:
             node = self.nodes[node_name]
             # Check if node has new messages to consume
-            if node.can_invoke():
+            if await node.a_can_invoke():
                 self._invoke_queue.append(node)
 
-    def initial_workflow(self, input_data: PublishToTopicEvent) -> Any:
+    async def initial_workflow(self, input_data: PublishToTopicEvent) -> Any:
         """Restore the workflow state from stored events."""
 
         # Reset all the topics
 
         for topic in self._topics.values():
-            topic.reset()
+            await topic.a_reset()
 
         invoke_context = input_data.invoke_context
 
         events = [
             event
-            for event in container.event_store.get_agent_events(
+            for event in await container.event_store.a_get_agent_events(
                 invoke_context.assistant_request_id
             )
             if isinstance(event, TopicEvent)
@@ -587,7 +591,7 @@ class EventDrivenWorkflow(Workflow):
 
             events_to_record: List[Event] = []
             for input_topic in input_topics:
-                event = input_topic.publish_data(
+                event = await input_topic.publish_data(
                     input_data.model_copy(
                         update={
                             "publisher_name": self.name,
@@ -604,7 +608,7 @@ class EventDrivenWorkflow(Workflow):
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:
-                self._topics[topic_event.name].restore_topic(topic_event)
+                await self._topics[topic_event.name].a_restore_topic(topic_event)
 
             publish_events = [
                 event for event in events if isinstance(event, PublishToTopicEvent)
@@ -641,7 +645,10 @@ class EventDrivenWorkflow(Workflow):
                 for node_name in subscribed_nodes:
                     node = self.nodes[node_name]
                     # add unprocessed node to the invoke queue
-                    if topic.can_consume(node_name) and node.can_invoke():
+                    if (
+                        await topic.a_can_consume(node_name)
+                        and await node.a_can_invoke()
+                    ):
                         self._invoke_queue.append(node)
 
             # Process in-workflow topics
@@ -662,13 +669,15 @@ class EventDrivenWorkflow(Workflow):
                         if paired_in_workflow_input_topic and isinstance(
                             paired_in_workflow_input_topic, InWorkflowInputTopic
                         ):
-                            paired_event = paired_in_workflow_input_topic.publish_data(
-                                input_data.model_copy(
-                                    update={
-                                        "publisher_name": self.name,
-                                        "publisher_type": self.type,
-                                    },
-                                    deep=True,
+                            paired_event = (
+                                await paired_in_workflow_input_topic.publish_data(
+                                    input_data.model_copy(
+                                        update={
+                                            "publisher_name": self.name,
+                                            "publisher_type": self.type,
+                                        },
+                                        deep=True,
+                                    )
                                 )
                             )
                             if paired_event:
@@ -679,7 +688,10 @@ class EventDrivenWorkflow(Workflow):
                             ]:
                                 node = self.nodes[node_name]
                                 # add unprocessed node to the invoke queue
-                                if topic.can_consume(node_name) and node.can_invoke():
+                                if (
+                                    await topic.a_can_consume(node_name)
+                                    and await node.a_can_invoke()
+                                ):
                                     self._invoke_queue.append(node)
 
     async def a_init_workflow(self, input_data: PublishToTopicEvent) -> Any:

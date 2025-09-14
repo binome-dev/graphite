@@ -4,8 +4,8 @@ from typing import Self
 
 from pydantic import Field
 
-from grafi.topics.topic import Topic
-from grafi.topics.topic import TopicBuilder
+from grafi.topics.topic_impl.topic import Topic
+from grafi.topics.topic_impl.topic import TopicBuilder
 from grafi.topics.topic_types import TopicType
 
 

@@ -23,10 +23,10 @@ from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
+from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import TopicExpr
+from grafi.topics.expressions.topic_expression import evaluate_subscription
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_expression import SubExpr
-from grafi.topics.topic_expression import TopicExpr
-from grafi.topics.topic_expression import evaluate_subscription
 
 
 class NodeBase(BaseModel):
@@ -84,10 +84,9 @@ class NodeBase(BaseModel):
         This method should be implemented by all subclasses to define
         the specific behavior of each node.
         """
-        yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def can_invoke(self) -> bool:
+    async def a_can_invoke(self) -> bool:
         """
         Check if this node can invoke given which topics currently have new data.
         If ALL of the node's subscribed_expressions is True, we return True.
@@ -100,7 +99,7 @@ class NodeBase(BaseModel):
 
         # Evaluate each expression; if any is satisfied, we can invoke.
         for topic in self._subscribed_topics.values():
-            if topic.can_consume(self.name):
+            if await topic.a_can_consume(self.name):
                 topics_with_new_msgs.add(topic.name)
 
         for expr in self.subscribed_expressions:

@@ -7,9 +7,9 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
 from grafi.nodes.node import Node
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from tests_integration.rag_assistant.tools.rags.rag_tool import RagTool
 

@@ -14,9 +14,9 @@ from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
+from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_expression import SubExpr
-from grafi.topics.topic_expression import TopicExpr
 
 
 class MockTool(Tool):

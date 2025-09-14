@@ -8,6 +8,7 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
@@ -32,9 +33,15 @@ class AssistantBase(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     assistant_id: str = default_id
-    name: str = "Assistant"
-    type: str = "assistant"
-    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
+    name: str = Field(default="Assistant")
+    type: str = Field(default="assistant")
+    oi_span_type: OpenInferenceSpanKindValues = Field(
+        default=OpenInferenceSpanKindValues.AGENT
+    )
+    is_sequential: bool = Field(
+        default=False,
+        description="Whether the assistant processes nodes sequentially. Recommended for workflows with strict ordering or debugging.",
+    )
 
     workflow: Workflow = Workflow()
 

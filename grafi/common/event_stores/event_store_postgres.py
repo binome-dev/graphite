@@ -5,7 +5,7 @@ from typing import Optional
 
 from loguru import logger
 
-from grafi.common.event_stores.event_store import EventStore
+from grafi.common.event_stores.event_store import AsyncEventStore
 from grafi.common.events.event import Event
 
 
@@ -16,12 +16,16 @@ try:
     from sqlalchemy import Integer
     from sqlalchemy import String
     from sqlalchemy import create_engine
+    from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.orm import DeclarativeBase
     from sqlalchemy.orm import sessionmaker
 except ImportError:
     raise ImportError(
-        "`sqlalchemy` not installed. Please install using `pip install sqlalchemy`"
+        "`sqlalchemy` not installed. Please install using `pip install sqlalchemy[asyncio] asyncpg`"
     )
 
 
@@ -52,221 +56,222 @@ class EventModel(Base):
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
 
-class EventStorePostgres(EventStore):
-    """Postgres-backed implementation of the EventStore interface."""
+class EventStorePostgres(AsyncEventStore):
+    """Postgres-backed implementation of the EventStore interface with async support."""
 
     def __init__(self, db_url: str):
         """
         Initialize the Postgres event store.
         :param db_url: The SQLAlchemy database URL, e.g. 'postgresql://user:pass@host/dbname'.
         """
+        # Keep sync engine for initialization and sync methods
         self.engine = create_engine(db_url, echo=False)
         Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
 
-    def record_event(self, event: Event) -> None:
-        """Record a single event into the database."""
-        session = self.Session()
-        try:
-            # Convert Event object to dict (assuming your Event class has a .to_dict() method)
-            event_dict = event.to_dict()
+        # Create async engine and session for async methods
+        # Convert postgresql:// to postgresql+asyncpg://
+        async_db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+        if "psycopg2" in async_db_url:
+            async_db_url = async_db_url.replace("psycopg2", "asyncpg")
+        self.async_engine = create_async_engine(async_db_url, echo=False)
+        self.AsyncSession = async_sessionmaker(
+            self.async_engine, class_=AsyncSession, expire_on_commit=False
+        )
 
-            # Create SQLAlchemy model instance
-            model = EventModel(
-                event_id=event_dict["event_id"],
-                conversation_id=event_dict["event_context"]["invoke_context"][
-                    "conversation_id"
-                ],
-                assistant_request_id=event_dict["assistant_request_id"],
-                event_type=event_dict["event_type"],
-                event_context=event_dict["event_context"],
-                data=event_dict["data"],
-                timestamp=event_dict["timestamp"],
-            )
-            session.add(model)
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Failed to record event: {e}")
-            raise e
-        finally:
-            session.close()
-
-    def record_events(self, events: List[Event]) -> None:
-        """Record multiple events into the database."""
-        session = self.Session()
-        try:
-            models = []
-            for event in events:
+    async def a_record_event(self, event: Event) -> None:
+        """Record a single event into the database asynchronously."""
+        async with self.AsyncSession() as session:
+            try:
+                # Convert Event object to dict
                 event_dict = event.to_dict()
-                models.append(
-                    EventModel(
-                        event_id=event_dict["event_id"],
-                        conversation_id=event_dict["event_context"]["invoke_context"][
-                            "conversation_id"
-                        ],
-                        assistant_request_id=event_dict["assistant_request_id"],
-                        event_type=event_dict["event_type"],
-                        event_context=event_dict["event_context"],
-                        data=event_dict["data"],
-                        timestamp=event_dict["timestamp"],
+
+                # Create SQLAlchemy model instance
+                model = EventModel(
+                    event_id=event_dict["event_id"],
+                    conversation_id=event_dict["event_context"]["invoke_context"][
+                        "conversation_id"
+                    ],
+                    assistant_request_id=event_dict["assistant_request_id"],
+                    event_type=event_dict["event_type"],
+                    event_context=event_dict["event_context"],
+                    data=event_dict["data"],
+                    timestamp=event_dict["timestamp"],
+                )
+                session.add(model)
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to record event: {e}")
+                raise e
+
+    async def a_record_events(self, events: List[Event]) -> None:
+        """Record multiple events into the database asynchronously."""
+        async with self.AsyncSession() as session:
+            try:
+                models = []
+                for event in events:
+                    event_dict = event.to_dict()
+                    models.append(
+                        EventModel(
+                            event_id=event_dict["event_id"],
+                            conversation_id=event_dict["event_context"][
+                                "invoke_context"
+                            ]["conversation_id"],
+                            assistant_request_id=event_dict["assistant_request_id"],
+                            event_type=event_dict["event_type"],
+                            event_context=event_dict["event_context"],
+                            data=event_dict["data"],
+                            timestamp=event_dict["timestamp"],
+                        )
+                    )
+                session.add_all(models)
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to record events: {e}")
+                raise e
+
+    async def a_get_event(self, event_id: str) -> Optional[Event]:
+        """Get an event by ID asynchronously."""
+        async with self.AsyncSession() as session:
+            try:
+                result = await session.execute(
+                    select(EventModel).where(EventModel.event_id == event_id)
+                )
+                row = result.scalar_one_or_none()
+
+                if not row:
+                    return None
+
+                event_data = {
+                    "event_id": row.event_id,
+                    "assistant_request_id": row.assistant_request_id,
+                    "event_type": row.event_type,
+                    "event_context": row.event_context,
+                    "data": row.data,
+                    "timestamp": str(row.timestamp),
+                }
+                return self._create_event_from_dict(event_data)
+            except Exception as e:
+                logger.error(f"Failed to get event {event_id}: {e}")
+                raise e
+
+    async def a_get_agent_events(self, assistant_request_id: str) -> List[Event]:
+        """Get all events for a given assistant_request_id asynchronously."""
+        async with self.AsyncSession() as session:
+            try:
+                result = await session.execute(
+                    select(EventModel).where(
+                        EventModel.assistant_request_id == assistant_request_id
                     )
                 )
-            session.bulk_save_objects(models)
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Failed to record events: {e}")
-            raise e
-        finally:
-            session.close()
+                rows = result.scalars().all()
 
-    def clear_events(self) -> None:
-        raise NotImplementedError("Clearing events is not implemented for postgres.")
+                if not rows:
+                    return []
 
-    def get_events(self) -> List[Event]:
-        raise NotImplementedError("Getting all events is not implemented for postgres.")
+                events: List[Event] = []
+                for r in rows:
+                    event_data = {
+                        "event_id": r.event_id,
+                        "assistant_request_id": r.assistant_request_id,
+                        "event_type": r.event_type,
+                        "event_context": r.event_context,
+                        "data": r.data,
+                        "timestamp": str(r.timestamp),
+                    }
+                    event = self._create_event_from_dict(event_data)
+                    if event:
+                        events.append(event)
 
-    def get_event(self, event_id: str) -> Optional[Event]:
-        """Get an event by ID."""
-        session = self.Session()
-        try:
-            row = (
-                session.query(EventModel)
-                .filter(EventModel.event_id == event_id)
-                .one_or_none()
-            )
-            if not row:
-                return None
+                return events
+            except Exception as e:
+                logger.error(f"Failed to get agent events {assistant_request_id}: {e}")
+                raise e
 
-            event_data = {
-                "event_id": row.event_id,
-                "assistant_request_id": row.assistant_request_id,
-                "event_type": row.event_type,
-                "event_context": row.event_context,
-                "data": row.data,
-                "timestamp": str(row.timestamp),
-            }
-            return self._create_event_from_dict(event_data)
-        except Exception as e:
-            logger.error(f"Failed to get event {event_id}: {e}")
-            raise e
-        finally:
-            session.close()
+    async def a_get_conversation_events(self, conversation_id: str) -> List[Event]:
+        """Get all events for a given conversation ID asynchronously."""
+        async with self.AsyncSession() as session:
+            try:
+                result = await session.execute(
+                    select(EventModel).where(
+                        EventModel.conversation_id == conversation_id
+                    )
+                )
+                rows = result.scalars().all()
 
-    def get_agent_events(self, assistant_request_id: str) -> List[Event]:
-        """
-        Get all events for a given assistant_request_id.
-        Again, naive approach of retrieving all and filtering in Python.
-        """
-        session = self.Session()
-        try:
-            row = (
-                session.query(EventModel)
-                .filter(EventModel.assistant_request_id == assistant_request_id)
-                .all()
-            )
-            if len(row) == 0:
-                return []
+                if not rows:
+                    return []
 
-            events: List[Event] = []
-            for r in row:
-                event_data = {
-                    "event_id": r.event_id,
-                    "assistant_request_id": r.assistant_request_id,
-                    "event_type": r.event_type,
-                    "event_context": r.event_context,
-                    "data": r.data,
-                    "timestamp": str(r.timestamp),
-                }
-                event = self._create_event_from_dict(event_data)
-                if event:
-                    events.append(event)
+                events: List[Event] = []
+                for r in rows:
+                    event_data = {
+                        "event_id": r.event_id,
+                        "assistant_request_id": r.assistant_request_id,
+                        "event_type": r.event_type,
+                        "event_context": r.event_context,
+                        "data": r.data,
+                        "timestamp": str(r.timestamp),
+                    }
+                    event = self._create_event_from_dict(event_data)
+                    if event:
+                        events.append(event)
 
-            return events
-        except Exception as e:
-            logger.error(f"Failed to get event {assistant_request_id}: {e}")
-            raise e
-        finally:
-            session.close()
+                return events
+            except Exception as e:
+                logger.error(
+                    f"Failed to get conversation events {conversation_id}: {e}"
+                )
+                raise e
 
-    def get_conversation_events(self, conversation_id: str) -> List[Event]:
-        """Get all events for a given conversation ID."""
-        session = self.Session()
-        try:
-            row = (
-                session.query(EventModel)
-                .filter(EventModel.conversation_id == conversation_id)
-                .all()
-            )
-            if len(row) == 0:
-                return []
-
-            events: List[Event] = []
-            for r in row:
-                event_data = {
-                    "event_id": r.event_id,
-                    "assistant_request_id": r.assistant_request_id,
-                    "event_type": r.event_type,
-                    "event_context": r.event_context,
-                    "data": r.data,
-                    "timestamp": str(r.timestamp),
-                }
-                event = self._create_event_from_dict(event_data)
-                if event:
-                    events.append(event)
-
-            return events
-        except Exception as e:
-            logger.error(f"Failed to get event {conversation_id}: {e}")
-            raise e
-        finally:
-            session.close()
-
-    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
-        """Get all events for a given topic name and specific offsets using JSONB operators."""
+    async def a_get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
+        """Get all events for a given topic name and specific offsets asynchronously."""
         if not offsets:
             return []
 
-        session = self.Session()
-        try:
-            # Use JSONB operators for efficient filtering at the database level
-            rows = (
-                session.query(EventModel).filter(
-                    # Filter by event type
-                    EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
-                    # Use JSONB ->> operator to extract name and compare
-                    EventModel.event_context.op("->>")("name") == name,
-                    # Use JSONB -> operator to extract offset and check if it's in our list
-                    # Cast the JSONB value to integer for comparison
-                    EventModel.event_context.op("->")("offset")
-                    .astext.cast(Integer)
-                    .in_(offsets),
+        async with self.AsyncSession() as session:
+            try:
+                # Use JSONB operators for efficient filtering at the database level
+                stmt = (
+                    select(EventModel).where(
+                        # Filter by event type
+                        EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
+                        # Use JSONB ->> operator to extract name and compare
+                        EventModel.event_context.op("->>")("name") == name,
+                        # Use JSONB -> operator to extract offset and check if it's in our list
+                        EventModel.event_context.op("->")("offset")
+                        .astext.cast(Integer)
+                        .in_(offsets),
+                    )
+                    # Order by offset for consistent results
+                    .order_by(
+                        EventModel.event_context.op("->")("offset").astext.cast(Integer)
+                    )
                 )
-                # Order by offset for consistent results
-                .order_by(
-                    EventModel.event_context.op("->")("offset").astext.cast(Integer)
-                )
-            ).all()
 
-            events: List[Event] = []
-            for r in rows:
-                event_data = {
-                    "event_id": r.event_id,
-                    "assistant_request_id": r.assistant_request_id,
-                    "event_type": r.event_type,
-                    "event_context": r.event_context,
-                    "data": r.data,
-                    "timestamp": str(r.timestamp),
-                }
-                event = self._create_event_from_dict(event_data)
-                if event:
-                    events.append(event)
+                result = await session.execute(stmt)
+                rows = result.scalars().all()
 
-            return events
+                events: List[Event] = []
+                for r in rows:
+                    event_data = {
+                        "event_id": r.event_id,
+                        "assistant_request_id": r.assistant_request_id,
+                        "event_type": r.event_type,
+                        "event_context": r.event_context,
+                        "data": r.data,
+                        "timestamp": str(r.timestamp),
+                    }
+                    event = self._create_event_from_dict(event_data)
+                    if event:
+                        events.append(event)
 
-        except Exception as e:
-            logger.error(f"Failed to get topic events for {name}: {e}")
-            raise e
-        finally:
-            session.close()
+                return events
+            except Exception as e:
+                logger.error(f"Failed to get topic events for {name}: {e}")
+                raise e
+
+    async def a_initialize(self) -> None:
+        """Initialize the database tables asynchronously."""
+        async with self.async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)

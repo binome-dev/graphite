@@ -1012,6 +1012,7 @@ name = "grafi"
 version = "0.0.27"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "arize-otel" },
     { name = "arize-phoenix-otel" },
     { name = "docstring-parser" },
@@ -1054,6 +1055,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.9.0" },
     { name = "arize-otel", specifier = ">=0.8.2" },
     { name = "arize-phoenix-otel", specifier = ">=0.10.3" },
     { name = "docstring-parser", specifier = ">=0.16" },
