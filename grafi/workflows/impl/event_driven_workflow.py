@@ -236,23 +236,17 @@ class EventDrivenWorkflow(Workflow):
             if await topic.a_can_consume(node_name) and await node.a_can_invoke():
                 self._invoke_queue.append(node)
 
-    @record_workflow_a_invoke
-    async def invoke(
+    async def invoke_sequential(
         self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Invoke the workflow with the given context and input.
         Returns results when all nodes complete processing.
         """
-        # Reset stop flag at the beginning of new execution
-        self.reset_stop_flag()
-
         invoke_context = input_data.invoke_context
 
         consumed_events: List[ConsumeFromTopicEvent] = []
         try:
-            await self.a_init_workflow(input_data, is_sequential=True)
-
             # Process nodes until invoke queue is empty or workflow is stopped
             while self._invoke_queue:
                 # Check if workflow should be stopped
@@ -299,207 +293,123 @@ class EventDrivenWorkflow(Workflow):
 
             for event in consumed_events:
                 yield event
-        except NodeExecutionError:
-            raise  # Re-raise NodeExecutionError as-is
-        except Exception as e:
-            raise WorkflowError(
-                message=f"Workflow {self.name} execution failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
         finally:
             if consumed_events:
                 await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
 
-    @record_workflow_a_invoke
-    async def a_invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
+    async def invoke_parallel(
+        self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """
-        Run the workflow with streaming output.
-        """
         invoke_context = input_data.invoke_context
 
+        # Start a background task to process all nodes (including streaming generators)
+        node_processing_task = [
+            asyncio.create_task(
+                self._invoke_node(
+                    invoke_context=invoke_context,
+                    node=node,
+                ),
+                name=node.name,
+            )
+            for node in self.nodes.values()
+        ]
+
+        # Get output topics
+        output_topics: list[TopicBase] = [
+            topic
+            for topic in self._topics.values()
+            if topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
+            or topic.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
+        ]
+
+        # Create AsyncOutputQueue with output topics and tracker
+        output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+        await output_queue.start_listeners()
+
+        consumed_output_events: List[ConsumeFromTopicEvent] = []
+
+        # Wait for either new data or completion, with a timeout to check stop flag
         try:
-            # Reset stop flag at the beginning of new execution
-            self.reset_stop_flag()
-
-            await self.a_init_workflow(input_data, is_sequential=is_sequential)
-
-            if is_sequential:
-                # If sequential, we just call the sequential method
-                consumed_events: List[ConsumeFromTopicEvent] = []
-
-                # Process nodes until invoke queue is empty or workflow is stopped
-                while self._invoke_queue:
-                    # Check if workflow should be stopped
-                    if self._stop_requested:
-                        logger.info("Workflow execution stopped by assistant request")
-                        break
-
-                    node = self._invoke_queue.popleft()
-
-                    # Given node, collect all the messages can be linked to it
-
-                    node_consumed_events: List[ConsumeFromTopicEvent] = (
-                        await get_node_input(node)
-                    )
-
-                    # Invoke node with collected inputs
-                    if node_consumed_events:
+            async for event in output_queue:
+                # Check if any node task has failed before yielding events
+                for i, task in enumerate(node_processing_task):
+                    if task.done() and not task.cancelled():
                         try:
-                            published_events: List[PublishToTopicEvent] = []
-                            async for result in node.a_invoke(
-                                invoke_context, node_consumed_events
-                            ):
-                                published_events.extend(
-                                    await a_publish_events(node, result)
-                                )
-
-                            for event in published_events:
-                                await self._a_add_to_invoke_queue(event)
-
-                            events: List[TopicEvent] = []
-                            events.extend(node_consumed_events)
-                            events.extend(published_events)
-
-                            await container.event_store.a_record_events(events)  # type: ignore[arg-type]
-                        except Exception as e:
-                            raise NodeExecutionError(
-                                node_name=node.name,
-                                message=f"Node execution failed: {e}",
-                                invoke_context=invoke_context,
-                                cause=e,
-                            ) from e
-
-                consumed_events = await self._get_output_events()
-
-                for event in consumed_events:
-                    yield event
-
-                if consumed_events:
-                    await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
-            else:
-
-                # Start a background task to process all nodes (including streaming generators)
-                node_processing_task = [
-                    asyncio.create_task(
-                        self._invoke_node(
-                            invoke_context=invoke_context,
-                            node=node,
-                        ),
-                        name=node.name,
-                    )
-                    for node in self.nodes.values()
-                ]
-
-                # Get output topics
-                output_topics: list[TopicBase] = [
-                    topic
-                    for topic in self._topics.values()
-                    if topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
-                    or topic.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
-                ]
-
-                # Create AsyncOutputQueue with output topics and tracker
-                output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
-                await output_queue.start_listeners()
-
-                consumed_output_events: List[ConsumeFromTopicEvent] = []
-
-                # Wait for either new data or completion, with a timeout to check stop flag
-                try:
-                    async for event in output_queue:
-                        # Check if any node task has failed before yielding events
-                        for i, task in enumerate(node_processing_task):
-                            if task.done() and not task.cancelled():
-                                try:
-                                    result = task.result()
-                                except Exception as task_error:
-                                    node_name = (
-                                        list(self.nodes.keys())[i]
-                                        if i < len(self.nodes)
-                                        else f"node_{i}"
-                                    )
-                                    logger.error(
-                                        f"Node {node_name} failed during execution: {task_error}"
-                                    )
-                                    # Cancel remaining tasks and stop workflow
-                                    for t in node_processing_task:
-                                        if not t.done():
-                                            t.cancel()
-                                    self.stop()
-
-                                    raise NodeExecutionError(
-                                        node_name=node_name,
-                                        message=f"Node {node_name} execution failed during workflow: {task_error}",
-                                        invoke_context=invoke_context,
-                                        cause=task_error,
-                                    ) from task_error
-
-                        # Now yield the data after committing
-                        consumed_event = ConsumeFromTopicEvent(
-                            name=event.name,
-                            type=event.type,
-                            consumer_name=self.name,
-                            consumer_type=self.type,
-                            invoke_context=event.invoke_context,
-                            offset=event.offset,
-                            data=event.data,
-                        )
-                        yield consumed_event
-
-                        consumed_output_events.append(consumed_event)
-                finally:
-                    await output_queue.stop_listeners()
-
-                    # Commit all consumed output events
-                    await self._a_commit_events(
-                        consumer_name=self.name, topic_events=consumed_output_events
-                    )
-
-                    # 4. graceful shutdown all the nodes
-                    self.stop()
-
-                    # process events after stopping
-                    if consumed_output_events:
-                        await container.event_store.a_record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
-
-                    # Wait for all node tasks to complete with proper error handling
-                    for t in node_processing_task:
-                        t.cancel()
-                    node_results = await asyncio.gather(
-                        *node_processing_task, return_exceptions=True
-                    )
-
-                    # Check for exceptions from node tasks and raise NodeExecutionError
-                    for i, result in enumerate(node_results):
-                        if isinstance(result, Exception) and not isinstance(
-                            result, asyncio.CancelledError
-                        ):
+                            result = task.result()
+                        except Exception as task_error:
                             node_name = (
                                 list(self.nodes.keys())[i]
                                 if i < len(self.nodes)
                                 else f"node_{i}"
                             )
                             logger.error(
-                                f"Node {node_name} failed with exception: {result}"
+                                f"Node {node_name} failed during execution: {task_error}"
                             )
+                            # Cancel remaining tasks and stop workflow
+                            for t in node_processing_task:
+                                if not t.done():
+                                    t.cancel()
+                            self.stop()
+
                             raise NodeExecutionError(
                                 node_name=node_name,
-                                message=f"Node {node_name} execution failed: {result}",
+                                message=f"Node {node_name} execution failed during workflow: {task_error}",
                                 invoke_context=invoke_context,
-                                cause=result,
-                            ) from result
+                                cause=task_error,
+                            ) from task_error
 
-        except NodeExecutionError:
-            raise  # Re-raise NodeExecutionError as-is
-        except Exception as e:
-            raise WorkflowError(
-                message=f"Workflow {self.name} async execution failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
+                # Now yield the data after committing
+                consumed_event = ConsumeFromTopicEvent(
+                    name=event.name,
+                    type=event.type,
+                    consumer_name=self.name,
+                    consumer_type=self.type,
+                    invoke_context=event.invoke_context,
+                    offset=event.offset,
+                    data=event.data,
+                )
+                yield consumed_event
+
+                consumed_output_events.append(consumed_event)
+        finally:
+            await output_queue.stop_listeners()
+
+            # Commit all consumed output events
+            await self._a_commit_events(
+                consumer_name=self.name, topic_events=consumed_output_events
+            )
+
+            # 4. graceful shutdown all the nodes
+            self.stop()
+
+            # process events after stopping
+            if consumed_output_events:
+                container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+
+            # Wait for all node tasks to complete with proper error handling
+            for t in node_processing_task:
+                t.cancel()
+            node_results = await asyncio.gather(
+                *node_processing_task, return_exceptions=True
+            )
+
+            # Check for exceptions from node tasks and raise NodeExecutionError
+            for i, result in enumerate(node_results):
+                if isinstance(result, Exception) and not isinstance(
+                    result, asyncio.CancelledError
+                ):
+                    node_name = (
+                        list(self.nodes.keys())[i]
+                        if i < len(self.nodes)
+                        else f"node_{i}"
+                    )
+                    logger.error(f"Node {node_name} failed with exception: {result}")
+                    raise NodeExecutionError(
+                        node_name=node_name,
+                        message=f"Node {node_name} execution failed: {result}",
+                        invoke_context=invoke_context,
+                        cause=result,
+                    ) from result
 
     async def _invoke_node(self, invoke_context: InvokeContext, node: NodeBase) -> None:
         """Enhanced node invocation with better async patterns and error handling."""
@@ -608,6 +518,37 @@ class EventDrivenWorkflow(Workflow):
             ) from e
         finally:
             buffer.clear()  # Clear buffer for next iteration
+
+    @record_workflow_a_invoke
+    async def a_invoke(
+        self, input_data: PublishToTopicEvent, is_sequential: bool = False
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+        """
+        Run the workflow with streaming output.
+        """
+        invoke_context = input_data.invoke_context
+        try:
+            # Reset stop flag at the beginning of new execution
+            self.reset_stop_flag()
+
+            await self.a_init_workflow(input_data, is_sequential)
+
+            if is_sequential:
+                # If sequential, we just call the sequential method
+                async for event in self.invoke_sequential(input_data):
+                    yield event
+            else:
+                async for event in self.invoke_parallel(input_data):
+                    yield event
+
+        except NodeExecutionError:
+            raise  # Re-raise NodeExecutionError as-is
+        except Exception as e:
+            raise WorkflowError(
+                message=f"Workflow {self.name} async execution failed: {e}",
+                invoke_context=invoke_context,
+                cause=e,
+            ) from e
 
     async def a_init_workflow(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
