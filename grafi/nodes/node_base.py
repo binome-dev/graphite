@@ -60,19 +60,6 @@ class NodeBase(BaseModel):
         """Return a list of subscribed topics."""
         return list(self._subscribed_topics.values())
 
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        node_input: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
-        """
-        Process the input data and return a response.
-
-        This method should be implemented by all subclasses to define
-        the specific behavior of each node.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
-
     async def a_invoke(
         self,
         invoke_context: InvokeContext,

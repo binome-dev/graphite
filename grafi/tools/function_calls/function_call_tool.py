@@ -13,7 +13,6 @@ from pydantic import Field
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionCallException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
@@ -96,52 +95,6 @@ class FunctionCallTool(Tool):
             List[Dict[str, Any]]: A list containing the function specifications.
         """
         return self.function_specs
-
-    @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        """
-        Invoke the registered function with the given arguments.
-
-        This method is decorated with @record_tool_invoke to log its invoke.
-
-        Args:
-            function_name (str): The name of the function to invoke.
-            arguments (Dict[str, Any]): The arguments to pass to the function.
-
-        Returns:
-            Any: The result of the function invoke.
-
-        Raises:
-            ValueError: If the provided function_name doesn't match the registered function.
-        """
-        if len(input_data) > 0 and input_data[0].tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
-
-        messages: Messages = []
-
-        for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
-            if tool_call.function.name in self.functions:
-                func = self.functions[tool_call.function.name]
-                try:
-                    response = func(
-                        self,
-                        **json.loads(tool_call.function.arguments),
-                    )
-
-                    messages.extend(
-                        self.to_messages(response=response, tool_call_id=tool_call.id)
-                    )
-                except Exception as e:
-                    raise FunctionCallException(
-                        tool_name=self.name,
-                        function_name=tool_call.function.name,
-                        message=f"Function call failed: {e}",
-                        invoke_context=invoke_context,
-                        cause=e,
-                    ) from e
-
-        return messages
 
     @record_tool_a_invoke
     async def a_invoke(

@@ -3,7 +3,6 @@ from typing import AsyncGenerator
 from typing import List
 
 from grafi.common.decorators.record_decorators import record_node_a_invoke
-from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -36,27 +35,6 @@ class Node(NodeBase):
     def builder(cls) -> NodeBaseBuilder:
         """Return a builder for Node."""
         return NodeBaseBuilder(cls)
-
-    @record_node_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        node_input: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
-        # Use the LLM's invoke method to get the response
-        response = self.command.invoke(
-            invoke_context,
-            node_input,
-        )
-
-        # Handle the response and update the output
-        return PublishToTopicEvent(
-            publisher_name=self.name,
-            publisher_type=self.type,
-            invoke_context=invoke_context,
-            consumed_event_ids=[event.event_id for event in node_input],
-            data=response,
-        )
 
     @record_node_a_invoke
     async def a_invoke(

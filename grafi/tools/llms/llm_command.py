@@ -16,7 +16,7 @@ from grafi.tools.command import Command
 
 
 class LLMCommand(Command):
-    def get_tool_input(
+    async def get_tool_input(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
@@ -25,7 +25,7 @@ class LLMCommand(Command):
 
         # Get conversation history messages from the event store
 
-        conversation_events = container.event_store.get_conversation_events(
+        conversation_events = await container.event_store.a_get_conversation_events(
             invoke_context.conversation_id
         )
 
@@ -47,7 +47,7 @@ class LLMCommand(Command):
                     all_messages.extend(output_event.data)
 
         # Retrieve agent events related to the current assistant request
-        agent_events = container.event_store.get_agent_events(
+        agent_events = await container.event_store.a_get_agent_events(
             invoke_context.assistant_request_id
         )
         topic_events = {

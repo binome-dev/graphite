@@ -1,9 +1,11 @@
 import asyncio
-import inspect
-from typing import Any
-from typing import Generic
+from typing import AsyncGenerator
 from typing import Optional
 from typing import TypeVar
+
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 
 
 _SENTINEL = object()
@@ -12,7 +14,7 @@ _SENTINEL = object()
 T = TypeVar("T")
 
 
-class AsyncResult(Generic[T]):
+class AsyncResult:
     """
     Wraps one of:
       - an async generator
@@ -33,16 +35,11 @@ class AsyncResult(Generic[T]):
         expected behavior without extra overhead.
     """
 
-    def __init__(self, source: Any):
+    def __init__(self, source: AsyncGenerator[ConsumeFromTopicEvent, None]):
         self._source = source
-        self._kind = (
-            "agen"
-            if inspect.isasyncgen(source)
-            else "awaitable" if inspect.isawaitable(source) else "value"
-        )
 
-        self._queue: asyncio.Queue[T] = asyncio.Queue()
-        self._items: list[T] = []
+        self._queue: asyncio.Queue[ConsumeFromTopicEvent] = asyncio.Queue()
+        self._items: list[ConsumeFromTopicEvent] = []
         self._done = asyncio.Event()
         self._started = False
         self._exc: Optional[BaseException] = None
@@ -55,17 +52,9 @@ class AsyncResult(Generic[T]):
 
     async def _producer(self) -> None:
         try:
-            if self._kind == "agen":
-                async for item in self._source:
-                    self._items.append(item)
-                    await self._queue.put(item)
-            elif self._kind == "awaitable":
-                val = await self._source
-                self._items.append(val)
-                await self._queue.put(val)
-            else:  # "value"
-                self._items.append(self._source)
-                await self._queue.put(self._source)
+            async for item in self._source:
+                self._items.append(item)
+                await self._queue.put(item)
         except BaseException as e:  # propagate cancellation/errors too
             self._exc = e
         finally:
@@ -94,24 +83,29 @@ class AsyncResult(Generic[T]):
             await self._done.wait()
             if self._exc:
                 raise self._exc
-            if self._kind == "agen":
-                # Awaiting a stream returns all collected items.
-                return list(self._items)
-            # Awaiting a single result returns that result.
-            return self._items[0] if self._items else None
+            return list(self._items)
 
         return _await_impl().__await__()
 
     # --- optional helpers ---
-    async def to_list(self) -> list[T]:
+    async def to_list(self) -> list[ConsumeFromTopicEvent]:
         """Always return a list of items (collects singles into a one-item list)."""
         result = await self
         return result if isinstance(result, list) else [result]
 
     async def aclose(self) -> None:
         """Attempt to close the underlying async generator (if any)."""
-        if self._kind == "agen":
-            try:
-                await self._source.aclose()
-            except Exception:
-                pass
+        try:
+            await self._source.aclose()
+        except Exception:
+            pass
+
+
+def func_wrapper(return_value) -> AsyncResult:
+    """
+    Normalize a function's *return value* into an AsyncResult.
+
+    Usage:
+        res: AsyncResult = function_wrapper(func(...))
+    """
+    return AsyncResult(return_value)

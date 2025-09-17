@@ -98,5 +98,4 @@ class InMemTopicEventQueue(TopicEventQueue):
         """
         Check if there are events available for consumption by a consumer asynchronously.
         """
-        async with self._cond:
-            return self._consumed[consumer_id] < len(self._records)
+        return self._consumed[consumer_id] < len(self._records)

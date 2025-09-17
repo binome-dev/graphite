@@ -40,7 +40,7 @@ async def test_simple_llm_assistant_async() -> None:
         .api_key(api_key)
         .build()
     )
-    event_store.clear_events()
+    await event_store.a_clear_events()
     # Test the run method
 
     input_data = [
@@ -58,8 +58,8 @@ async def test_simple_llm_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 12
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 12
 
     input_data = [
         Message(
@@ -81,8 +81,8 @@ async def test_simple_llm_assistant_async() -> None:
     # events = event_store.get_events()
     # with open("events_output.json", "w") as f:
     #     json.dump([event.to_dict() for event in events], f, indent=4, default=str)
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 24
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant_async())

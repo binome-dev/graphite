@@ -31,22 +31,6 @@ class Tool(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        """
-        Process the input data and return a response.
-
-        This method should be implemented by all subclasses to define
-        the specific behavior of each tool.
-
-        Raises:
-            NotImplementedError: If the method is not implemented by a subclass.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
-
     async def a_invoke(
         self,
         invoke_context: InvokeContext,

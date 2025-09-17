@@ -11,7 +11,6 @@ from typing import cast
 from openai import NOT_GIVEN
 from openai import AsyncClient
 from openai import NotGiven
-from openai import OpenAI
 from openai import OpenAIError
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
@@ -20,7 +19,6 @@ from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -100,64 +98,6 @@ class OpenAITool(LLM):
         ] or NOT_GIVEN
 
         return api_messages, api_tools
-
-    @record_tool_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        """
-        Invoke a request to the OpenAI API.
-
-        This method sends a request to the OpenAI API with the provided input data and functions,
-        and returns the response as a Message object.
-
-        Args:
-            input_data (Messages): A list of Message objects representing the input messages.
-
-        Returns:
-            Message: The response from the OpenAI API converted to a Message object.
-
-        Raises:
-            RuntimeError: If there's an error in the OpenAI API call.
-        """
-        api_messages, api_tools = self.prepare_api_input(input_data)
-
-        try:
-            client = OpenAI(api_key=self.api_key)
-
-            req_func = (
-                client.chat.completions.create
-                if not self.structured_output
-                else client.beta.chat.completions.parse
-            )
-
-            response = req_func(
-                model=self.model,
-                messages=api_messages,
-                tools=api_tools,
-                **self.chat_params,
-            )
-            # Return the raw response
-            return self.to_messages(response)
-
-        except OpenAIError as e:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"OpenAI API call failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
-        except Exception as e:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"Unexpected error during OpenAI API call: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
 
     @record_tool_a_invoke
     async def a_invoke(

@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Self
 from typing import TypeVar
 
+from loguru import logger
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -56,9 +57,18 @@ class TopicBase(BaseModel):
         """
         Publish data to the topic if it meets the condition.
         """
-        raise NotImplementedError(
-            "Method 'publish_data' must be implemented in subclasses."
-        )
+        if self.condition(publish_event.data):
+            event = publish_event.model_copy(
+                update={
+                    "name": self.name,
+                    "type": self.type,
+                },
+                deep=True,
+            )
+            return await self.a_add_event(event)
+        else:
+            logger.info(f"[{self.name}] Message NOT published (condition not met)")
+            return None
 
     async def a_can_consume(self, consumer_name: str) -> bool:
         """

@@ -21,7 +21,6 @@ from google.genai import types
 from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -135,40 +134,6 @@ class GeminiTool(LLM):
         )
 
     # --------------------------------------------------------------------- #
-    # Synchronous (blocking) one‑shot call
-    # --------------------------------------------------------------------- #
-    @record_tool_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        contents, tools = self.prepare_api_input(input_data)
-
-        client = self._client()
-        # Build optional config only when we actually have tools
-        cfg = types.GenerateContentConfig(
-            tools=tools if tools else None, **self.chat_params  # type: ignore[arg-type]
-        )
-
-        try:
-            response: GenerateContentResponse = client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=cfg,
-            )
-        except Exception as exc:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"Gemini API call failed: {exc}",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
-
-        return self.to_messages(response)
-
-    # --------------------------------------------------------------------- #
     # Asynchronous (async/await) one‑shot call
     # --------------------------------------------------------------------- #
     @record_tool_a_invoke
@@ -248,9 +213,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided

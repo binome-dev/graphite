@@ -16,7 +16,6 @@ from typing import cast
 
 from openai import AsyncClient
 from openai import NotGiven
-from openai import OpenAI
 from openai import OpenAIError
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
@@ -25,7 +24,6 @@ from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -103,44 +101,6 @@ class OpenRouterTool(LLM):
         ] or None
 
         return api_messages, api_tools
-
-    # ------------------------------------------------------------------ #
-    # Blocking call                                                      #
-    # ------------------------------------------------------------------ #
-    @record_tool_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        messages, tools = self.prepare_api_input(input_data)
-
-        try:
-            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-            resp: ChatCompletion = client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=tools,
-                extra_headers=self.extra_headers or None,
-                **self.chat_params,
-            )
-            return self.to_messages(resp)
-        except OpenAIError as exc:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"OpenRouter API call failed: {exc}",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
-        except Exception as exc:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"Unexpected error during OpenRouter API call: {exc}",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
 
     # ------------------------------------------------------------------ #
     # Async call                                                         #

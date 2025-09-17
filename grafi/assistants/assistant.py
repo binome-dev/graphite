@@ -2,11 +2,9 @@ import json
 import os
 from typing import Any
 from typing import AsyncGenerator
-from typing import List
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.decorators.record_decorators import record_assistant_a_invoke
-from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -22,29 +20,9 @@ class Assistant(AssistantBase):
         event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
     """
 
-    @record_assistant_invoke
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-        """
-        Process the input data through the LLM workflow, make function calls, and return the generated response.
-        Args:
-            invoke_context (InvokeContext): Context containing invoke information
-            input_data (Messages): List of input messages to be processed
-
-        Returns:
-            Messages: List of generated response messages, sorted by timestamp
-
-        Raises:
-            ValueError: If the OpenAI API key is not provided and not found in environment variables
-        """
-
-        # Invoke the workflow with the input data
-        events = self.workflow.invoke(input_data)
-
-        return events
-
     @record_assistant_a_invoke
     async def a_invoke(
-        self, input_data: PublishToTopicEvent
+        self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Process the input data through the LLM workflow, make function calls, and return the generated response.
@@ -60,7 +38,7 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        async for output in self.workflow.a_invoke(input_data):
+        async for output in self.workflow.a_invoke(input_data, is_sequential):
             yield output
 
     def to_dict(self) -> dict[str, Any]:

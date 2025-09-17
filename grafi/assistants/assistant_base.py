@@ -1,6 +1,5 @@
 from typing import Any
 from typing import AsyncGenerator
-from typing import List
 from typing import Self
 from typing import TypeVar
 
@@ -38,10 +37,6 @@ class AssistantBase(BaseModel):
     oi_span_type: OpenInferenceSpanKindValues = Field(
         default=OpenInferenceSpanKindValues.AGENT
     )
-    is_sequential: bool = Field(
-        default=False,
-        description="Whether the assistant processes nodes sequentially. Recommended for workflows with strict ordering or debugging.",
-    )
 
     workflow: Workflow = Workflow()
 
@@ -52,16 +47,8 @@ class AssistantBase(BaseModel):
         """Construct the workflow for the assistant."""
         raise NotImplementedError("Subclasses must implement '_construct_workflow'.")
 
-    def invoke(
-        self,
-        input_data: PublishToTopicEvent,
-    ) -> List[ConsumeFromTopicEvent]:
-        """Invoke the assistant's workflow with the provided input data."""
-        raise NotImplementedError("Subclasses must implement 'invoke'.")
-
     async def a_invoke(
-        self,
-        input_data: PublishToTopicEvent,
+        self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
         raise NotImplementedError("Subclasses must implement 'a_invoke'.")

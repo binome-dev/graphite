@@ -10,7 +10,6 @@ from typing import Union
 from grafi.common.decorators.record_base import ComponentConfig
 from grafi.common.decorators.record_base import EventContext
 from grafi.common.decorators.record_base import create_async_decorator
-from grafi.common.decorators.record_base import create_sync_decorator
 
 # Import event types
 from grafi.common.events.component_events import AssistantFailedEvent
@@ -76,9 +75,6 @@ _assistant_config = ComponentConfig(
     span_name_suffix="run",
 )
 
-# Sync assistant decorator
-record_assistant_invoke = create_sync_decorator(_assistant_config)
-
 # Async assistant decorator
 record_assistant_a_invoke = create_async_decorator(_assistant_config)
 
@@ -101,9 +97,6 @@ _workflow_config = ComponentConfig(
     process_async_result=process_async_result,
     span_name_suffix="invoke",
 )
-
-# Sync workflow decorator
-record_workflow_invoke = create_sync_decorator(_workflow_config)
 
 # Async workflow decorator
 record_workflow_a_invoke = create_async_decorator(_workflow_config)
@@ -154,9 +147,6 @@ _node_config = ComponentConfig(
     span_name_suffix="invoke",
 )
 
-# Sync node decorator
-record_node_invoke = create_sync_decorator(_node_config)
-
 # Async node decorator
 record_node_a_invoke = create_async_decorator(_node_config)
 
@@ -197,9 +187,6 @@ _tool_config = ComponentConfig(
     process_async_result=process_messages_streaming_result,
     span_name_suffix="invoke",
 )
-
-# Sync tool decorator
-record_tool_invoke = create_sync_decorator(_tool_config)
 
 # Async tool decorator
 record_tool_a_invoke = create_async_decorator(_tool_config)

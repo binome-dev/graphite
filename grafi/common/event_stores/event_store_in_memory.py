@@ -3,12 +3,12 @@
 from typing import List
 from typing import Optional
 
-from grafi.common.event_stores.event_store import AsyncEventStore
+from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
-class EventStoreInMemory(AsyncEventStore):
+class EventStoreInMemory(EventStore):
     """Stores and manages events in memory by default."""
 
     events: List[Event] = []

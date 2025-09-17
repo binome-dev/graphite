@@ -1,8 +1,6 @@
 from typing import Dict
 from typing import List
 
-import anyio
-
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -88,18 +86,6 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     return output_events
 
 
-async def publish_events(
-    node: NodeBase, publish_event: PublishToTopicEvent
-) -> List[PublishToTopicEvent]:
-    published_events: List[PublishToTopicEvent] = []
-    for topic in node.publish_to:
-        event = await topic.publish_data(publish_event)
-        if event:
-            published_events.append(event)
-
-    return published_events
-
-
 async def a_publish_events(
     node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
@@ -136,9 +122,3 @@ async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
                 consumed_events.append(consumed_event)
 
     return consumed_events
-
-
-def run_async(afunc, /, *args, **kwargs):
-    with anyio.from_thread.start_blocking_portal() as portal:
-        # portal.call() takes a coroutine function and arguments
-        return portal.call(afunc, *args, **kwargs)
