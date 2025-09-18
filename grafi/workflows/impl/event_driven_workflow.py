@@ -414,6 +414,7 @@ class EventDrivenWorkflow(Workflow):
     async def _invoke_node(self, invoke_context: InvokeContext, node: NodeBase) -> None:
         """Enhanced node invocation with better async patterns and error handling."""
         buffer: Dict[str, List[TopicEvent]] = {}
+        active_tasks: List[asyncio.Task] = []
 
         async def _wait_and_buffer(consumer_name: str, topic: TopicBase) -> None:
             """
@@ -434,11 +435,16 @@ class EventDrivenWorkflow(Workflow):
 
         async def wait_node_invoke(node: NodeBase) -> None:
             while not node.can_invoke_with_topics(list(buffer.keys())):
+                # Check for stop request before creating new tasks
+                if self._stop_requested:
+                    return
+
                 # for every topic that *doesn't* have data yet, start one waiter
                 tasks = [
                     asyncio.create_task(_wait_and_buffer(node.name, topic))
                     for topic in node.subscribed_topics
                 ]
+                active_tasks.extend(tasks)
 
                 _, pending = await asyncio.wait(
                     tasks, return_when=asyncio.FIRST_COMPLETED
@@ -451,11 +457,25 @@ class EventDrivenWorkflow(Workflow):
                     # silence "task was destroyed but it is pending"
                     asyncio.create_task(_ignore_cancel(t))
 
+                # Remove completed/cancelled tasks from active_tasks
+                active_tasks[:] = [t for t in active_tasks if not t.done()]
+
+        def _cancel_all_active_tasks():
+            """Cancel all active tasks."""
+            for task in active_tasks:
+                if not task.done():
+                    task.cancel()
+            active_tasks.clear()
+
         try:
             while not self._stop_requested:
                 # Check if node can be invoked
 
                 await wait_node_invoke(node)
+
+                # Check again after wait_node_invoke in case stop was requested
+                if self._stop_requested:
+                    break
 
                 await self._tracker.enter(node.name)
 
@@ -505,11 +525,14 @@ class EventDrivenWorkflow(Workflow):
 
         except asyncio.CancelledError:
             logger.info(f"Node {node.name} was cancelled")
+            _cancel_all_active_tasks()
             raise
         except NodeExecutionError:
+            _cancel_all_active_tasks()
             raise  # Re-raise NodeExecutionError as-is
         except Exception as e:
             logger.error(f"Fatal error in node {node.name} execution: {e}")
+            _cancel_all_active_tasks()
             raise NodeExecutionError(
                 node_name=node.name,
                 message=f"Fatal error in node execution: {e}",
@@ -517,6 +540,7 @@ class EventDrivenWorkflow(Workflow):
                 cause=e,
             ) from e
         finally:
+            _cancel_all_active_tasks()
             buffer.clear()  # Clear buffer for next iteration
 
     @record_workflow_a_invoke

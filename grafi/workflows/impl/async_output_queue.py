@@ -69,8 +69,9 @@ class AsyncOutputQueue:
                 current_activity = self.tracker.get_activity_count()
 
                 # If no new activity since last check and no data, we're done
-                if current_activity == last_activity_count and not topic.can_consume(
-                    self.consumer_name
+                if (
+                    current_activity == last_activity_count
+                    and not await topic.a_can_consume(self.consumer_name)
                 ):
                     # cancel an unfinished waiter (if any) to avoid warnings
                     for t in pending:
