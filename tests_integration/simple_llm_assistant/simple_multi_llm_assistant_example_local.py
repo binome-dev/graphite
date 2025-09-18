@@ -82,7 +82,7 @@ async def test_simple_multi_llm_assistant_async() -> None:
         human_request_process_function=human_request_process_function,
     )
 
-    event_store.clear_events()
+    await event_store.a_clear_events()
 
     input_data = [
         Message(
@@ -94,12 +94,13 @@ async def test_simple_multi_llm_assistant_async() -> None:
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=input_data,
-        )
+        ),
+        is_sequential=True,
     ):
         print(output)
         assert output is not None
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 57
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 57
 
 
 asyncio.run(test_simple_multi_llm_assistant_async())

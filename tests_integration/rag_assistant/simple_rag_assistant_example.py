@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import uuid
@@ -5,6 +6,7 @@ from pathlib import Path
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.rag_assistant.simple_rag_assistant import SimpleRagAssistant
@@ -50,7 +52,7 @@ def initialize_index(
         return base_index
 
 
-def test_rag_tool() -> None:
+async def test_rag_tool() -> None:
     index = initialize_index()
     invoke_context = get_invoke_context()
     simple_rag_assistant = SimpleRagAssistant(
@@ -59,18 +61,21 @@ def test_rag_tool() -> None:
         api_key=api_key,
     )
 
-    result = simple_rag_assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=[Message(role="user", content="What is AWS EC2?")],
+    result = await async_func_wrapper(
+        simple_rag_assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=[Message(role="user", content="What is AWS EC2?")],
+            ),
+            is_sequential=True,
         )
     )
 
     print(result)
     assert "EC2" in str(result[0].data[0].content)
     assert "computing" in str(result[0].data[0].content)
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 12
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 12
 
     # Delete the PERSIST_DIR and all files in it
     if os.path.exists(PERSIST_DIR):
@@ -78,4 +83,4 @@ def test_rag_tool() -> None:
         print(f"Deleted {PERSIST_DIR} and all its contents")
 
 
-test_rag_tool()
+asyncio.run(test_rag_tool())

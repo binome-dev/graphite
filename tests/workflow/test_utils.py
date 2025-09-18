@@ -15,7 +15,6 @@ from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
-from grafi.workflows.impl.utils import publish_events
 
 
 class TestGetAsyncOutputEvents:
@@ -196,67 +195,6 @@ class TestGetAsyncOutputEvents:
 
 
 class TestPublishEvents:
-    def test_publish_events_sync(self):
-        # Mock node and topics
-        mock_topic1 = MagicMock(spec=TopicBase)
-        mock_topic2 = MagicMock(spec=TopicBase)
-
-        node = MagicMock(spec=Node)
-        node.name = "test_node"
-        node.type = "test_type"
-        node.publish_to = [mock_topic1, mock_topic2]
-
-        invoke_context = InvokeContext(
-            conversation_id="test-conversation",
-            invoke_id="test-invoke",
-            assistant_request_id="test-request",
-        )
-        result = [Message(role="assistant", content="Test result")]
-        consumed_events = []
-
-        # Mock publish_data to return events
-        mock_event1 = PublishToTopicEvent(
-            name="topic1",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=0,
-            data=result,
-            consumed_events=consumed_events,
-        )
-        mock_event2 = PublishToTopicEvent(
-            name="topic2",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=1,
-            data=result,
-            consumed_events=consumed_events,
-        )
-
-        mock_topic1.publish_data.return_value = mock_event1
-        mock_topic2.publish_data.return_value = mock_event2
-
-        publish_to_event = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            publisher_name=node.name,
-            publisher_type=node.type,
-            data=result,
-            consumed_event_ids=[event.event_id for event in consumed_events],
-        )
-
-        all_events = publish_events(
-            node,
-            publish_to_event,
-        )
-
-        # The function returns all_events which includes both consumed and published
-        assert len(all_events) == 2  # 0 consumed + 2 published
-        assert mock_event1 in all_events
-        assert mock_event2 in all_events
-
-        # Verify topics were called correctly
-        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
 
     @pytest.mark.asyncio
     async def test_a_publish_events(self):

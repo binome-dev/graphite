@@ -87,7 +87,7 @@ async def test_simple_hitl_assistant() -> None:
         outputs.append(output)
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 18
 
@@ -112,7 +112,7 @@ async def test_simple_hitl_assistant() -> None:
         outputs_1.append(output)
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 36
 
@@ -134,7 +134,7 @@ async def test_simple_hitl_assistant() -> None:
     ):
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 54
 

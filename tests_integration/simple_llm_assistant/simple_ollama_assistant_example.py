@@ -1,9 +1,11 @@
 # We will test the SimpleLLMAssistant class in this file.
 
+import asyncio
 import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
@@ -22,7 +24,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_simple_llm_assistant() -> None:
+async def test_simple_llm_assistant() -> None:
     assistant = (
         SimpleOllamaAssistant.builder()
         .name("SimpleOllamaAssistant")
@@ -35,7 +37,7 @@ def test_simple_llm_assistant() -> None:
         .api_url("http://localhost:11434")
         .build()
     )
-    event_store.clear_events()
+    await event_store.a_clear_events()
     # Test the run method
     input_data = [
         Message(
@@ -44,16 +46,19 @@ def test_simple_llm_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
 
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 12
+    assert len(await event_store.a_get_events()) == 12
 
     input_data = [
         Message(
@@ -62,17 +67,20 @@ def test_simple_llm_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
 
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].data[0].content)
-    assert len(event_store.get_events()) == 24
+    assert len(await event_store.a_get_events()) == 24
 
 
-test_simple_llm_assistant()
+asyncio.run(test_simple_llm_assistant())

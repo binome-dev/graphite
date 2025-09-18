@@ -8,9 +8,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.topics.topic_types import TopicType
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
+from grafi.topics.topic_types import TopicType
 
 
 event_store = container.event_store
@@ -29,7 +29,7 @@ def get_invoke_context() -> InvokeContext:
 # async streaming                                                             #
 # --------------------------------------------------------------------------- #
 async def test_openrouter_tool_a_stream() -> None:
-    event_store.clear_events()
+    await event_store.a_clear_events()
     or_tool = OpenRouterTool.builder().is_streaming(True).api_key(api_key).build()
 
     content = ""
@@ -44,58 +44,38 @@ async def test_openrouter_tool_a_stream() -> None:
                 print(m.content + "_", end="", flush=True)
 
     assert content and "Grafi" in content
-    assert len(event_store.get_events()) == 2
-
-
-# --------------------------------------------------------------------------- #
-# synchronous one-shot                                                        #
-# --------------------------------------------------------------------------- #
-def test_openrouter_tool_invoke() -> None:
-    event_store.clear_events()
-    or_tool = OpenRouterTool.builder().api_key(api_key).build()
-
-    msgs = or_tool.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    )
-
-    for m in msgs:
-        assert m.role == "assistant"
-        assert m.content and "Grafi" in m.content
-        print(m.content)
-
-    assert len(event_store.get_events()) == 2
+    assert len(await event_store.a_get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
 # invoke with custom chat params                                             #
 # --------------------------------------------------------------------------- #
-def test_openrouter_tool_with_chat_param() -> None:
+async def test_openrouter_tool_with_chat_param() -> None:
     chat_param = {"temperature": 0.1, "max_tokens": 15}
 
-    event_store.clear_events()
+    await event_store.a_clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    msgs = or_tool.invoke(
+    async for msgs in or_tool.a_invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    )
+    ):
 
-    for m in msgs:
-        assert m.role == "assistant"
-        assert m.content and "Grafi" in m.content
-        print(m.content)
-        if isinstance(m.content, str):
-            assert len(m.content) < 70  # 15 tokens ≈ < 70 chars
+        for m in msgs:
+            assert m.role == "assistant"
+            assert m.content and "Grafi" in m.content
+            print(m.content)
+            if isinstance(m.content, str):
+                assert len(m.content) < 70  # 15 tokens ≈ < 70 chars
 
-    assert len(event_store.get_events()) == 2
+    assert len(await event_store.a_get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
 # async one-shot                                                              #
 # --------------------------------------------------------------------------- #
 async def test_openrouter_tool_async() -> None:
-    event_store.clear_events()
+    await event_store.a_clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
@@ -110,14 +90,14 @@ async def test_openrouter_tool_async() -> None:
 
     print(content)
     assert "Grafi" in content
-    assert len(event_store.get_events()) == 2
+    assert len(await event_store.a_get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
 # end-to-end: Node streaming path                                          #
 # --------------------------------------------------------------------------- #
 async def test_llm_a_stream_node_openrouter() -> None:
-    event_store.clear_events()
+    await event_store.a_clear_events()
 
     llm_stream_node: Node = (
         Node.builder()
@@ -148,14 +128,10 @@ async def test_llm_a_stream_node_openrouter() -> None:
 
     assert content and "Grafi" in content
     # decorators: 2 events from tool + 2 from node wrapper
-    assert len(event_store.get_events()) == 4
+    assert len(await event_store.a_get_events()) == 4
 
 
-# sync
-test_openrouter_tool_invoke()
-test_openrouter_tool_with_chat_param()
-
-# async
+asyncio.run(test_openrouter_tool_with_chat_param())
 asyncio.run(test_openrouter_tool_a_stream())
 asyncio.run(test_openrouter_tool_async())
 asyncio.run(test_llm_a_stream_node_openrouter())

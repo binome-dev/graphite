@@ -39,7 +39,7 @@ async def test_simple_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    event_store.clear_events()
+    await event_store.a_clear_events()
 
     content = ""
 
@@ -63,7 +63,7 @@ async def test_simple_llm_assistant() -> None:
     assert "Grafi" in content
     assert content is not None
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(f"Total events: {len(events)}")
     assert len(events) == 12
 

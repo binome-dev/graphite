@@ -42,7 +42,7 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_simple_function_call_assistant() -> None:
-    event_store.clear_events()
+    await event_store.a_clear_events()
     assistant = (
         SimpleStreamFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")

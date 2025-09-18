@@ -4,7 +4,6 @@ from typing import Dict
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -33,12 +32,6 @@ class RagTool(Tool):
     type: str = "RagTool"
     index: BaseIndex
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
-
-    @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        query_engine = self.index.as_query_engine()
-        response = query_engine.query(input_data[-1].content)
-        return self.to_messages(response)
 
     @record_tool_a_invoke
     async def a_invoke(

@@ -67,7 +67,7 @@ event_store.record_event(event)
 
 # Retrieve events
 all_events = event_store.get_events()
-specific_event = event_store.get_event(event.event_id)
+specific_event = await event_store.a_get_event(event.event_id)
 request_events = event_store.get_agent_events("req_123")
 ```
 
@@ -147,7 +147,7 @@ event_store.record_events(events)
 
 ```python
 # Get specific event
-event = event_store.get_event("event_123")
+event = await event_store.a_get_event("event_123")
 
 # Get all events for an assistant request
 request_events = event_store.get_agent_events("req_456")

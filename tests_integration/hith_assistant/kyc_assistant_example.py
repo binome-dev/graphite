@@ -1,9 +1,11 @@
+import asyncio
 import json
 import os
 import uuid
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -83,7 +85,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_kyc_assistant() -> None:
+async def test_kyc_assistant() -> None:
     assistant = (
         KycAssistant.builder()
         .name("SimpleHITLAssistant")
@@ -106,10 +108,12 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=input_data,
+            )
         )
     )
 
@@ -122,14 +126,16 @@ def test_kyc_assistant() -> None:
         )
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=human_input,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=human_input,
+            )
         )
     )
 
     print(output)
 
 
-test_kyc_assistant()
+asyncio.run(test_kyc_assistant())

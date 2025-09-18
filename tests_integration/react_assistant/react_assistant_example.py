@@ -3,6 +3,7 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
@@ -42,7 +43,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_react_assistant() -> None:
+async def test_react_assistant() -> None:
     # Set up the assistant with DuckDuckGoTool
     assistant = (
         ReActAssistant.builder()
@@ -71,10 +72,13 @@ def test_react_assistant() -> None:
     ]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print("Assistant output:", output)
@@ -83,7 +87,7 @@ def test_react_assistant() -> None:
     assert output is not None
     print(
         "Number of events recorded:",
-        len(event_store.get_events()),
+        len(await event_store.a_get_events()),
     )
 
     # import json

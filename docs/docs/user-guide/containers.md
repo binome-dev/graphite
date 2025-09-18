@@ -381,7 +381,7 @@ def test_event_store_integration(test_container):
     test_event = Event(event_id="test-123")
 
     event_store.record_event(test_event)
-    retrieved = event_store.get_event("test-123")
+    retrieved = await event_store.a_get_event("test-123")
 
     assert retrieved.event_id == "test-123"
 ```

@@ -11,7 +11,6 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -41,20 +40,6 @@ class FunctionTool(Tool):
         This method allows for the construction of a FunctionTool instance with specified parameters.
         """
         return FunctionToolBuilder(cls)
-
-    @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        try:
-            response = self.function(input_data)
-            return self.to_messages(response=response)
-        except Exception as e:
-            raise FunctionToolException(
-                tool_name=self.name,
-                operation="invoke",
-                message=f"Function execution failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
 
     @record_tool_a_invoke
     async def a_invoke(

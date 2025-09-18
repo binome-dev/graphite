@@ -64,7 +64,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         print(output)
         assert output is not None
 
-    assert len(event_store.get_events()) == 24
+    assert len(await event_store.a_get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

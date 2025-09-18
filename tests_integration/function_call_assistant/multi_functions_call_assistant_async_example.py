@@ -131,7 +131,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    assert len(event_store.get_events()) == 34
+    assert len(await event_store.a_get_events()) == 34
 
     # Test the run method
     invoke_context_2 = get_invoke_context()
@@ -148,8 +148,8 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 68
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 68
 
     # Test the run method
     invoke_context_3 = get_invoke_context()
@@ -166,8 +166,8 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 102
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 102
 
 
 asyncio.run(test_multi_functions_call_assistant_async())

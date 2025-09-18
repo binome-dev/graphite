@@ -101,11 +101,11 @@ class AsyncResult:
             pass
 
 
-def func_wrapper(return_value) -> AsyncResult:
+def async_func_wrapper(return_value) -> AsyncResult:
     """
     Normalize a function's *return value* into an AsyncResult.
 
     Usage:
-        res: AsyncResult = function_wrapper(func(...))
+        res: AsyncResult = async_func_wrapper(func(...))
     """
     return AsyncResult(return_value)

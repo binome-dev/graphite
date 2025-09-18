@@ -69,8 +69,8 @@ async def test_simple_function_call_assistant_async() -> None:
         assert "12345" in str(output.data[0].content)
         assert "sunny" in str(output.data[0].content)
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 27
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 27
 
 
 # Run the test function asynchronously

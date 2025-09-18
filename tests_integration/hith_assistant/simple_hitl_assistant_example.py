@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import uuid
@@ -5,6 +6,7 @@ import uuid
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -50,7 +52,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_simple_hitl_assistant() -> None:
+async def test_simple_hitl_assistant() -> None:
     assistant = (
         SimpleHITLAssistant.builder()
         .name("SimpleHITLAssistant")
@@ -78,11 +80,13 @@ def test_simple_hitl_assistant() -> None:
         data=input_data,
     )
 
-    output = assistant.invoke(input_data)
+    output = await async_func_wrapper(
+        assistant.a_invoke(input_data, is_sequential=True)
+    )
 
     print(output)
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 18
 
@@ -99,9 +103,11 @@ def test_simple_hitl_assistant() -> None:
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = assistant.invoke(input_data)
+    output = await async_func_wrapper(
+        assistant.a_invoke(input_data, is_sequential=True)
+    )
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 36
 
@@ -118,13 +124,15 @@ def test_simple_hitl_assistant() -> None:
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = assistant.invoke(input_data)
+    output = await async_func_wrapper(
+        assistant.a_invoke(input_data, is_sequential=True)
+    )
 
     print(output)
 
-    events = event_store.get_events()
+    events = await event_store.a_get_events()
     print(len(events))
     assert len(events) == 54
 
 
-test_simple_hitl_assistant()
+asyncio.run(test_simple_hitl_assistant())

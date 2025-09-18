@@ -1,9 +1,11 @@
+import asyncio
 import os
 import uuid
 from typing import Any
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
@@ -34,7 +36,7 @@ def mock_agent_call_function(
     return message.model_dump()
 
 
-def test_simple_function_call_assistant() -> None:
+async def test_simple_function_call_assistant() -> None:
     invoke_context = get_invoke_context()
 
     assistant = (
@@ -55,17 +57,20 @@ def test_simple_function_call_assistant() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.a_invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print(output)
     assert output is not None
     assert "12345" in str(output[0].data[0].content)
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 24
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) == 24
 
 
-test_simple_function_call_assistant()
+asyncio.run(test_simple_function_call_assistant())

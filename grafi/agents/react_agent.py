@@ -11,11 +11,12 @@ from pydantic import Field
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -35,6 +36,7 @@ Response in a concise and clear manner, ensuring that your answers are accurate 
 """
 
 CONVERSATION_ID = uuid.uuid4().hex
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 
 class ReActAgent(Assistant):
@@ -46,9 +48,11 @@ class ReActAgent(Assistant):
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
-        default=GoogleSearchTool.builder()
-        .name("GoogleSearchTool")
-        .fixed_max_results(3)
+        default=TavilyTool.builder()
+        .name("TavilyTestTool")
+        .api_key(tavily_api_key)
+        .max_tokens(6000)
+        .search_depth("advanced")
         .build()
     )
     model: str = Field(default="gpt-4o-mini")
@@ -148,8 +152,12 @@ class ReActAgent(Assistant):
             data=input_data,
         )
 
-    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
-        output = super().invoke(self.get_input(question, invoke_context))
+    async def run(
+        self, question: str, invoke_context: Optional[InvokeContext] = None
+    ) -> str:
+        output = await async_func_wrapper(
+            super().a_invoke(self.get_input(question, invoke_context))
+        )
 
         return output[0].data[0].content
 

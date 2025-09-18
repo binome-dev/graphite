@@ -8,7 +8,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
-from grafi.common.models.async_result import func_wrapper
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.simple_llm_assistant.simple_llm_assistant import (
@@ -54,7 +54,9 @@ async def test_simple_llm_assistant() -> None:
         data=input_data,
     )
 
-    output = await func_wrapper(assistant.a_invoke(input_data, is_sequential=True))
+    output = await async_func_wrapper(
+        assistant.a_invoke(input_data, is_sequential=True)
+    )
     print(output)
     assert output is not None
     assert len(await event_store.a_get_events()) == 12
@@ -69,13 +71,13 @@ async def test_simple_llm_assistant() -> None:
         invoke_context=get_invoke_context(),
         data=input_data,
     )
-    async for output in func_wrapper(
+    async for output in async_func_wrapper(
         assistant.a_invoke(input_data, is_sequential=True)
     ):
         print(output)
-    assert output is not None
-    assert "Grafi" in str(output.data[0].content)
-    assert len(await event_store.a_get_events()) == 24
+        assert output is not None
+        assert "Grafi" in str(output.data[0].content)
+        assert len(await event_store.a_get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant())
