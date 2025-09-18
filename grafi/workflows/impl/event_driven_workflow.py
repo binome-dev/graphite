@@ -384,7 +384,7 @@ class EventDrivenWorkflow(Workflow):
 
             # process events after stopping
             if consumed_output_events:
-                container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+                await container.event_store.a_record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
 
             # Wait for all node tasks to complete with proper error handling
             for t in node_processing_task:
