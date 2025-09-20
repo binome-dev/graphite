@@ -71,7 +71,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
-    async for messages in claude_instance.a_invoke(invoke_context, input_data):
+    async for messages in claude_instance.invoke(invoke_context, input_data):
         result.extend(messages)
 
     assert isinstance(result, List)
@@ -125,7 +125,7 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
 
     msgs = [Message(role="user", content="Weather?")]
     claude_instance.add_function_specs(tools)
-    async for _ in claude_instance.a_invoke(invoke_context, msgs):
+    async for _ in claude_instance.invoke(invoke_context, msgs):
         pass  # Just consume the generator to trigger the API call
 
     kwargs = mock_client.messages.create.call_args[1]
@@ -151,7 +151,7 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Anthropic async call failed"):
-        async for _ in claude_instance.a_invoke(
+        async for _ in claude_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
         ):
             pass  # Exception should be raised before we get any results

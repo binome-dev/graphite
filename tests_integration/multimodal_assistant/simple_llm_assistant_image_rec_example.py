@@ -47,7 +47,7 @@ async def test_simple_image_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     input_data = [
         Message(
@@ -64,7 +64,7 @@ async def test_simple_image_llm_assistant() -> None:
         )
     ]
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -75,7 +75,7 @@ async def test_simple_image_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "GRAPHITE" in str(output[0].data[0].content)
-    assert len(await event_store.a_get_events()) == 12
+    assert len(await event_store.get_events()) == 12
 
 
 asyncio.run(test_simple_image_llm_assistant())

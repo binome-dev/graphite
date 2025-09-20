@@ -39,7 +39,7 @@ class ChromadbRetrievalTool(RetrievalTool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)

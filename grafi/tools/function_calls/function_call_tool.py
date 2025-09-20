@@ -97,7 +97,7 @@ class FunctionCallTool(Tool):
         return self.function_specs
 
     @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """

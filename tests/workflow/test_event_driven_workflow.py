@@ -26,7 +26,7 @@ class MockTool(Tool):
     def invoke(self, invoke_context, input_data):
         return [Message(role="assistant", content="mock response")]
 
-    async def a_invoke(self, invoke_context, input_data):
+    async def invoke(self, invoke_context, input_data):
         yield [Message(role="assistant", content="mock response")]
 
 
@@ -191,7 +191,7 @@ class TestEventDrivenWorkflowOutputEvents:
             consumed_event_ids=[],
             offset=0,
         )
-        await workflow._topics["test_output"].a_add_event(mock_event)
+        await workflow._topics["test_output"].add_event(mock_event)
 
         return workflow
 
@@ -232,14 +232,14 @@ class TestEventDrivenWorkflowAsyncInvoke:
         return EventDrivenWorkflow(nodes={"test_node": node})
 
     def test_a_invoke_method_exists(self, async_workflow):
-        """Test that a_invoke method exists and is async."""
-        assert hasattr(async_workflow, "a_invoke")
-        assert callable(async_workflow.a_invoke)
+        """Test that invoke method exists and is async."""
+        assert hasattr(async_workflow, "invoke")
+        assert callable(async_workflow.invoke)
 
     @pytest.mark.asyncio
     async def test_a_invoke_basic_flow(self, async_workflow):
         """Test basic async invoke flow."""
-        # This test verifies that the a_invoke method can be called
+        # This test verifies that the invoke method can be called
         # and properly sets up the async machinery
 
         invoke_context = InvokeContext(
@@ -253,16 +253,16 @@ class TestEventDrivenWorkflowAsyncInvoke:
         ) as mock_container:
             mock_event_store = Mock()
             mock_container.event_store = mock_event_store
-            mock_event_store.a_get_agent_events = AsyncMock(return_value=[])
-            mock_event_store.a_record_events = AsyncMock()
-            mock_event_store.a_record_event = AsyncMock()
+            mock_event_store.get_agent_events = AsyncMock(return_value=[])
+            mock_event_store.record_events = AsyncMock()
+            mock_event_store.record_event = AsyncMock()
 
             # Create a timeout to avoid hanging
             try:
                 # Run async invoke with timeout
                 results = []
                 async with asyncio.timeout(0.5):
-                    async for msg in async_workflow.a_invoke(
+                    async for msg in async_workflow.invoke(
                         PublishToTopicEvent(
                             invoke_context=invoke_context, data=input_messages
                         )
@@ -273,16 +273,16 @@ class TestEventDrivenWorkflowAsyncInvoke:
                 pass
 
             # The workflow should have been initialized
-            mock_event_store.a_get_agent_events.assert_called_with("test")
+            mock_event_store.get_agent_events.assert_called_with("test")
 
     @pytest.mark.asyncio
     async def test_a_invoke_with_async_output_queue(self, async_workflow):
-        """Test that a_invoke uses AsyncOutputQueue."""
+        """Test that invoke uses AsyncOutputQueue."""
         # We can verify that the workflow has the necessary components
         assert hasattr(async_workflow, "_tracker")
         assert hasattr(async_workflow, "_topics")
 
-        # The AsyncOutputQueue should be created during a_invoke execution
+        # The AsyncOutputQueue should be created during invoke execution
         # This is more of an integration test ensuring the components work together
 
 
@@ -305,8 +305,8 @@ class TestEventDrivenWorkflowInitialWorkflow:
 
     def test_initial_workflow_method_exists(self, workflow_for_initial_test):
         """Test that initial_workflow method exists."""
-        assert hasattr(workflow_for_initial_test, "a_initial_workflow")
-        assert callable(workflow_for_initial_test.a_initial_workflow)
+        assert hasattr(workflow_for_initial_test, "initial_workflow")
+        assert callable(workflow_for_initial_test.initial_workflow)
 
 
 class TestEventDrivenWorkflowToDict:
@@ -367,12 +367,12 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         await workflow_with_tracker._tracker.enter("test_node")
         assert not workflow_with_tracker._tracker.is_idle()
 
-        # Call a_init_workflow which should reset tracker
+        # Call init_workflow which should reset tracker
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
         with patch("grafi.common.containers.container.container"):
-            await workflow_with_tracker.a_init_workflow(
+            await workflow_with_tracker.init_workflow(
                 PublishToTopicEvent(invoke_context=invoke_context, data=[])
             )
 

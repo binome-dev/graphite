@@ -43,11 +43,11 @@ class Command(BaseModel):
         # If no command found, return the base Command class
         return cls(tool=tool)
 
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
         tool_input = await self.get_tool_input(invoke_context, input_data)
-        async for messages in self.tool.a_invoke(invoke_context, tool_input):
+        async for messages in self.tool.invoke(invoke_context, tool_input):
             yield messages
 
     async def get_tool_input(

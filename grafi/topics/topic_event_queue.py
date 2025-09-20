@@ -17,7 +17,7 @@ class TopicEventQueue(ABC):
     """
 
     @abstractmethod
-    async def a_put(self, event: TopicEvent) -> TopicEvent:
+    async def put(self, event: TopicEvent) -> TopicEvent:
         """
         Append an event to the queue.
 
@@ -30,7 +30,7 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
-    async def a_fetch(
+    async def fetch(
         self,
         consumer_id: str,
         offset: Optional[int] = None,
@@ -50,7 +50,7 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
-    async def a_commit_to(self, consumer_id: str, offset: int) -> int:
+    async def commit_to(self, consumer_id: str, offset: int) -> int:
         """
         Commit all offsets up to and including the specified offset.
 
@@ -61,7 +61,7 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
-    async def a_reset(self) -> None:
+    async def reset(self) -> None:
         """
         Reset the queue to its initial state.
         Clears all events and consumer offsets.
@@ -69,7 +69,7 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
-    async def a_can_consume(self, consumer_id: str) -> bool:
+    async def can_consume(self, consumer_id: str) -> bool:
         """
         Check if there are events available for consumption by a consumer.
 

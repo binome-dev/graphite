@@ -130,7 +130,7 @@ async def test_multi_functions_call_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context_1,
                 data=input_question_1,
@@ -140,9 +140,9 @@ async def test_multi_functions_call_assistant() -> None:
     )
 
     print(output)
-    print(len(await event_store.a_get_events()))
+    print(len(await event_store.get_events()))
     assert output is not None
-    assert len(await event_store.a_get_events()) == 34
+    assert len(await event_store.get_events()) == 34
 
     # Test the run method
     invoke_context_2 = get_invoke_context()
@@ -151,7 +151,7 @@ async def test_multi_functions_call_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context_2,
                 data=input_question_2,
@@ -162,7 +162,7 @@ async def test_multi_functions_call_assistant() -> None:
 
     print(output)
     assert output is not None
-    assert len(await event_store.a_get_events()) == 68
+    assert len(await event_store.get_events()) == 68
 
     # Test the run method
     invoke_context_3 = get_invoke_context()
@@ -171,7 +171,7 @@ async def test_multi_functions_call_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context_3,
                 data=input_question_3,
@@ -181,7 +181,7 @@ async def test_multi_functions_call_assistant() -> None:
     )
     print(output)
     assert output is not None
-    assert len(await event_store.a_get_events()) == 102
+    assert len(await event_store.get_events()) == 102
 
     # assistant.generate_workflow_graph()
 

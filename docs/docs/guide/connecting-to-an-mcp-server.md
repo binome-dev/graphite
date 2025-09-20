@@ -337,7 +337,7 @@ class StockAssistantBuilder(
 ```
 
 
-Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines as well. For this case we are making a fully asynchronous workflow by overrding the  `async def a_run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchrnously.
+Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines as well. For this case we are making a fully asynchronous workflow by overrding the  `async def run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchrnously.
 
 ```python
 #main.py
@@ -372,7 +372,7 @@ async def create_assistant():
         .model(model)
         .api_key(api_key)
         .function_call_llm_system_message(function_call_llm_system_message)
-        .function_tool(await MCPTool.builder().connections(mcp_config).a_build())
+        .function_tool(await MCPTool.builder().connections(mcp_config).build())
         .summary_llm_system_message(
             "You are a helpful assistant that provides a summary of the company overview. return all output as json formatted string")
         .build()
@@ -392,7 +392,7 @@ async def main():
     question = "What is the overview of the company Tesla?"
     input_data = [Message(role="user", content=question)]
 
-    async for response in assistant.a_invoke(invoke_context, input_data):
+    async for response in assistant.invoke(invoke_context, input_data):
         print("Assistant output:")
         for output in response:
             print(output.content)
@@ -528,7 +528,7 @@ When you call the assistant's `a_invoke()` method from `main.py`
 
 ```python
 
-async for output in assistant.a_invoke(invoke_context, input_data):
+async for output in assistant.invoke(invoke_context, input_data):
 ```
 
 The `input_data` gets published on the assistants `InputTopic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/0b6b666b6f0e122ac970f437ee24f5d87c30a81a/grafi/workflows/impl/event_driven_workflow.py#L681-L687) but we are outlying it here so you can follow the flow of data.

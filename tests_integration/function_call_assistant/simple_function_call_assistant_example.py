@@ -57,7 +57,7 @@ async def test_simple_function_call_assistant() -> None:
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -69,14 +69,14 @@ async def test_simple_function_call_assistant() -> None:
     assert output is not None
     assert "12345" in str(output[0].data[0].content)
     assert "bad" in str(output[0].data[0].content)
-    print(len(await event_store.a_get_events()))
-    assert len(await event_store.a_get_events()) == 24
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 24
 
     # Test restore from finished requests
 
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,

@@ -47,13 +47,13 @@ async def test_mimo_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     # Test greeting input
     print("Testing greeting input...")
     greeting_input = [Message(content="Hello there! How are you?", role="user")]
     greeting_output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=greeting_input,
@@ -63,7 +63,7 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Greeting Output: {greeting_output}")
     assert len(greeting_output) == 2
 
-    assert len(await event_store.a_get_events()) == 20
+    assert len(await event_store.get_events()) == 20
 
     # Test question input
     print("\nTesting question input...")
@@ -74,7 +74,7 @@ async def test_mimo_llm_assistant() -> None:
         )
     ]
     question_output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=question_input,
@@ -84,7 +84,7 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Question Output: {question_output}")
     assert len(question_output) == 2
 
-    assert len(await event_store.a_get_events()) == 40
+    assert len(await event_store.get_events()) == 40
 
     # Test mixed input (both greeting and question)
     print("\nTesting mixed input...")
@@ -95,7 +95,7 @@ async def test_mimo_llm_assistant() -> None:
         )
     ]
     mixed_output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=mixed_input,
@@ -106,7 +106,7 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Mixed Output: {mixed_output}")
     assert len(mixed_output) == 3
 
-    assert len(await event_store.a_get_events()) == 70
+    assert len(await event_store.get_events()) == 70
 
 
 test_mimo_llm_assistant()

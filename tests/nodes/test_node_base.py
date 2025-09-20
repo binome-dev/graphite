@@ -31,7 +31,7 @@ class MockTool(Tool):
             **kwargs,
         )
 
-    async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages):
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages):
         yield [
             Message(role="assistant", content=f"Mock async response from {self.name}")
         ]
@@ -43,15 +43,15 @@ class MockTopic(TopicBase):
     def __init__(self, name: str = "mock_topic", **kwargs):
         super().__init__(name=name, **kwargs)
 
-    async def a_publish_data(
+    async def publish_data(
         self, invoke_context, publisher_name, publisher_type, data, consumed_event_ids
     ):
         pass
 
-    async def a_can_consume(self, consumer_name: str) -> bool:
+    async def can_consume(self, consumer_name: str) -> bool:
         return True
 
-    async def a_consume(self, consumer_name: str) -> List:
+    async def consume(self, consumer_name: str) -> List:
         return []
 
     def to_dict(self):
@@ -61,7 +61,7 @@ class MockTopic(TopicBase):
 class ConcreteNodeBase(NodeBase):
     """Concrete implementation of NodeBase for testing."""
 
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, node_input: List[ConsumeFromTopicEvent]
     ):
         yield [Message(role="assistant", content="Concrete async node response")]
@@ -229,9 +229,9 @@ class TestNodeBase:
         invoke_context: InvokeContext,
         sample_consumed_events: List[ConsumeFromTopicEvent],
     ):
-        """Test that the concrete implementation of a_invoke method works."""
+        """Test that the concrete implementation of invoke method works."""
         messages = []
-        async for message_batch in basic_node_base.a_invoke(
+        async for message_batch in basic_node_base.invoke(
             invoke_context, sample_consumed_events
         ):
             messages.extend(message_batch)
@@ -245,14 +245,14 @@ class TestNodeBase:
         invoke_context: InvokeContext,
         sample_consumed_events: List[ConsumeFromTopicEvent],
     ):
-        """Test that NodeBase raises NotImplementedError for a_invoke method."""
+        """Test that NodeBase raises NotImplementedError for invoke method."""
         base_node = NodeBase(name="abstract_node")
 
         with pytest.raises(
             NotImplementedError, match="Subclasses must implement this method"
         ):
-            # Since a_invoke is an async generator, we need to iterate to trigger the exception
-            async for _ in base_node.a_invoke(invoke_context, sample_consumed_events):
+            # Since invoke is an async generator, we need to iterate to trigger the exception
+            async for _ in base_node.invoke(invoke_context, sample_consumed_events):
                 pass
 
     # Test Model Configuration
@@ -450,7 +450,7 @@ class TestNodeBase:
         class CustomNodeBase(NodeBase):
             custom_field: str = "default"
 
-            async def a_invoke(self, invoke_context, node_input):
+            async def invoke(self, invoke_context, node_input):
                 yield [
                     Message(
                         role="assistant", content=f"Custom async: {self.custom_field}"
@@ -860,8 +860,8 @@ class TestNodeBaseBuilder:
     async def test_a_can_invoke_with_subscriptions_not_satisfied(
         self, mock_topic: MockTopic
     ):
-        """Test a_can_invoke returns False when subscription expressions are not satisfied."""
-        # Ensure MockTopic has a_can_consume method
+        """Test can_invoke returns False when subscription expressions are not satisfied."""
+        # Ensure MockTopic has can_consume method
         topic_expr = TopicExpr(topic=mock_topic)
         node = ConcreteNodeBase(
             name="test_node",
@@ -869,9 +869,9 @@ class TestNodeBaseBuilder:
         )
         node._subscribed_topics = {mock_topic.name: mock_topic}
 
-        # Mock a_can_consume to return False and evaluate_subscription to return False
+        # Mock can_consume to return False and evaluate_subscription to return False
         with patch.object(
-            MockTopic, "a_can_consume", new_callable=AsyncMock
+            MockTopic, "can_consume", new_callable=AsyncMock
         ) as mock_can_consume:
             mock_can_consume.return_value = False
 
@@ -879,11 +879,11 @@ class TestNodeBaseBuilder:
                 "grafi.topics.expressions.topic_expression.evaluate_subscription",
                 return_value=False,
             ):
-                assert await node.a_can_invoke() is False
+                assert await node.can_invoke() is False
 
     @pytest.mark.asyncio
     async def test_a_can_invoke_with_multiple_subscriptions(self):
-        """Test a_can_invoke with multiple subscription expressions."""
+        """Test can_invoke with multiple subscription expressions."""
         topic1 = MockTopic(name="topic1")
         topic2 = MockTopic(name="topic2")
 
@@ -898,15 +898,15 @@ class TestNodeBaseBuilder:
 
         # Mock both topics to have consumable data
         with patch.object(
-            MockTopic, "a_can_consume", new_callable=AsyncMock
+            MockTopic, "can_consume", new_callable=AsyncMock
         ) as mock_can_consume:
             mock_can_consume.return_value = True
             with patch.object(
-                MockTopic, "a_can_consume", new_callable=AsyncMock
+                MockTopic, "can_consume", new_callable=AsyncMock
             ) as mock_can_consume:
                 mock_can_consume.return_value = True
                 with patch(
                     "grafi.topics.expressions.topic_expression.evaluate_subscription",
                     return_value=True,
                 ):
-                    assert await node.a_can_invoke() is True
+                    assert await node.can_invoke() is True

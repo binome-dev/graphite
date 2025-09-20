@@ -139,7 +139,7 @@ context = InvokeContext()
 messages = [Message(role="user", content="Hello world")]
 
 # Publish to topic
-event = await topic.a_publish_data(
+event = await topic.publish_data(
     invoke_context=context,
     publisher_name="my_publisher",
     publisher_type="application",
@@ -279,7 +279,7 @@ def test_topic_publishing():
     messages = [Message(role="user", content="test")]
 
     # Test successful publishing
-    event = await topic.a_publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",
@@ -299,7 +299,7 @@ def test_condition_filtering():
 
     # Test with single message (should be filtered)
     single_message = [Message(role="user", content="test")]
-    event = await topic.a_publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",

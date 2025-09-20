@@ -37,13 +37,13 @@ class Node(NodeBase):
         return NodeBaseBuilder(cls)
 
     @record_node_a_invoke
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> AsyncGenerator[PublishToTopicEvent, None]:
         # Use the LLM's invoke method to get the response generator
-        async for messages in self.command.a_invoke(
+        async for messages in self.command.invoke(
             invoke_context,
             input_data=node_input,
         ):

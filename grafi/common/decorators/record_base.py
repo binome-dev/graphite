@@ -98,7 +98,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 input_data=input_data,
                 invoke_context=invoke_context,
             )
-            await container.event_store.a_record_event(invoke_event)
+            await container.event_store.record_event(invoke_event)
 
             # Execute with tracing
             result_list = []
@@ -146,7 +146,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     invoke_context=invoke_context,
                     error=str(e),
                 )
-                await container.event_store.a_record_event(failed_event)
+                await container.event_store.record_event(failed_event)
                 raise
             else:
                 # Record respond event
@@ -158,7 +158,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     invoke_context=invoke_context,
                     output_data=output_data,
                 )
-                await container.event_store.a_record_event(respond_event)
+                await container.event_store.record_event(respond_event)
 
         return wrapper
 

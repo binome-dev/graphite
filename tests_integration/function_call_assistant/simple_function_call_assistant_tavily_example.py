@@ -50,7 +50,7 @@ async def test_simple_function_call_assistant_with_tavily() -> None:
 
     # Invoke the assistant's function call
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -64,9 +64,9 @@ async def test_simple_function_call_assistant_with_tavily() -> None:
     assert output is not None
     print(
         "Number of events recorded:",
-        len(await event_store.a_get_events()),
+        len(await event_store.get_events()),
     )
-    assert len(await event_store.a_get_events()) == 24
+    assert len(await event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_tavily())

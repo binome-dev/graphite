@@ -67,7 +67,7 @@ async def test_function_call_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -94,7 +94,7 @@ async def test_function_call_assistant() -> None:
     )
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -130,7 +130,7 @@ async def test_function_call_assistant_disapproval() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -157,7 +157,7 @@ async def test_function_call_assistant_disapproval() -> None:
     )
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -192,7 +192,7 @@ async def test_function_call_assistant_suggestion() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -218,7 +218,7 @@ async def test_function_call_assistant_suggestion() -> None:
     )
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -250,7 +250,7 @@ async def test_function_call_assistant_suggestion() -> None:
     )
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -288,7 +288,7 @@ async def test_function_call_assistant_suggestion_mem() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,

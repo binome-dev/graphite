@@ -40,10 +40,10 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_openai_tool_a_stream() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     openai_tool = OpenAITool.builder().is_streaming(True).api_key(api_key).build()
     content = ""
-    async for messages in openai_tool.a_invoke(
+    async for messages in openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -53,7 +53,7 @@ async def test_openai_tool_a_stream() -> None:
                 content += message.content
                 print(message.content + "_", end="", flush=True)
 
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
     assert content is not None
     assert "Grafi" in content
 
@@ -64,8 +64,8 @@ async def test_openai_tool_with_chat_param() -> None:
         "max_tokens": 15,
     }
     openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
-    await event_store.a_clear_events()
-    async for messages in openai_tool.a_invoke(
+    await event_store.clear_events()
+    async for messages in openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -80,14 +80,14 @@ async def test_openai_tool_with_chat_param() -> None:
                 # Ensure the content length is within the expected range
                 assert len(message.content) < 70
 
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 async def test_openai_tool_with_structured_output() -> None:
     chat_param = {"response_format": UserForm}
     openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
-    await event_store.a_clear_events()
-    async for messages in openai_tool.a_invoke(
+    await event_store.clear_events()
+    async for messages in openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Generate mock user with first name Grafi.")],
     ):
@@ -99,15 +99,15 @@ async def test_openai_tool_with_structured_output() -> None:
             assert message.content is not None
             assert "Grafi" in message.content
 
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 async def test_openai_tool_async() -> None:
     openai_tool = OpenAITool.builder().api_key(api_key).build()
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     content = ""
-    async for messages in openai_tool.a_invoke(
+    async for messages in openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -120,13 +120,13 @@ async def test_openai_tool_async() -> None:
 
     assert "Grafi" in content
 
-    print(len(await event_store.a_get_events()))
+    print(len(await event_store.get_events()))
 
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 async def test_llm_a_stream_node() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     llm_stream_node: Node = (
         Node.builder()
         .tool(OpenAITool.builder().is_streaming(True).api_key(api_key).build())
@@ -149,7 +149,7 @@ async def test_llm_a_stream_node() -> None:
         ],
     )
 
-    async for event in llm_stream_node.a_invoke(
+    async for event in llm_stream_node.invoke(
         invoke_context,
         [topic_event],
     ):
@@ -161,7 +161,7 @@ async def test_llm_a_stream_node() -> None:
 
     assert content is not None
     assert "Grafi" in content
-    assert len(await event_store.a_get_events()) == 4
+    assert len(await event_store.get_events()) == 4
 
 
 asyncio.run(test_openai_tool_with_chat_param())

@@ -86,7 +86,7 @@ async def test_invoke(function_instance, invoke_context):
             ],
         )
     ]
-    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+    async for msgs in function_instance.invoke(invoke_context, input_data):
         for msg in msgs:
             assert msg.content == "hello - 42"
 
@@ -109,7 +109,7 @@ async def test_invoke_wrong_function_name(function_instance, invoke_context):
             ],
         )
     ]
-    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+    async for msgs in function_instance.invoke(invoke_context, input_data):
         assert msgs == []
 
 
@@ -148,7 +148,7 @@ async def test_invoke_with_different_args(
             ],
         )
     ]
-    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+    async for msgs in function_instance.invoke(invoke_context, input_data):
         for msg in msgs:
             assert msg.content == expected
 
@@ -174,7 +174,7 @@ async def test_invoke_with_missing_args(function_instance, invoke_context):
     from grafi.common.exceptions import FunctionCallException
 
     with pytest.raises(FunctionCallException):
-        async for msgs in function_instance.a_invoke(invoke_context, input_data):
+        async for msgs in function_instance.invoke(invoke_context, input_data):
             assert msgs  # should not reach here
 
 

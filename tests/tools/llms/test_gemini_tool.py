@@ -67,7 +67,7 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
-    async for msg in gemini_instance.a_invoke(invoke_context, input_data):
+    async for msg in gemini_instance.invoke(invoke_context, input_data):
         result.extend(msg)
 
     assert isinstance(result, List)
@@ -126,7 +126,7 @@ async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context
 
     gemini_instance.add_function_specs(tools)
 
-    async for msg in gemini_instance.a_invoke(invoke_context, input_data):
+    async for msg in gemini_instance.invoke(invoke_context, input_data):
         assert msg
 
     call_kwargs = mock_client.aio.models.generate_content.call_args[1]
@@ -153,7 +153,7 @@ async def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Failure"):
-        async for _ in gemini_instance.a_invoke(
+        async for _ in gemini_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
         ):
             pass  # Exception should be raised before we get any results

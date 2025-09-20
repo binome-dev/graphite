@@ -42,7 +42,7 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_simple_function_call_assistant_no_function_call() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     assistant = (
         SimpleStreamFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
@@ -56,7 +56,7 @@ async def test_simple_function_call_assistant_no_function_call() -> None:
 
     content = ""
 
-    async for event in assistant.a_invoke(
+    async for event in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=input_data,

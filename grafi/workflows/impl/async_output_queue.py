@@ -48,7 +48,7 @@ class AsyncOutputQueue:
 
         while True:
             # waiter 1: "some records arrived"
-            topic_task = asyncio.create_task(topic.a_consume(self.consumer_name))
+            topic_task = asyncio.create_task(topic.consume(self.consumer_name))
             # waiter 2: "graph just became idle"
             idle_event_waiter = asyncio.create_task(self.tracker.wait_idle_event())
 
@@ -71,7 +71,7 @@ class AsyncOutputQueue:
                 # If no new activity since last check and no data, we're done
                 if (
                     current_activity == last_activity_count
-                    and not await topic.a_can_consume(self.consumer_name)
+                    and not await topic.can_consume(self.consumer_name)
                 ):
                     # cancel an unfinished waiter (if any) to avoid warnings
                     for t in pending:

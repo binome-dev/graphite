@@ -106,7 +106,7 @@ async def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
 
     mock_ollama_client.return_value.chat = mock_chat
     result = []
-    async for msg in tool.a_invoke(invoke_context, input_data):
+    async for msg in tool.invoke(invoke_context, input_data):
         result.extend(msg)
 
     assert result[0].role == "assistant"

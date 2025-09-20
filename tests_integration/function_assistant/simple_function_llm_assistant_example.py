@@ -91,7 +91,7 @@ async def test_simple_function_call_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -103,8 +103,8 @@ async def test_simple_function_call_assistant() -> None:
     assert output is not None
     assert "first_name" in str(output[0].data[0].content)
     assert "last_name" in str(output[0].data[0].content)
-    print(len(await event_store.a_get_events()))
-    assert len(await event_store.a_get_events()) == 18
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 18
 
 
 asyncio.run(test_simple_function_call_assistant())

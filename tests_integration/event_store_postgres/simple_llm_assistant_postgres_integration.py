@@ -74,7 +74,7 @@ async def test_simple_llm_assistant() -> None:
         Message(content="Hello, my name is Grafi, how are you doing?", role="user")
     ]
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -85,7 +85,7 @@ async def test_simple_llm_assistant() -> None:
 
     print(output)
     assert output is not None
-    events = await event_store.a_get_conversation_events(conversation_id)
+    events = await event_store.get_conversation_events(conversation_id)
     assert len(events) == 12
 
     input_data = [
@@ -95,7 +95,7 @@ async def test_simple_llm_assistant() -> None:
         )
     ]
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=input_data,
@@ -106,7 +106,7 @@ async def test_simple_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].data[0].content)
-    assert len(await event_store.a_get_conversation_events(conversation_id)) == 24
+    assert len(await event_store.get_conversation_events(conversation_id)) == 24
 
 
 asyncio.run(test_simple_llm_assistant())

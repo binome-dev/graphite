@@ -117,9 +117,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import AsyncGenerator
 
 @record_assistant_a_invoke
-async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async assistant implementation
-    async for output in self.workflow.a_invoke(input_data):
+    async for output in self.workflow.invoke(input_data):
         yield output
 ```
 
@@ -184,10 +184,10 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from typing import List, AsyncGenerator
 
 @record_node_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext,
+async def invoke(self, invoke_context: InvokeContext,
                    node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[PublishToTopicEvent, None]:
     # Async node processing - execute command and yield PublishToTopicEvents
-    async for messages in self.command.a_invoke(invoke_context, node_input):
+    async for messages in self.command.invoke(invoke_context, node_input):
         yield PublishToTopicEvent(
             publisher_name=self.name,
             publisher_type=self.type,
@@ -242,7 +242,7 @@ Records asynchronous tool invocations that return async generators.
 from grafi.common.decorators.record_decorators import record_tool_a_invoke
 
 @record_tool_a_invoke
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     # Async tool execution
     yield tool_results
 ```
@@ -299,7 +299,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import AsyncGenerator
 
 @record_workflow_a_invoke
-async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Async workflow orchestration
     # Initialize workflow, execute nodes asynchronously, yield consumed events
     async for output_event in self._execute_workflow(input_data):

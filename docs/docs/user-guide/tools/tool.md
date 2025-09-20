@@ -65,7 +65,7 @@ response = tool.invoke(invoke_context, input_messages)
 
 ```python
 # Asynchronous processing with generator
-async for message_batch in tool.a_invoke(invoke_context, input_messages):
+async for message_batch in tool.invoke(invoke_context, input_messages):
     process_messages(message_batch)
 ```
 
@@ -103,7 +103,7 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
     result = self.process_data(input_data)
     return self.to_messages(result)
 
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     """Asynchronous processing implementation."""
     # Process input_data asynchronously
     result = await self.async_process_data(input_data)
@@ -173,7 +173,7 @@ class TextProcessorTool(Tool):
         processed = self._process_text(content)
         return self.to_messages(processed)
 
-    async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         """Process text asynchronously."""
         if not input_data:
             yield []
@@ -332,7 +332,7 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
 ### Async Error Handling
 
 ```python
-async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     try:
         result = await self.async_process(input_data)
         yield self.to_messages(result)
@@ -367,7 +367,7 @@ async def test_tool_a_invoke():
     input_messages = [Message(role="user", content="test input")]
 
     results = []
-    async for batch in tool.a_invoke(context, input_messages):
+    async for batch in tool.invoke(context, input_messages):
         results.extend(batch)
 
     assert len(results) > 0

@@ -53,14 +53,14 @@ async def load_events_from_json() -> InvokeContext:
         events_data = json.load(f)
 
     # Clear any existing events
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     # Convert each event dict to Event object and store it
     for event_dict in events_data:
         event = event_store._create_event_from_dict(event_dict)
         if event is None:
             raise ValueError(f"Failed to create event from dict: {event_dict}")
-        await event_store.a_record_event(event)
+        await event_store.record_event(event)
         invoke_context = event.invoke_context
 
     return invoke_context
@@ -98,7 +98,7 @@ async def test_react_assistant() -> None:
 
     # Invoke the assistant's function call
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,

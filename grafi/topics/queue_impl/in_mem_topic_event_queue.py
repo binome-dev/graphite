@@ -21,9 +21,7 @@ class InMemTopicEventQueue(TopicEventQueue):
 
     def __init__(self) -> None:
         self.id: str = default_id
-        self._records: List[
-            TopicEvent
-        ] = (
+        self._records: List[TopicEvent] = (
             []
         )  # contiguous in memory log, persistent all the topic events generated from publishers
 
@@ -39,7 +37,7 @@ class InMemTopicEventQueue(TopicEventQueue):
         )  # condition variable for synchronization, all accesses to _records are protected by this condition variable
 
     # ------------------------------ asynchronous methods ------------------------------
-    async def a_put(self, event: TopicEvent) -> TopicEvent:
+    async def put(self, event: TopicEvent) -> TopicEvent:
         """
         Append a message to the log. Returns the offset of the appended message.
         Implements backpressure when cache is full.
@@ -51,7 +49,7 @@ class InMemTopicEventQueue(TopicEventQueue):
             self._cond.notify_all()  # wake waiting consumers
             return event
 
-    async def a_fetch(
+    async def fetch(
         self,
         consumer_id: str,
         offset: Optional[int] = None,
@@ -66,7 +64,7 @@ class InMemTopicEventQueue(TopicEventQueue):
 
         async with self._cond:
             # If timeout is 0 or None and no data, return immediately
-            while not await self.a_can_consume(consumer_id):
+            while not await self.can_consume(consumer_id):
                 try:
                     logger.debug(
                         f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
@@ -76,7 +74,7 @@ class InMemTopicEventQueue(TopicEventQueue):
                     return []
                 except asyncio.CancelledError:
                     # Handle cancellation gracefully
-                    logger.info("Fetch operation was cancelled.")
+                    logger.debug("Fetch operation was cancelled.")
                     return []
 
             start = self._consumed[consumer_id]
@@ -91,7 +89,7 @@ class InMemTopicEventQueue(TopicEventQueue):
 
             return batch
 
-    async def a_commit_to(self, consumer_id: str, offset: int) -> int:
+    async def commit_to(self, consumer_id: str, offset: int) -> int:
         """Commit all offsets up to and including the specified offset."""
         async with self._cond:
             # Only commit if offset is greater than current committed
@@ -100,7 +98,7 @@ class InMemTopicEventQueue(TopicEventQueue):
 
             return self._committed[consumer_id]
 
-    async def a_reset(self) -> None:
+    async def reset(self) -> None:
         """
         Reset the queue to its initial state asynchronously.
         """
@@ -109,7 +107,7 @@ class InMemTopicEventQueue(TopicEventQueue):
             self._consumed = defaultdict(int)
             self._committed = defaultdict(lambda: -1)
 
-    async def a_can_consume(self, consumer_id: str) -> bool:
+    async def can_consume(self, consumer_id: str) -> bool:
         """
         Check if there are events available for consumption by a consumer asynchronously.
         """

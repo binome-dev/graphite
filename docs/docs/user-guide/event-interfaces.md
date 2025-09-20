@@ -87,12 +87,12 @@ class MyAssistant(Assistant):
         events = self.workflow.invoke(input_data)
         return events
 
-    async def a_invoke(
+    async def invoke(
         self,
         input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Asynchronous streaming of events."""
-        async for output in self.workflow.a_invoke(input_data):
+        async for output in self.workflow.invoke(input_data):
             yield output
 ```
 

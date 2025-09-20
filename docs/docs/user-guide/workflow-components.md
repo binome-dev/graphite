@@ -140,7 +140,7 @@ async def _output_listener(self, topic: TopicBase):
 
     while True:
         # Wait for either new data or idle state
-        topic_task = asyncio.create_task(topic.a_consume(self.consumer_name))
+        topic_task = asyncio.create_task(topic.consume(self.consumer_name))
         idle_event_waiter = asyncio.create_task(self.tracker.wait_idle_event())
 
         done, pending = await asyncio.wait(
@@ -198,9 +198,9 @@ async def __anext__(self) -> TopicEvent:
 These components work together in the EventDrivenWorkflow's async execution:
 
 ```python
-async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Initialize workflow
-    await self.a_init_workflow(invoke_context, input)
+    await self.init_workflow(invoke_context, input)
 
     # Start node processing tasks
     node_processing_tasks = [

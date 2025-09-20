@@ -30,7 +30,7 @@ class MyAssistant(AssistantBase):
         # Implementation required
         pass
 
-    async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         # Implementation required
         pass
 ```
@@ -100,14 +100,14 @@ def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]
 
 **Raises**: `ValueError` if required configuration (e.g., API keys) is missing
 
-#### a_invoke()
+#### invoke()
 
 Asynchronously processes input events with support for streaming responses.
 
 ```python
 @record_assistant_a_invoke
-async def a_invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-    async for output in self.workflow.a_invoke(input_data):
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async for output in self.workflow.invoke(input_data):
         yield output
 ```
 

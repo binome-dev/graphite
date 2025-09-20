@@ -30,7 +30,7 @@ class MockTool(Tool):
             **kwargs,
         )
 
-    async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages):
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages):
         yield [
             Message(role="assistant", content=f"Mock async response from {self.name}")
         ]
@@ -47,10 +47,10 @@ class MockTopic(TopicBase):
     ):
         pass
 
-    async def a_can_consume(self, consumer_name: str) -> bool:
+    async def can_consume(self, consumer_name: str) -> bool:
         return True
 
-    async def a_consume(self, consumer_name: str) -> List:
+    async def consume(self, consumer_name: str) -> List:
         return []
 
     def to_dict(self):
@@ -250,9 +250,9 @@ class TestNode:
         # Mock the decorator to return the original function
         mock_decorator.side_effect = lambda func: func
 
-        # The actual Command has a_invoke method, so we test it directly
+        # The actual Command has invoke method, so we test it directly
         messages = []
-        async for message_batch in node_with_tool.a_invoke(
+        async for message_batch in node_with_tool.invoke(
             invoke_context, sample_consumed_events
         ):
             messages.append(message_batch)
@@ -276,7 +276,7 @@ class TestNode:
         assert basic_node._command is None
 
         with pytest.raises(AttributeError):
-            async for _ in basic_node.a_invoke(invoke_context, sample_consumed_events):
+            async for _ in basic_node.invoke(invoke_context, sample_consumed_events):
                 pass
 
     # Test Async Invoke Method
@@ -293,7 +293,7 @@ class TestNode:
         mock_decorator.side_effect = lambda func: func
 
         messages = []
-        async for message_batch in node_with_tool.a_invoke(
+        async for message_batch in node_with_tool.invoke(
             invoke_context, sample_consumed_events
         ):
             messages.extend(message_batch)
@@ -314,20 +314,20 @@ class TestNode:
         mock_decorator.side_effect = lambda func: func
 
         with pytest.raises(AttributeError):
-            async for _ in basic_node.a_invoke(invoke_context, sample_consumed_events):
+            async for _ in basic_node.invoke(invoke_context, sample_consumed_events):
                 pass
 
-    # Test a_can_invoke Method
+    # Test can_invoke Method
     @pytest.mark.asyncio
     async def test_a_can_invoke_no_subscriptions(self, basic_node: Node):
-        """Test a_can_invoke returns True when no subscriptions are defined."""
-        assert await basic_node.a_can_invoke() is True
+        """Test can_invoke returns True when no subscriptions are defined."""
+        assert await basic_node.can_invoke() is True
 
     @pytest.mark.asyncio
     async def test_a_can_invoke_with_subscriptions_all_satisfied(
         self, mock_topic: MockTopic
     ):
-        """Test a_can_invoke returns True when all subscription expressions are satisfied."""
+        """Test can_invoke returns True when all subscription expressions are satisfied."""
         topic_expr = TopicExpr(topic=mock_topic)
         node = Node(
             name="test_node",
@@ -336,14 +336,14 @@ class TestNode:
 
         # Patch the method at the class level to work with Pydantic models
         with patch.object(
-            MockTopic, "a_can_consume", new_callable=AsyncMock
+            MockTopic, "can_consume", new_callable=AsyncMock
         ) as mock_can_consume:
             mock_can_consume.return_value = True
             with patch(
                 "grafi.topics.expressions.topic_expression.evaluate_subscription",
                 return_value=True,
             ):
-                assert await node.a_can_invoke() is True
+                assert await node.can_invoke() is True
 
     # Test to_dict Method
     def test_to_dict_basic_node(self, basic_node: Node):
@@ -458,7 +458,7 @@ class TestNode:
             mock_decorator.side_effect = lambda func: func
 
             messages = []
-            async for message_batch in node.a_invoke(invoke_context, sample_events):
+            async for message_batch in node.invoke(invoke_context, sample_events):
                 messages.extend(message_batch)
 
             assert isinstance(messages, list)
@@ -468,7 +468,7 @@ class TestNode:
     async def test_node_with_empty_subscribed_expressions_list(self):
         """Test Node with empty subscribed_expressions list."""
         node = Node(name="test_node", subscribed_expressions=[])
-        assert await node.a_can_invoke() is True
+        assert await node.can_invoke() is True
         assert node._subscribed_topics == {}
 
     def test_node_with_empty_publish_to_list(self):

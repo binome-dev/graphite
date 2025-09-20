@@ -156,7 +156,7 @@ class ReActAgent(Assistant):
         self, question: str, invoke_context: Optional[InvokeContext] = None
     ) -> str:
         output = await async_func_wrapper(
-            super().a_invoke(self.get_input(question, invoke_context))
+            super().invoke(self.get_input(question, invoke_context))
         )
 
         return output[0].data[0].content
@@ -164,7 +164,7 @@ class ReActAgent(Assistant):
     async def a_run(
         self, question: str, invoke_context: Optional[InvokeContext] = None
     ) -> AsyncGenerator[Message, None]:
-        async for output in super().a_invoke(self.get_input(question, invoke_context)):
+        async for output in super().invoke(self.get_input(question, invoke_context)):
             for message in output.data:
                 yield message
 

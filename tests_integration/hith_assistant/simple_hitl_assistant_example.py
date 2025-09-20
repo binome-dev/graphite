@@ -80,13 +80,11 @@ async def test_simple_hitl_assistant() -> None:
         data=input_data,
     )
 
-    output = await async_func_wrapper(
-        assistant.a_invoke(input_data, is_sequential=True)
-    )
+    output = await async_func_wrapper(assistant.invoke(input_data, is_sequential=True))
 
     print(output)
 
-    events = await event_store.a_get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 18
 
@@ -103,11 +101,9 @@ async def test_simple_hitl_assistant() -> None:
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = await async_func_wrapper(
-        assistant.a_invoke(input_data, is_sequential=True)
-    )
+    output = await async_func_wrapper(assistant.invoke(input_data, is_sequential=True))
 
-    events = await event_store.a_get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 36
 
@@ -124,13 +120,11 @@ async def test_simple_hitl_assistant() -> None:
         consumed_event_ids=[event.event_id for event in output],
     )
 
-    output = await async_func_wrapper(
-        assistant.a_invoke(input_data, is_sequential=True)
-    )
+    output = await async_func_wrapper(assistant.invoke(input_data, is_sequential=True))
 
     print(output)
 
-    events = await event_store.a_get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 54
 

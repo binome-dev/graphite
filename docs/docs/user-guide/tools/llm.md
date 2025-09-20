@@ -203,7 +203,7 @@ class CustomLLM(LLM):
         # Synchronous API call implementation
         pass
 
-    async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         # Asynchronous API call implementation
         pass
 

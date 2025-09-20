@@ -31,7 +31,7 @@ class Tool(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         input_data: Messages,

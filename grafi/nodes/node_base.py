@@ -60,7 +60,7 @@ class NodeBase(BaseModel):
         """Return a list of subscribed topics."""
         return list(self._subscribed_topics.values())
 
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
@@ -75,7 +75,7 @@ class NodeBase(BaseModel):
         # The yield after raise is unreachable but needed for type checking
         yield  # pragma: no cover
 
-    async def a_can_invoke(self) -> bool:
+    async def can_invoke(self) -> bool:
         """
         Check if this node can invoke given which topics currently have new data.
         If ALL of the node's subscribed_expressions is True, we return True.
@@ -88,7 +88,7 @@ class NodeBase(BaseModel):
 
         # Evaluate each expression; if any is satisfied, we can invoke.
         for topic in self._subscribed_topics.values():
-            if await topic.a_can_consume(self.name):
+            if await topic.can_consume(self.name):
                 topics_with_new_msgs.add(topic.name)
 
         for expr in self.subscribed_expressions:

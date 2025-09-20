@@ -30,7 +30,7 @@ async def test_publish_message(topic: Topic, invoke_context: InvokeContext):
     """Test publishing a message to the topic."""
     message = Message(role="assistant", content="Test Message")
 
-    event = await topic.a_publish_data(
+    event = await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -55,10 +55,10 @@ async def test_can_consume(topic: Topic, invoke_context: InvokeContext):
     message = Message(role="assistant", content="Test Message")
 
     # Before publishing, consumer should not be able to consume
-    assert not await topic.a_can_consume("consumer_1")
+    assert not await topic.can_consume("consumer_1")
 
     # Publish a message
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -70,7 +70,7 @@ async def test_can_consume(topic: Topic, invoke_context: InvokeContext):
     )
 
     # Now the consumer should be able to consume
-    assert await topic.a_can_consume("consumer_1")
+    assert await topic.can_consume("consumer_1")
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -89,7 +89,7 @@ async def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
             data=[message1],
         )
     )
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -100,7 +100,7 @@ async def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
         )
     )
 
-    consumed_messages = await topic.a_consume("consumer_1", 0.1)
+    consumed_messages = await topic.consume("consumer_1", 0.1)
 
     assert len(consumed_messages) == 2  # Consumer should receive both messages
     assert consumed_messages[0].offset == 0
@@ -113,7 +113,7 @@ async def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeConte
     """Ensure no messages are consumed when there are no new ones."""
     message = Message(role="assistant", content="Test Message")
 
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -125,9 +125,9 @@ async def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeConte
     )
 
     # First consume
-    await topic.a_consume("consumer_1", 0.1)
+    await topic.consume("consumer_1", 0.1)
     # Second consume (should return empty list)
-    consumed_messages = await topic.a_consume("consumer_1", 0.1)
+    consumed_messages = await topic.consume("consumer_1", 0.1)
 
     assert len(consumed_messages) == 0  # Should return an empty list
 
@@ -138,7 +138,7 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
     message1 = Message(role="assistant", content="Message 1")
     message2 = Message(role="assistant", content="Message 2")
 
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -148,7 +148,7 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
             data=[message1],
         )
     )
-    await topic.a_publish_data(
+    await topic.publish_data(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             name="agent_input_topic",
@@ -160,17 +160,17 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
     )
 
     # Consumer 1 consumes both messages
-    consumed_messages_1 = await topic.a_consume("consumer_1", 0.1)
+    consumed_messages_1 = await topic.consume("consumer_1", 0.1)
     assert len(consumed_messages_1) == 2
 
     # Consumer 1 has no more messages to consume
-    assert not await topic.a_can_consume("consumer_1")
-    consumed_messages_1_again = await topic.a_consume("consumer_1", 0.1)
+    assert not await topic.can_consume("consumer_1")
+    consumed_messages_1_again = await topic.consume("consumer_1", 0.1)
     assert len(consumed_messages_1_again) == 0
 
     # Consumer 2 starts fresh and should receive both messages
-    consumed_messages_2 = await topic.a_consume("consumer_2", 0.1)
+    consumed_messages_2 = await topic.consume("consumer_2", 0.1)
     assert len(consumed_messages_2) == 2
 
     # Consumer 2 has no more messages to consume
-    assert not await topic.a_can_consume("consumer_2")
+    assert not await topic.can_consume("consumer_2")

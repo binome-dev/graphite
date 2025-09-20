@@ -80,7 +80,7 @@ async def test_a_get_function_specs_adds_specs(dummy_connections):
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
-        tool = await MCPTool.builder().connections(dummy_connections).a_build()
+        tool = await MCPTool.builder().connections(dummy_connections).build()
         tool.function_specs = []
         mock_tool = MagicMock()
         mock_tool.name = "test_tool"
@@ -109,7 +109,7 @@ async def test_a_invoke_text_content(
         instance.call_tool = AsyncMock(return_value=mock_result)
 
         result = [
-            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
+            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
         ]
         assert "hello" in result[0][0].content
 
@@ -132,7 +132,7 @@ async def test_a_invoke_image_content(
         instance.call_tool = AsyncMock(return_value=mock_result)
 
         result = [
-            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
+            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
         ]
         assert result[0][0].content == "imgdata"
 
@@ -162,7 +162,7 @@ async def test_a_invoke_embedded_resource(
         instance.call_tool = AsyncMock(return_value=mock_result)
 
         result = [
-            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
+            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
         ]
         assert "Embedded resource" in result[0][0].content
 
@@ -186,7 +186,7 @@ async def test_a_invoke_unsupported_content(
         instance.call_tool = AsyncMock(return_value=mock_result)
 
         result = [
-            m async for m in tool.a_invoke(dummy_invoke_context, dummy_input_message)
+            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
         ]
         assert "Unsupported content type" in result[0][0].content
 
@@ -199,7 +199,7 @@ async def test_a_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
         tool_calls = None
 
     with pytest.raises(ValueError):
-        async for _ in tool.a_invoke(dummy_invoke_context, [DummyInputMessage()]):
+        async for _ in tool.invoke(dummy_invoke_context, [DummyInputMessage()]):
             pass
 
 
@@ -212,7 +212,7 @@ async def test_get_prompt_and_resources(dummy_connections):
         )
         instance.read_resource = AsyncMock(return_value=["res1"])
 
-        tool = await MCPTool.builder().connections(dummy_connections).a_build()
+        tool = await MCPTool.builder().connections(dummy_connections).build()
         tool.prompts = [Prompt(name="prompt1", description="Test prompt")]
         tool.resources = [Resource(uri="user://resource/uri1", name="res1")]
 

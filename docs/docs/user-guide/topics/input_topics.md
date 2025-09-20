@@ -200,7 +200,7 @@ async def human_approval_workflow():
         content="Please review the following document..."
     )]
 
-    output_event = await output_topic.a_publish_data(
+    output_event = await output_topic.publish_data(
         invoke_context=context,
         publisher_name="review_system",
         publisher_type="workflow",
@@ -213,7 +213,7 @@ async def human_approval_workflow():
 
     # Process user response
     user_feedback = [Message(role="user", content="Looks good, approved!")]
-    input_data = await input_topic.a_publish_input_data(
+    input_data = await input_topic.publish_input_data(
         upstream_event=output_event,
         data=user_feedback
     )
@@ -271,7 +271,7 @@ class HumanInLoopNode(Node):
         if self.needs_approval(data_events):
             # Request human approval
             approval_request = self.create_approval_request(data_events)
-            await self.output_topic.a_publish_data(
+            await self.output_topic.publish_data(
                 invoke_context=context,
                 publisher_name=self.name,
                 publisher_type="node",
@@ -292,7 +292,7 @@ async def test_input_topics():
     input_topic = InputTopic(name="test_input")
 
     messages = [Message(role="user", content="test input")]
-    event = await input_topic.a_publish_data(
+    event = await input_topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",
@@ -315,7 +315,7 @@ async def test_input_topics():
     )
 
     # Simulate workflow output
-    output_event = await output_topic.a_publish_data(
+    output_event = await output_topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="workflow",
         publisher_type="node",
@@ -325,7 +325,7 @@ async def test_input_topics():
 
     # Simulate user response
     user_response = [Message(role="user", content="Here's my input")]
-    input_data = await workflow_input_topic.a_publish_input_data(
+    input_data = await workflow_input_topic.publish_input_data(
         upstream_event=output_event,
         data=user_response
     )

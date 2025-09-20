@@ -113,7 +113,7 @@ async def test_invoke_function(google_search_tool, mock_search):
 
     out = []
 
-    async for msg in google_search_tool.a_invoke(invoke_context, input_messages):
+    async for msg in google_search_tool.invoke(invoke_context, input_messages):
         out.extend(msg)
 
     assert isinstance(out[0], Message)
@@ -169,7 +169,7 @@ async def test_invoke_with_invalid_function(google_search_tool):
     ]
 
     result = []
-    async for msg in google_search_tool.a_invoke(invoke_context, bad_call_message):
+    async for msg in google_search_tool.invoke(invoke_context, bad_call_message):
         result.extend(msg)
     assert result == []
 
@@ -207,7 +207,7 @@ async def test_error_handling(google_search_tool):
         from grafi.common.exceptions import FunctionCallException
 
         with pytest.raises(FunctionCallException) as excinfo:
-            async for msg in google_search_tool.a_invoke(
+            async for msg in google_search_tool.invoke(
                 invoke_context, message_with_call
             ):
                 assert msg  # should not reach here

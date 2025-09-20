@@ -44,7 +44,7 @@ async def test_simple_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     input_data = [
         Message(content="Hello, my name is Grafi, how are you doing?", role="user")
@@ -54,12 +54,10 @@ async def test_simple_llm_assistant() -> None:
         data=input_data,
     )
 
-    output = await async_func_wrapper(
-        assistant.a_invoke(input_data, is_sequential=True)
-    )
+    output = await async_func_wrapper(assistant.invoke(input_data, is_sequential=True))
     print(output)
     assert output is not None
-    assert len(await event_store.a_get_events()) == 12
+    assert len(await event_store.get_events()) == 12
 
     input_data = [
         Message(
@@ -72,12 +70,12 @@ async def test_simple_llm_assistant() -> None:
         data=input_data,
     )
     async for output in async_func_wrapper(
-        assistant.a_invoke(input_data, is_sequential=True)
+        assistant.invoke(input_data, is_sequential=True)
     ):
         print(output)
         assert output is not None
         assert "Grafi" in str(output.data[0].content)
-        assert len(await event_store.a_get_events()) == 24
+        assert len(await event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant())

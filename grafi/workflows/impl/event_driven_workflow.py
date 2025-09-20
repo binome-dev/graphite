@@ -31,9 +31,9 @@ from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTop
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
-from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
+from grafi.workflows.impl.utils import publish_events
 from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
 
@@ -186,8 +186,8 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         for output_topic in output_topics:
-            if await output_topic.a_can_consume(self.name):
-                events = await output_topic.a_consume(self.name)
+            if await output_topic.can_consume(self.name):
+                events = await output_topic.consume(self.name)
                 for event in events:
                     consumed_events.append(
                         ConsumeFromTopicEvent(
@@ -217,7 +217,7 @@ class EventDrivenWorkflow(Workflow):
             )
 
         for topic, offset in topic_max_offset.items():
-            await self._topics[topic].a_commit(consumer_name, offset)
+            await self._topics[topic].commit(consumer_name, offset)
 
     async def _a_add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
@@ -233,7 +233,7 @@ class EventDrivenWorkflow(Workflow):
         for node_name in subscribed_nodes:
             node = self.nodes[node_name]
             # add unprocessed node to the invoke queue
-            if await topic.a_can_consume(node_name) and await node.a_can_invoke():
+            if await topic.can_consume(node_name) and await node.can_invoke():
                 self._invoke_queue.append(node)
 
     async def invoke_sequential(
@@ -266,12 +266,10 @@ class EventDrivenWorkflow(Workflow):
                 if node_consumed_events:
                     try:
                         published_events: List[PublishToTopicEvent] = []
-                        async for result in node.a_invoke(
+                        async for result in node.invoke(
                             invoke_context, node_consumed_events
                         ):
-                            published_events.extend(
-                                await a_publish_events(node, result)
-                            )
+                            published_events.extend(await publish_events(node, result))
 
                         for event in published_events:
                             await self._a_add_to_invoke_queue(event)
@@ -280,7 +278,7 @@ class EventDrivenWorkflow(Workflow):
                         events.extend(node_consumed_events)
                         events.extend(published_events)
 
-                        await container.event_store.a_record_events(events)  # type: ignore[arg-type]
+                        await container.event_store.record_events(events)  # type: ignore[arg-type]
                     except Exception as e:
                         raise NodeExecutionError(
                             node_name=node.name,
@@ -295,7 +293,7 @@ class EventDrivenWorkflow(Workflow):
                 yield event  # type: ignore[arg-type]
         finally:
             if consumed_events:
-                await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
+                await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
 
     async def invoke_parallel(
         self, input_data: PublishToTopicEvent
@@ -384,7 +382,7 @@ class EventDrivenWorkflow(Workflow):
 
             # process events after stopping
             if consumed_output_events:
-                await container.event_store.a_record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+                await container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
 
             # Wait for all node tasks to complete with proper error handling
             for t in node_processing_task:
@@ -421,7 +419,7 @@ class EventDrivenWorkflow(Workflow):
             Block until *at least one* new record is available on `topic`,
             put **all** currently‑available new records into its buffer.
             """
-            recs = await topic.a_consume(consumer_name)
+            recs = await topic.consume(consumer_name)
 
             if topic.name not in buffer:
                 buffer[topic.name] = []
@@ -498,18 +496,16 @@ class EventDrivenWorkflow(Workflow):
                     # publish before commit
                     node_output_events: List[PublishToTopicEvent] = []
                     if consumed_events:
-                        async for event in node.a_invoke(
-                            invoke_context, consumed_events
-                        ):
+                        async for event in node.invoke(invoke_context, consumed_events):
                             node_output_events.extend(
-                                await a_publish_events(node=node, publish_event=event)
+                                await publish_events(node=node, publish_event=event)
                             )
 
                     await self._a_commit_events(
                         consumer_name=node.name, topic_events=consumed_events
                     )
-                    await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
-                    await container.event_store.a_record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
+                    await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
+                    await container.event_store.record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
 
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
@@ -544,7 +540,7 @@ class EventDrivenWorkflow(Workflow):
             buffer.clear()  # Clear buffer for next iteration
 
     @record_workflow_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
@@ -555,7 +551,7 @@ class EventDrivenWorkflow(Workflow):
             # Reset stop flag at the beginning of new execution
             self.reset_stop_flag()
 
-            await self.a_init_workflow(input_data, is_sequential)
+            await self.init_workflow(input_data, is_sequential)
 
             if is_sequential:
                 # If sequential, we just call the sequential method
@@ -574,7 +570,7 @@ class EventDrivenWorkflow(Workflow):
                 cause=e,
             ) from e
 
-    async def a_init_workflow(
+    async def init_workflow(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> Any:
         # 1 – initial seeding
@@ -582,13 +578,13 @@ class EventDrivenWorkflow(Workflow):
             self._tracker.reset()
 
         for topic in self._topics.values():
-            await topic.a_reset()
+            await topic.reset()
 
         invoke_context = input_data.invoke_context
 
         events = [
             event
-            for event in await container.event_store.a_get_agent_events(
+            for event in await container.event_store.get_agent_events(
                 invoke_context.assistant_request_id
             )
             if isinstance(event, TopicEvent)
@@ -603,7 +599,7 @@ class EventDrivenWorkflow(Workflow):
 
             events_to_record: List[Event] = []
             for input_topic in input_topics:
-                event = await input_topic.a_publish_data(
+                event = await input_topic.publish_data(
                     input_data.model_copy(
                         update={
                             "publisher_name": self.name,
@@ -618,11 +614,11 @@ class EventDrivenWorkflow(Workflow):
                         await self._a_add_to_invoke_queue(event)
 
             if events_to_record:
-                await container.event_store.a_record_events(events_to_record)
+                await container.event_store.record_events(events_to_record)
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
             for topic_event in events:
-                await self._topics[topic_event.name].a_restore_topic(topic_event)
+                await self._topics[topic_event.name].restore_topic(topic_event)
                 if is_sequential and isinstance(topic_event, PublishToTopicEvent):
                     await self._a_add_to_invoke_queue(topic_event)
 
@@ -658,7 +654,7 @@ class EventDrivenWorkflow(Workflow):
                             paired_in_workflow_input_topic, InWorkflowInputTopic
                         ):
                             paired_event = (
-                                await paired_in_workflow_input_topic.a_publish_data(
+                                await paired_in_workflow_input_topic.publish_data(
                                     input_data.model_copy(
                                         update={
                                             "publisher_name": self.name,
@@ -671,7 +667,7 @@ class EventDrivenWorkflow(Workflow):
                             if paired_event:
                                 if is_sequential:
                                     await self._a_add_to_invoke_queue(paired_event)
-                                await container.event_store.a_record_event(paired_event)
+                                await container.event_store.record_event(paired_event)
 
     def to_dict(self) -> dict[str, Any]:
         return {

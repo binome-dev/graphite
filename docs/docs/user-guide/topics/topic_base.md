@@ -129,11 +129,11 @@ def consume(self, consumer_name: str) -> List[PublishToTopicEvent | OutputTopicE
 ### Async Message Retrieval
 
 ```python
-async def a_consume(
+async def consume(
     self, consumer_name: str, timeout: Optional[float] = None
 ) -> List[TopicEvent]:
     """Asynchronously retrieve new/unconsumed messages for the given node."""
-    return await self.event_cache.a_fetch(consumer_name, timeout=timeout)
+    return await self.event_cache.fetch(consumer_name, timeout=timeout)
 ```
 
 ### Offset Management
@@ -144,9 +144,9 @@ The system maintains two types of offsets:
 - **Committed Offset**: Tracks what has been fully processed (advanced after processing)
 
 ```python
-async def a_commit(self, consumer_name: str, offset: int) -> None:
+async def commit(self, consumer_name: str, offset: int) -> None:
     """Commit processed messages up to the specified offset."""
-    await self.event_cache.a_commit_to(consumer_name, offset)
+    await self.event_cache.commit_to(consumer_name, offset)
 ```
 
 ## Message Filtering
@@ -197,7 +197,7 @@ def reset(self) -> None:
     """Reset the topic to its initial state."""
     self.event_cache = TopicEventQueue(self.name)
 
-async def a_reset(self) -> None:
+async def reset(self) -> None:
     """Asynchronously reset the topic to its initial state."""
     self.event_cache.reset()
     self.event_cache = TopicEventQueue(self.name)
@@ -218,18 +218,18 @@ def restore_topic(self, topic_event: TopicEvent) -> None:
         )
         self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
 
-async def a_restore_topic(self, topic_event: TopicEvent) -> None:
+async def restore_topic(self, topic_event: TopicEvent) -> None:
     """Asynchronously restore a topic from a topic event."""
     if isinstance(topic_event, PublishToTopicEvent) or isinstance(
         topic_event, OutputTopicEvent
     ):
-        await self.event_cache.a_put(topic_event)
+        await self.event_cache.put(topic_event)
     elif isinstance(topic_event, ConsumeFromTopicEvent):
         # Fetch the events for the consumer and commit the offset
-        await self.event_cache.a_fetch(
+        await self.event_cache.fetch(
             consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
         )
-        await self.event_cache.a_commit_to(
+        await self.event_cache.commit_to(
             topic_event.consumer_name, topic_event.offset
         )
 ```

@@ -67,10 +67,10 @@ class Command(BaseModel):
             self.get_tool_input(invoke_context, input_data)
         )
 
-    async def a_invoke(self, invoke_context: InvokeContext,
+    async def invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         """Asynchronous tool invocation."""
-        async for message in self.tool.a_invoke(
+        async for message in self.tool.invoke(
             invoke_context,
             self.get_tool_input(invoke_context, input_data)
         ):
@@ -242,7 +242,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 | Method                                        | Description                                                                                                    |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `invoke(invoke_context, input_data)`      | Synchronously calls `retrieval_tool.invoke`, returning the resulting `Message`.                               |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously calls `retrieval_tool.a_invoke`, yielding one or more `Message` objects.                       |
+| `a_invoke(invoke_context, input_data)`    | Asynchronously calls `retrieval_tool.invoke`, yielding one or more `Message` objects.                       |
 | `to_dict()`                                   | Serializes the command’s state, including the `retrieval_tool` configuration.                                  |
 
 [`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
@@ -258,7 +258,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 | Method                                        | Description                                                                                                          |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | `invoke(invoke_context, input_data)`      | Synchronously calls `rag_tool.invoke`, returning a `Message` with retrieval results.                                |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously invokes `rag_tool.a_invoke`, yielding partial or complete messages from the retrieval-augmented flow.|
+| `a_invoke(invoke_context, input_data)`    | Asynchronously invokes `rag_tool.invoke`, yielding partial or complete messages from the retrieval-augmented flow.|
 | `to_dict()`                                   | Serializes the command’s state, reflecting the assigned `RagTool` configuration.                                     |
 
 Both commands enable a node to delegate specialized retrieval operations to their respective tools, without needing to manage the internal logic of how embeddings or RAG processes are performed.
@@ -443,7 +443,7 @@ class StatefulCommand(Command):
 class ResilientCommand(Command):
     """Command with built-in error recovery."""
 
-    async def a_invoke(self, invoke_context: InvokeContext,
+    async def invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         max_retries = 3
         retry_count = 0
@@ -451,7 +451,7 @@ class ResilientCommand(Command):
         while retry_count < max_retries:
             try:
                 tool_input = self.get_tool_input(invoke_context, input_data)
-                async for message in self.tool.a_invoke(invoke_context, tool_input):
+                async for message in self.tool.invoke(invoke_context, tool_input):
                     yield message
                 break
             except Exception as e:

@@ -12,9 +12,9 @@ from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_types import TopicType
-from grafi.workflows.impl.utils import a_publish_events
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
+from grafi.workflows.impl.utils import publish_events
 
 
 class TestGetAsyncOutputEvents:
@@ -214,7 +214,7 @@ class TestPublishEvents:
         result = [Message(role="assistant", content="Test result")]
         consumed_events = []
 
-        # Mock a_publish_data to return events
+        # Mock publish_data to return events
         mock_event1 = PublishToTopicEvent(
             name="topic1",
             publisher_name=node.name,
@@ -226,8 +226,8 @@ class TestPublishEvents:
         )
         mock_event2 = None  # Test case where topic doesn't publish
 
-        mock_topic1.a_publish_data.return_value = mock_event1
-        mock_topic2.a_publish_data.return_value = mock_event2
+        mock_topic1.publish_data.return_value = mock_event1
+        mock_topic2.publish_data.return_value = mock_event2
 
         publish_to_event = PublishToTopicEvent(
             invoke_context=invoke_context,
@@ -237,13 +237,13 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
-        published_events = await a_publish_events(node, publish_to_event)
+        published_events = await publish_events(node, publish_to_event)
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
 
         # Verify topics were called correctly
-        mock_topic1.a_publish_data.assert_called_once_with(publish_to_event)
+        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
 
 
 class TestGetNodeInput:
@@ -264,9 +264,9 @@ class TestGetNodeInput:
             assistant_request_id="test-request",
         )
 
-        # Mock a_can_consume and a_consume methods
-        mock_topic1.a_can_consume.return_value = True
-        mock_topic2.a_can_consume.return_value = False  # This topic has no messages
+        # Mock can_consume and consume methods
+        mock_topic1.can_consume.return_value = True
+        mock_topic2.can_consume.return_value = False  # This topic has no messages
 
         mock_event = MagicMock()
         mock_event.invoke_context = invoke_context
@@ -275,7 +275,7 @@ class TestGetNodeInput:
         mock_event.offset = 0
         mock_event.data = [Message(role="user", content="Test")]
 
-        mock_topic1.a_consume.return_value = [mock_event]
+        mock_topic1.consume.return_value = [mock_event]
 
         consumed_events = await get_node_input(node)
 
@@ -285,10 +285,10 @@ class TestGetNodeInput:
         assert consumed_events[0].consumer_type == node.type
         assert consumed_events[0].name == "topic1"
 
-        # Verify a_can_consume was called
-        mock_topic1.a_can_consume.assert_called_once_with(node.name)
-        mock_topic2.a_can_consume.assert_called_once_with(node.name)
+        # Verify can_consume was called
+        mock_topic1.can_consume.assert_called_once_with(node.name)
+        mock_topic2.can_consume.assert_called_once_with(node.name)
 
-        # Verify a_consume was only called on topic1
-        mock_topic1.a_consume.assert_called_once_with(node.name)
-        mock_topic2.a_consume.assert_not_called()
+        # Verify consume was only called on topic1
+        mock_topic1.consume.assert_called_once_with(node.name)
+        mock_topic2.consume.assert_not_called()

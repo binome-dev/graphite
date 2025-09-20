@@ -86,12 +86,12 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     return output_events
 
 
-async def a_publish_events(
+async def publish_events(
     node: NodeBase, publish_event: PublishToTopicEvent
 ) -> List[PublishToTopicEvent]:
     published_events: List[PublishToTopicEvent] = []
     for topic in node.publish_to:
-        event = await topic.a_publish_data(publish_event)
+        event = await topic.publish_data(publish_event)
 
         if event:
             published_events.append(event)
@@ -106,9 +106,9 @@ async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
 
     # Process each topic the node is subscribed to
     for subscribed_topic in node_subscribed_topics:
-        if await subscribed_topic.a_can_consume(node.name):
+        if await subscribed_topic.can_consume(node.name):
             # Get messages from topic and create consume events
-            node_consumed_events = await subscribed_topic.a_consume(node.name)
+            node_consumed_events = await subscribed_topic.consume(node.name)
             for event in node_consumed_events:
                 consumed_event = ConsumeFromTopicEvent(
                     invoke_context=event.invoke_context,

@@ -71,7 +71,7 @@ async def test_invoke_function(duckduckgo_tool, mock_ddgs):
 
     result = []
 
-    async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
         result.extend(msg)
 
     assert isinstance(result[0], Message)
@@ -121,7 +121,7 @@ async def test_invoke_with_invalid_function_name(duckduckgo_tool):
 
     result = []
 
-    async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
         result.extend(msg)
     assert len(result) == 0
 
@@ -158,6 +158,6 @@ async def test_error_handling(duckduckgo_tool):
         from grafi.common.exceptions import FunctionCallException
 
         with pytest.raises(FunctionCallException) as excinfo:
-            async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+            async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
                 assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)

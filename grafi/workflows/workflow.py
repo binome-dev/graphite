@@ -46,14 +46,14 @@ class Workflow(BaseModel):
         """
         self._stop_requested = False
 
-    async def a_invoke(
+    async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invokes the workflow with the given initial inputs parallelly."""
         yield None  # type: ignore
         raise NotImplementedError
 
-    async def a_initial_workflow(self, assistant_request_id: str) -> Any:
+    async def initial_workflow(self, assistant_request_id: str) -> Any:
         """Initial workflow state, and replays events from an unfinished request to resume invoke."""
         raise NotImplementedError
 

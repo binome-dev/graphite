@@ -76,7 +76,7 @@ async def test_a_invoke_simple_response(monkeypatch, deepseek_instance, invoke_c
 
     input_data = [Message(role="user", content="Say hello")]
     result_messages = []
-    async for message_batch in deepseek_instance.a_invoke(invoke_context, input_data):
+    async for message_batch in deepseek_instance.invoke(invoke_context, input_data):
         result_messages.extend(message_batch)
 
     assert isinstance(result_messages, List)
@@ -157,7 +157,7 @@ async def test_a_invoke_function_call(monkeypatch, deepseek_instance, invoke_con
     deepseek_instance.add_function_specs(tools)
 
     result_messages = []
-    async for message_batch in deepseek_instance.a_invoke(invoke_context, input_data):
+    async for message_batch in deepseek_instance.invoke(invoke_context, input_data):
         result_messages.extend(message_batch)
 
     assert result_messages[0].role == "assistant"
@@ -199,7 +199,7 @@ async def test_a_invoke_api_error(monkeypatch, deepseek_instance, invoke_context
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):
-        async for _ in deepseek_instance.a_invoke(
+        async for _ in deepseek_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
         ):
             pass

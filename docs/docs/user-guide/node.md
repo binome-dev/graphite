@@ -104,7 +104,7 @@ input_datas = [ConsumeFromTopicEvent(...)]  # List of consumed events
 output_event: PublishToTopicEvent = node.invoke(context, input_datas)
 
 # Asynchronous invocation
-async for output_event in node.a_invoke(context, input_datas):
+async for output_event in node.invoke(context, input_datas):
     # Process each PublishToTopicEvent as it's generated
     pass
 ```

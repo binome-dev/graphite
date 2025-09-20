@@ -230,8 +230,8 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
 
             try:
                 # Process events and publish results
-                async for msgs in node.a_invoke(invoke_context, consumed_events):
-                    published_events = await a_publish_events(...)
+                async for msgs in node.invoke(invoke_context, consumed_events):
+                    published_events = await publish_events(...)
                     # Notify downstream nodes immediately
                     for event in published_events:
                         if event.name in self._topic_nodes:

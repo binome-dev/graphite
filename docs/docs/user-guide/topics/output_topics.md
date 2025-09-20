@@ -270,7 +270,7 @@ class HumanApprovalWorkflow:
         )]
 
         # Publish to workflow output topic
-        event = await self.output_topic.a_publish_data(
+        event = await self.output_topic.publish_data(
             invoke_context=InvokeContext(),
             publisher_name="approval_system",
             publisher_type="workflow",
@@ -317,7 +317,7 @@ async def test_output_topic():
 
     # Test basic publishing
     messages = [Message(role="assistant", content="test")]
-    event = await topic.a_publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",

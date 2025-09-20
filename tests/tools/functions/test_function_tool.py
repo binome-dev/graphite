@@ -32,7 +32,7 @@ async def test_a_invoke_returns_message(function_tool):
         assistant_request_id=uuid.uuid4().hex,
     )
     input_messages = [Message(role="user", content="test")]
-    agen = function_tool.a_invoke(context, input_messages)
+    agen = function_tool.invoke(context, input_messages)
     messages = []
     async for msg in agen:
         messages.extend(msg)

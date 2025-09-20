@@ -73,7 +73,7 @@ async def test_react_assistant() -> None:
 
     # Invoke the assistant's function call
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=input_data,
@@ -87,7 +87,7 @@ async def test_react_assistant() -> None:
     assert output is not None
     print(
         "Number of events recorded:",
-        len(await event_store.a_get_events()),
+        len(await event_store.get_events()),
     )
 
     # import json

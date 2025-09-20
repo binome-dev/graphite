@@ -42,7 +42,7 @@ class FunctionTool(Tool):
         return FunctionToolBuilder(cls)
 
     @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         try:
@@ -54,7 +54,7 @@ class FunctionTool(Tool):
         except Exception as e:
             raise FunctionToolException(
                 tool_name=self.name,
-                operation="a_invoke",
+                operation="invoke",
                 message=f"Async function execution failed: {e}",
                 invoke_context=invoke_context,
                 cause=e,

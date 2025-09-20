@@ -37,7 +37,7 @@ async def test_simple_llm_assistant() -> None:
         .api_url("http://localhost:11434")
         .build()
     )
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     # Test the run method
     input_data = [
         Message(
@@ -47,7 +47,7 @@ async def test_simple_llm_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=input_data,
@@ -58,7 +58,7 @@ async def test_simple_llm_assistant() -> None:
 
     print(output)
     assert output is not None
-    assert len(await event_store.a_get_events()) == 12
+    assert len(await event_store.get_events()) == 12
 
     input_data = [
         Message(
@@ -68,7 +68,7 @@ async def test_simple_llm_assistant() -> None:
     ]
 
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=input_data,
@@ -80,7 +80,7 @@ async def test_simple_llm_assistant() -> None:
     print(output)
     assert output is not None
     assert "Grafi" in str(output[0].data[0].content)
-    assert len(await event_store.a_get_events()) == 24
+    assert len(await event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_llm_assistant())

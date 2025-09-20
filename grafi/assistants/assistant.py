@@ -21,7 +21,7 @@ class Assistant(AssistantBase):
     """
 
     @record_assistant_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
@@ -38,7 +38,7 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        async for output in self.workflow.a_invoke(input_data, is_sequential):
+        async for output in self.workflow.invoke(input_data, is_sequential):
             yield output
 
     def to_dict(self) -> dict[str, Any]:

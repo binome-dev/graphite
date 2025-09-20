@@ -85,7 +85,7 @@ class MCPTool(FunctionCallTool):
             self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
     @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
@@ -192,9 +192,9 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
 
     def build(self) -> None:
         raise NotImplementedError(
-            "MCPTool does not support synchronous invoke. Use a_build instead."
+            "MCPTool does not support synchronous invoke. Use build instead."
         )
 
-    async def a_build(self) -> "MCPTool":
+    async def build(self) -> "MCPTool":
         mcp_tool = await self._cls.initialize(**self.kwargs)
         return mcp_tool

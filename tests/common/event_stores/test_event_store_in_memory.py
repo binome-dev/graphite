@@ -108,14 +108,14 @@ class TestEventStoreInMemory:
     async def test_initialization(self, event_store: EventStore):
         """Test that the event store initializes correctly."""
         assert event_store is not None
-        assert await event_store.a_get_events() == []
+        assert await event_store.get_events() == []
 
     @pytest.mark.asyncio
     async def test_record_single_event(self, event_store: EventStore, sample_event):
         """Test recording a single event to the store."""
-        await event_store.a_record_event(sample_event)
+        await event_store.record_event(sample_event)
 
-        events = await event_store.a_get_events()
+        events = await event_store.get_events()
         assert len(events) == 1
         assert events[0].event_id == sample_event.event_id
 
@@ -125,9 +125,9 @@ class TestEventStoreInMemory:
     ):
         """Test recording multiple events separately."""
         for event in multiple_events:
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
-        events = await event_store.a_get_events()
+        events = await event_store.get_events()
         assert len(events) == len(multiple_events)
 
         # Check events are in order
@@ -137,9 +137,9 @@ class TestEventStoreInMemory:
     @pytest.mark.asyncio
     async def test_record_events_batch(self, event_store: EventStore, multiple_events):
         """Test recording multiple events in batch."""
-        await event_store.a_record_events(multiple_events)
+        await event_store.record_events(multiple_events)
 
-        events = await event_store.a_get_events()
+        events = await event_store.get_events()
         assert len(events) == len(multiple_events)
 
         # Check events are in order
@@ -149,9 +149,9 @@ class TestEventStoreInMemory:
     @pytest.mark.asyncio
     async def test_get_event_by_id(self, event_store: EventStore, sample_event):
         """Test getting an event by ID."""
-        await event_store.a_record_event(sample_event)
+        await event_store.record_event(sample_event)
 
-        retrieved_event = await event_store.a_get_event(sample_event.event_id)
+        retrieved_event = await event_store.get_event(sample_event.event_id)
         assert retrieved_event is not None
         assert retrieved_event.event_id == sample_event.event_id
         assert retrieved_event is sample_event
@@ -159,7 +159,7 @@ class TestEventStoreInMemory:
     @pytest.mark.asyncio
     async def test_get_event_by_nonexistent_id(self, event_store: EventStore):
         """Test getting an event by non-existent ID."""
-        result = await event_store.a_get_event("nonexistent-id")
+        result = await event_store.get_event("nonexistent-id")
         assert result is None
 
     @pytest.mark.asyncio
@@ -168,44 +168,44 @@ class TestEventStoreInMemory:
     ):
         """Test filtering events by conversation ID."""
         for event in multiple_events:
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
         # Get events for conv-0
-        conv_0_events = await event_store.a_get_conversation_events("conv-0")
+        conv_0_events = await event_store.get_conversation_events("conv-0")
         assert len(conv_0_events) == 3  # Events 0, 2, 4
         for event in conv_0_events:
             assert event.invoke_context.conversation_id == "conv-0"
 
         # Get events for conv-1
-        conv_1_events = await event_store.a_get_conversation_events("conv-1")
+        conv_1_events = await event_store.get_conversation_events("conv-1")
         assert len(conv_1_events) == 2  # Events 1, 3
         for event in conv_1_events:
             assert event.invoke_context.conversation_id == "conv-1"
 
         # Get events for non-existent conversation
-        no_events = await event_store.a_get_conversation_events("conv-999")
+        no_events = await event_store.get_conversation_events("conv-999")
         assert no_events == []
 
     @pytest.mark.asyncio
     async def test_get_agent_events(self, event_store: EventStore, multiple_events):
         """Test filtering events by assistant request ID."""
         for event in multiple_events:
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
         # Get events for assist-0
-        assist_0_events = await event_store.a_get_agent_events("assist-0")
+        assist_0_events = await event_store.get_agent_events("assist-0")
         assert len(assist_0_events) == 2  # Events 0, 3
         for event in assist_0_events:
             assert event.invoke_context.assistant_request_id == "assist-0"
 
         # Get events for assist-1
-        assist_1_events = await event_store.a_get_agent_events("assist-1")
+        assist_1_events = await event_store.get_agent_events("assist-1")
         assert len(assist_1_events) == 2  # Events 1, 4
         for event in assist_1_events:
             assert event.invoke_context.assistant_request_id == "assist-1"
 
         # Get events for assist-2
-        assist_2_events = await event_store.a_get_agent_events("assist-2")
+        assist_2_events = await event_store.get_agent_events("assist-2")
         assert len(assist_2_events) == 1  # Event 2
         for event in assist_2_events:
             assert event.invoke_context.assistant_request_id == "assist-2"
@@ -214,41 +214,41 @@ class TestEventStoreInMemory:
     async def test_get_topic_events(self, event_store: EventStore, topic_events):
         """Test filtering events by topic name and offsets."""
         for event in topic_events:
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
         # Get events for topic-0 with specific offsets
-        topic_0_events = await event_store.a_get_topic_events("topic-0", [0, 2])
+        topic_0_events = await event_store.get_topic_events("topic-0", [0, 2])
         assert len(topic_0_events) == 2  # Events 0, 2
         for event in topic_0_events:
             assert event.name == "topic-0"
             assert event.offset in [0, 2]
 
         # Get events for topic-1 with specific offset
-        topic_1_events = await event_store.a_get_topic_events("topic-1", [1])
+        topic_1_events = await event_store.get_topic_events("topic-1", [1])
         assert len(topic_1_events) == 1  # Event 1
         assert topic_1_events[0].name == "topic-1"
         assert topic_1_events[0].offset == 1
 
         # Get events for non-existent topic
-        no_events = await event_store.a_get_topic_events("non-existent", [0])
+        no_events = await event_store.get_topic_events("non-existent", [0])
         assert no_events == []
 
     @pytest.mark.asyncio
     async def test_clear_events(self, event_store: EventStore, multiple_events):
         """Test clearing all events from the store."""
         for event in multiple_events:
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
-        assert len(await event_store.a_get_events()) == 5
-        await event_store.a_clear_events()
-        assert len(await event_store.a_get_events()) == 0
+        assert len(await event_store.get_events()) == 5
+        await event_store.clear_events()
+        assert len(await event_store.get_events()) == 0
 
     @pytest.mark.asyncio
     async def test_event_persistence_in_memory(
         self, event_store: EventStore, sample_event
     ):
         """Test that events persist in memory between operations."""
-        await event_store.a_record_event(sample_event)
+        await event_store.record_event(sample_event)
 
         # Add another event
         another_event = SampleEvent(
@@ -261,10 +261,10 @@ class TestEventStoreInMemory:
             ),
             test_data="another data",
         )
-        await event_store.a_record_event(another_event)
+        await event_store.record_event(another_event)
 
         # Original event should still be there
-        all_events = await event_store.a_get_events()
+        all_events = await event_store.get_events()
         assert len(all_events) == 2
         assert all_events[0].event_id == sample_event.event_id
         assert all_events[1].event_id == another_event.event_id
@@ -272,10 +272,10 @@ class TestEventStoreInMemory:
     @pytest.mark.asyncio
     async def test_empty_filters(self, event_store: EventStore):
         """Test filtering on empty event store."""
-        assert await event_store.a_get_conversation_events("any") == []
-        assert await event_store.a_get_agent_events("any") == []
-        assert await event_store.a_get_topic_events("any", [0]) == []
-        assert await event_store.a_get_event("any") is None
+        assert await event_store.get_conversation_events("any") == []
+        assert await event_store.get_agent_events("any") == []
+        assert await event_store.get_topic_events("any", [0]) == []
+        assert await event_store.get_event("any") is None
 
     @pytest.mark.asyncio
     async def test_event_ordering_preserved(self, event_store: EventStore):
@@ -293,9 +293,9 @@ class TestEventStoreInMemory:
                 test_data=f"ordered-data-{i}",
             )
             events.append(event)
-            await event_store.a_record_event(event)
+            await event_store.record_event(event)
 
-        stored_events = await event_store.a_get_events()
+        stored_events = await event_store.get_events()
         for i, event in enumerate(stored_events):
             assert event.event_id == f"ordered-{i}"
             assert event.test_data == f"ordered-data-{i}"
@@ -303,10 +303,10 @@ class TestEventStoreInMemory:
     @pytest.mark.asyncio
     async def test_get_events_returns_copy(self, event_store: EventStore, sample_event):
         """Test that get_events returns a copy, not the original list."""
-        await event_store.a_record_event(sample_event)
+        await event_store.record_event(sample_event)
 
-        events1 = await event_store.a_get_events()
-        events2 = await event_store.a_get_events()
+        events1 = await event_store.get_events()
+        events2 = await event_store.get_events()
 
         # Should be different list instances
         assert events1 is not events2
@@ -320,16 +320,16 @@ class TestEventStoreInMemory:
     ):
         """Test handling mixed event types."""
         # Record both regular events and topic events
-        await event_store.a_record_event(sample_event)
-        await event_store.a_record_events(topic_events)
+        await event_store.record_event(sample_event)
+        await event_store.record_events(topic_events)
 
-        all_events = await event_store.a_get_events()
+        all_events = await event_store.get_events()
         assert len(all_events) == 4  # 1 sample + 3 topic events
 
         # Should be able to retrieve by conversation
-        conv_0_events = await event_store.a_get_conversation_events("conv-0")
+        conv_0_events = await event_store.get_conversation_events("conv-0")
         assert len(conv_0_events) == 1  # Only topic-event-0
 
         # Should be able to retrieve topic events
-        topic_0_events = await event_store.a_get_topic_events("topic-0", [0, 2])
+        topic_0_events = await event_store.get_topic_events("topic-0", [0, 2])
         assert len(topic_0_events) == 2

@@ -21,7 +21,7 @@ class MockOutputTopic(OutputTopic):
         self._events = []
         self._consumed_offset = -1
 
-    async def a_consume(self, consumer_name: str):
+    async def consume(self, consumer_name: str):
         """Mock async consume that returns events."""
         # Simulate waiting for events
         await asyncio.sleep(0.01)
@@ -32,7 +32,7 @@ class MockOutputTopic(OutputTopic):
             self._consumed_offset = new_events[-1].offset
         return new_events
 
-    def can_consume(self, consumer_name: str) -> bool:
+    async def can_consume(self, consumer_name: str) -> bool:
         """Check if there are events to consume."""
         return any(e.offset > self._consumed_offset for e in self._events)
 

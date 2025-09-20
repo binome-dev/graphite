@@ -72,7 +72,7 @@ async def test_react_assistant_async() -> None:
     ]
 
     # Invoke the assistant's function call
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=input_data,
@@ -85,7 +85,7 @@ async def test_react_assistant_async() -> None:
 
     print(
         "Number of events recorded:",
-        len(await event_store.a_get_events()),
+        len(await event_store.get_events()),
     )
 
     # assistant.generate_workflow_graph()

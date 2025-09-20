@@ -41,7 +41,7 @@ class TopicBase(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def a_publish_data(
+    async def publish_data(
         self, publish_event: PublishToTopicEvent
     ) -> PublishToTopicEvent:
         """
@@ -55,58 +55,58 @@ class TopicBase(BaseModel):
                 },
                 deep=True,
             )
-            return await self.a_add_event(event)
+            return await self.add_event(event)
         else:
             logger.info(f"[{self.name}] Message NOT published (condition not met)")
             return None
 
-    async def a_can_consume(self, consumer_name: str) -> bool:
+    async def can_consume(self, consumer_name: str) -> bool:
         """
         Checks whether the given node can consume any new/unread messages
         from this topic (i.e., if there are event IDs that the node hasn't
         already consumed).
         """
-        return await self.event_queue.a_can_consume(consumer_name)
+        return await self.event_queue.can_consume(consumer_name)
 
-    async def a_consume(
+    async def consume(
         self, consumer_name: str, timeout: Optional[float] = None
     ) -> List[TopicEvent]:
         """
         Asynchronously retrieve new/unconsumed messages for the given node by fetching them
         """
-        return await self.event_queue.a_fetch(consumer_name, timeout=timeout)
+        return await self.event_queue.fetch(consumer_name, timeout=timeout)
 
-    async def a_commit(self, consumer_name: str, offset: int) -> None:
-        await self.event_queue.a_commit_to(consumer_name, offset)
+    async def commit(self, consumer_name: str, offset: int) -> None:
+        await self.event_queue.commit_to(consumer_name, offset)
 
-    async def a_reset(self) -> None:
+    async def reset(self) -> None:
         """
         Asynchronously reset the topic to its initial state.
         """
-        await self.event_queue.a_reset()
+        await self.event_queue.reset()
 
-    async def a_restore_topic(self, topic_event: TopicEvent) -> None:
+    async def restore_topic(self, topic_event: TopicEvent) -> None:
         """
         Asynchronously restore a topic from a topic event.
         """
         if isinstance(topic_event, PublishToTopicEvent):
-            await self.event_queue.a_put(topic_event)
+            await self.event_queue.put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
             # Fetch the events for the consumer and commit the offset
-            await self.event_queue.a_fetch(
+            await self.event_queue.fetch(
                 consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
             )
-            await self.event_queue.a_commit_to(
+            await self.event_queue.commit_to(
                 topic_event.consumer_name, topic_event.offset
             )
 
-    async def a_add_event(self, event: TopicEvent) -> TopicEvent:
+    async def add_event(self, event: TopicEvent) -> TopicEvent:
         """
         Asynchronously add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
         """
         if isinstance(event, PublishToTopicEvent):
-            return await self.event_queue.a_put(event)
+            return await self.event_queue.put(event)
 
     def serialize_callable(self) -> dict:
         """

@@ -95,7 +95,7 @@ class TestOutputTopic:
         topic = OutputTopic(name="test_output_topic")
         yield topic
         # Cleanup after test
-        await topic.a_reset()
+        await topic.reset()
 
     def test_output_topic_creation(self):
         """Test creating an OutputTopic with default values."""
@@ -124,7 +124,7 @@ class TestOutputTopic:
         # Mock condition to return True
         output_topic.condition = Mock(return_value=True)
 
-        event = await output_topic.a_publish_data(
+        event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
@@ -154,7 +154,7 @@ class TestOutputTopic:
         # Mock condition to return False
         output_topic.condition = Mock(return_value=False)
 
-        event = await output_topic.a_publish_data(
+        event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",

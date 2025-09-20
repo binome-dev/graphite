@@ -35,11 +35,11 @@ def get_invoke_context() -> InvokeContext:
 #  2) async streaming                                                         #
 # --------------------------------------------------------------------------- #
 async def test_claude_tool_a_stream() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     claude = ClaudeTool.builder().is_streaming(True).api_key(api_key).build()
 
     content = ""
-    async for messages in claude.a_invoke(
+    async for messages in claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -50,7 +50,7 @@ async def test_claude_tool_a_stream() -> None:
                 print(msg.content + "_", end="", flush=True)
 
     assert "Grafi" in content
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
@@ -60,7 +60,7 @@ async def test_claude_tool_with_chat_param() -> None:
     # Anthropic needs `max_tokens`; others are optional
     chat_param = {"temperature": 0.2}
 
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     claude = (
         ClaudeTool.builder()
         .api_key(api_key)
@@ -69,7 +69,7 @@ async def test_claude_tool_with_chat_param() -> None:
         .build()
     )
 
-    async for messages in claude.a_invoke(
+    async for messages in claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -82,18 +82,18 @@ async def test_claude_tool_with_chat_param() -> None:
                 # Ensure the content length is within the expected range
                 assert len(msg.content) < 250
 
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
 #  5) async one-shot                                                          #
 # --------------------------------------------------------------------------- #
 async def test_claude_tool_async() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
     claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in claude.a_invoke(
+    async for messages in claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
@@ -104,14 +104,14 @@ async def test_claude_tool_async() -> None:
 
     print(content)
     assert "Grafi" in content
-    assert len(await event_store.a_get_events()) == 2
+    assert len(await event_store.get_events()) == 2
 
 
 # --------------------------------------------------------------------------- #
 #  6) end-to-end pathway through Node                                      #
 # --------------------------------------------------------------------------- #
 async def test_llm_a_stream_node_claude() -> None:
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     llm_stream_node: Node = (
         Node.builder()
@@ -133,7 +133,7 @@ async def test_llm_a_stream_node_claude() -> None:
     )
 
     content = ""
-    async for event in llm_stream_node.a_invoke(invoke_context, [topic_event]):
+    async for event in llm_stream_node.invoke(invoke_context, [topic_event]):
         for msg in event.data:
             assert msg.role == "assistant"
             if isinstance(msg.content, str):
@@ -142,7 +142,7 @@ async def test_llm_a_stream_node_claude() -> None:
 
     assert "Grafi" in content
     # 2 events from ClaudeTool + 2 from Node decorators
-    assert len(await event_store.a_get_events()) == 4
+    assert len(await event_store.get_events()) == 4
 
 
 # --------------------------------------------------------------------------- #

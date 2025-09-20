@@ -105,7 +105,7 @@ ollama_tool = (
 # Asynchronous streaming
 async def stream_example():
     messages = [Message(role="user", content="Tell me a story")]
-    async for message_batch in ollama_tool.a_invoke(invoke_context, messages):
+    async for message_batch in ollama_tool.invoke(invoke_context, messages):
         for message in message_batch:
             if message.content:
                 print(message.content, end="", flush=True)

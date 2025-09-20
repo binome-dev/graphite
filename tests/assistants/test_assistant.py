@@ -43,7 +43,7 @@ class TestAssistant:
                 data=[Message(content="async workflow response", role="assistant")],
             )
 
-        mock_workflow.a_invoke.return_value = mock_a_invoke()
+        mock_workflow.invoke.return_value = mock_a_invoke()
         mock_workflow.to_dict.return_value = {"workflow": "data"}
         return mock_workflow
 
@@ -118,11 +118,11 @@ class TestAssistant:
 
         # Invoke
         result_events = []
-        async for event in mock_assistant.a_invoke(input_data):
+        async for event in mock_assistant.invoke(input_data):
             result_events.append(event)
 
         # Verify
-        mock_assistant.workflow.a_invoke.assert_called_once_with(input_data, False)
+        mock_assistant.workflow.invoke.assert_called_once_with(input_data, False)
         assert len(result_events) == 1
         assert result_events[0].data[0].content == "async workflow response"
         assert result_events[0].data[0].role == "assistant"
@@ -141,10 +141,10 @@ class TestAssistant:
         )
 
         result_events = []
-        async for event in mock_assistant.a_invoke(input_data):
+        async for event in mock_assistant.invoke(input_data):
             result_events.append(event)
 
-        mock_assistant.workflow.a_invoke.assert_called_once_with(input_data, False)
+        mock_assistant.workflow.invoke.assert_called_once_with(input_data, False)
         assert len(result_events) == 1
 
     @pytest.mark.asyncio
@@ -176,14 +176,14 @@ class TestAssistant:
                 data=[Message(content="second response", role="assistant")],
             )
 
-        mock_assistant.workflow.a_invoke.return_value = mock_multi_yield()
+        mock_assistant.workflow.invoke.return_value = mock_multi_yield()
 
         input_data = PublishToTopicEvent(
             invoke_context=invoke_context, data=input_messages
         )
 
         result_events = []
-        async for event in mock_assistant.a_invoke(input_data):
+        async for event in mock_assistant.invoke(input_data):
             result_events.append(event)
 
         assert len(result_events) == 2
@@ -202,14 +202,14 @@ class TestAssistant:
             raise ValueError("Async workflow error")
             yield  # This line won't be reached, but needed for generator syntax
 
-        mock_assistant.workflow.a_invoke.return_value = mock_error_generator()
+        mock_assistant.workflow.invoke.return_value = mock_error_generator()
 
         input_data = PublishToTopicEvent(
             invoke_context=invoke_context, data=input_messages
         )
 
         with pytest.raises(ValueError, match="Async workflow error"):
-            async for _ in mock_assistant.a_invoke(input_data):
+            async for _ in mock_assistant.invoke(input_data):
                 pass
 
     # Test to_dict Method
@@ -342,7 +342,7 @@ class TestAssistant:
 
             # Test asynchronous invoke
             async_results = []
-            async for event in assistant.a_invoke(input_data):
+            async for event in assistant.invoke(input_data):
                 async_results.append(event)
 
             assert len(async_results) == 1

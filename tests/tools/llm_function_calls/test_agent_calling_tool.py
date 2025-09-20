@@ -69,7 +69,7 @@ async def test_invoke_successful(agent_calling_tool):
         )
     ]
     result = []
-    async for msg in agent_calling_tool.a_invoke(invoke_context, input_data):
+    async for msg in agent_calling_tool.invoke(invoke_context, input_data):
         result.extend(msg)
 
     assert result[0].role == "tool"
@@ -100,7 +100,7 @@ async def test_invoke_invalid_function_name(agent_calling_tool):
         )
     ]
 
-    async for msgs in agent_calling_tool.a_invoke(invoke_context, input_data):
+    async for msgs in agent_calling_tool.invoke(invoke_context, input_data):
         for msg in msgs:
             assert msg.content is None
 
@@ -115,7 +115,7 @@ async def test_invoke_none_function_call(agent_calling_tool):
     input_data = [Message(role="assistant")]
 
     with pytest.raises(ValueError, match="Agent call is None."):
-        async for msg in agent_calling_tool.a_invoke(invoke_context, input_data):
+        async for msg in agent_calling_tool.invoke(invoke_context, input_data):
             assert msg  # should not reach here
 
 

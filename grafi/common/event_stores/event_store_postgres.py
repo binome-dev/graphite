@@ -77,7 +77,7 @@ class EventStorePostgres(EventStore):
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
 
-    async def a_record_event(self, event: Event) -> None:
+    async def record_event(self, event: Event) -> None:
         """Record a single event into the database asynchronously."""
         async with self.AsyncSession() as session:
             try:
@@ -103,7 +103,7 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to record event: {e}")
                 raise e
 
-    async def a_record_events(self, events: List[Event]) -> None:
+    async def record_events(self, events: List[Event]) -> None:
         """Record multiple events into the database asynchronously."""
         async with self.AsyncSession() as session:
             try:
@@ -130,7 +130,7 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to record events: {e}")
                 raise e
 
-    async def a_get_event(self, event_id: str) -> Optional[Event]:
+    async def get_event(self, event_id: str) -> Optional[Event]:
         """Get an event by ID asynchronously."""
         async with self.AsyncSession() as session:
             try:
@@ -155,7 +155,7 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to get event {event_id}: {e}")
                 raise e
 
-    async def a_get_agent_events(self, assistant_request_id: str) -> List[Event]:
+    async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given assistant_request_id asynchronously."""
         async with self.AsyncSession() as session:
             try:
@@ -188,7 +188,7 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to get agent events {assistant_request_id}: {e}")
                 raise e
 
-    async def a_get_conversation_events(self, conversation_id: str) -> List[Event]:
+    async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID asynchronously."""
         async with self.AsyncSession() as session:
             try:
@@ -223,7 +223,7 @@ class EventStorePostgres(EventStore):
                 )
                 raise e
 
-    async def a_get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
+    async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets asynchronously."""
         if not offsets:
             return []
@@ -270,7 +270,7 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to get topic events for {name}: {e}")
                 raise e
 
-    async def a_initialize(self) -> None:
+    async def initialize(self) -> None:
         """Initialize the database tables asynchronously."""
         async with self.async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

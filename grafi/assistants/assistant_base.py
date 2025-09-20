@@ -47,7 +47,7 @@ class AssistantBase(BaseModel):
         """Construct the workflow for the assistant."""
         raise NotImplementedError("Subclasses must implement '_construct_workflow'.")
 
-    async def a_invoke(
+    async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""

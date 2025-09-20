@@ -73,7 +73,7 @@ async def test_simple_llm_assistant() -> None:
         .name("SimpleLLMPromptTemplateAssistant")
         .build()
     )
-    await event_store.a_clear_events()
+    await event_store.clear_events()
 
     input_data = [
         Message(
@@ -82,7 +82,7 @@ async def test_simple_llm_assistant() -> None:
         )
     ]
     output = await async_func_wrapper(
-        assistant.a_invoke(
+        assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 data=input_data,
@@ -92,7 +92,7 @@ async def test_simple_llm_assistant() -> None:
 
     print(output[0].data[0].content)
     assert output is not None
-    assert len(await event_store.a_get_events()) == 12
+    assert len(await event_store.get_events()) == 12
 
 
 test_simple_llm_assistant()

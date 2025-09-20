@@ -34,7 +34,7 @@ class RagTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         query_engine = self.index.as_query_engine(use_async=True)
