@@ -179,9 +179,9 @@ class OllamaTool(LLM):
             raw_tool_calls = message_data.tool_calls
 
             if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
+                message_args[
+                    "content"
+                ] = ""  # Clear content when function call is included
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:

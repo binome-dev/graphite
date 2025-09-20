@@ -7,21 +7,21 @@ error handling, and integration with OpenTelemetry components.
 
 import os
 import socket
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock
+from unittest.mock import call
+from unittest.mock import patch
 
 import pytest
 
-from grafi.common.instrumentations.tracing import (
-    TracingOptions,
-    is_local_endpoint_available,
-    setup_tracing,
-    _get_arize_config,
-    _get_phoenix_config,
-    _setup_arize_tracing,
-    _setup_phoenix_tracing,
-    _setup_auto_tracing,
-    _setup_in_memory_tracing,
-)
+from grafi.common.instrumentations.tracing import TracingOptions
+from grafi.common.instrumentations.tracing import _get_arize_config
+from grafi.common.instrumentations.tracing import _get_phoenix_config
+from grafi.common.instrumentations.tracing import _setup_arize_tracing
+from grafi.common.instrumentations.tracing import _setup_auto_tracing
+from grafi.common.instrumentations.tracing import _setup_in_memory_tracing
+from grafi.common.instrumentations.tracing import _setup_phoenix_tracing
+from grafi.common.instrumentations.tracing import is_local_endpoint_available
+from grafi.common.instrumentations.tracing import setup_tracing
 
 
 class TestTracingOptions:
@@ -259,7 +259,6 @@ class TestPhoenixTracing:
                 patch("grafi.common.instrumentations.tracing.OpenAIInstrumentor"),
                 patch("grafi.common.instrumentations.tracing.set_tracer_provider"),
             ):
-
                 result = _setup_phoenix_tracing(
                     "localhost", 4317, "test-project", require_available=False
                 )

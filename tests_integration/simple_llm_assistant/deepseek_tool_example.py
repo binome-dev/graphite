@@ -63,7 +63,6 @@ async def test_deepseek_tool_with_chat_param() -> None:
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-
         for message in messages:
             assert message.role == "assistant"
             assert message.content

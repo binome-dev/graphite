@@ -63,7 +63,6 @@ async def test_simple_function_call_assistant() -> None:
         ),
         is_sequential=True,
     ):
-
         outputs.append(output)
 
     assert outputs[0] is not None
@@ -85,7 +84,6 @@ async def test_simple_function_call_assistant() -> None:
         ),
         is_sequential=True,
     ):
-
         assert output == []
 
 

@@ -60,7 +60,6 @@ async def test_openrouter_tool_with_chat_param() -> None:
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-
         for m in msgs:
             assert m.role == "assistant"
             assert m.content and "Grafi" in m.content

@@ -28,7 +28,6 @@ from grafi.tools.llms.llm import LLMBuilder
 
 try:
     from anthropic import NOT_GIVEN
-    from anthropic import Anthropic
     from anthropic import AsyncAnthropic
     from anthropic import NotGiven
     from anthropic.types import Message as AnthropicMessage

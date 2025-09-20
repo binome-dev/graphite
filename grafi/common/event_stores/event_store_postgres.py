@@ -22,7 +22,6 @@ try:
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.orm import DeclarativeBase
-    from sqlalchemy.orm import sessionmaker
 except ImportError:
     raise ImportError(
         "`sqlalchemy` not installed. Please install using `pip install sqlalchemy[asyncio] asyncpg`"

@@ -258,9 +258,9 @@ class EventDrivenWorkflow(Workflow):
 
                 # Given node, collect all the messages can be linked to it
 
-                node_consumed_events: List[ConsumeFromTopicEvent] = (
-                    await get_node_input(node)
-                )
+                node_consumed_events: List[
+                    ConsumeFromTopicEvent
+                ] = await get_node_input(node)
 
                 # Invoke node with collected inputs
                 if node_consumed_events:

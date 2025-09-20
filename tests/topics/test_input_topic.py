@@ -174,6 +174,3 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
     # Consumer 2 has no more messages to consume
     assert not await topic.a_can_consume("consumer_2")
-
-
-# Ensure a topic can be created

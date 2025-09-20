@@ -73,7 +73,6 @@ async def test_claude_tool_with_chat_param() -> None:
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
-
         for msg in messages:
             assert msg.role == "assistant"
             assert msg.content and "Grafi" in msg.content

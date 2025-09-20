@@ -1,7 +1,6 @@
 from typing import Any
 from typing import TypeVar
 
-
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_base import TopicBaseBuilder
 
