@@ -4,6 +4,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from loguru import logger
+
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.default_id import default_id
 from grafi.topics.topic_event_queue import TopicEventQueue
@@ -53,7 +55,7 @@ class InMemTopicEventQueue(TopicEventQueue):
         self,
         consumer_id: str,
         offset: Optional[int] = None,
-        timeout: Optional[float] = None,
+        timeout: Optional[float] = 1.0,
     ) -> List[TopicEvent]:
         """
         Await fresh records newer than the consumer's consumed offset.
@@ -64,20 +66,17 @@ class InMemTopicEventQueue(TopicEventQueue):
 
         async with self._cond:
             # If timeout is 0 or None and no data, return immediately
-            if timeout == 0 or (
-                timeout is None and not await self.a_can_consume(consumer_id)
-            ):
-                if not await self.a_can_consume(consumer_id):
-                    return []
-
-            # Wait for data if timeout > 0
             while not await self.a_can_consume(consumer_id):
-                if timeout is None:
-                    # Default behavior: don't wait, return empty
-                    return []
                 try:
+                    logger.debug(
+                        f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
+                    )
                     await asyncio.wait_for(self._cond.wait(), timeout)
                 except asyncio.TimeoutError:
+                    return []
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully
+                    logger.info("Fetch operation was cancelled.")
                     return []
 
             start = self._consumed[consumer_id]

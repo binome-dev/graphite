@@ -95,7 +95,7 @@ async def test_consume_messages(topic: Topic, invoke_context: InvokeContext):
         )
     )
 
-    consumed_messages = await topic.a_consume("consumer_1")
+    consumed_messages = await topic.a_consume("consumer_1", 0.1)
 
     assert len(consumed_messages) == 2  # Consumer should receive both messages
     assert consumed_messages[0].offset == 0
@@ -123,7 +123,7 @@ async def test_consume_no_new_messages(topic: Topic, invoke_context: InvokeConte
     # First consume
     await topic.a_consume("consumer_1")
     # Second consume (should return empty list)
-    consumed_messages = await topic.a_consume("consumer_1")
+    consumed_messages = await topic.a_consume("consumer_1", 0.1)
 
     assert len(consumed_messages) == 0  # Should return an empty list
 
@@ -159,7 +159,7 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
     # Consumer 1 has no more messages to consume
     assert not await topic.a_can_consume("consumer_1")
-    consumed_messages_1_again = await topic.a_consume("consumer_1")
+    consumed_messages_1_again = await topic.a_consume("consumer_1", 1)
     assert len(consumed_messages_1_again) == 0
 
     # Consumer 2 starts fresh and should receive both messages

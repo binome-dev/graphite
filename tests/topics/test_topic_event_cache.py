@@ -86,13 +86,13 @@ class TestTopicEventQueue:
         assert await cache.a_can_consume("consumer1")
 
         # After consuming, can't consume anymore
-        await cache.a_fetch("consumer1")
+        await cache.a_fetch("consumer1", timeout=0.1)
         assert not await cache.a_can_consume("consumer1")
 
     @pytest.mark.asyncio
     async def test_fetch_no_events(self, cache: TopicEventQueue):
         # Fetch with no events returns empty list
-        result = await cache.a_fetch("consumer1")
+        result = await cache.a_fetch("consumer1", timeout=0.1)
         assert result == []  # Returns empty list when no events to consume
 
     @pytest.mark.asyncio
@@ -105,7 +105,7 @@ class TestTopicEventQueue:
         assert cache._consumed["consumer1"] == 1
 
         # Can't fetch again
-        result = await cache.a_fetch("consumer1")
+        result = await cache.a_fetch("consumer1", timeout=0.1)
         assert result == []
 
     @pytest.mark.asyncio
@@ -133,7 +133,7 @@ class TestTopicEventQueue:
             await cache.a_put(event)
 
         # Fetch all events
-        result = await cache.a_fetch("consumer1")
+        result = await cache.a_fetch("consumer1", timeout=0.1)
         assert result == events
         assert cache._consumed["consumer1"] == 5
 
@@ -162,13 +162,13 @@ class TestTopicEventQueue:
             await cache.a_put(event)
 
         # Fetch only up to offset 3
-        result = await cache.a_fetch("consumer1", offset=3)
+        result = await cache.a_fetch("consumer1", offset=3, timeout=0.1)
         assert len(result) == 4
         assert result == events[:4]
         assert cache._consumed["consumer1"] == 4
 
         # Fetch remaining
-        result = await cache.a_fetch("consumer1")
+        result = await cache.a_fetch("consumer1", timeout=0.1)
         assert len(result) == 1
         assert result == events[4:]
 
@@ -177,8 +177,8 @@ class TestTopicEventQueue:
         await cache.a_put(sample_event)
 
         # Both consumers can fetch the same event
-        result1 = await cache.a_fetch("consumer1")
-        result2 = await cache.a_fetch("consumer2")
+        result1 = await cache.a_fetch("consumer1", timeout=0.1)
+        result2 = await cache.a_fetch("consumer2", timeout=0.1)
 
         assert result1 == [sample_event]
         assert result2 == [sample_event]
@@ -216,7 +216,7 @@ class TestTopicEventQueue:
         await cache.a_put(sample_event)
 
         # Fetch event
-        result = await cache.a_fetch("consumer1")
+        result = await cache.a_fetch("consumer1", timeout=0.1)
         assert result == [sample_event]
         assert cache._consumed["consumer1"] == 1
 
@@ -260,7 +260,7 @@ class TestTopicEventQueue:
             await cache.a_put(event)
 
         # Fetch only up to offset 3
-        result = await cache.a_fetch("consumer1", offset=3)
+        result = await cache.a_fetch("consumer1", offset=3, timeout=0.1)
         assert len(result) == 4
         assert result == events[:4]
 
@@ -305,7 +305,7 @@ class TestTopicEventQueue:
         )
 
         # Should have 15 events total
-        assert len(await cache.a_fetch("temp_id")) == 15
+        assert len(await cache.a_fetch("temp_id", timeout=0.1)) == 15
 
     @pytest.mark.asyncio
     async def test_concurrent_consumers(self, cache: TopicEventQueue):
@@ -399,7 +399,7 @@ class TestTopicEventQueue:
         self, cache: TopicEventQueue
     ):
         # When can_consume returns False, fetch should return empty list
-        assert await cache.a_fetch("consumer1") == []
+        assert await cache.a_fetch("consumer1", timeout=0.1) == []
 
     @pytest.mark.asyncio
     async def test_consumer_isolation(self, cache: TopicEventQueue):
@@ -516,7 +516,7 @@ class TestTopicEventQueue:
 
         # Test offset less than current position (should still use current position)
         cache._consumed["consumer1"] = 3
-        result = await cache.a_fetch("consumer1", offset=1)
+        result = await cache.a_fetch("consumer1", offset=1, timeout=0.1)
         assert len(result) == 0  # start=3, end=max(3,1)=3, so slice[3:3] is empty
 
         # Test offset greater than available events

@@ -67,7 +67,7 @@ async def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     await topic.a_publish_data(publish_to_topic_event)
     await topic.a_reset()
 
-    assert await topic.a_consume("dummy") == []  # All messages should be cleared
+    assert await topic.a_consume("dummy", 1) == []  # All messages should be cleared
     # Consumption offsets are now managed internally by TopicEventQueue
 
 
