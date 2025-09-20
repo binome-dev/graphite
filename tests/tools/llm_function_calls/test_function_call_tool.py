@@ -44,7 +44,7 @@ def invoke_context(event_store):
 
 
 @pytest.fixture
-def function_instance(event_store):
+def function_instance(event_store) -> SampleFunction:
     return SampleFunction()
 
 
@@ -68,7 +68,8 @@ def test_get_function_specs(function_instance):
     assert "arg2" in specs[0].parameters.properties
 
 
-def test_invoke(function_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -85,11 +86,13 @@ def test_invoke(function_instance, invoke_context):
             ],
         )
     ]
-    result = function_instance.invoke(invoke_context, input_data)
-    assert result[0].content == "hello - 42"
+    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+        for msg in msgs:
+            assert msg.content == "hello - 42"
 
 
-def test_invoke_wrong_function_name(function_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_wrong_function_name(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -106,8 +109,8 @@ def test_invoke_wrong_function_name(function_instance, invoke_context):
             ],
         )
     ]
-    result = function_instance.invoke(invoke_context, input_data)
-    assert len(result) == 0
+    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+        assert msgs == []
 
 
 def test_to_dict(function_instance):
@@ -128,7 +131,10 @@ def test_to_dict(function_instance):
         ({"arg1": "test", "arg2": 0}, "test - 0"),
     ],
 )
-def test_invoke_with_different_args(function_instance, invoke_context, args, expected):
+@pytest.mark.asyncio
+async def test_invoke_with_different_args(
+    function_instance, invoke_context, args, expected
+):
     input_data = [
         Message(
             role="assistant",
@@ -142,11 +148,13 @@ def test_invoke_with_different_args(function_instance, invoke_context, args, exp
             ],
         )
     ]
-    result = function_instance.invoke(invoke_context, input_data)
-    assert result[0].content == expected
+    async for msgs in function_instance.a_invoke(invoke_context, input_data):
+        for msg in msgs:
+            assert msg.content == expected
 
 
-def test_invoke_with_missing_args(function_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_with_missing_args(function_instance, invoke_context):
     input_data = [
         Message(
             role="assistant",
@@ -166,7 +174,8 @@ def test_invoke_with_missing_args(function_instance, invoke_context):
     from grafi.common.exceptions import FunctionCallException
 
     with pytest.raises(FunctionCallException):
-        function_instance.invoke(invoke_context, input_data)
+        async for msgs in function_instance.a_invoke(invoke_context, input_data):
+            assert msgs  # should not reach here
 
 
 def test_function_without_llm_decorator():

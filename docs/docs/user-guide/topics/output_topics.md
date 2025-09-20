@@ -317,7 +317,7 @@ async def test_output_topic():
 
     # Test basic publishing
     messages = [Message(role="assistant", content="test")]
-    event = topic.publish_data(
+    event = await topic.a_publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",

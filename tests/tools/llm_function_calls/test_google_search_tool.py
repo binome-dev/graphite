@@ -85,7 +85,8 @@ def test_google_search_function(google_search_tool, mock_search):
 # --------------------------------------------------------------------------- #
 #  invoke() dispatcher
 # --------------------------------------------------------------------------- #
-def test_invoke_function(google_search_tool, mock_search):
+@pytest.mark.asyncio
+async def test_invoke_function(google_search_tool, mock_search):
     invoke_context = InvokeContext(
         conversation_id="test_conv",
         invoke_id="test_invoke_id",
@@ -110,7 +111,10 @@ def test_invoke_function(google_search_tool, mock_search):
         )
     ]
 
-    out = google_search_tool.invoke(invoke_context, input_messages)
+    out = []
+
+    async for msg in google_search_tool.a_invoke(invoke_context, input_messages):
+        out.extend(msg)
 
     assert isinstance(out[0], Message)
     assert out[0].role == "tool"
@@ -143,7 +147,8 @@ def test_builder_configuration():
 # --------------------------------------------------------------------------- #
 #  Invalid function name
 # --------------------------------------------------------------------------- #
-def test_invoke_with_invalid_function(google_search_tool):
+@pytest.mark.asyncio
+async def test_invoke_with_invalid_function(google_search_tool):
     invoke_context = InvokeContext(
         conversation_id="test_conv",
         invoke_id="test_invoke_id",
@@ -163,8 +168,9 @@ def test_invoke_with_invalid_function(google_search_tool):
         )
     ]
 
-    # FunctionCallTool.invoke() should ignore unknown tools → empty reply list
-    result = google_search_tool.invoke(invoke_context, bad_call_message)
+    result = []
+    async for msg in google_search_tool.a_invoke(invoke_context, bad_call_message):
+        result.extend(msg)
     assert result == []
 
 
@@ -201,5 +207,8 @@ async def test_error_handling(google_search_tool):
         from grafi.common.exceptions import FunctionCallException
 
         with pytest.raises(FunctionCallException) as excinfo:
-            google_search_tool.invoke(invoke_context, message_with_call)
+            async for msg in google_search_tool.a_invoke(
+                invoke_context, message_with_call
+            ):
+                assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from grafi.agents.react_agent import ReActAgent
 from grafi.agents.react_agent import ReActAgentBuilder
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 
 
 class TestReActAgentBuilder:
@@ -24,7 +24,7 @@ class TestReActAgentBuilder:
         assert agent.type == "ReActAgent"
         assert agent.model == "gpt-4o-mini"
         assert agent.system_prompt is not None
-        assert isinstance(agent.function_call_tool, GoogleSearchTool)
+        assert isinstance(agent.function_call_tool, TavilyTool)
 
     def test_agent_creation_with_custom_values(self):
         """Test creating a ReAct agent with custom values."""
@@ -50,8 +50,8 @@ class TestReActAgentBuilder:
         agent = ReActAgent()
 
         assert agent.function_call_tool is not None
-        assert isinstance(agent.function_call_tool, GoogleSearchTool)
-        assert agent.function_call_tool.name == "GoogleSearchTool"
+        assert isinstance(agent.function_call_tool, TavilyTool)
+        assert agent.function_call_tool.name == "TavilyTestTool"
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "env-test-key"})
     def test_api_key_from_environment(self):

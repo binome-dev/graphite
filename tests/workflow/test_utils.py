@@ -248,7 +248,8 @@ class TestPublishEvents:
 
 
 class TestGetNodeInput:
-    def test_get_node_input_sync(self):
+    @pytest.mark.asyncio
+    async def test_get_node_input_async(self):
         # Mock node and subscribed topics
         mock_topic1 = MagicMock(spec=TopicBase)
         mock_topic2 = MagicMock(spec=TopicBase)
@@ -264,9 +265,9 @@ class TestGetNodeInput:
             assistant_request_id="test-request",
         )
 
-        # Mock can_consume and consume methods
-        mock_topic1.can_consume.return_value = True
-        mock_topic2.can_consume.return_value = False  # This topic has no messages
+        # Mock a_can_consume and a_consume methods
+        mock_topic1.a_can_consume.return_value = True
+        mock_topic2.a_can_consume.return_value = False  # This topic has no messages
 
         mock_event = MagicMock()
         mock_event.invoke_context = invoke_context
@@ -275,9 +276,9 @@ class TestGetNodeInput:
         mock_event.offset = 0
         mock_event.data = [Message(role="user", content="Test")]
 
-        mock_topic1.consume.return_value = [mock_event]
+        mock_topic1.a_consume.return_value = [mock_event]
 
-        consumed_events = get_node_input(node)
+        consumed_events = await get_node_input(node)
 
         assert len(consumed_events) == 1
         assert isinstance(consumed_events[0], ConsumeFromTopicEvent)
@@ -285,10 +286,10 @@ class TestGetNodeInput:
         assert consumed_events[0].consumer_type == node.type
         assert consumed_events[0].name == "topic1"
 
-        # Verify can_consume was called
-        mock_topic1.can_consume.assert_called_once_with(node.name)
-        mock_topic2.can_consume.assert_called_once_with(node.name)
+        # Verify a_can_consume was called
+        mock_topic1.a_can_consume.assert_called_once_with(node.name)
+        mock_topic2.a_can_consume.assert_called_once_with(node.name)
 
-        # Verify consume was only called on topic1
-        mock_topic1.consume.assert_called_once_with(node.name)
-        mock_topic2.consume.assert_not_called()
+        # Verify a_consume was only called on topic1
+        mock_topic1.a_consume.assert_called_once_with(node.name)
+        mock_topic2.a_consume.assert_not_called()

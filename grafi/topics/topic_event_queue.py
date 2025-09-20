@@ -50,7 +50,7 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
-    async def a_commit_to(self, consumer_id: str, offset: int) -> None:
+    async def a_commit_to(self, consumer_id: str, offset: int) -> int:
         """
         Commit all offsets up to and including the specified offset.
 

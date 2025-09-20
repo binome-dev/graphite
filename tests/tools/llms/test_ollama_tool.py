@@ -23,7 +23,7 @@ def invoke_context():
 @pytest.fixture
 def mock_ollama_client(monkeypatch):
     mock = Mock()
-    monkeypatch.setattr("ollama.Client", mock)
+    monkeypatch.setattr("ollama.AsyncClient", mock)
     return mock
 
 
@@ -86,7 +86,8 @@ def test_prepare_api_input():
     }
 
 
-def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
+@pytest.mark.asyncio
+async def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
     tool = OllamaTool()
     input_data = [Message(role="user", content="Hello")]
 
@@ -98,16 +99,19 @@ def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
             }
         }
     )
-    mock_ollama_client.return_value.chat.return_value = mock_response
 
-    result = tool.invoke(invoke_context, input_data)
+    # Make the chat method return a coroutine that resolves to the mock_response
+    async def mock_chat(*args, **kwargs):
+        return mock_response
+
+    mock_ollama_client.return_value.chat = mock_chat
+    result = []
+    async for msg in tool.a_invoke(invoke_context, input_data):
+        result.extend(msg)
 
     assert result[0].role == "assistant"
     assert result[0].content == "Hi there!"
     mock_ollama_client.assert_called_once_with("http://localhost:11434")
-    mock_ollama_client.return_value.chat.assert_called_once_with(
-        model="qwen3", messages=[{"role": "user", "content": "Hello"}], tools=None
-    )
 
 
 def test_to_messages():

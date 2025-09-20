@@ -57,10 +57,22 @@ class InMemTopicEventQueue(TopicEventQueue):
         Await fresh records newer than the consumer's consumed offset.
         Immediately advances consumed offset to prevent duplicate fetches.
         Returns [] if `timeout` (seconds) elapses with no data.
+        If timeout is None or 0, returns immediately with available data (or empty list).
         """
 
         async with self._cond:
+            # If timeout is 0 or None and no data, return immediately
+            if timeout == 0 or (
+                timeout is None and not await self.a_can_consume(consumer_id)
+            ):
+                if not await self.a_can_consume(consumer_id):
+                    return []
+
+            # Wait for data if timeout > 0
             while not await self.a_can_consume(consumer_id):
+                if timeout is None:
+                    # Default behavior: don't wait, return empty
+                    return []
                 try:
                     await asyncio.wait_for(self._cond.wait(), timeout)
                 except asyncio.TimeoutError:
@@ -78,12 +90,14 @@ class InMemTopicEventQueue(TopicEventQueue):
 
             return batch
 
-    async def a_commit_to(self, consumer_id: str, offset: int) -> None:
+    async def a_commit_to(self, consumer_id: str, offset: int) -> int:
         """Commit all offsets up to and including the specified offset."""
         async with self._cond:
             # Only commit if offset is greater than current committed
             if offset > self._committed[consumer_id]:
                 self._committed[consumer_id] = offset
+
+            return self._committed[consumer_id]
 
     async def a_reset(self) -> None:
         """

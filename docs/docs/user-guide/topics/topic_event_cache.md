@@ -178,7 +178,7 @@ async def a_commit_to(self, consumer_id: str, offset: int) -> None:
 # Producer
 cache = TopicEventQueue("my_topic")
 event = PublishToTopicEvent(...)
-cache.put(event)
+cache.a_put(event)
 
 # Consumer
 consumer_id = "consumer_1"

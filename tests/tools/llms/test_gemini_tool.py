@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
@@ -46,7 +47,8 @@ def test_init(gemini_instance):
 # --------------------------------------------------------------------------- #
 #  invoke() — simple reply
 # --------------------------------------------------------------------------- #
-def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     # Fake GenerateContentResponse object – only `.text` is accessed
@@ -54,9 +56,9 @@ def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
     mock_response.text = "Hello, world!"
     mock_response.function_calls = None
 
-    # Stub client and method
+    # Stub client and method - need to mock the async aio interface
     mock_client = MagicMock()
-    mock_client.models.generate_content = MagicMock(return_value=mock_response)
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     # Patch genai.Client ctor inside the module
     monkeypatch.setattr(
@@ -64,15 +66,17 @@ def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
     )
 
     input_data = [Message(role="user", content="Say hello")]
-    result = gemini_instance.invoke(invoke_context, input_data)
+    result = []
+    async for msg in gemini_instance.a_invoke(invoke_context, input_data):
+        result.extend(msg)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
     assert result[0].content == "Hello, world!"
 
     # Ensure generate_content called with correct args
-    mock_client.models.generate_content.assert_called_once()
-    call_kwargs = mock_client.models.generate_content.call_args[1]
+    mock_client.aio.models.generate_content.assert_called_once()
+    call_kwargs = mock_client.aio.models.generate_content.call_args[1]
     assert call_kwargs["model"] == "gemini-2.0-flash-lite"
 
     # Contents must include system message
@@ -83,7 +87,8 @@ def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  invoke() — tool / function call path
 # --------------------------------------------------------------------------- #
-def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     # TODO: improve this unit tests
@@ -101,7 +106,7 @@ def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
     mock_response.function_calls = [mock_function_call]
 
     mock_client = MagicMock()
-    mock_client.models.generate_content = MagicMock(return_value=mock_response)
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
@@ -121,9 +126,10 @@ def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
 
     gemini_instance.add_function_specs(tools)
 
-    gemini_instance.invoke(invoke_context, input_data)
+    async for msg in gemini_instance.a_invoke(invoke_context, input_data):
+        assert msg
 
-    call_kwargs = mock_client.models.generate_content.call_args[1]
+    call_kwargs = mock_client.aio.models.generate_content.call_args[1]
     # The GenerateContentConfig should contain our tool schema
     assert call_kwargs is not None
 
@@ -131,14 +137,15 @@ def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  Error propagation
 # --------------------------------------------------------------------------- #
-def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     def _raise(*_a, **_kw):  # pragma: no cover
         raise Exception("Failure")
 
     mock_client = MagicMock()
-    mock_client.models.generate_content.side_effect = _raise
+    mock_client.aio.models.generate_content.side_effect = _raise
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
@@ -146,7 +153,10 @@ def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Failure"):
-        gemini_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
+        async for _ in gemini_instance.a_invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass  # Exception should be raised before we get any results
 
 
 # --------------------------------------------------------------------------- #

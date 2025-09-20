@@ -1,3 +1,4 @@
+import inspect
 import json
 from typing import Any
 from typing import Callable
@@ -86,7 +87,10 @@ class AgentCallingTool(FunctionCallTool):
                     role="assistant",
                     content=prompt,
                 )
-                response = await func(invoke_context, message)
+                response = func(invoke_context, message)
+
+                if inspect.isawaitable(response):
+                    response = await response
 
                 messages.extend(
                     self.to_messages(

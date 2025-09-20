@@ -54,8 +54,11 @@ def test_init(deepseek_instance):
 # --------------------------------------------------------------------------- #
 #  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
-def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
-    import grafi.tools.llms.impl.deepseek_tool as dst_module
+@pytest.mark.asyncio
+async def test_a_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
+    from unittest.mock import AsyncMock
+
+    import grafi.tools.llms.impl.deepseek_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -63,18 +66,22 @@ def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
     ]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = MagicMock(return_value=mock_response)
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     # Patch the OpenAI.Client constructor the tool uses
     mock_openai_cls = MagicMock(return_value=mock_client)
-    monkeypatch.setattr(dst_module, "OpenAI", mock_openai_cls)
+    monkeypatch.setattr(
+        grafi.tools.llms.impl.deepseek_tool, "AsyncClient", mock_openai_cls
+    )
 
     input_data = [Message(role="user", content="Say hello")]
-    result = deepseek_instance.invoke(invoke_context, input_data)
+    result_messages = []
+    async for message_batch in deepseek_instance.a_invoke(invoke_context, input_data):
+        result_messages.extend(message_batch)
 
-    assert isinstance(result, List)
-    assert result[0].role == "assistant"
-    assert result[0].content == "Hello, world!"
+    assert isinstance(result_messages, List)
+    assert result_messages[0].role == "assistant"
+    assert result_messages[0].content == "Hello, world!"
 
     # Constructor must receive both api_key and base_url
     mock_openai_cls.assert_called_once_with(
@@ -101,8 +108,11 @@ def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  invoke() – function call path
 # --------------------------------------------------------------------------- #
-def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
-    import grafi.tools.llms.impl.deepseek_tool as dst_module
+@pytest.mark.asyncio
+async def test_a_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
+    from unittest.mock import AsyncMock
+
+    import grafi.tools.llms.impl.deepseek_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -125,8 +135,12 @@ def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
     ]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = MagicMock(return_value=mock_response)
-    monkeypatch.setattr(dst_module, "OpenAI", MagicMock(return_value=mock_client))
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    monkeypatch.setattr(
+        grafi.tools.llms.impl.deepseek_tool,
+        "AsyncClient",
+        MagicMock(return_value=mock_client),
+    )
 
     # user msg + attached function spec
     input_data = [Message(role="user", content="What's the weather in London?")]
@@ -142,12 +156,14 @@ def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
     ]
     deepseek_instance.add_function_specs(tools)
 
-    result = deepseek_instance.invoke(invoke_context, input_data)
+    result_messages = []
+    async for message_batch in deepseek_instance.a_invoke(invoke_context, input_data):
+        result_messages.extend(message_batch)
 
-    assert result[0].role == "assistant"
-    assert result[0].content is None
-    assert isinstance(result[0].tool_calls, list)
-    assert result[0].tool_calls[0].id == "test_id"
+    assert result_messages[0].role == "assistant"
+    assert result_messages[0].content is None
+    assert isinstance(result_messages[0].tool_calls, list)
+    assert result_messages[0].tool_calls[0].id == "test_id"
 
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == "deepseek-chat"
@@ -170,19 +186,23 @@ def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  Error handling
 # --------------------------------------------------------------------------- #
-def test_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
-    import grafi.tools.llms.impl.deepseek_tool as dst_module
+@pytest.mark.asyncio
+async def test_a_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
+    import grafi.tools.llms.impl.deepseek_tool
 
     # Force constructor to raise – simulates any client error
     def _raise(*_a, **_kw):  # noqa: D401
         raise Exception("Error code")
 
-    monkeypatch.setattr(dst_module, "OpenAI", _raise)
+    monkeypatch.setattr(grafi.tools.llms.impl.deepseek_tool, "AsyncClient", _raise)
 
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):
-        deepseek_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
+        async for _ in deepseek_instance.a_invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
 
 
 # --------------------------------------------------------------------------- #

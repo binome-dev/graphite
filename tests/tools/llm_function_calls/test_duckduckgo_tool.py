@@ -45,7 +45,8 @@ def test_web_search_using_duckduckgo(duckduckgo_tool, mock_ddgs):
     assert json.loads(result) == [{"title": "Test Result", "link": "http://test.com"}]
 
 
-def test_invoke_function(duckduckgo_tool, mock_ddgs):
+@pytest.mark.asyncio
+async def test_invoke_function(duckduckgo_tool, mock_ddgs):
     invoke_context = InvokeContext(
         conversation_id="test_conv",
         invoke_id="test_invoke_id",
@@ -68,9 +69,10 @@ def test_invoke_function(duckduckgo_tool, mock_ddgs):
         )
     ]
 
-    result = duckduckgo_tool.invoke(invoke_context, input_message)
+    result = []
 
-    print(result)
+    async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+        result.extend(msg)
 
     assert isinstance(result[0], Message)
     assert result[0].role == "tool"
@@ -93,7 +95,8 @@ def test_builder_configuration():
     assert tool.proxy == "http://proxy.test"
 
 
-def test_invoke_with_invalid_function_name(duckduckgo_tool):
+@pytest.mark.asyncio
+async def test_invoke_with_invalid_function_name(duckduckgo_tool):
     invoke_context = InvokeContext(
         conversation_id="test_conv",
         invoke_id="test_invoke_id",
@@ -116,7 +119,10 @@ def test_invoke_with_invalid_function_name(duckduckgo_tool):
         )
     ]
 
-    result = duckduckgo_tool.invoke(invoke_context, input_message)
+    result = []
+
+    async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+        result.extend(msg)
     assert len(result) == 0
 
 
@@ -152,5 +158,6 @@ async def test_error_handling(duckduckgo_tool):
         from grafi.common.exceptions import FunctionCallException
 
         with pytest.raises(FunctionCallException) as excinfo:
-            duckduckgo_tool.invoke(invoke_context, input_message)
+            async for msg in duckduckgo_tool.a_invoke(invoke_context, input_message):
+                assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)

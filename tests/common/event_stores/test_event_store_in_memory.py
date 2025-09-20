@@ -237,7 +237,7 @@ class TestEventStoreInMemory:
     async def test_clear_events(self, event_store: EventStore, multiple_events):
         """Test clearing all events from the store."""
         for event in multiple_events:
-            event_store.record_event(event)
+            await event_store.a_record_event(event)
 
         assert len(await event_store.a_get_events()) == 5
         await event_store.a_clear_events()

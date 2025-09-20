@@ -147,7 +147,7 @@ class GeminiTool(LLM):
         client = genai.Client(api_key=self.api_key)  # same lightweight client
 
         cfg = (
-            types.GenerateContentConfig(tools=tools)  # type: ignore[arg-type]
+            types.GenerateContentConfig(tools=tools, **self.chat_params)  # type: ignore[arg-type]
             if tools
             else None
         )
@@ -158,7 +158,6 @@ class GeminiTool(LLM):
                     model=self.model,
                     contents=contents,
                     config=cfg,
-                    **self.chat_params,
                 ):
                     yield self.to_stream_messages(chunk)
             else:
@@ -167,7 +166,6 @@ class GeminiTool(LLM):
                         model=self.model,
                         contents=contents,
                         config=cfg,
-                        **self.chat_params,
                     )
                 )
                 yield self.to_messages(response)

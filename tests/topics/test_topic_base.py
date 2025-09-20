@@ -47,18 +47,32 @@ def topic() -> TopicBase:
     return topic
 
 
-def test_reset(topic: TopicBase, invoke_context: InvokeContext):
+@pytest.mark.asyncio
+async def test_reset(topic: TopicBase, invoke_context: InvokeContext):
     """Ensure topic resets correctly."""
     message = Message(role="assistant", content="Test Message")
 
-    topic.publish_data(invoke_context, "test_publisher", "test_type", [message], [])
-    topic.reset()
+    publish_to_topic_event = PublishToTopicEvent(
+        event_id="event_2",
+        name="test_topic",
+        offset=0,
+        publisher_name="test_publisher",
+        publisher_type="test_type",
+        consumed_event_ids=[],
+        invoke_context=invoke_context,
+        data=[message],
+        timestamp=datetime(2023, 1, 1, 13, 0),
+    )
 
-    assert topic.event_cache.num_events() == 0  # All messages should be cleared
+    await topic.a_publish_data(publish_to_topic_event)
+    await topic.a_reset()
+
+    assert await topic.a_consume("dummy") == []  # All messages should be cleared
     # Consumption offsets are now managed internally by TopicEventQueue
 
 
-def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
+@pytest.mark.asyncio
+async def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
     """Ensure topic restores correctly from events."""
     event = PublishToTopicEvent(
         event_id="event_1",
@@ -71,11 +85,10 @@ def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
         timestamp=datetime(2023, 1, 1, 13, 0),
     )
 
-    topic.restore_topic(event)
+    await topic.a_restore_topic(event)
 
-    assert topic.event_cache.num_events() == 1
     # Event was restored to cache, verify by consuming it
-    consumed_events = topic.consume("test_consumer")
+    consumed_events = await topic.a_consume("test_consumer")
     assert len(consumed_events) == 1
     assert consumed_events[0].event_id == "event_1"
 

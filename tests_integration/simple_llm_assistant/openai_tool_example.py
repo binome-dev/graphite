@@ -74,12 +74,13 @@ async def test_openai_tool_with_chat_param() -> None:
 
             print(message.content)
 
-            assert len(await event_store.a_get_events()) == 2
             assert message.content is not None
             assert "Grafi" in message.content
             if isinstance(message.content, str):
                 # Ensure the content length is within the expected range
                 assert len(message.content) < 70
+
+    assert len(await event_store.a_get_events()) == 2
 
 
 async def test_openai_tool_with_structured_output() -> None:
@@ -95,9 +96,10 @@ async def test_openai_tool_with_structured_output() -> None:
 
             print(message.content)
 
-            assert len(await event_store.a_get_events()) == 2
             assert message.content is not None
             assert "Grafi" in message.content
+
+    assert len(await event_store.a_get_events()) == 2
 
 
 async def test_openai_tool_async() -> None:

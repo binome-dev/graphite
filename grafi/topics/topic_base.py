@@ -41,16 +41,6 @@ class TopicBase(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    async def publish_data(
-        self, publish_event: PublishToTopicEvent
-    ) -> PublishToTopicEvent:
-        """
-        Publish data to the topic if it meets the condition.
-        """
-        raise NotImplementedError(
-            "Method 'publish_data' must be implemented in subclasses."
-        )
-
     async def a_publish_data(
         self, publish_event: PublishToTopicEvent
     ) -> PublishToTopicEvent:

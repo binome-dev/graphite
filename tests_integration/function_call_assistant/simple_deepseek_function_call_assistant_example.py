@@ -55,6 +55,7 @@ async def test_simple_function_call_assistant() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
+    outputs = []
     async for output in assistant.a_invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
@@ -63,12 +64,16 @@ async def test_simple_function_call_assistant() -> None:
         is_sequential=True,
     ):
 
-        print(output)
-        assert output is not None
-        assert "12345" in str(output.data[0].content)
-        assert "bad" in str(output.data[0].content)
-        print(len(await event_store.a_get_events()))
-        assert len(await event_store.a_get_events()) >= 24
+        outputs.append(output)
+
+    assert outputs[0] is not None
+    print(outputs)
+    print(outputs[-1].data[0].content)
+    assert "12345" in str(outputs[-1].data[0].content)
+    assert "bad" in str(outputs[-1].data[0].content)
+
+    print(len(await event_store.a_get_events()))
+    assert len(await event_store.a_get_events()) >= 24
 
     # Test restore from finished requests
 

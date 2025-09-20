@@ -24,20 +24,6 @@ def function_tool():
     return tool
 
 
-def test_invoke_returns_message(function_tool):
-    context = InvokeContext(
-        conversation_id="conversation_id",
-        invoke_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
-    )
-    input_messages = [Message(role="user", content="test")]
-    result = function_tool.invoke(context, input_messages)
-    assert isinstance(result, list)
-    assert isinstance(result[0], Message)
-    assert result[0].role == "function"
-    assert "42" in result[0].content
-
-
 @pytest.mark.asyncio
 async def test_a_invoke_returns_message(function_tool):
     context = InvokeContext(

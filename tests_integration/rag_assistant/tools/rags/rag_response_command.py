@@ -11,7 +11,7 @@ from grafi.tools.command import Command
 class RagResponseCommand(Command):
     """A command that responds with a message."""
 
-    def get_tool_input(
+    async def get_tool_input(
         self, invoke_context: InvokeContext, node_input: List[ConsumeFromTopicEvent]
     ) -> Messages:
         # Only consider the last message contains the content to query

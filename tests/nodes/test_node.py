@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
@@ -7,7 +8,6 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -30,9 +30,6 @@ class MockTool(Tool):
             **kwargs,
         )
 
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        return [Message(role="assistant", content=f"Mock response from {self.name}")]
-
     async def a_invoke(self, invoke_context: InvokeContext, input_data: Messages):
         yield [
             Message(role="assistant", content=f"Mock async response from {self.name}")
@@ -50,10 +47,10 @@ class MockTopic(TopicBase):
     ):
         pass
 
-    def can_consume(self, consumer_name: str) -> bool:
+    async def a_can_consume(self, consumer_name: str) -> bool:
         return True
 
-    def consume(self, consumer_name: str) -> List:
+    async def a_consume(self, consumer_name: str) -> List:
         return []
 
     def to_dict(self):
@@ -240,8 +237,9 @@ class TestNode:
         assert len(node.publish_to) == 1
 
     # Test Invoke Method
-    @patch("grafi.nodes.node.record_node_invoke")
-    def test_invoke_with_tool(
+    @patch("grafi.nodes.node.record_node_a_invoke")
+    @pytest.mark.asyncio
+    async def test_invoke_with_tool(
         self,
         mock_decorator,
         node_with_tool: Node,
@@ -252,14 +250,19 @@ class TestNode:
         # Mock the decorator to return the original function
         mock_decorator.side_effect = lambda func: func
 
-        # The actual Command has invoke method, so we test it directly
-        result = node_with_tool.invoke(invoke_context, sample_consumed_events)
+        # The actual Command has a_invoke method, so we test it directly
+        messages = []
+        async for message_batch in node_with_tool.a_invoke(
+            invoke_context, sample_consumed_events
+        ):
+            messages.append(message_batch)
 
-        # Verify we get a result (the actual implementation should work)
-        assert isinstance(result, PublishToTopicEvent)
+        # Verify we get results
+        assert isinstance(messages, list)
 
-    @patch("grafi.nodes.node.record_node_invoke")
-    def test_invoke_without_tool_raises_error(
+    @patch("grafi.nodes.node.record_node_a_invoke")
+    @pytest.mark.asyncio
+    async def test_invoke_without_tool_raises_error(
         self,
         mock_decorator,
         basic_node: Node,
@@ -273,7 +276,8 @@ class TestNode:
         assert basic_node._command is None
 
         with pytest.raises(AttributeError):
-            basic_node.invoke(invoke_context, sample_consumed_events)
+            async for _ in basic_node.a_invoke(invoke_context, sample_consumed_events):
+                pass
 
     # Test Async Invoke Method
     @patch("grafi.nodes.node.record_node_a_invoke")
@@ -313,25 +317,33 @@ class TestNode:
             async for _ in basic_node.a_invoke(invoke_context, sample_consumed_events):
                 pass
 
-    # Test can_invoke Method
-    def test_can_invoke_no_subscriptions(self, basic_node: Node):
-        """Test can_invoke returns True when no subscriptions are defined."""
-        assert basic_node.can_invoke() is True
+    # Test a_can_invoke Method
+    @pytest.mark.asyncio
+    async def test_a_can_invoke_no_subscriptions(self, basic_node: Node):
+        """Test a_can_invoke returns True when no subscriptions are defined."""
+        assert await basic_node.a_can_invoke() is True
 
-    def test_can_invoke_with_subscriptions_all_satisfied(self, mock_topic: MockTopic):
-        """Test can_invoke returns True when all subscription expressions are satisfied."""
+    @pytest.mark.asyncio
+    async def test_a_can_invoke_with_subscriptions_all_satisfied(
+        self, mock_topic: MockTopic
+    ):
+        """Test a_can_invoke returns True when all subscription expressions are satisfied."""
         topic_expr = TopicExpr(topic=mock_topic)
         node = Node(
             name="test_node",
             subscribed_expressions=[topic_expr],
         )
 
-        # The MockTopic already has can_consume method that returns True
-        with patch(
-            "grafi.topics.topic_expression.evaluate_subscription",
-            return_value=True,
-        ):
-            assert node.can_invoke() is True
+        # Patch the method at the class level to work with Pydantic models
+        with patch.object(
+            MockTopic, "a_can_consume", new_callable=AsyncMock
+        ) as mock_can_consume:
+            mock_can_consume.return_value = True
+            with patch(
+                "grafi.topics.expressions.topic_expression.evaluate_subscription",
+                return_value=True,
+            ):
+                assert await node.a_can_invoke() is True
 
     # Test to_dict Method
     def test_to_dict_basic_node(self, basic_node: Node):
@@ -452,10 +464,11 @@ class TestNode:
             assert isinstance(messages, list)
 
     # Test Edge Cases
-    def test_node_with_empty_subscribed_expressions_list(self):
+    @pytest.mark.asyncio
+    async def test_node_with_empty_subscribed_expressions_list(self):
         """Test Node with empty subscribed_expressions list."""
         node = Node(name="test_node", subscribed_expressions=[])
-        assert node.can_invoke() is True
+        assert await node.a_can_invoke() is True
         assert node._subscribed_topics == {}
 
     def test_node_with_empty_publish_to_list(self):
@@ -529,7 +542,7 @@ class TestNode:
     def test_command_factory_integration(self, mock_tool: MockTool):
         """Test that Command.for_tool is called correctly during node creation."""
         with patch(
-            "grafi.common.models.command.Command.for_tool",
+            "grafi.tools.command.Command.for_tool",
             return_value=Command(tool=mock_tool),
         ) as mock_factory:
             node = Node(name="test_node", tool=mock_tool)

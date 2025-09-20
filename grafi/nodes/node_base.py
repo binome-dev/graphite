@@ -72,6 +72,8 @@ class NodeBase(BaseModel):
         the specific behavior of each node.
         """
         raise NotImplementedError("Subclasses must implement this method.")
+        # The yield after raise is unreachable but needed for type checking
+        yield  # pragma: no cover
 
     async def a_can_invoke(self) -> bool:
         """
