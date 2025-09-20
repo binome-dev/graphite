@@ -98,7 +98,7 @@ The EventDrivenWorkflow uses asynchronous execution with the `invoke` method, ha
 
 The asynchronous execution model provides sophisticated event-driven processing with proper coordination:
 
-1. **Workflow Initialization**: Sets up initial state with `a_init_workflow`
+1. **Workflow Initialization**: Sets up initial state with `init_workflow`
 2. **Concurrent Node Processing**: Spawns individual tasks for each node using `_invoke_node`  
 3. **Output Listening**: Creates listeners for each output topic to capture results
 4. **Event Streaming**: Uses `MergeIdleQueue` to stream events as they become available
@@ -190,7 +190,7 @@ async for event in MergeIdleQueue(queue, self._tracker):
     consumed_output_event = ConsumeFromTopicEvent(...)
 
     # Commit BEFORE yielding to prevent duplicate data
-    await self._a_commit_events(
+    await self._commit_events(
         consumer_name=self.name, events=[consumed_output_event]
     )
 
@@ -232,7 +232,7 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
                                 topic.event_cache._cond.notify_all()
 
                 # Commit processed events
-                await self._a_commit_events(...)
+                await self._commit_events(...)
 
             finally:
                 # Signal node is no longer active

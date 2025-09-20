@@ -319,12 +319,12 @@ class TestNode:
 
     # Test can_invoke Method
     @pytest.mark.asyncio
-    async def test_a_can_invoke_no_subscriptions(self, basic_node: Node):
+    async def test_can_invoke_no_subscriptions(self, basic_node: Node):
         """Test can_invoke returns True when no subscriptions are defined."""
         assert await basic_node.can_invoke() is True
 
     @pytest.mark.asyncio
-    async def test_a_can_invoke_with_subscriptions_all_satisfied(
+    async def test_can_invoke_with_subscriptions_all_satisfied(
         self, mock_topic: MockTopic
     ):
         """Test can_invoke returns True when all subscription expressions are satisfied."""

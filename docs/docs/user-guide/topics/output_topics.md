@@ -65,8 +65,7 @@ A specialized topic for handling workflow output that requires human interaction
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `builder` | `() -> InWorkflowOutputTopicBuilder` | Class method returning builder instance |
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Publish workflow output data |
-| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Async version of publish_data |
+| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Async version of publish_data |
 
 ### Builders
 

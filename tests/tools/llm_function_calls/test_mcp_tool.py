@@ -76,7 +76,7 @@ def dummy_input_message():
 
 
 @pytest.mark.asyncio
-async def test_a_get_function_specs_adds_specs(dummy_connections):
+async def test_get_function_specs_adds_specs(dummy_connections):
     with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
@@ -89,7 +89,7 @@ async def test_a_get_function_specs_adds_specs(dummy_connections):
         instance.list_tools = AsyncMock(return_value=[mock_tool])
         instance.list_resources = AsyncMock(return_value=[])
         instance.list_prompts = AsyncMock(return_value=[])
-        await tool._a_get_function_specs()
+        await tool._get_function_specs()
         assert any(fs.name == "test_tool" for fs in tool.function_specs)
 
 

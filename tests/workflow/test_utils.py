@@ -196,7 +196,7 @@ class TestGetAsyncOutputEvents:
 
 class TestPublishEvents:
     @pytest.mark.asyncio
-    async def test_a_publish_events(self):
+    async def test_publish_events(self):
         # Mock node and topics
         mock_topic1 = AsyncMock(spec=TopicBase)
         mock_topic2 = AsyncMock(spec=TopicBase)

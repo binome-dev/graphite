@@ -39,7 +39,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-async def test_openai_tool_a_stream() -> None:
+async def test_openai_tool_stream() -> None:
     await event_store.clear_events()
     openai_tool = OpenAITool.builder().is_streaming(True).api_key(api_key).build()
     content = ""
@@ -125,7 +125,7 @@ async def test_openai_tool_async() -> None:
     assert len(await event_store.get_events()) == 2
 
 
-async def test_llm_a_stream_node() -> None:
+async def test_llm_stream_node() -> None:
     await event_store.clear_events()
     llm_stream_node: Node = (
         Node.builder()
@@ -166,6 +166,6 @@ async def test_llm_a_stream_node() -> None:
 
 asyncio.run(test_openai_tool_with_chat_param())
 asyncio.run(test_openai_tool_with_structured_output())
-asyncio.run(test_openai_tool_a_stream())
+asyncio.run(test_openai_tool_stream())
 asyncio.run(test_openai_tool_async())
-asyncio.run(test_llm_a_stream_node())
+asyncio.run(test_llm_stream_node())

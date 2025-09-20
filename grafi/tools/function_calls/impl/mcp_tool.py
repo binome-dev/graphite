@@ -53,7 +53,7 @@ class MCPTool(FunctionCallTool):
         Initialize the MCPTool with the given keyword arguments.
         """
         mcp_tool = cls(**kwargs)
-        await mcp_tool._a_get_function_specs()
+        await mcp_tool._get_function_specs()
 
         return mcp_tool
 
@@ -64,7 +64,7 @@ class MCPTool(FunctionCallTool):
         """
         return MCPToolBuilder(cls)
 
-    async def _a_get_function_specs(self) -> None:
+    async def _get_function_specs(self) -> None:
         if not self.mcp_config:
             raise ValueError("mcp_config are not set.")
 

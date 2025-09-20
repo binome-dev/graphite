@@ -34,7 +34,7 @@ def get_invoke_context() -> InvokeContext:
 # --------------------------------------------------------------------------- #
 #  2) async streaming                                                         #
 # --------------------------------------------------------------------------- #
-async def test_claude_tool_a_stream() -> None:
+async def test_claude_tool_stream() -> None:
     await event_store.clear_events()
     claude = ClaudeTool.builder().is_streaming(True).api_key(api_key).build()
 
@@ -110,7 +110,7 @@ async def test_claude_tool_async() -> None:
 # --------------------------------------------------------------------------- #
 #  6) end-to-end pathway through Node                                      #
 # --------------------------------------------------------------------------- #
-async def test_llm_a_stream_node_claude() -> None:
+async def test_llm_stream_node_claude() -> None:
     await event_store.clear_events()
 
     llm_stream_node: Node = (
@@ -150,6 +150,6 @@ async def test_llm_a_stream_node_claude() -> None:
 # --------------------------------------------------------------------------- #
 
 asyncio.run(test_claude_tool_with_chat_param())
-asyncio.run(test_claude_tool_a_stream())
+asyncio.run(test_claude_tool_stream())
 asyncio.run(test_claude_tool_async())
-asyncio.run(test_llm_a_stream_node_claude())
+asyncio.run(test_llm_stream_node_claude())

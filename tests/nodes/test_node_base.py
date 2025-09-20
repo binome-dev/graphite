@@ -857,7 +857,7 @@ class TestNodeBaseBuilder:
         assert node.custom_field == "default"
 
     @pytest.mark.asyncio
-    async def test_a_can_invoke_with_subscriptions_not_satisfied(
+    async def test_can_invoke_with_subscriptions_not_satisfied(
         self, mock_topic: MockTopic
     ):
         """Test can_invoke returns False when subscription expressions are not satisfied."""
@@ -882,7 +882,7 @@ class TestNodeBaseBuilder:
                 assert await node.can_invoke() is False
 
     @pytest.mark.asyncio
-    async def test_a_can_invoke_with_multiple_subscriptions(self):
+    async def test_can_invoke_with_multiple_subscriptions(self):
         """Test can_invoke with multiple subscription expressions."""
         topic1 = MockTopic(name="topic1")
         topic2 = MockTopic(name="topic2")

@@ -28,7 +28,7 @@ def get_invoke_context() -> InvokeContext:
 # --------------------------------------------------------------------------- #
 # async streaming                                                             #
 # --------------------------------------------------------------------------- #
-async def test_openrouter_tool_a_stream() -> None:
+async def test_openrouter_tool_stream() -> None:
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().is_streaming(True).api_key(api_key).build()
 
@@ -95,7 +95,7 @@ async def test_openrouter_tool_async() -> None:
 # --------------------------------------------------------------------------- #
 # end-to-end: Node streaming path                                          #
 # --------------------------------------------------------------------------- #
-async def test_llm_a_stream_node_openrouter() -> None:
+async def test_llm_stream_node_openrouter() -> None:
     await event_store.clear_events()
 
     llm_stream_node: Node = (
@@ -131,6 +131,6 @@ async def test_llm_a_stream_node_openrouter() -> None:
 
 
 asyncio.run(test_openrouter_tool_with_chat_param())
-asyncio.run(test_openrouter_tool_a_stream())
+asyncio.run(test_openrouter_tool_stream())
 asyncio.run(test_openrouter_tool_async())
-asyncio.run(test_llm_a_stream_node_openrouter())
+asyncio.run(test_llm_stream_node_openrouter())

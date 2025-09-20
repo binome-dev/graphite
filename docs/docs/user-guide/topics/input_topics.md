@@ -34,7 +34,7 @@ The foundational topic for receiving initial input into a workflow.
 |--------|-----------|-------------|
 | `builder` | `() -> InputTopicBuilder` | Class method returning builder instance |
 | `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publish input messages to the topic |
-| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data |
+| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data |
 
 ### InWorkflowInputTopic
 
@@ -58,7 +58,7 @@ A specialized input topic for managing human-in-the-loop interactions within run
 |--------|-----------|-------------|
 | `builder` | `() -> InWorkflowInputTopicBuilder` | Class method returning builder instance |
 | `publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Publish input data based on upstream event |
-| `a_publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Async version of publish_input_data |
+| `publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Async version of publish_input_data |
 
 ### Builders
 

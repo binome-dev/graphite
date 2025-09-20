@@ -30,7 +30,7 @@ def get_invoke_context() -> InvokeContext:
 # --------------------------------------------------------------------------- #
 #  async streaming                                                            #
 # --------------------------------------------------------------------------- #
-async def test_deepseek_tool_a_stream() -> None:
+async def test_deepseek_tool_stream() -> None:
     await event_store.clear_events()
     ds_tool = DeepseekTool.builder().is_streaming(True).api_key(api_key).build()
 
@@ -99,7 +99,7 @@ async def test_deepseek_tool_async() -> None:
 # --------------------------------------------------------------------------- #
 #  end-to-end: Node streaming with DeepseekTool                            #
 # --------------------------------------------------------------------------- #
-async def test_llm_a_stream_node_deepseek() -> None:
+async def test_llm_stream_node_deepseek() -> None:
     await event_store.clear_events()
 
     llm_stream_node = (
@@ -136,6 +136,6 @@ async def test_llm_a_stream_node_deepseek() -> None:
 
 
 asyncio.run(test_deepseek_tool_with_chat_param())
-asyncio.run(test_deepseek_tool_a_stream())
+asyncio.run(test_deepseek_tool_stream())
 asyncio.run(test_deepseek_tool_async())
-asyncio.run(test_llm_a_stream_node_deepseek())
+asyncio.run(test_llm_stream_node_deepseek())

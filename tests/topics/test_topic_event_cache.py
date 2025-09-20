@@ -198,7 +198,7 @@ class TestTopicEventQueue:
         assert cache._committed["consumer1"] == 10
 
     @pytest.mark.asyncio
-    async def test_a_put(self, cache: TopicEventQueue, sample_event):
+    async def test_put(self, cache: TopicEventQueue, sample_event):
         # Put event asynchronously
         result = await cache.put(sample_event)
 
@@ -206,13 +206,13 @@ class TestTopicEventQueue:
         assert cache._records[0] == sample_event
 
     @pytest.mark.asyncio
-    async def test_a_fetch_no_events_with_timeout(self, cache: TopicEventQueue):
+    async def test_fetch_no_events_with_timeout(self, cache: TopicEventQueue):
         # Try to fetch with timeout when no events
         result = await cache.fetch("consumer1", timeout=0.1)
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_a_fetch_single_event(self, cache: TopicEventQueue, sample_event):
+    async def test_fetch_single_event(self, cache: TopicEventQueue, sample_event):
         await cache.put(sample_event)
 
         # Fetch event
@@ -221,7 +221,7 @@ class TestTopicEventQueue:
         assert cache._consumed["consumer1"] == 1
 
     @pytest.mark.asyncio
-    async def test_a_fetch_wait_for_event(self, cache: TopicEventQueue, sample_event):
+    async def test_fetch_wait_for_event(self, cache: TopicEventQueue, sample_event):
         # Start fetch task that will wait
         fetch_task = asyncio.create_task(cache.fetch("consumer1", timeout=1.0))
 
@@ -236,7 +236,7 @@ class TestTopicEventQueue:
         assert result == [sample_event]
 
     @pytest.mark.asyncio
-    async def test_a_fetch_with_offset(self, cache: TopicEventQueue):
+    async def test_fetch_with_offset(self, cache: TopicEventQueue):
         # Add 5 events
         events = []
         for i in range(5):
@@ -265,7 +265,7 @@ class TestTopicEventQueue:
         assert result == events[:4]
 
     @pytest.mark.asyncio
-    async def test_a_commit_to(self, cache: TopicEventQueue):
+    async def test_commit_to(self, cache: TopicEventQueue):
         # Commit asynchronously
         await cache.commit_to("consumer1", 5)
         assert cache._committed["consumer1"] == 5

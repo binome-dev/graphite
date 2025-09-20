@@ -203,7 +203,7 @@ class EventDrivenWorkflow(Workflow):
 
         return consumed_events
 
-    async def _a_commit_events(
+    async def _commit_events(
         self, consumer_name: str, topic_events: List[ConsumeFromTopicEvent]
     ) -> None:
         if not topic_events:
@@ -219,7 +219,7 @@ class EventDrivenWorkflow(Workflow):
         for topic, offset in topic_max_offset.items():
             await self._topics[topic].commit(consumer_name, offset)
 
-    async def _a_add_to_invoke_queue(self, event: TopicEvent) -> None:
+    async def _add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
 
         if topic_name not in self._topic_nodes:
@@ -272,7 +272,7 @@ class EventDrivenWorkflow(Workflow):
                             published_events.extend(await publish_events(node, result))
 
                         for event in published_events:
-                            await self._a_add_to_invoke_queue(event)
+                            await self._add_to_invoke_queue(event)
 
                         events: List[TopicEvent] = []
                         events.extend(node_consumed_events)
@@ -373,7 +373,7 @@ class EventDrivenWorkflow(Workflow):
             await output_queue.stop_listeners()
 
             # Commit all consumed output events
-            await self._a_commit_events(
+            await self._commit_events(
                 consumer_name=self.name, topic_events=consumed_output_events
             )
 
@@ -501,7 +501,7 @@ class EventDrivenWorkflow(Workflow):
                                 await publish_events(node=node, publish_event=event)
                             )
 
-                    await self._a_commit_events(
+                    await self._commit_events(
                         consumer_name=node.name, topic_events=consumed_events
                     )
                     await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
@@ -611,7 +611,7 @@ class EventDrivenWorkflow(Workflow):
                 if event:
                     events_to_record.append(event)
                     if is_sequential:
-                        await self._a_add_to_invoke_queue(event)
+                        await self._add_to_invoke_queue(event)
 
             if events_to_record:
                 await container.event_store.record_events(events_to_record)
@@ -620,7 +620,7 @@ class EventDrivenWorkflow(Workflow):
             for topic_event in events:
                 await self._topics[topic_event.name].restore_topic(topic_event)
                 if is_sequential and isinstance(topic_event, PublishToTopicEvent):
-                    await self._a_add_to_invoke_queue(topic_event)
+                    await self._add_to_invoke_queue(topic_event)
 
             # Process in-workflow topics
             in_workflow_output_topic_names: Set[str] = set()
@@ -666,7 +666,7 @@ class EventDrivenWorkflow(Workflow):
                             )
                             if paired_event:
                                 if is_sequential:
-                                    await self._a_add_to_invoke_queue(paired_event)
+                                    await self._add_to_invoke_queue(paired_event)
                                 await container.event_store.record_event(paired_event)
 
     def to_dict(self) -> dict[str, Any]:
