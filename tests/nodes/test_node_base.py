@@ -223,7 +223,7 @@ class TestNodeBase:
         assert basic_node_base._command is command
 
     @pytest.mark.asyncio
-    async def test_concrete_a_invoke_method(
+    async def test_concrete_invoke_method(
         self,
         basic_node_base: ConcreteNodeBase,
         invoke_context: InvokeContext,
@@ -240,7 +240,7 @@ class TestNodeBase:
         assert messages[0].content == "Concrete async node response"
 
     @pytest.mark.asyncio
-    async def test_abstract_a_invoke_not_implemented_in_base_class(
+    async def test_abstract_invoke_not_implemented_in_base_class(
         self,
         invoke_context: InvokeContext,
         sample_consumed_events: List[ConsumeFromTopicEvent],

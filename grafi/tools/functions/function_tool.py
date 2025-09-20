@@ -10,7 +10,7 @@ import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -41,7 +41,7 @@ class FunctionTool(Tool):
         """
         return FunctionToolBuilder(cls)
 
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:

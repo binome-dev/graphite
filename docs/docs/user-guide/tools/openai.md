@@ -81,9 +81,9 @@ openai_tool = (
 # Create input messages
 messages = [Message(role="user", content="Hello, how are you?")]
 
-# Synchronous invocation
-response = openai_tool.invoke(invoke_context, messages)
-print(response[0].content)
+# Asynchronous invocation
+async for response in openai_tool.invoke(invoke_context, messages):
+    print(response[0].content)
 ```
 
 ### Streaming Usage

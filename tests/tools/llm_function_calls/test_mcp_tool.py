@@ -94,7 +94,7 @@ async def test_a_get_function_specs_adds_specs(dummy_connections):
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_text_content(
+async def test_invoke_text_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
     tool = MCPTool(connections=dummy_connections)
@@ -115,7 +115,7 @@ async def test_a_invoke_text_content(
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_image_content(
+async def test_invoke_image_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
     tool = MCPTool(connections=dummy_connections)
@@ -138,7 +138,7 @@ async def test_a_invoke_image_content(
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_embedded_resource(
+async def test_invoke_embedded_resource(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
     tool = MCPTool(connections=dummy_connections)
@@ -168,7 +168,7 @@ async def test_a_invoke_embedded_resource(
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_unsupported_content(
+async def test_invoke_unsupported_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
     tool = MCPTool(connections=dummy_connections)
@@ -192,7 +192,7 @@ async def test_a_invoke_unsupported_content(
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
+async def test_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
     tool = MCPTool(connections=dummy_connections)
 
     class DummyInputMessage:

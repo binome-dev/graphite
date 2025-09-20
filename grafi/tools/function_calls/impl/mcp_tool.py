@@ -7,7 +7,7 @@ from typing import List
 from loguru import logger
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import Connection
@@ -84,7 +84,7 @@ class MCPTool(FunctionCallTool):
 
             self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self,
         invoke_context: InvokeContext,

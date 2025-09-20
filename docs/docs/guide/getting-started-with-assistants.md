@@ -227,20 +227,19 @@ This function is not part of the framework, but rather a helper function used to
 class FinanceAssistant(Assistant):
 
     ...
-    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+    async def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
         """Run the assistant with a question and return the response."""
         # Call helper function get_input()
         input_data, invoke_context = self.get_input(question, invoke_context)
         # This is the line that invokes the workflow
-        output = super().invoke(invoke_context, input_data)
-
-        # Handle different content types
-        if output and len(output) > 0:
-            content = output[0].content
-            if isinstance(content, str):
-                return content
-            elif content is not None:
-                return str(content)
+        async for output in super().invoke(input_data):
+            # Handle different content types
+            if output and len(output) > 0:
+                content = output[0].content
+                if isinstance(content, str):
+                    return content
+                elif content is not None:
+                    return str(content)
 
         return "No response generated"
 ```

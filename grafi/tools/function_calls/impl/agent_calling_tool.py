@@ -7,7 +7,7 @@ from typing import Self
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
@@ -54,7 +54,7 @@ class AgentCallingTool(FunctionCallTool):
         """
         return AgentCallingToolBuilder(cls)
 
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:

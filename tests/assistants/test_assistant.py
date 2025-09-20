@@ -32,7 +32,7 @@ class TestAssistant:
         """Create a mock Workflow instance."""
         mock_workflow = Mock(spec=Workflow)
 
-        async def mock_a_invoke(*args, **kwargs):
+        async def mock_invoke(*args, **kwargs):
             yield ConsumeFromTopicEvent(
                 invoke_context=invoke_context,
                 name="agent_output",
@@ -43,7 +43,7 @@ class TestAssistant:
                 data=[Message(content="async workflow response", role="assistant")],
             )
 
-        mock_workflow.invoke.return_value = mock_a_invoke()
+        mock_workflow.invoke.return_value = mock_invoke()
         mock_workflow.to_dict.return_value = {"workflow": "data"}
         return mock_workflow
 
@@ -104,8 +104,8 @@ class TestAssistant:
 
     # Test Async Invoke Method
     @pytest.mark.asyncio
-    @patch("grafi.assistants.assistant.record_assistant_a_invoke")
-    async def test_a_invoke_success(
+    @patch("grafi.assistants.assistant.record_assistant_invoke")
+    async def test_invoke_success(
         self, mock_decorator, mock_assistant, invoke_context, input_messages
     ):
         """Test successful async invoke method."""
@@ -128,8 +128,8 @@ class TestAssistant:
         assert result_events[0].data[0].role == "assistant"
 
     @pytest.mark.asyncio
-    @patch("grafi.assistants.assistant.record_assistant_a_invoke")
-    async def test_a_invoke_with_empty_messages(
+    @patch("grafi.assistants.assistant.record_assistant_invoke")
+    async def test_invoke_with_empty_messages(
         self, mock_decorator, mock_assistant, invoke_context
     ):
         """Test async invoke with empty messages."""
@@ -148,8 +148,8 @@ class TestAssistant:
         assert len(result_events) == 1
 
     @pytest.mark.asyncio
-    @patch("grafi.assistants.assistant.record_assistant_a_invoke")
-    async def test_a_invoke_multiple_yields(
+    @patch("grafi.assistants.assistant.record_assistant_invoke")
+    async def test_invoke_multiple_yields(
         self, mock_decorator, mock_assistant, invoke_context, input_messages
     ):
         """Test async invoke with multiple yields."""
@@ -191,8 +191,8 @@ class TestAssistant:
         assert result_events[1].data[0].content == "second response"
 
     @pytest.mark.asyncio
-    @patch("grafi.assistants.assistant.record_assistant_a_invoke")
-    async def test_a_invoke_workflow_exception_propagated(
+    @patch("grafi.assistants.assistant.record_assistant_invoke")
+    async def test_invoke_workflow_exception_propagated(
         self, mock_decorator, mock_assistant, invoke_context, input_messages
     ):
         """Test that async workflow exceptions are propagated."""

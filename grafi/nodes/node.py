@@ -2,7 +2,7 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import List
 
-from grafi.common.decorators.record_decorators import record_node_a_invoke
+from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -36,7 +36,7 @@ class Node(NodeBase):
         """Return a builder for Node."""
         return NodeBaseBuilder(cls)
 
-    @record_node_a_invoke
+    @record_node_invoke
     async def invoke(
         self,
         invoke_context: InvokeContext,

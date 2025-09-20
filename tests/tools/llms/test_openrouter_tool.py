@@ -52,9 +52,7 @@ def test_init(openrouter_instance):
 #  Simple assistant reply
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_simple_response(
-    monkeypatch, openrouter_instance, invoke_context
-):
+async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context):
     import grafi.tools.llms.impl.openrouter_tool
     import grafi.tools.llms.impl.openrouter_tool as or_module
 
@@ -102,7 +100,7 @@ async def test_a_invoke_simple_response(
 #  With extra headers
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_with_extra_headers(
+async def test_invoke_with_extra_headers(
     monkeypatch, openrouter_instance, invoke_context
 ):
     import grafi.tools.llms.impl.openrouter_tool
@@ -140,7 +138,7 @@ async def test_a_invoke_with_extra_headers(
 #  Function / tool-call path
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
+async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
     import grafi.tools.llms.impl.openrouter_tool
 
     mock_response = Mock(spec=ChatCompletion)
@@ -197,7 +195,7 @@ async def test_a_invoke_function_call(monkeypatch, openrouter_instance, invoke_c
 #  Error propagation
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
+async def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
     import grafi.tools.llms.impl.openrouter_tool
 
     def _raise(*_a, **_kw):  # pragma: no cover

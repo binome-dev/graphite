@@ -18,7 +18,7 @@ from openai.types.chat.chat_completion_message_param import ChatCompletionMessag
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -99,7 +99,7 @@ class OpenAITool(LLM):
 
         return api_messages, api_tools
 
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self,
         invoke_context: InvokeContext,

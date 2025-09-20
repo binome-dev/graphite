@@ -4,7 +4,7 @@ from typing import Any
 from typing import AsyncGenerator
 
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.decorators.record_decorators import record_assistant_a_invoke
+from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -20,7 +20,7 @@ class Assistant(AssistantBase):
         event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
     """
 
-    @record_assistant_a_invoke
+    @record_assistant_invoke
     async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:

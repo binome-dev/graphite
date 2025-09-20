@@ -237,7 +237,7 @@ class TestNode:
         assert len(node.publish_to) == 1
 
     # Test Invoke Method
-    @patch("grafi.nodes.node.record_node_a_invoke")
+    @patch("grafi.nodes.node.record_node_invoke")
     @pytest.mark.asyncio
     async def test_invoke_with_tool(
         self,
@@ -260,7 +260,7 @@ class TestNode:
         # Verify we get results
         assert isinstance(messages, list)
 
-    @patch("grafi.nodes.node.record_node_a_invoke")
+    @patch("grafi.nodes.node.record_node_invoke")
     @pytest.mark.asyncio
     async def test_invoke_without_tool_raises_error(
         self,
@@ -280,9 +280,9 @@ class TestNode:
                 pass
 
     # Test Async Invoke Method
-    @patch("grafi.nodes.node.record_node_a_invoke")
+    @patch("grafi.nodes.node.record_node_invoke")
     @pytest.mark.asyncio
-    async def test_a_invoke_with_tool(
+    async def test_invoke_with_tool(
         self,
         mock_decorator,
         node_with_tool: Node,
@@ -301,9 +301,9 @@ class TestNode:
         # Verify we get results
         assert isinstance(messages, list)
 
-    @patch("grafi.nodes.node.record_node_a_invoke")
+    @patch("grafi.nodes.node.record_node_invoke")
     @pytest.mark.asyncio
-    async def test_a_invoke_without_tool_raises_error(
+    async def test_invoke_without_tool_raises_error(
         self,
         mock_decorator,
         basic_node: Node,
@@ -454,7 +454,7 @@ class TestNode:
             )
         ]
 
-        with patch("grafi.nodes.node.record_node_a_invoke") as mock_decorator:
+        with patch("grafi.nodes.node.record_node_invoke") as mock_decorator:
             mock_decorator.side_effect = lambda func: func
 
             messages = []

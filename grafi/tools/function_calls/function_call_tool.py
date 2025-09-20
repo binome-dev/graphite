@@ -12,7 +12,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.common.decorators.llm_function import llm_function
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionCallException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
@@ -96,7 +96,7 @@ class FunctionCallTool(Tool):
         """
         return self.function_specs
 
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:

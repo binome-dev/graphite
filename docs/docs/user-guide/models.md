@@ -103,7 +103,8 @@ from grafi.tools.tool import Tool
 command = Command.for_tool(my_tool)
 
 # Invoke the command
-response = command.invoke(invoke_context, input_datas)
+async for response in command.invoke(invoke_context, input_datas):
+    # Process response
 ```
 
 ## FunctionSpec

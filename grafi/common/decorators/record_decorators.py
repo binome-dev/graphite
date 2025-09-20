@@ -76,7 +76,7 @@ _assistant_config = ComponentConfig(
 )
 
 # Async assistant decorator
-record_assistant_a_invoke = create_async_decorator(_assistant_config)
+record_assistant_invoke = create_async_decorator(_assistant_config)
 
 # ============================================================================
 # WORKFLOW DECORATORS
@@ -99,7 +99,7 @@ _workflow_config = ComponentConfig(
 )
 
 # Async workflow decorator
-record_workflow_a_invoke = create_async_decorator(_workflow_config)
+record_workflow_invoke = create_async_decorator(_workflow_config)
 
 
 # ============================================================================
@@ -148,7 +148,7 @@ _node_config = ComponentConfig(
 )
 
 # Async node decorator
-record_node_a_invoke = create_async_decorator(_node_config)
+record_node_invoke = create_async_decorator(_node_config)
 
 
 # ============================================================================
@@ -189,4 +189,4 @@ _tool_config = ComponentConfig(
 )
 
 # Async tool decorator
-record_tool_a_invoke = create_async_decorator(_tool_config)
+record_tool_invoke = create_async_decorator(_tool_config)

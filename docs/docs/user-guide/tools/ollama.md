@@ -83,9 +83,9 @@ ollama_tool = (
 # Create input messages
 messages = [Message(role="user", content="Hello, how are you?")]
 
-# Synchronous invocation
-response = ollama_tool.invoke(invoke_context, messages)
-print(response[0].content)
+# Asynchronous invocation
+async for response in ollama_tool.invoke(invoke_context, messages):
+    print(response[0].content)
 ```
 
 ### Streaming Usage

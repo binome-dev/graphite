@@ -46,7 +46,7 @@ def test_init(openai_instance):
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_simple_response(monkeypatch, openai_instance, invoke_context):
+async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_context):
     import grafi.tools.llms.impl.openai_tool
 
     mock_response = Mock(spec=ChatCompletion)
@@ -85,7 +85,7 @@ async def test_a_invoke_simple_response(monkeypatch, openai_instance, invoke_con
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_function_call(monkeypatch, openai_instance, invoke_context):
+async def test_invoke_function_call(monkeypatch, openai_instance, invoke_context):
     import grafi.tools.llms.impl.openai_tool
 
     mock_response = Mock(spec=ChatCompletion)
@@ -149,7 +149,7 @@ async def test_a_invoke_function_call(monkeypatch, openai_instance, invoke_conte
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_api_error(openai_instance, invoke_context):
+async def test_invoke_api_error(openai_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):

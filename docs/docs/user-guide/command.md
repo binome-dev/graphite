@@ -542,11 +542,11 @@ Commands integrate seamlessly with Graphite's event-driven workflows:
 ```python
 # In a Node
 @record_node_invoke
-def invoke(self, invoke_context: InvokeContext,
-           node_input: List[ConsumeFromTopicEvent]) -> Messages:
+async def invoke(self, invoke_context: InvokeContext,
+           node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[Messages, None]:
     # Command automatically handles data transformation
-    response = self.command.invoke(invoke_context, node_input)
-    return response
+    async for response in self.command.invoke(invoke_context, node_input):
+        yield response
 
 # Command selection happens automatically
 node = Node.builder().tool(my_llm_tool).build()

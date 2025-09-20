@@ -55,7 +55,7 @@ def test_init(deepseek_instance):
 #  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
+async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
     from unittest.mock import AsyncMock
 
     import grafi.tools.llms.impl.deepseek_tool
@@ -109,7 +109,7 @@ async def test_a_invoke_simple_response(monkeypatch, deepseek_instance, invoke_c
 #  invoke() – function call path
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
+async def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
     from unittest.mock import AsyncMock
 
     import grafi.tools.llms.impl.deepseek_tool
@@ -187,7 +187,7 @@ async def test_a_invoke_function_call(monkeypatch, deepseek_instance, invoke_con
 #  Error handling
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_a_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
+async def test_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
     import grafi.tools.llms.impl.deepseek_tool
 
     # Force constructor to raise – simulates any client error

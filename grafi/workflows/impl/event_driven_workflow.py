@@ -11,7 +11,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
 from grafi.common.containers.container import container
-from grafi.common.decorators.record_decorators import record_workflow_a_invoke
+from grafi.common.decorators.record_decorators import record_workflow_invoke
 from grafi.common.events.event import Event
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -539,7 +539,7 @@ class EventDrivenWorkflow(Workflow):
             _cancel_all_active_tasks()
             buffer.clear()  # Clear buffer for next iteration
 
-    @record_workflow_a_invoke
+    @record_workflow_invoke
     async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:

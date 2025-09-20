@@ -1,7 +1,7 @@
 """Tests for the unified record decorators."""
 
 from grafi.common.decorators.record_base import EventContext
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 
 
 class TestEventContext:
@@ -54,9 +54,9 @@ class TestToolDecorators:
     """Test suite for tool decorators."""
 
     def test_record_tool_async_decorator_exists(self):
-        """Test that @record_tool_a_invoke decorator exists and can be applied."""
+        """Test that @record_tool_invoke decorator exists and can be applied."""
 
-        @record_tool_a_invoke
+        @record_tool_invoke
         async def test_async_tool_function(self, messages):
             return f"async processed: {len(messages)} messages"
 
@@ -77,7 +77,7 @@ class TestDecoratorBehavior:
         async def original_async_func(self, data):
             return data
 
-        decorated_async_func = record_tool_a_invoke(original_async_func)
+        decorated_async_func = record_tool_invoke(original_async_func)
 
         # Should return a different object (wrapper)
         assert decorated_async_func is not original_async_func

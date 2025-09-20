@@ -81,12 +81,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFro
 from typing import List, AsyncGenerator
 
 class MyAssistant(Assistant):
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-        """Synchronous processing of events."""
-        # Delegate to workflow
-        events = self.workflow.invoke(input_data)
-        return events
-
     async def invoke(
         self,
         input_data: PublishToTopicEvent
@@ -103,26 +97,25 @@ from grafi.nodes.node import Node
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from typing import List
+from typing import List, AsyncGenerator
 
 class ProcessorNode(Node):
-    def invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent]
-    ) -> PublishToTopicEvent:
+    ) -> AsyncGenerator[PublishToTopicEvent, None]:
         """Process consumed events and publish result."""
         # Execute command on input data
-        response = self.command.invoke(invoke_context, node_input)
-
-        # Wrap response in PublishToTopicEvent
-        return PublishToTopicEvent(
-            publisher_name=self.name,
-            publisher_type=self.type,
-            invoke_context=invoke_context,
-            consumed_event_ids=[event.event_id for event in node_input],
-            data=response
-        )
+        async for response in self.command.invoke(invoke_context, node_input):
+            # Wrap response in PublishToTopicEvent
+            yield PublishToTopicEvent(
+                publisher_name=self.name,
+                publisher_type=self.type,
+                invoke_context=invoke_context,
+                consumed_event_ids=[event.event_id for event in node_input],
+                data=response
+            )
 ```
 
 ### Workflow Integration
@@ -133,19 +126,17 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 
 class MyWorkflow(Workflow):
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-        """Execute workflow synchronously."""
+    async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+        """Execute workflow asynchronously."""
         # Initialize workflow with input event
-        self.initial_workflow(input_data)
+        await self.init_workflow(input_data)
 
         # Process nodes until completion
         while not self._invoke_queue.empty():
             node = self._invoke_queue.get()
-            output = node.invoke(...)
-            # Publish output to topics
-
-        # Return consumed events from output topics
-        return self._get_output_events()
+            async for output in node.invoke(...):
+                # Publish output to topics
+                yield output
 ```
 
 ## Benefits of Event Interfaces
@@ -186,14 +177,16 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
 
 **New Pattern:**
 ```python
-def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-    return self.workflow.invoke(input_data)
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async for output in self.workflow.invoke(input_data):
+        yield output
 ```
 
 Key changes:
 1. Input is now a single `PublishToTopicEvent` instead of separate context and data
-2. Output is a list of `ConsumeFromTopicEvent` objects
+2. Output is an async generator yielding `ConsumeFromTopicEvent` objects
 3. Context and data are embedded within the event objects
+4. Method is now async and uses `async for` for streaming responses
 4. Event IDs enable tracing the full processing chain
 
 ## Best Practices

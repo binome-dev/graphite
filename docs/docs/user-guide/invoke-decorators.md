@@ -88,11 +88,13 @@ Records synchronous assistant invocations with event logging and tracing.
 from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from typing import AsyncGenerator
 
 @record_assistant_invoke
-def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
+async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     # Assistant implementation
-    return self.workflow.invoke(input_data)
+    async for output in self.workflow.invoke(input_data):
+        yield output
 ```
 
 ### Node Decorators
@@ -117,20 +119,20 @@ from grafi.common.decorators.record_node_invoke import record_node_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from typing import List
+from typing import List, AsyncGenerator
 
 @record_node_invoke
-def invoke(self, invoke_context: InvokeContext,
-           node_input: List[ConsumeFromTopicEvent]) -> PublishToTopicEvent:
-    # Node processing logic - execute command and return PublishToTopicEvent
-    response = self.command.invoke(invoke_context, node_input)
-    return PublishToTopicEvent(
-        publisher_name=self.name,
-        publisher_type=self.type,
-        invoke_context=invoke_context,
-        consumed_event_ids=[event.event_id for event in node_input],
-        data=response
-    )
+async def invoke(self, invoke_context: InvokeContext,
+           node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[PublishToTopicEvent, None]:
+    # Node processing logic - execute command and yield PublishToTopicEvents
+    async for response in self.command.invoke(invoke_context, node_input):
+        yield PublishToTopicEvent(
+            publisher_name=self.name,
+            publisher_type=self.type,
+            invoke_context=invoke_context,
+            consumed_event_ids=[event.event_id for event in node_input],
+            data=response
+        )
 ```
 
 ### Tool Decorators

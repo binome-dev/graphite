@@ -20,7 +20,7 @@ from typing import Self
 from google.genai import types
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -136,7 +136,7 @@ class GeminiTool(LLM):
     # --------------------------------------------------------------------- #
     # Asynchronous (async/await) one‑shot call
     # --------------------------------------------------------------------- #
-    @record_tool_a_invoke
+    @record_tool_invoke
     async def invoke(
         self,
         invoke_context: InvokeContext,

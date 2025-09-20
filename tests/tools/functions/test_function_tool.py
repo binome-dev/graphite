@@ -25,7 +25,7 @@ def function_tool():
 
 
 @pytest.mark.asyncio
-async def test_a_invoke_returns_message(function_tool):
+async def test_invoke_returns_message(function_tool):
     context = InvokeContext(
         conversation_id="conversation_id",
         invoke_id=uuid.uuid4().hex,

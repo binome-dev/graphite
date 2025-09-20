@@ -231,13 +231,13 @@ class TestEventDrivenWorkflowAsyncInvoke:
 
         return EventDrivenWorkflow(nodes={"test_node": node})
 
-    def test_a_invoke_method_exists(self, async_workflow):
+    def test_invoke_method_exists(self, async_workflow):
         """Test that invoke method exists and is async."""
         assert hasattr(async_workflow, "invoke")
         assert callable(async_workflow.invoke)
 
     @pytest.mark.asyncio
-    async def test_a_invoke_basic_flow(self, async_workflow):
+    async def test_invoke_basic_flow(self, async_workflow):
         """Test basic async invoke flow."""
         # This test verifies that the invoke method can be called
         # and properly sets up the async machinery
@@ -276,7 +276,7 @@ class TestEventDrivenWorkflowAsyncInvoke:
             mock_event_store.get_agent_events.assert_called_with("test")
 
     @pytest.mark.asyncio
-    async def test_a_invoke_with_async_output_queue(self, async_workflow):
+    async def test_invoke_with_async_output_queue(self, async_workflow):
         """Test that invoke uses AsyncOutputQueue."""
         # We can verify that the workflow has the necessary components
         assert hasattr(async_workflow, "_tracker")
