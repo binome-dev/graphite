@@ -26,10 +26,6 @@ class MyAssistant(AssistantBase):
         # Implementation required
         pass
 
-    def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-        # Implementation required
-        pass
-
     async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         # Implementation required
         pass
@@ -52,8 +48,7 @@ Subclasses must implement these abstract methods:
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `_construct_workflow` | `() -> AssistantBase` | Constructs and configures the assistant's workflow |
-| `invoke` | `(PublishToTopicEvent) -> List[ConsumeFromTopicEvent]` | Synchronous event processing |
-| `a_invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Asynchronous event processing with streaming support |
+| `invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Asynchronous event processing with streaming support |
 
 ### Lifecycle
 
@@ -65,7 +60,7 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 ### Implementation Features
 
-- **Automatic Event Recording**: Uses `@record_assistant_invoke` and `@record_assistant_a_invoke` decorators
+- **Automatic Event Recording**: Uses `@record_assistant_invoke` decorator
 - **Workflow Delegation**: Delegates all processing to the configured workflow
 - **Manifest Generation**: Supports generating configuration manifests
 - **Serialization**: Provides dictionary serialization capabilities
@@ -74,8 +69,7 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `invoke` | `(PublishToTopicEvent) -> List[ConsumeFromTopicEvent]` | Processes input events synchronously through the workflow |
-| `a_invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Processes input events asynchronously with streaming support |
+| `invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Processes input events asynchronously with streaming support |
 | `to_dict` | `() -> dict[str, Any]` | Serializes the assistant's workflow configuration |
 | `generate_manifest` | `(output_dir: str = ".") -> str` | Generates a JSON manifest file for the assistant |
 
@@ -83,29 +77,10 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 #### invoke()
 
-Synchronously processes input events through the configured workflow.
-
-```python
-@record_assistant_invoke
-def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-    events = self.workflow.invoke(input_data)
-    return events
-```
-
-**Parameters**:
-
-- `input_data`: A `PublishToTopicEvent` containing the data to be processed and context information
-
-**Returns**: List of `ConsumeFromTopicEvent` objects representing the workflow output
-
-**Raises**: `ValueError` if required configuration (e.g., API keys) is missing
-
-#### invoke()
-
 Asynchronously processes input events with support for streaming responses.
 
 ```python
-@record_assistant_a_invoke
+@record_assistant_invoke
 async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     async for output in self.workflow.invoke(input_data):
         yield output

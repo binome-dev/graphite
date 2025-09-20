@@ -89,8 +89,7 @@ context = InvokeContext(
 | Method                 | Description                                                                         |
 |------------------------|-------------------------------------------------------------------------------------|
 | `for_tool(tool)`       | Class method factory to create appropriate command for a tool type.                |
-| `invoke(context, data)`| Synchronously invokes the tool with the provided context and input data.           |
-| `a_invoke(context, data)` | Asynchronously invokes the tool, yielding response messages.                    |
+| `invoke(context, data)` | Asynchronously invokes the tool, yielding response messages.                    |
 | `get_tool_input(context, data)` | Processes input events and extracts messages for tool consumption.         |
 | `to_dict()`            | Serializes the command to a dictionary representation.                             |
 

@@ -524,7 +524,7 @@ Topics can have conditions attached to them to trigger them, in the case of `Inp
 
 
 
-When you call the assistant's `a_invoke()` method from `main.py`
+When you call the assistant's `invoke()` method from `main.py`
 
 ```python
 

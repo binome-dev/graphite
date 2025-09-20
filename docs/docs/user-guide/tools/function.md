@@ -16,8 +16,7 @@ The **FunctionTool** class is a specialized `Tool` designed to invoke custom fun
 | Method              | Signature                                                           | Description                                                                                         |
 |---------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> FunctionToolBuilder`                               | Returns a builder instance for constructing FunctionTool objects.                                  |
-| `invoke`            | `(invoke_context: InvokeContext, input_data: Messages) -> Messages` | Synchronously invokes the wrapped function with input messages and returns the result as messages. |
-| `a_invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously invokes the function, supporting both regular and await-able functions.        |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously invokes the function, supporting both regular and await-able functions.        |
 | `to_messages`       | `(response: OutputType) -> Messages`                               | Converts the function's raw response into standardized `Message` objects with appropriate formatting. |
 | `to_dict`           | `() -> dict[str, Any]`                                              | Serializes the tool's configuration into a dictionary format for persistence or debugging.         |
 
@@ -44,7 +43,7 @@ The tool automatically handles different response types in its `to_messages` met
 
 ### Async Support
 
-The `a_invoke` method supports both synchronous and asynchronous functions:
+The `invoke` method supports both synchronous and asynchronous functions:
 
 - For regular functions: Executes the function normally
 - For async functions: Automatically detects await-able responses using `inspect.isawaitable()` and awaits them

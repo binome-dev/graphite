@@ -1,6 +1,6 @@
 # OllamaTool
 
-`OllamaTool` is an implementation of the `LLM` interface designed to interface with Ollama's language model API. It supports synchronous and asynchronous interaction patterns, streaming responses, and function calling, converting workflow `Message` objects into an Ollama-compatible format and translating API responses back into the workflow.
+`OllamaTool` is an implementation of the `LLM` interface designed to interface with Ollama's language model API. It supports asynchronous interaction patterns, streaming responses, and function calling, converting workflow `Message` objects into an Ollama-compatible format and translating API responses back into the workflow.
 
 ## Fields
 
@@ -22,8 +22,7 @@
 |---------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> OllamaToolBuilder`                                | Returns a builder instance for constructing OllamaTool objects.                                    |
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]` | Adapts Message objects to Ollama API format, including function specifications. |
-| `invoke`            | `(invoke_context: InvokeContext, input_data: Messages) -> Messages` | Synchronously calls the Ollama API and returns the response as Messages.                          |
-| `a_invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously calls the Ollama API, supporting both streaming and non-streaming modes.     |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously calls the Ollama API, supporting both streaming and non-streaming modes.     |
 | `to_stream_messages`| `(chunk: ChatResponse \| dict[str, Any]) -> Messages` | Converts streaming response chunks from Ollama's API into Message objects. |
 | `to_messages`       | `(response: ChatResponse) -> Messages`                            | Converts a complete response from Ollama's API into Message objects.                               |
 | `to_dict`           | `() -> dict[str, Any]`                                             | Provides a dictionary representation of the OllamaTool configuration.                              |
@@ -38,9 +37,8 @@ The Ollama tool processes requests through several key steps:
    - Extracts function specifications and converts them to Ollama tool format
    - Handles function calls by converting them to tool_calls format
 
-2. **API Invocation**: Depending on the method called:
-   - **Synchronous (`invoke`)**: Creates an Ollama client and makes a direct API call
-   - **Asynchronous (`a_invoke`)**: Uses AsyncClient for concurrent operations
+2. **API Invocation**:
+   - **Asynchronous (`invoke`)**: Uses AsyncClient for concurrent operations
    - **Streaming**: When `is_streaming=True`, processes responses incrementally
    - **Function Calling**: Supports tool/function calling through Ollama's API
 
@@ -204,7 +202,7 @@ The `OllamaTool` integrates seamlessly with Graphite's architecture:
 
 - **Command Pattern**: Uses `@use_command(LLMCommand)` for workflow integration
 - **Observability**: Includes OpenInference tracing with `LLM` span type
-- **Decorators**: Uses `@record_tool_invoke` and `@record_tool_a_invoke` for monitoring
+- **Decorators**: Uses `@record_tool_invoke` for monitoring
 - **Local Deployment**: Perfect for local or on-premises LLM deployments
 
 By leveraging `OllamaTool` in your workflows, you can utilize powerful local language models through Ollama while maintaining consistency with Graphite's tool architecture and event-driven patterns. This enables privacy-focused, locally-hosted AI capabilities without external API dependencies.

@@ -1,6 +1,6 @@
 # OpenAITool
 
-`OpenAITool` is a concrete implementation of the `LLM` interface, integrating directly with OpenAI's language model APIs. It supports synchronous and asynchronous interactions, as well as streaming responses for real-time applications.
+`OpenAITool` is a concrete implementation of the `LLM` interface, integrating directly with OpenAI's language model APIs. It supports asynchronous interactions and streaming responses for real-time applications.
 
 ## Fields
 
@@ -22,8 +22,7 @@
 |---------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> OpenAIToolBuilder`                                | Returns a builder instance for constructing OpenAITool objects.                                    |
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[ChatCompletionMessageParam], Union[List[ChatCompletionToolParam], NotGiven]]` | Adapts Message objects to OpenAI API format, including function specifications. |
-| `invoke`            | `(invoke_context: InvokeContext, input_data: Messages) -> Messages` | Synchronously calls the OpenAI API and returns the response as Messages.                          |
-| `a_invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously calls the OpenAI API, supporting both streaming and non-streaming modes.     |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously calls the OpenAI API, supporting both streaming and non-streaming modes.     |
 | `to_stream_messages`| `(chunk: ChatCompletionChunk) -> Messages`                        | Converts streaming response chunks from OpenAI's API into Message objects.                         |
 | `to_messages`       | `(response: ChatCompletion) -> Messages`                          | Converts a complete response from OpenAI's API into Message objects.                               |
 | `to_dict`           | `() -> Dict[str, Any]`                                             | Serializes OpenAITool configuration, masking the API key for security.                             |
@@ -37,9 +36,8 @@ The OpenAI tool processes requests through several key steps:
    - Converts message fields (role, content, tool_calls, etc.) to OpenAI format
    - Extracts function specifications and converts them to OpenAI tool format
 
-2. **API Invocation**: Depending on the method called:
-   - **Synchronous (`invoke`)**: Creates an OpenAI client and makes a direct API call
-   - **Asynchronous (`a_invoke`)**: Uses AsyncClient for concurrent operations
+2. **API Invocation**:
+   - **Asynchronous (`invoke`)**: Uses AsyncClient for concurrent operations
    - **Streaming**: When `is_streaming=True`, processes responses incrementally
    - **Structured Output**: When `structured_output=True`, uses OpenAI's beta parsing API
 
@@ -180,6 +178,6 @@ The `OpenAITool` integrates seamlessly with Graphite's architecture:
 
 - **Command Pattern**: Uses `@use_command(LLMCommand)` for workflow integration
 - **Observability**: Includes OpenInference tracing with `LLM` span type
-- **Decorators**: Uses `@record_tool_invoke` and `@record_tool_a_invoke` for monitoring
+- **Decorators**: Uses `@record_tool_invoke` for monitoring
 
 By leveraging `OpenAITool` in your workflows, you gain access to OpenAI's powerful language models while maintaining consistency with Graphite's tool architecture and event-driven patterns.

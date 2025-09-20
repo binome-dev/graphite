@@ -178,7 +178,7 @@ When creating a concrete LLM implementation, you must:
 
 1. **Inherit from LLM**: Extend the `LLM` base class
 2. **Implement `prepare_api_input`**: Convert `Messages` to provider-specific format
-3. **Implement `invoke` and `a_invoke`**: Handle synchronous and asynchronous API calls
+3. **Implement `invoke`**: Handle asynchronous API calls
 4. **Implement response conversion**: Convert provider responses back to `Messages`
 5. **Create a builder**: Extend `LLMBuilder` with provider-specific configuration
 

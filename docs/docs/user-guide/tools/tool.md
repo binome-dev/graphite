@@ -15,8 +15,7 @@ The `Tool` class is the fundamental base class for all tools in the Graphite fra
 
 | Method       | Signature                                                                  | Description                                                                                    |
 |--------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `invoke`     | `(invoke_context: InvokeContext, input_data: Messages) -> Messages`       | Synchronous method to process input data and return response messages.                        |
-| `a_invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield response messages via async generator.    |
+| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield response messages via async generator.    |
 | `to_messages`| `(response: Any) -> Messages`                                              | Converts tool-specific response data into standardized Message objects.                       |
 | `to_dict`    | `() -> Dict[str, Any]`                                                     | Serializes the tool instance into a dictionary representation.                                |
 
@@ -50,16 +49,9 @@ tool = (
 )
 ```
 
-### Execution Patterns
+### Execution Pattern
 
-Tools support both synchronous and asynchronous execution patterns:
-
-#### Synchronous Execution
-
-```python
-# Synchronous processing
-response = tool.invoke(invoke_context, input_messages)
-```
+Tools use asynchronous execution patterns:
 
 #### Asynchronous Execution
 
@@ -97,12 +89,6 @@ class MyCustomTool(Tool):
 ### 2. Implement Core Methods
 
 ```python
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-    """Synchronous processing implementation."""
-    # Process input_data
-    result = self.process_data(input_data)
-    return self.to_messages(result)
-
 async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     """Asynchronous processing implementation."""
     # Process input_data asynchronously
@@ -163,15 +149,6 @@ class TextProcessorTool(Tool):
     @classmethod
     def builder(cls) -> "TextProcessorToolBuilder":
         return TextProcessorToolBuilder(cls)
-
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        """Process text synchronously."""
-        if not input_data:
-            return []
-
-        content = input_data[0].content or ""
-        processed = self._process_text(content)
-        return self.to_messages(processed)
 
     async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         """Process text asynchronously."""
@@ -314,21 +291,6 @@ class MyTool(Tool):
 
 ## Error Handling Best Practices
 
-### Method Implementation
-
-```python
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-    try:
-        # Tool-specific processing
-        result = self.process(input_data)
-        return self.to_messages(result)
-    except Exception as e:
-        # Log error with context
-        logger.error(f"Tool {self.name} failed: {e}")
-        # Return error message
-        return [Message(role="assistant", content=f"Error: {str(e)}")]
-```
-
 ### Async Error Handling
 
 ```python
@@ -350,18 +312,8 @@ import pytest
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
 
-def test_tool_invoke():
-    tool = MyCustomTool()
-    context = InvokeContext()
-    input_messages = [Message(role="user", content="test input")]
-
-    result = tool.invoke(context, input_messages)
-
-    assert len(result) > 0
-    assert result[0].content is not None
-
 @pytest.mark.asyncio
-async def test_tool_a_invoke():
+async def test_tool_invoke():
     tool = MyCustomTool()
     context = InvokeContext()
     input_messages = [Message(role="user", content="test input")]
