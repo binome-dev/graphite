@@ -258,9 +258,9 @@ class EventDrivenWorkflow(Workflow):
 
                 # Given node, collect all the messages can be linked to it
 
-                node_consumed_events: List[
-                    ConsumeFromTopicEvent
-                ] = await get_node_input(node)
+                node_consumed_events: List[ConsumeFromTopicEvent] = (
+                    await get_node_input(node)
+                )
 
                 # Invoke node with collected inputs
                 if node_consumed_events:
@@ -291,8 +291,8 @@ class EventDrivenWorkflow(Workflow):
 
             consumed_events = await self._get_output_events()
 
-            for event in consumed_events:
-                yield event
+            for event in consumed_events:  # type: ignore[arg-type]
+                yield event  # type: ignore[arg-type]
         finally:
             if consumed_events:
                 await container.event_store.a_record_events(consumed_events)  # type: ignore[arg-type]
@@ -460,7 +460,7 @@ class EventDrivenWorkflow(Workflow):
                 # Remove completed/cancelled tasks from active_tasks
                 active_tasks[:] = [t for t in active_tasks if not t.done()]
 
-        def _cancel_all_active_tasks():
+        def _cancel_all_active_tasks() -> None:
             """Cancel all active tasks."""
             for task in active_tasks:
                 if not task.done():

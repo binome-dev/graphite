@@ -5,7 +5,7 @@ from typing import Optional
 
 from loguru import logger
 
-from grafi.common.event_stores.event_store import AsyncEventStore
+from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
 
 
@@ -55,7 +55,7 @@ class EventModel(Base):
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
 
-class EventStorePostgres(AsyncEventStore):
+class EventStorePostgres(EventStore):
     """Postgres-backed implementation of the EventStore interface with async support."""
 
     def __init__(self, db_url: str):
