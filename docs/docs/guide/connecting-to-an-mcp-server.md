@@ -347,6 +347,7 @@ import uuid
 from typing import Dict
 
 from grafi.common.containers.container import container
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.models.invoke_context import InvokeContext
 from grafi.models.mcp_connections import StreamableHttpConnection
 from grafi.models.message import Message
@@ -392,7 +393,11 @@ async def main():
     question = "What is the overview of the company Tesla?"
     input_data = [Message(role="user", content=question)]
 
-    async for response in assistant.invoke(invoke_context, input_data):
+    publish_event = PublishToTopicEvent(
+        invoke_context=execution_context, data=input_messages
+    )
+
+    async for response in assistant.invoke(publish_event):
         print("Assistant output:")
         for output in response:
             print(output.content)

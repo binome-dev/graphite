@@ -199,10 +199,6 @@ class CustomLLM(LLM):
         # Convert Messages to provider-specific format
         pass
 
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        # Synchronous API call implementation
-        pass
-
     async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
         # Asynchronous API call implementation
         pass

@@ -130,20 +130,25 @@ event_store = container.event_store
 Graphite has a built in react agent that can be used out of the box for your needs, we will use it for the simple use case of passing in input and retrieving the output from OpenAI.
 
 ```python
+import asyncio
 from grafi.agents.react_agent import create_react_agent
 
-react_agent = create_react_agent()
+async def run_agent():
 
-result = react_agent.run(user_input, invoke_context)
+    react_agent = create_react_agent()
 
-print("Output from React Agent:", result)
+    result = await react_agent.run(user_input, invoke_context)
+
+    print("Output from React Agent:", result)
 
 
-events = event_store.get_conversation_events(conversation_id)
+    events = event_store.get_conversation_events(conversation_id)
 
-print(f"Events for conversation {conversation_id}:")
+    print(f"Events for conversation {conversation_id}:")
 
-print(f"Events: {events} ")
+    print(f"Events: {events} ")
+
+asyncio.run(run_agent())
 
 ```
 
@@ -202,21 +207,22 @@ invoke_context = InvokeContext(
     assistant_request_id=assistant_request_id,
 )
 
-message = Message(role="user", content=user_input)
+async def run_agent():
+
+    react_agent = create_react_agent()
+
+    result = await react_agent.run(user_input, invoke_context)
+
+    print("Output from React Agent:", result)
 
 
-react_agent = create_react_agent()
+    events = event_store.get_conversation_events(conversation_id)
 
-result = react_agent.run(user_input, invoke_context)
+    print(f"Events for conversation {conversation_id}:")
 
+    print(f"Events: {events} ")
 
-for output_message in result:
-    print("Output message:", output_message)
-
-events = event_store.get_conversation_events(conversation_id)
-
-print(f"Events for conversation {conversation_id}:")
-print(f"Events: {events} ")
+asyncio.run(run_agent())
 
 ```
 

@@ -85,9 +85,12 @@ Create a file named `react_agent_app.py` and create a build-in react-agent:
 
 ```python
 # react_agent_app.py
+import asyncio
+
 from grafi.agents.react_agent import create_react_agent
 
-def main():
+
+async def main():
     print("ReAct Agent Chat Interface")
     print("Type your questions and press Enter. Type '/bye' to exit.")
     print("-" * 50)
@@ -97,7 +100,7 @@ def main():
     while True:
         user_input = input("\nYou: ").strip()
 
-        if user_input.lower() == '/bye':
+        if user_input.lower() == "/bye":
             print("Goodbye!")
             break
 
@@ -106,20 +109,22 @@ def main():
 
         try:
             # Get synchronized response from agent
-            output = react_agent.run(user_input)
+            output = await react_agent.run(user_input)
             print(f"\nAgent: {output}")
 
         except Exception as e:
             print(f"Error: {e}")
 
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 ```
 
-And finally export an `OPENAI_API_KEY` key as an environment variable:
+And finally export an `OPENAI_API_KEY` and `TAVILY_API_KEY` key as an environment variable:
 
 ```bash
 export OPENAI_API_KEY="sk-proj-******"
+export TAVILY_API_KEY="tvly-******"
 ```
 
 ---
