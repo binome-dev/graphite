@@ -87,8 +87,8 @@ Builder for constructing InWorkflowInputTopic instances.
 
 ```python
 from grafi.topics.topic import InputTopic
-from grafi.common.models.message import Message
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.message import Message
+from grafi.models.invoke_context import InvokeContext
 
 # Create input topic
 input_topic = InputTopic(name="agent_input_topic")

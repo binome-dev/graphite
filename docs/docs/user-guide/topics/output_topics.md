@@ -106,8 +106,8 @@ Workflow topics are typically created as pairs for human-in-the-loop interaction
 
 ```python
 from grafi.topics.output_topic import OutputTopic, agent_output_topic
-from grafi.common.models.message import Message
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.message import Message
+from grafi.models.invoke_context import InvokeContext
 
 # Create context and messages
 context = InvokeContext()
@@ -131,7 +131,7 @@ if event:
 ```python
 import asyncio
 from typing import AsyncIterator
-from grafi.common.models.message import Messages
+from grafi.models.message import Messages
 
 async def streaming_response() -> AsyncIterator[Messages]:
     """Example async generator for streaming responses."""
@@ -208,7 +208,7 @@ async def managed_streaming():
 
 ```python
 from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
-from grafi.common.models.message import Message
+from grafi.models.message import Message
 
 # Create workflow output topic (paired with an input topic)
 workflow_output_topic = InWorkflowOutputTopic(

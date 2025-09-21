@@ -70,7 +70,7 @@ ollama_tool = (
 
 ```python
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
-from grafi.common.models.message import Message
+from grafi.models.message import Message
 
 # Create the tool
 ollama_tool = (
@@ -112,7 +112,7 @@ async def stream_example():
 ### Function Calling
 
 ```python
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.models.function_spec import FunctionSpec
 
 # Add function specifications
 function_spec = FunctionSpec(

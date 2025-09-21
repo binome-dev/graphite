@@ -188,9 +188,9 @@ Prepare input data and context for workflow execution:
 - Returns both the input data and context
 
 ```python
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.invoke_context import InvokeContext
 from typing import Optional
-from grafi.common.models.message import Message
+from grafi.models.message import Message
 
 class FinanceAssistant(Assistant):
 

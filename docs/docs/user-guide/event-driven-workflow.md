@@ -35,7 +35,6 @@ The following table summarizes key methods within the EventDrivenWorkflow class,
 | `_invoke_node`            | Invokes a single node asynchronously with proper stream handling and error management.                                                                   |
 | `init_workflow`         | Asynchronously initializes workflow state, either restoring from stored events or creating new workflow with input data.                                |
 | `on_event`                | Event handler that responds to topic publish events, evaluates node readiness, and queues nodes for execution.                                          |
-| `initial_workflow`        | Initializes workflow state, either restoring from stored events or creating new workflow with input data.                                               |
 | `to_dict`                 | Serializes the workflow to a dictionary representation including nodes, topics, and topic-node mappings.                                                |
 
 ## Workflow Execution Flow

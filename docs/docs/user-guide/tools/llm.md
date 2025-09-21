@@ -53,7 +53,7 @@ llm_tool = (
 ### Function Calling Setup
 
 ```python
-from grafi.common.models.function_spec import FunctionSpec
+from grafi.models.function_spec import FunctionSpec
 
 # Create function specifications
 function_specs = [

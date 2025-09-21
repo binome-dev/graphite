@@ -33,15 +33,14 @@ The base class for all topic implementations, providing core messaging functiona
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publish messages to the topic (abstract) |
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data (abstract) |
 | `can_consume` | `(consumer_name: str) -> bool` | Check if consumer has unread messages |
 | `consume` | `(consumer_name: str) -> List[PublishToTopicEvent]` | Retrieve unread messages for consumer |
-| `consume` | `(consumer_name: str, timeout: Optional[float]) -> List[TopicEvent]` | Async version of consume with timeout |
-| `commit` | `(consumer_name: str, offset: int) -> None` | Commit processed messages up to offset |
+| `consume` | `async (consumer_name: str, timeout: Optional[float]) -> List[TopicEvent]` | Async version of consume with timeout |
+| `commit` | `async (consumer_name: str, offset: int) -> None` | Commit processed messages up to offset |
 | `reset` | `() -> None` | Reset topic to initial state |
-| `reset` | `() -> None` | Async version of reset |
+| `reset` | `async () -> None` | Async version of reset |
 | `restore_topic` | `(topic_event: TopicEvent) -> None` | Restore topic from event |
-| `restore_topic` | `(topic_event: TopicEvent) -> None` | Async version of restore_topic |
+| `restore_topic` | `async (topic_event: TopicEvent) -> None` | Async version of restore_topic |
 
 #### Utility Methods
 

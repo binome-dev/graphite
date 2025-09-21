@@ -167,8 +167,8 @@ import uuid
 from grafi.agents.react_agent import create_react_agent
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.models.invoke_context import InvokeContext
+from grafi.models.message import Message
 
 postgres_event_store = EventStorePostgres(
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
