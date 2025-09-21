@@ -1,11 +1,45 @@
 """Tests for the ReAct agent implementation."""
 
 import os
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
+
+# Set environment variable before any imports to prevent API key errors
+os.environ["TAVILY_API_KEY"] = "mock-api-key-for-testing"
+
+# Now import after setting the environment variable
 from grafi.agents.react_agent import ReActAgent
 from grafi.agents.react_agent import ReActAgentBuilder
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
+
+
+@pytest.fixture(autouse=True)
+def mock_tavily_client():
+    """Automatically mock TavilyClient for all tests."""
+    with patch(
+        "grafi.tools.function_calls.impl.tavily_tool.TavilyClient"
+    ) as mock_client_class:
+        # Create a mock instance
+        mock_instance = MagicMock()
+        mock_instance.search.return_value = {
+            "query": "test query",
+            "answer": "Mock search result",
+            "results": [
+                {
+                    "title": "Mock Result",
+                    "url": "https://example.com/mock",
+                    "content": "Mock content for testing",
+                    "score": 0.9,
+                }
+            ],
+        }
+
+        # Make the class return our mock instance when instantiated
+        mock_client_class.return_value = mock_instance
+        yield mock_client_class
 
 
 class TestReActAgentBuilder:
