@@ -36,7 +36,6 @@ Response in a concise and clear manner, ensuring that your answers are accurate 
 """
 
 CONVERSATION_ID = uuid.uuid4().hex
-tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 
 class ReActAgent(Assistant):
@@ -46,6 +45,9 @@ class ReActAgent(Assistant):
     name: str = Field(default="ReActAgent")
     type: str = Field(default="ReActAgent")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    tavily_api_key: Optional[str] = Field(
+        default_factory=lambda: os.getenv("TAVILY_API_KEY")
+    )
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
         default=TavilyTool.builder()
