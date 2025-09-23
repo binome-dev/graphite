@@ -136,11 +136,11 @@ event_store = EventStorePostgres(db_url)
 
 ```python
 # Record single event
-await eevent_store.record_event(event)
+await event_store.record_event(event)
 
 # Record multiple events (batch operation)
 events = [event1, event2, event3]
-await eevent_store.record_events(events)
+await event_store.record_events(events)
 ```
 
 #### Querying Events
@@ -153,7 +153,7 @@ event = await event_store.get_event("event_123")
 request_events = await event_store.get_agent_events("req_456")
 
 # Get all events for a conversation
-conversation_events = await eevent_store.get_conversation_events("conv_789")
+conversation_events = await event_store.get_conversation_events("conv_789")
 ```
 
 ### Error Handling

@@ -51,7 +51,7 @@ class AssistantBase(BaseModel):
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
-        raise NotImplementedError("Subclasses must implement 'a_invoke'.")
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the assistant to a dictionary representation."""
