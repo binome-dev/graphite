@@ -4,7 +4,6 @@ from typing import Any
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -40,15 +39,7 @@ class ChromadbRetrievalTool(RetrievalTool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
-        result: QueryResult = self.collection.query(
-            query_embeddings=embeddings, n_results=self.n_results
-        )
-        return self.to_messages(result)
-
-    @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)

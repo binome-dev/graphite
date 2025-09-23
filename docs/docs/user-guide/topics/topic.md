@@ -103,7 +103,7 @@ def publish_data(
 ### Basic Topic Creation
 
 ```python
-from grafi.common.topics.topic import Topic
+from grafi.topics.topic import Topic
 
 # Create simple topic
 topic = Topic(name="notifications")
@@ -131,15 +131,15 @@ topic = (Topic.builder()
 ### Publishing Messages
 
 ```python
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.models.invoke_context import InvokeContext
+from grafi.models.message import Message
 
 # Create context and messages
 context = InvokeContext()
 messages = [Message(role="user", content="Hello world")]
 
 # Publish to topic
-event = topic.publish_data(
+event = await topic.publish_data(
     invoke_context=context,
     publisher_name="my_publisher",
     publisher_type="application",
@@ -204,7 +204,7 @@ all_messages_topic = Topic(name="all_messages")
 The module provides a pre-configured topic for agent input:
 
 ```python
-from grafi.common.topics.topic import agent_input_topic
+from grafi.topics.topic import agent_input_topic
 
 # Use the predefined agent input topic
 event = agent_input_topic.publish_data(
@@ -279,7 +279,7 @@ def test_topic_publishing():
     messages = [Message(role="user", content="test")]
 
     # Test successful publishing
-    event = topic.publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",
@@ -299,7 +299,7 @@ def test_condition_filtering():
 
     # Test with single message (should be filtered)
     single_message = [Message(role="user", content="test")]
-    event = topic.publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",

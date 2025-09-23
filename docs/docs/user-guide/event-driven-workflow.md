@@ -29,14 +29,12 @@ The following table summarizes key methods within the EventDrivenWorkflow class,
 | `_add_topics`             | Sets up topic subscriptions and node-to-topic mappings from node configurations.                                                                         |
 | `_add_topic`              | Registers a topic within the workflow and sets default publish event handlers.                                                                           |
 | `_handle_function_calling_nodes` | Links function calling nodes with LLM nodes to enable function specification sharing.                                                             |
-| `_a_commit_events`        | Commits processed events to their respective topics, updating consumer offsets.                                                                          |
+| `_commit_events`        | Commits processed events to their respective topics, updating consumer offsets.                                                                          |
 | `_get_output_events`      | Retrieves and returns consumed events from agent output and in-workflow output topics.                                                                   |
-| `invoke`                  | Synchronous workflow execution that processes nodes from the invoke queue until completion.                                                              |
-| `a_invoke`                | Asynchronous workflow execution with streaming support and concurrent node processing.                                                                   |
+| `invoke`                | Asynchronous workflow execution with streaming support and concurrent node processing.                                                                   |
 | `_invoke_node`            | Invokes a single node asynchronously with proper stream handling and error management.                                                                   |
-| `a_init_workflow`         | Asynchronously initializes workflow state, either restoring from stored events or creating new workflow with input data.                                |
+| `init_workflow`         | Asynchronously initializes workflow state, either restoring from stored events or creating new workflow with input data.                                |
 | `on_event`                | Event handler that responds to topic publish events, evaluates node readiness, and queues nodes for execution.                                          |
-| `initial_workflow`        | Initializes workflow state, either restoring from stored events or creating new workflow with input data.                                               |
 | `to_dict`                 | Serializes the workflow to a dictionary representation including nodes, topics, and topic-node mappings.                                                |
 
 ## Workflow Execution Flow
@@ -93,20 +91,13 @@ graph TD
 
 ## Node Execution Process
 
-The EventDrivenWorkflow supports both synchronous (`invoke`) and asynchronous (`a_invoke`) execution modes, each handling node orchestration differently.
+The EventDrivenWorkflow uses asynchronous execution with the `invoke` method, handling node orchestration through async/await patterns.
 
-### Synchronous Execution (`invoke`)
-
-1. **Workflow Initialization**: Calls `initial_workflow` to restore state or set up new workflow
-2. **Node Processing Loop**: Processes nodes from `_invoke_queue` sequentially until empty
-3. **Event Collection**: Collects consumed events using `_get_consumed_events`
-4. **Output Assembly**: Sorts output messages by timestamp and returns results
-
-### Asynchronous Execution (`a_invoke`)
+### Asynchronous Execution (`invoke`)
 
 The asynchronous execution model provides sophisticated event-driven processing with proper coordination:
 
-1. **Workflow Initialization**: Sets up initial state with `a_init_workflow`
+1. **Workflow Initialization**: Sets up initial state with `init_workflow`
 2. **Concurrent Node Processing**: Spawns individual tasks for each node using `_invoke_node`  
 3. **Output Listening**: Creates listeners for each output topic to capture results
 4. **Event Streaming**: Uses `MergeIdleQueue` to stream events as they become available
@@ -198,7 +189,7 @@ async for event in MergeIdleQueue(queue, self._tracker):
     consumed_output_event = ConsumeFromTopicEvent(...)
 
     # Commit BEFORE yielding to prevent duplicate data
-    await self._a_commit_events(
+    await self._commit_events(
         consumer_name=self.name, events=[consumed_output_event]
     )
 
@@ -230,8 +221,8 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
 
             try:
                 # Process events and publish results
-                async for msgs in node.a_invoke(invoke_context, consumed_events):
-                    published_events = await a_publish_events(...)
+                async for msgs in node.invoke(invoke_context, consumed_events):
+                    published_events = await publish_events(...)
                     # Notify downstream nodes immediately
                     for event in published_events:
                         if event.name in self._topic_nodes:
@@ -240,7 +231,7 @@ async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
                                 topic.event_cache._cond.notify_all()
 
                 # Commit processed events
-                await self._a_commit_events(...)
+                await self._commit_events(...)
 
             finally:
                 # Signal node is no longer active

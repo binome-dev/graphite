@@ -59,18 +59,10 @@ class Command(BaseModel):
 
     tool: Tool
 
-    def invoke(self, invoke_context: InvokeContext,
-               input_data: List[ConsumeFromTopicEvent]) -> Messages:
-        """Synchronous tool invocation."""
-        return self.tool.invoke(
-            invoke_context,
-            self.get_tool_input(invoke_context, input_data)
-        )
-
-    async def a_invoke(self, invoke_context: InvokeContext,
+    async def invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         """Asynchronous tool invocation."""
-        async for message in self.tool.a_invoke(
+        async for message in self.tool.invoke(
             invoke_context,
             self.get_tool_input(invoke_context, input_data)
         ):
@@ -89,8 +81,7 @@ class Command(BaseModel):
 
 | Method | Description |
 |--------|-------------|
-| `invoke` | Synchronous tool execution with data transformation |
-| `a_invoke` | Asynchronous tool execution supporting streaming |
+| `invoke` | Asynchronous tool execution supporting streaming |
 | `get_tool_input` | Transforms topic events into tool-compatible format |
 | `to_dict` | Serializes command state for persistence or debugging |
 
@@ -220,8 +211,7 @@ class RagResponseCommand(Command):
 
 | Method                                            | Description                                                                                                            |
 |---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `invoke(invoke_context, input_data)`          | Invokes the `function_tool`'s synchronous `invoke` method, returning a list of resulting `Message` objects.           |
-| `a_invoke(invoke_context, input_data)`        | Calls the `function_tool`'s asynchronous `a_invoke`, yielding one or more `Message` objects in an async generator.    |
+| `invoke(invoke_context, input_data)`        | Calls the `function_tool`'s asynchronous `invoke`, yielding one or more `Message` objects in an async generator.    |
 | `get_function_specs()`                            | Retrieves the function specifications (schema, name, parameters) from the underlying `function_tool`.                  |
 | `to_dict()`                                       | Serializes the command’s current state, including the `function_tool` configuration.                                   |
 
@@ -241,8 +231,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 | Method                                        | Description                                                                                                    |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `invoke(invoke_context, input_data)`      | Synchronously calls `retrieval_tool.invoke`, returning the resulting `Message`.                               |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously calls `retrieval_tool.a_invoke`, yielding one or more `Message` objects.                       |
+| `invoke(invoke_context, input_data)`    | Asynchronously calls `retrieval_tool.invoke`, yielding one or more `Message` objects.                       |
 | `to_dict()`                                   | Serializes the command’s state, including the `retrieval_tool` configuration.                                  |
 
 [`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py) similarly delegates to a `RagTool` that performs retrieval-augmented generation. This command is used by `RagNode`.
@@ -257,8 +246,7 @@ By passing a `FunctionCallTool` to the `function_tool` field, you can seamlessly
 
 | Method                                        | Description                                                                                                          |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
-| `invoke(invoke_context, input_data)`      | Synchronously calls `rag_tool.invoke`, returning a `Message` with retrieval results.                                |
-| `a_invoke(invoke_context, input_data)`    | Asynchronously invokes `rag_tool.a_invoke`, yielding partial or complete messages from the retrieval-augmented flow.|
+| `invoke(invoke_context, input_data)`    | Asynchronously invokes `rag_tool.invoke`, yielding partial or complete messages from the retrieval-augmented flow.|
 | `to_dict()`                                   | Serializes the command’s state, reflecting the assigned `RagTool` configuration.                                     |
 
 Both commands enable a node to delegate specialized retrieval operations to their respective tools, without needing to manage the internal logic of how embeddings or RAG processes are performed.
@@ -270,7 +258,7 @@ Both commands enable a node to delegate specialized retrieval operations to thei
 Register custom commands for specific tool types:
 
 ```python
-from grafi.common.models.command import use_command
+from grafi.models.command import use_command
 
 @use_command(MyCustomCommand)
 class MySpecialTool(Tool):
@@ -318,10 +306,10 @@ Create custom commands when you need:
 
 ```python
 from typing import List
-from grafi.common.models.command import Command
+from grafi.models.command import Command
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Messages
+from grafi.models.invoke_context import InvokeContext
+from grafi.models.message import Messages
 
 class DatabaseQueryCommand(Command):
     """Command for database query tools with caching and optimization."""
@@ -443,7 +431,7 @@ class StatefulCommand(Command):
 class ResilientCommand(Command):
     """Command with built-in error recovery."""
 
-    async def a_invoke(self, invoke_context: InvokeContext,
+    async def invoke(self, invoke_context: InvokeContext,
                        input_data: List[ConsumeFromTopicEvent]) -> MsgsAGen:
         max_retries = 3
         retry_count = 0
@@ -451,7 +439,7 @@ class ResilientCommand(Command):
         while retry_count < max_retries:
             try:
                 tool_input = self.get_tool_input(invoke_context, input_data)
-                async for message in self.tool.a_invoke(invoke_context, tool_input):
+                async for message in self.tool.invoke(invoke_context, tool_input):
                     yield message
                 break
             except Exception as e:
@@ -554,11 +542,11 @@ Commands integrate seamlessly with Graphite's event-driven workflows:
 ```python
 # In a Node
 @record_node_invoke
-def invoke(self, invoke_context: InvokeContext,
-           node_input: List[ConsumeFromTopicEvent]) -> Messages:
+async def invoke(self, invoke_context: InvokeContext,
+           node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[Messages, None]:
     # Command automatically handles data transformation
-    response = self.command.invoke(invoke_context, node_input)
-    return response
+    async for response in self.command.invoke(invoke_context, node_input):
+        yield response
 
 # Command selection happens automatically
 node = Node.builder().tool(my_llm_tool).build()

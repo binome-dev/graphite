@@ -1,12 +1,12 @@
 import pytest
 
-from grafi.common.topics.subscription_builder import (
+from grafi.topics.expressions.subscription_builder import (
     SubscriptionBuilder,  # Replace `your_module` with the actual module
 )
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import CombinedExpr
-from grafi.common.topics.topic_expression import LogicalOp
-from grafi.common.topics.topic_expression import TopicExpr
+from grafi.topics.expressions.topic_expression import CombinedExpr
+from grafi.topics.expressions.topic_expression import LogicalOp
+from grafi.topics.expressions.topic_expression import TopicExpr
+from grafi.topics.topic_base import TopicBase
 
 
 @pytest.fixture

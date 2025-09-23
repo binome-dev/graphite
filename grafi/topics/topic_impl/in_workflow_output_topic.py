@@ -4,9 +4,9 @@ from typing import Self
 
 from pydantic import Field
 
-from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic import TopicBuilder
-from grafi.common.topics.topic_types import TopicType
+from grafi.topics.topic_impl.topic import Topic
+from grafi.topics.topic_impl.topic import TopicBuilder
+from grafi.topics.topic_types import TopicType
 
 
 # OutputTopic handles sync and async publishing of messages to the agent output topic.

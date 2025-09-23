@@ -5,6 +5,7 @@ from pathlib import Path
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
@@ -46,27 +47,27 @@ def get_invoke_context() -> InvokeContext:
 
 
 # mock events
-def load_events_from_json() -> InvokeContext:
+async def load_events_from_json() -> InvokeContext:
     # Load events from JSON file
     with open(Path(__file__).parent / "react_events_unfinished.json", "r") as f:
         events_data = json.load(f)
 
     # Clear any existing events
-    event_store.clear_events()
+    await event_store.clear_events()
 
     # Convert each event dict to Event object and store it
     for event_dict in events_data:
         event = event_store._create_event_from_dict(event_dict)
         if event is None:
             raise ValueError(f"Failed to create event from dict: {event_dict}")
-        event_store.record_event(event)
+        await event_store.record_event(event)
         invoke_context = event.invoke_context
 
     return invoke_context
 
 
-def test_react_assistant() -> None:
-    invoke_context = load_events_from_json()
+async def test_react_assistant() -> None:
+    invoke_context = await load_events_from_json()
 
     # Set up the assistant with DuckDuckGoTool
     assistant = (
@@ -96,10 +97,13 @@ def test_react_assistant() -> None:
     ]
 
     # Invoke the assistant's function call
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print("Assistant output:", output)

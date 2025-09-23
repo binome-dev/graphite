@@ -8,9 +8,9 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 from pydantic import PrivateAttr
 
-from grafi.common.models.command import use_command
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
+from grafi.tools.command import use_command
 from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder

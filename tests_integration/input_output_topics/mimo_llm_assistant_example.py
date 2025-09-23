@@ -7,6 +7,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.input_output_topics.mimo_llm_assistant import MIMOLLMAssistant
@@ -26,7 +27,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_mimo_llm_assistant() -> None:
+async def test_mimo_llm_assistant() -> None:
     assistant = (
         MIMOLLMAssistant.builder()
         .name("MIMOLLMAssistant")
@@ -46,21 +47,23 @@ def test_mimo_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    event_store.clear_events()
+    await event_store.clear_events()
 
     # Test greeting input
     print("Testing greeting input...")
     greeting_input = [Message(content="Hello there! How are you?", role="user")]
-    greeting_output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=greeting_input,
+    greeting_output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=greeting_input,
+            )
         )
     )
     print(f"Greeting Output: {greeting_output}")
     assert len(greeting_output) == 2
 
-    assert len(event_store.get_events()) == 20
+    assert len(await event_store.get_events()) == 20
 
     # Test question input
     print("\nTesting question input...")
@@ -70,16 +73,18 @@ def test_mimo_llm_assistant() -> None:
             role="user",
         )
     ]
-    question_output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=question_input,
+    question_output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=question_input,
+            )
         )
     )
     print(f"Question Output: {question_output}")
     assert len(question_output) == 2
 
-    assert len(event_store.get_events()) == 40
+    assert len(await event_store.get_events()) == 40
 
     # Test mixed input (both greeting and question)
     print("\nTesting mixed input...")
@@ -89,16 +94,19 @@ def test_mimo_llm_assistant() -> None:
             role="user",
         )
     ]
-    mixed_output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=get_invoke_context(),
-            data=mixed_input,
+    mixed_output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=get_invoke_context(),
+                data=mixed_input,
+            ),
+            is_sequential=True,
         )
     )
     print(f"Mixed Output: {mixed_output}")
     assert len(mixed_output) == 3
 
-    assert len(event_store.get_events()) == 70
+    assert len(await event_store.get_events()) == 70
 
 
 test_mimo_llm_assistant()

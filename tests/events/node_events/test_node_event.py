@@ -7,7 +7,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_types import TopicType
+from grafi.topics.topic_types import TopicType
 
 
 def get_consumed_events(

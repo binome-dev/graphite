@@ -9,10 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_types import TopicType
 from grafi.nodes.node import Node
-from grafi.workflows.impl.utils import a_publish_events
+from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import get_node_input
 from grafi.workflows.impl.utils import publish_events
@@ -196,10 +195,11 @@ class TestGetAsyncOutputEvents:
 
 
 class TestPublishEvents:
-    def test_publish_events_sync(self):
+    @pytest.mark.asyncio
+    async def test_publish_events(self):
         # Mock node and topics
-        mock_topic1 = MagicMock(spec=TopicBase)
-        mock_topic2 = MagicMock(spec=TopicBase)
+        mock_topic1 = AsyncMock(spec=TopicBase)
+        mock_topic2 = AsyncMock(spec=TopicBase)
 
         node = MagicMock(spec=Node)
         node.name = "test_node"
@@ -224,15 +224,7 @@ class TestPublishEvents:
             data=result,
             consumed_events=consumed_events,
         )
-        mock_event2 = PublishToTopicEvent(
-            name="topic2",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=1,
-            data=result,
-            consumed_events=consumed_events,
-        )
+        mock_event2 = None  # Test case where topic doesn't publish
 
         mock_topic1.publish_data.return_value = mock_event1
         mock_topic2.publish_data.return_value = mock_event2
@@ -245,72 +237,18 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
-        all_events = publish_events(
-            node,
-            publish_to_event,
-        )
-
-        # The function returns all_events which includes both consumed and published
-        assert len(all_events) == 2  # 0 consumed + 2 published
-        assert mock_event1 in all_events
-        assert mock_event2 in all_events
-
-        # Verify topics were called correctly
-        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
-
-    @pytest.mark.asyncio
-    async def test_a_publish_events(self):
-        # Mock node and topics
-        mock_topic1 = AsyncMock(spec=TopicBase)
-        mock_topic2 = AsyncMock(spec=TopicBase)
-
-        node = MagicMock(spec=Node)
-        node.name = "test_node"
-        node.type = "test_type"
-        node.publish_to = [mock_topic1, mock_topic2]
-
-        invoke_context = InvokeContext(
-            conversation_id="test-conversation",
-            invoke_id="test-invoke",
-            assistant_request_id="test-request",
-        )
-        result = [Message(role="assistant", content="Test result")]
-        consumed_events = []
-
-        # Mock a_publish_data to return events
-        mock_event1 = PublishToTopicEvent(
-            name="topic1",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=0,
-            data=result,
-            consumed_events=consumed_events,
-        )
-        mock_event2 = None  # Test case where topic doesn't publish
-
-        mock_topic1.a_publish_data.return_value = mock_event1
-        mock_topic2.a_publish_data.return_value = mock_event2
-
-        publish_to_event = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            publisher_name=node.name,
-            publisher_type=node.type,
-            data=result,
-            consumed_event_ids=[event.event_id for event in consumed_events],
-        )
-
-        published_events = await a_publish_events(node, publish_to_event)
+        published_events = await publish_events(node, publish_to_event)
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
 
         # Verify topics were called correctly
-        mock_topic1.a_publish_data.assert_called_once_with(publish_to_event)
+        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
 
 
 class TestGetNodeInput:
-    def test_get_node_input_sync(self):
+    @pytest.mark.asyncio
+    async def test_get_node_input_async(self):
         # Mock node and subscribed topics
         mock_topic1 = MagicMock(spec=TopicBase)
         mock_topic2 = MagicMock(spec=TopicBase)
@@ -339,7 +277,7 @@ class TestGetNodeInput:
 
         mock_topic1.consume.return_value = [mock_event]
 
-        consumed_events = get_node_input(node)
+        consumed_events = await get_node_input(node)
 
         assert len(consumed_events) == 1
         assert isinstance(consumed_events[0], ConsumeFromTopicEvent)

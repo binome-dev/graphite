@@ -12,6 +12,7 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant import (
@@ -97,7 +98,7 @@ def create_collection(document_path: Path = CURRENT_DIR / "data") -> Collection:
     return collection
 
 
-def test_simple_embedding_retrieval_tool() -> None:
+async def test_simple_embedding_retrieval_tool() -> None:
     invoke_context = get_invoke_context()
     simple_rag_assistant = SimpleEmbeddingRetrievalAssistant(
         name="SimpleEmbeddingRetrievalAssistant",
@@ -106,21 +107,24 @@ def test_simple_embedding_retrieval_tool() -> None:
         collection=create_collection(),
     )
 
-    result = simple_rag_assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=[
-                Message(
-                    role="user",
-                    content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
-                )
-            ],
+    result = await async_func_wrapper(
+        simple_rag_assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=[
+                    Message(
+                        role="user",
+                        content="What is a service provided by Amazon Web Services that offers on-demand, scalable computing capacity in the cloud.",
+                    )
+                ],
+            ),
+            is_sequential=True,
         )
     )
 
     assert "Amazon EC2" in str(result[0].data[0].content)
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 12
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 12
 
 
 test_simple_embedding_retrieval_tool()

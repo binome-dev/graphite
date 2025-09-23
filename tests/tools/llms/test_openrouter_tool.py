@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
@@ -50,7 +51,9 @@ def test_init(openrouter_instance):
 # --------------------------------------------------------------------------- #
 #  Simple assistant reply
 # --------------------------------------------------------------------------- #
-def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context):
+    import grafi.tools.llms.impl.openrouter_tool
     import grafi.tools.llms.impl.openrouter_tool as or_module
 
     # Fake successful response
@@ -60,22 +63,28 @@ def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context
     ]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = MagicMock(return_value=mock_response)
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     # Patch the OpenAI class used inside the tool
-    monkeypatch.setattr(or_module, "OpenAI", MagicMock(return_value=mock_client))
-
-    result = openrouter_instance.invoke(
-        invoke_context, [Message(role="user", content="Say hello")]
+    monkeypatch.setattr(
+        grafi.tools.llms.impl.openrouter_tool,
+        "AsyncClient",
+        MagicMock(return_value=mock_client),
     )
 
-    # Assertions on result
-    assert isinstance(result, List)
-    assert result[0].role == "assistant"
-    assert result[0].content == "Hello, world!"
+    result_messages = []
+    async for message_batch in openrouter_instance.invoke(
+        invoke_context, [Message(role="user", content="Say hello")]
+    ):
+        result_messages.extend(message_batch)
 
-    # OpenAI ctor must receive correct kwargs
-    or_module.OpenAI.assert_called_once_with(
+    # Assertions on result
+    assert isinstance(result_messages, List)
+    assert result_messages[0].role == "assistant"
+    assert result_messages[0].content == "Hello, world!"
+
+    # AsyncClient ctor must receive correct kwargs
+    or_module.AsyncClient.assert_called_once_with(
         api_key="test_api_key", base_url="https://openrouter.ai/api/v1"
     )
 
@@ -90,8 +99,11 @@ def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context
 # --------------------------------------------------------------------------- #
 #  With extra headers
 # --------------------------------------------------------------------------- #
-def test_invoke_with_extra_headers(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool as or_module
+@pytest.mark.asyncio
+async def test_invoke_with_extra_headers(
+    monkeypatch, openrouter_instance, invoke_context
+):
+    import grafi.tools.llms.impl.openrouter_tool
 
     openrouter_instance.extra_headers = {
         "HTTP-Referer": "https://my-app.example",
@@ -104,12 +116,18 @@ def test_invoke_with_extra_headers(monkeypatch, openrouter_instance, invoke_cont
     ]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = MagicMock(return_value=mock_response)
-    monkeypatch.setattr(or_module, "OpenAI", MagicMock(return_value=mock_client))
-
-    openrouter_instance.invoke(
-        invoke_context, [Message(role="user", content="Hi there")]
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    monkeypatch.setattr(
+        grafi.tools.llms.impl.openrouter_tool,
+        "AsyncClient",
+        MagicMock(return_value=mock_client),
     )
+
+    result_messages = []
+    async for message_batch in openrouter_instance.invoke(
+        invoke_context, [Message(role="user", content="Hi there")]
+    ):
+        result_messages.extend(message_batch)
 
     # ensure headers propagated
     call_kwargs = mock_client.chat.completions.create.call_args[1]
@@ -119,8 +137,9 @@ def test_invoke_with_extra_headers(monkeypatch, openrouter_instance, invoke_cont
 # --------------------------------------------------------------------------- #
 #  Function / tool-call path
 # --------------------------------------------------------------------------- #
-def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool as or_module
+@pytest.mark.asyncio
+async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
+    import grafi.tools.llms.impl.openrouter_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -143,8 +162,12 @@ def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
     ]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = MagicMock(return_value=mock_response)
-    monkeypatch.setattr(or_module, "OpenAI", MagicMock(return_value=mock_client))
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    monkeypatch.setattr(
+        grafi.tools.llms.impl.openrouter_tool,
+        "AsyncClient",
+        MagicMock(return_value=mock_client),
+    )
 
     tools = [
         FunctionSpec(
@@ -159,9 +182,11 @@ def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
 
     input_data = [Message(role="user", content="Weather?")]
     openrouter_instance.add_function_specs(tools)
-    result = openrouter_instance.invoke(invoke_context, input_data)
+    result_messages = []
+    async for message_batch in openrouter_instance.invoke(invoke_context, input_data):
+        result_messages.extend(message_batch)
 
-    assert result[0].tool_calls[0].id == "test_id"
+    assert result_messages[0].tool_calls[0].id == "test_id"
     call_kwargs = mock_client.chat.completions.create.call_args[1]
     assert call_kwargs["tools"] is not None
 
@@ -169,18 +194,22 @@ def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  Error propagation
 # --------------------------------------------------------------------------- #
-def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool as or_module
+@pytest.mark.asyncio
+async def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
+    import grafi.tools.llms.impl.openrouter_tool
 
     def _raise(*_a, **_kw):  # pragma: no cover
         raise Exception("Error code")
 
-    monkeypatch.setattr(or_module, "OpenAI", _raise)
+    monkeypatch.setattr(grafi.tools.llms.impl.openrouter_tool, "AsyncClient", _raise)
 
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):
-        openrouter_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
+        async for _ in openrouter_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
 
 
 # --------------------------------------------------------------------------- #

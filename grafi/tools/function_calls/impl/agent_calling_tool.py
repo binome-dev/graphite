@@ -1,3 +1,4 @@
+import inspect
 import json
 from typing import Any
 from typing import Callable
@@ -6,7 +7,6 @@ from typing import Self
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
@@ -55,55 +55,7 @@ class AgentCallingTool(FunctionCallTool):
         return AgentCallingToolBuilder(cls)
 
     @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        """
-        Invoke the registered function with the given arguments.
-
-        This method is decorated with @record_tool_invoke to log its invoke.
-
-        Args:
-            function_name (str): The name of the function to invoke.
-            arguments (Dict[str, Any]): The arguments to pass to the function.
-
-        Returns:
-            Any: The result of the function invoke.
-
-        Raises:
-            ValueError: If the provided function_name doesn't match the registered function.
-        """
-        if len(input_data) > 0 and input_data[0].tool_calls is None:
-            logger.warning("Agent call is None.")
-            raise ValueError("Agent call is None.")
-
-        messages: Messages = []
-        for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
-            if tool_call.function.name == self.agent_name:
-                func = self.agent_call
-
-                prompt = json.loads(tool_call.function.arguments)["prompt"]
-                message = Message(
-                    role="assistant",
-                    content=prompt,
-                )
-                response = func(invoke_context, message)
-
-                messages.extend(
-                    self.to_messages(
-                        response=response["content"], tool_call_id=tool_call.id
-                    )
-                )
-            else:
-                logger.warning(
-                    f"Function name {tool_call.function.name} does not match the registered function {self.agent_name}."
-                )
-                messages.extend(
-                    self.to_messages(response=None, tool_call_id=tool_call.id)
-                )
-
-        return messages
-
-    @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
@@ -135,7 +87,10 @@ class AgentCallingTool(FunctionCallTool):
                     role="assistant",
                     content=prompt,
                 )
-                response = await func(invoke_context, message)
+                response = func(invoke_context, message)
+
+                if inspect.isawaitable(response):
+                    response = await response
 
                 messages.extend(
                     self.to_messages(

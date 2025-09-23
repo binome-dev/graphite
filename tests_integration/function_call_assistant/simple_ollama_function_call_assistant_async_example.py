@@ -58,7 +58,7 @@ async def test_simple_function_call_assistant_async() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
@@ -69,8 +69,8 @@ async def test_simple_function_call_assistant_async() -> None:
         assert "12345" in str(output.data[0].content)
         assert "sunny" in str(output.data[0].content)
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 27
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 27
 
 
 # Run the test function asynchronously

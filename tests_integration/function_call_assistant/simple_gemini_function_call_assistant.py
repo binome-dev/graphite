@@ -7,13 +7,13 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
+from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 

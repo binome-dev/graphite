@@ -45,14 +45,14 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         SimpleFunctionCallAssistant.builder()
         .name("MCPAssistant")
         .api_key(api_key)
-        .function_tool(await MCPTool.builder().connections(server_params).a_build())
+        .function_tool(await MCPTool.builder().connections(server_params).build())
         .build()
     )
 
     input_data = [Message(role="user", content="Hi my name is Graphite.")]
 
     # Invoke the assistant's function call
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
@@ -61,7 +61,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         print(output)
         assert output is not None
 
-    assert len(event_store.get_events()) == 24
+    assert len(await event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

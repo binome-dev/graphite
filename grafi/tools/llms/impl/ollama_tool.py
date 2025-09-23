@@ -12,7 +12,6 @@ from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -87,39 +86,7 @@ class OllamaTool(LLM):
         return api_messages, api_functions
 
     @record_tool_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        """
-        Invoke a request to the Ollama API asynchronously.
-        """
-        logger.debug("Input data: %s", input_data)
-
-        # Prepare payload
-        api_messages, api_functions = self.prepare_api_input(input_data)
-        # Use Ollama Client to send the request
-        client = ollama.Client(self.api_url)
-        try:
-            response = client.chat(
-                model=self.model, messages=api_messages, tools=api_functions
-            )
-
-            # Return the raw response as a Message object
-            return self.to_messages(response)
-        except Exception as e:
-            logger.error("Ollama API error: %s", e)
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"Ollama API call failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
-
-    @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
@@ -212,9 +179,9 @@ class OllamaTool(LLM):
             raw_tool_calls = message_data.tool_calls
 
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
 
             tool_calls = []
             for raw_tool_call in raw_tool_calls:

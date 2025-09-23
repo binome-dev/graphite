@@ -1,5 +1,7 @@
 """Module for storing and managing events with optional file logging."""
 
+from abc import ABC
+from abc import abstractmethod
 from typing import Any
 from typing import Dict
 from typing import List
@@ -27,40 +29,32 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 
 
-class EventStore:
+class EventStore(ABC):
     """Stores and manages events."""
 
-    def record_event(self, event: Event) -> None:
-        # record event to the store
-        raise NotImplementedError
+    @abstractmethod
+    async def record_event(self, event: Event) -> None: ...
 
-    def record_events(self, events: List[Event]) -> None:
-        # record events to the store
-        raise NotImplementedError
+    @abstractmethod
+    async def record_events(self, events: List[Event]) -> None: ...
 
-    def clear_events(self) -> None:
-        """Clear all events."""
-        raise NotImplementedError
+    @abstractmethod
+    async def clear_events(self) -> None: ...
 
-    def get_events(self) -> List[Event]:
-        """Get all events."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get_events(self) -> List[Event]: ...
 
-    def get_event(self, event_id: str) -> Optional[Event]:
-        """Get an event by ID."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get_event(self, event_id: str) -> Optional[Event]: ...
 
-    def get_agent_events(self, assistant_request_id: str) -> List[Event]:
-        """Get all events for a given agent request ID."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get_agent_events(self, assistant_request_id: str) -> List[Event]: ...
 
-    def get_conversation_events(self, conversation_id: str) -> List[Event]:
-        """Get all events for a given conversation ID."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get_conversation_events(self, conversation_id: str) -> List[Event]: ...
 
-    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
-        """Get all events for a given topic name."""
-        raise NotImplementedError
+    @abstractmethod
+    async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]: ...
 
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
         """Create an event object from a dictionary."""

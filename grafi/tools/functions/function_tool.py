@@ -10,15 +10,14 @@ import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
-from grafi.common.models.command import Command
-from grafi.common.models.command import use_command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.command import Command
+from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
@@ -43,21 +42,7 @@ class FunctionTool(Tool):
         return FunctionToolBuilder(cls)
 
     @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        try:
-            response = self.function(input_data)
-            return self.to_messages(response=response)
-        except Exception as e:
-            raise FunctionToolException(
-                tool_name=self.name,
-                operation="invoke",
-                message=f"Function execution failed: {e}",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
-
-    @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         try:
@@ -69,7 +54,7 @@ class FunctionTool(Tool):
         except Exception as e:
             raise FunctionToolException(
                 tool_name=self.name,
-                operation="a_invoke",
+                operation="invoke",
                 message=f"Async function execution failed: {e}",
                 invoke_context=invoke_context,
                 cause=e,

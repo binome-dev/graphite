@@ -24,7 +24,7 @@ The foundational topic for receiving initial input into a workflow.
 | `name` | `str` | Topic name (typically "agent_input_topic") |
 | `type` | `str` | Topic type identifier ("AgentInput") |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
+| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
 
 *Inherits all fields from `TopicBase`*
 
@@ -34,7 +34,7 @@ The foundational topic for receiving initial input into a workflow.
 |--------|-----------|-------------|
 | `builder` | `() -> InputTopicBuilder` | Class method returning builder instance |
 | `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publish input messages to the topic |
-| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data |
+| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Async version of publish_data |
 
 ### InWorkflowInputTopic
 
@@ -48,7 +48,7 @@ A specialized input topic for managing human-in-the-loop interactions within run
 | `type` | `str` | Topic type identifier ("InWorkflowInput") |
 | `paired_in_workflow_output_topic_name` | `str` | Name of the paired output topic |
 | `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventCache` | Manages event storage and consumer offsets |
+| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
 
 *Inherits all fields from `TopicBase`*
 
@@ -58,7 +58,7 @@ A specialized input topic for managing human-in-the-loop interactions within run
 |--------|-----------|-------------|
 | `builder` | `() -> InWorkflowInputTopicBuilder` | Class method returning builder instance |
 | `publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Publish input data based on upstream event |
-| `a_publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Async version of publish_input_data |
+| `publish_input_data` | `(upstream_event: OutputTopicEvent, data: Messages) -> PublishToTopicEvent` | Async version of publish_input_data |
 
 ### Builders
 
@@ -86,9 +86,9 @@ Builder for constructing InWorkflowInputTopic instances.
 ### Basic Input Publishing
 
 ```python
-from grafi.common.topics.topic import InputTopic
-from grafi.common.models.message import Message
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.topics.topic import InputTopic
+from grafi.models.message import Message
+from grafi.models.invoke_context import InvokeContext
 
 # Create input topic
 input_topic = InputTopic(name="agent_input_topic")
@@ -145,8 +145,8 @@ workflow = (WorkflowBuilder()
 ### Creating Paired Topics
 
 ```python
-from grafi.common.topics.in_workflow_input_topic import InWorkflowInputTopic
-from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.topics.in_workflow_input_topic import InWorkflowInputTopic
+from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
 
 # Create paired topics for human-in-the-loop
 workflow_output_topic = InWorkflowOutputTopic(
@@ -200,7 +200,7 @@ async def human_approval_workflow():
         content="Please review the following document..."
     )]
 
-    output_event = await output_topic.a_publish_data(
+    output_event = await output_topic.publish_data(
         invoke_context=context,
         publisher_name="review_system",
         publisher_type="workflow",
@@ -213,7 +213,7 @@ async def human_approval_workflow():
 
     # Process user response
     user_feedback = [Message(role="user", content="Looks good, approved!")]
-    input_data = await input_topic.a_publish_input_data(
+    input_data = await input_topic.publish_input_data(
         upstream_event=output_event,
         data=user_feedback
     )
@@ -271,7 +271,7 @@ class HumanInLoopNode(Node):
         if self.needs_approval(data_events):
             # Request human approval
             approval_request = self.create_approval_request(data_events)
-            await self.output_topic.a_publish_data(
+            await self.output_topic.publish_data(
                 invoke_context=context,
                 publisher_name=self.name,
                 publisher_type="node",
@@ -292,7 +292,7 @@ async def test_input_topics():
     input_topic = InputTopic(name="test_input")
 
     messages = [Message(role="user", content="test input")]
-    event = await input_topic.a_publish_data(
+    event = await input_topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",
@@ -315,7 +315,7 @@ async def test_input_topics():
     )
 
     # Simulate workflow output
-    output_event = await output_topic.a_publish_data(
+    output_event = await output_topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="workflow",
         publisher_type="node",
@@ -325,7 +325,7 @@ async def test_input_topics():
 
     # Simulate user response
     user_response = [Message(role="user", content="Here's my input")]
-    input_data = await workflow_input_topic.a_publish_input_data(
+    input_data = await workflow_input_topic.publish_input_data(
         upstream_event=output_event,
         data=user_response
     )

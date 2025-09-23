@@ -1,9 +1,11 @@
+import asyncio
 import os
 import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -42,7 +44,7 @@ def get_invoke_context(
     )
 
 
-def test_function_call_assistant() -> None:
+async def test_function_call_assistant() -> None:
     conversation_id = "test_conversation_id_approve"
     assistant_request_id = "test_assistant_request_id_approve"
 
@@ -64,10 +66,13 @@ def test_function_call_assistant() -> None:
         Message(role="user", content="Hello, I want to delete database user_backup.")
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print(output)
@@ -88,11 +93,14 @@ def test_function_call_assistant() -> None:
         assistant_request_id,
     )
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
-            consumed_event_ids=[event.event_id for event in output],
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            ),
+            is_sequential=True,
         )
     )
     print(output)
@@ -100,7 +108,7 @@ def test_function_call_assistant() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_function_call_assistant_disapproval() -> None:
+async def test_function_call_assistant_disapproval() -> None:
     conversation_id = "test_conversation_id_disapprove"
     assistant_request_id = "test_assistant_request_id_disapprove"
     invoke_context = get_invoke_context(
@@ -121,10 +129,13 @@ def test_function_call_assistant_disapproval() -> None:
         Message(role="user", content="Hello, I want to delete database user_backup.")
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print(output)
@@ -145,11 +156,13 @@ def test_function_call_assistant_disapproval() -> None:
         assistant_request_id,
     )
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
-            consumed_event_ids=[event.event_id for event in output],
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
         )
     )
     print(output)
@@ -157,7 +170,7 @@ def test_function_call_assistant_disapproval() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_function_call_assistant_suggestion() -> None:
+async def test_function_call_assistant_suggestion() -> None:
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_suggest"
     invoke_context = get_invoke_context(
@@ -178,10 +191,12 @@ def test_function_call_assistant_suggestion() -> None:
         Message(role="user", content="Hello, I want to delete database user_backup.")
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            )
         )
     )
     print(output)
@@ -202,11 +217,13 @@ def test_function_call_assistant_suggestion() -> None:
         assistant_request_id,
     )
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
-            consumed_event_ids=[event.event_id for event in output],
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
         )
     )
     print(output)
@@ -232,11 +249,13 @@ def test_function_call_assistant_suggestion() -> None:
         assistant_request_id,
     )
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
-            consumed_event_ids=[event.event_id for event in output],
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
         )
     )
     print(output)
@@ -244,7 +263,7 @@ def test_function_call_assistant_suggestion() -> None:
     assert output[0].data[0].tool_calls is None
 
 
-def test_function_call_assistant_suggestion_mem() -> None:
+async def test_function_call_assistant_suggestion_mem() -> None:
     conversation_id = "test_conversation_id_suggest"
     assistant_request_id = "test_assistant_request_id_mem"
     invoke_context = get_invoke_context(
@@ -268,10 +287,12 @@ def test_function_call_assistant_suggestion_mem() -> None:
         Message(role="user", content="Hello, I want to delete database product_backup.")
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            )
         )
     )
     print(output)
@@ -284,7 +305,7 @@ def test_function_call_assistant_suggestion_mem() -> None:
     assert parsed_args["db_name"] == "staging.product_backup"
 
 
-test_function_call_assistant()
-test_function_call_assistant_disapproval()
+asyncio.run(test_function_call_assistant())
+asyncio.run(test_function_call_assistant_disapproval())
 # test_function_call_assistant_suggestion()
 # test_function_call_assistant_suggestion_mem()

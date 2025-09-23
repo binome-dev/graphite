@@ -17,10 +17,10 @@ async def run_agent() -> None:
     }
 
     react_agent = create_react_agent(
-        function_call_tool=await MCPTool.builder().connections(server_params).a_build()  # type: ignore
+        function_call_tool=await MCPTool.builder().connections(server_params).build()  # type: ignore
     )
 
-    async for output in react_agent.a_run(
+    async for output in react_agent.run(
         "Please call mcp function 'echo' my name 'Graphite'?"
     ):
         print(output.content)

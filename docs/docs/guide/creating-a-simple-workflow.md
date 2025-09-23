@@ -43,8 +43,8 @@ The main function orchestrates the entire workflow. We start by defining a sampl
 
 ```python linenums="9"
 import uuid
-from grafi.common.models.message import Message
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.message import Message
+from grafi.models.invoke_context import InvokeContext
 
 def main():
     user_input = "What is the capital of the United Kingdom"
@@ -85,8 +85,8 @@ The node subscribes to the `agent_input_topic` (the root topic in Graphite), use
 ```python linenums="27"
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
 
 
 agent_input_topic = InputTopic(name="agent_input_topic")
@@ -131,13 +131,12 @@ workflow = (
 With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`.
 
 ```python linenums="54"
-result = workflow.invoke(
+async for result in workflow.invoke(
     invoke_context,
     [message]
-)
-
-for output_message in result:
-    print("Output message:", output_message.content)
+):
+    for output_message in result:
+        print("Output message:", output_message.content)
 ```
 
 ### 6. Entry Point

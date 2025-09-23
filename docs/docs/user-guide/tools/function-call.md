@@ -20,8 +20,7 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 |----------------------|--------------------------------------------------------------------------------------------------------------------------|
 | `function` (Builder Class) | Builder method to register a function. Automatically applies `@llm_function` if not already decorated.                   |
 | `get_function_specs` | Retrieves detailed metadata about registered functions (including parameter info), enabling structured LLM-based function calls. |
-| `invoke`            | Evaluates incoming messages for tool calls, matches them to registered functions, and executes with JSON arguments.  |
-| `a_invoke`          | Asynchronous equivalent to `invoke`, allowing concurrency and awaiting coroutine functions.                               |
+| `invoke`          | Asynchronous method that evaluates incoming messages for tool calls, matches them to registered functions, and executes with JSON arguments, allowing concurrency and awaiting coroutine functions.                               |
 | `to_messages`       | Converts invoke results into `Message` objects with proper `tool_call_id` linkage.                          |
 | `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
 
@@ -85,7 +84,7 @@ def calculate_sum(x: int, y: int, precision: float = 0.1) -> float:
 
 2. **Automatic Discovery**: When inheriting from `FunctionCallTool`, the `__init_subclass__` method automatically discovers all methods decorated with `@llm_function` and adds them to the `functions` dictionary and `function_specs` list.
 
-3. **Message Processing**: When `invoke` or `a_invoke` receives messages, it examines the `tool_calls` field in the first message to find function calls that match registered function names.
+3. **Message Processing**: When `invoke` receives messages, it examines the `tool_calls` field in the first message to find function calls that match registered function names.
 
 4. **Function Execution**: For each matching tool call:
    - Arguments are parsed from JSON in the `tool_call.function.arguments` field
@@ -279,15 +278,14 @@ This tool automatically discovers available functions from connected MCP servers
 | Method           | Description                                                                                                                                                                                                 |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `get_function_specs` | Returns the function specification (name, description, parameters) for the agent call.                                                                                                                  |
-| `invoke`        | Synchronously processes incoming tool calls that match `agent_name`, passing the `prompt` to the `agent_call` callable and returning a list of `Message` objects.                                           |
-| `a_invoke`      | Asynchronous variant of `invoke`; yields messages in an async generator for real-time or concurrent agent calls.                                                                                           |
+| `invoke`      | Asynchronous method that processes incoming tool calls matching `agent_name`, passing the `prompt` to the `agent_call` callable; yields messages in an async generator for real-time or concurrent agent calls.                                                                                           |
 | `to_messages`   | Creates a `Message` object from the agent's response, linking the output to `tool_call_id`.                                                                                                                 |
 | `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
 
 **Workflow Example**:
 
 1. **Tool Registration**: An `AgentCallingTool` is constructed with details about the agent (`agent_name`, `agent_description`, etc.) and the callable (`agent_call`).
-2. **Agent Invocation**: When an LLM includes a tool call referencing this agent's name, `invoke` or `a_invoke` receives the `prompt` and calls the agent.
+2. **Agent Invocation**: When an LLM includes a tool call referencing this agent's name, `invoke` receives the `prompt` and calls the agent.
 3. **Response Conversion**: The agent's return value is formed into a new `Message`, which the workflow can then process or forward.
 
 **Usage and Customization**:

@@ -1,9 +1,11 @@
+import asyncio
 import os
 import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -101,7 +103,7 @@ You are a friendly and helpful assistant with access to multiple tools. After ge
 """
 
 
-def test_multi_functions_call_assistant() -> None:
+async def test_multi_functions_call_assistant() -> None:
     builder = (
         MultiFunctionsCallAssistant.builder()
         .name("MultiFunctionsCallAssistant")
@@ -127,17 +129,20 @@ def test_multi_functions_call_assistant() -> None:
         Message(role="user", content="Hello, how's the weather in 12345?")
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context_1,
-            data=input_question_1,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context_1,
+                data=input_question_1,
+            ),
+            is_sequential=True,
         )
     )
 
     print(output)
-    print(len(event_store.get_events()))
+    print(len(await event_store.get_events()))
     assert output is not None
-    assert len(event_store.get_events()) == 34
+    assert len(await event_store.get_events()) == 34
 
     # Test the run method
     invoke_context_2 = get_invoke_context()
@@ -145,16 +150,19 @@ def test_multi_functions_call_assistant() -> None:
         Message(role="user", content="Hello, how's the population in 12345?"),
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context_2,
-            data=input_question_2,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context_2,
+                data=input_question_2,
+            ),
+            is_sequential=True,
         )
     )
 
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 68
+    assert len(await event_store.get_events()) == 68
 
     # Test the run method
     invoke_context_3 = get_invoke_context()
@@ -162,17 +170,20 @@ def test_multi_functions_call_assistant() -> None:
         Message(role="user", content="Hello, how's the house price in 12345?"),
     ]
 
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context_3,
-            data=input_question_3,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context_3,
+                data=input_question_3,
+            ),
+            is_sequential=True,
         )
     )
     print(output)
     assert output is not None
-    assert len(event_store.get_events()) == 102
+    assert len(await event_store.get_events()) == 102
 
     # assistant.generate_workflow_graph()
 
 
-test_multi_functions_call_assistant()
+asyncio.run(test_multi_functions_call_assistant())

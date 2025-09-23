@@ -4,7 +4,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from grafi.common.topics.topic_base import TopicBase
+from grafi.topics.topic_base import TopicBase
 
 
 class LogicalOp(Enum):

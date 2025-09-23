@@ -54,7 +54,7 @@ async def test_simple_function_call_assistant() -> None:
     # Test the run method
     input_data = [Message(role="user", content="Hello, what is the aws EC2?")]
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=input_data,
@@ -64,8 +64,8 @@ async def test_simple_function_call_assistant() -> None:
         assert output is not None
         assert "EC2" in str(output.data[0].content)
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 12
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 12
 
 
 asyncio.run(test_simple_function_call_assistant())

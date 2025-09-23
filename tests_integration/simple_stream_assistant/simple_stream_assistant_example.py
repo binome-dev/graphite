@@ -39,11 +39,11 @@ async def test_simple_llm_assistant() -> None:
         .api_key(api_key)
         .build()
     )
-    event_store.clear_events()
+    await event_store.clear_events()
 
     content = ""
 
-    async for event in assistant.a_invoke(
+    async for event in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=[
@@ -63,7 +63,7 @@ async def test_simple_llm_assistant() -> None:
     assert "Grafi" in content
     assert content is not None
 
-    events = event_store.get_events()
+    events = await event_store.get_events()
     print(f"Total events: {len(events)}")
     assert len(events) == 12
 

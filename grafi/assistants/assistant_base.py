@@ -1,6 +1,5 @@
 from typing import Any
 from typing import AsyncGenerator
-from typing import List
 from typing import Self
 from typing import TypeVar
 
@@ -8,6 +7,7 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store import EventStore
@@ -32,9 +32,11 @@ class AssistantBase(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     assistant_id: str = default_id
-    name: str = "Assistant"
-    type: str = "assistant"
-    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
+    name: str = Field(default="Assistant")
+    type: str = Field(default="assistant")
+    oi_span_type: OpenInferenceSpanKindValues = Field(
+        default=OpenInferenceSpanKindValues.AGENT
+    )
 
     workflow: Workflow = Workflow()
 
@@ -45,19 +47,11 @@ class AssistantBase(BaseModel):
         """Construct the workflow for the assistant."""
         raise NotImplementedError("Subclasses must implement '_construct_workflow'.")
 
-    def invoke(
-        self,
-        input_data: PublishToTopicEvent,
-    ) -> List[ConsumeFromTopicEvent]:
-        """Invoke the assistant's workflow with the provided input data."""
-        raise NotImplementedError("Subclasses must implement 'invoke'.")
-
-    async def a_invoke(
-        self,
-        input_data: PublishToTopicEvent,
+    async def invoke(
+        self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
-        raise NotImplementedError("Subclasses must implement 'a_invoke'.")
+        raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the assistant to a dictionary representation."""

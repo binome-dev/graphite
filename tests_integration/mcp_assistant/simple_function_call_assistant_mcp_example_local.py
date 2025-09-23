@@ -38,7 +38,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     }
 
     # Set up the assistant with MCPTool
-    mcp_tool = await MCPTool.builder().connections(server_params).a_build()
+    mcp_tool = await MCPTool.builder().connections(server_params).build()
 
     assistant = (
         SimpleFunctionCallAssistant.builder()
@@ -55,7 +55,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     ]
 
     # Invoke the assistant's function call
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=input_data,
@@ -64,7 +64,7 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
         print(output)
         assert output is not None
 
-    assert len(event_store.get_events()) == 24
+    assert len(await event_store.get_events()) == 24
 
 
 asyncio.run(test_simple_function_call_assistant_with_mcp())

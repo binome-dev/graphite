@@ -32,7 +32,7 @@ In Graphite, various models provide the fundamental data structures that underpi
 ### Usage Example
 
 ```python
-from grafi.common.models.message import Message
+from grafi.models.message import Message
 
 # Creating a user message
 user_message = Message(
@@ -64,7 +64,7 @@ assistant_message = Message(
 ### InvokeContext Usage Example
 
 ```python
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.invoke_context import InvokeContext
 
 context = InvokeContext(
     conversation_id="conv_123",
@@ -89,22 +89,22 @@ context = InvokeContext(
 | Method                 | Description                                                                         |
 |------------------------|-------------------------------------------------------------------------------------|
 | `for_tool(tool)`       | Class method factory to create appropriate command for a tool type.                |
-| `invoke(context, data)`| Synchronously invokes the tool with the provided context and input data.           |
-| `a_invoke(context, data)` | Asynchronously invokes the tool, yielding response messages.                    |
+| `invoke(context, data)` | Asynchronously invokes the tool, yielding response messages.                    |
 | `get_tool_input(context, data)` | Processes input events and extracts messages for tool consumption.         |
 | `to_dict()`            | Serializes the command to a dictionary representation.                             |
 
 ### Command Usage Example
 
 ```python
-from grafi.common.models.command import Command
+from grafi.models.command import Command
 from grafi.tools.tool import Tool
 
 # Create command from tool
 command = Command.for_tool(my_tool)
 
 # Invoke the command
-response = command.invoke(invoke_context, input_datas)
+async for response in command.invoke(invoke_context, input_datas):
+    # Process response
 ```
 
 ## FunctionSpec

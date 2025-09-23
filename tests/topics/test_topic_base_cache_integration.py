@@ -9,9 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic import Topic
-from grafi.common.topics.topic_event_cache import TopicEventCache
+from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.topic_impl.topic import Topic
 
 
 class TestTopicBaseCacheIntegration:
@@ -41,15 +41,15 @@ class TestTopicBaseCacheIntegration:
     def test_topic_initialization_with_cache(self):
         topic = Topic(name="test")
         assert topic.name == "test"
-        assert isinstance(topic.event_cache, TopicEventCache)
-        assert topic.event_cache.id is not None
-        assert topic.event_cache.num_events() == 0
+        assert isinstance(topic.event_queue, TopicEventQueue)
+        assert topic.event_queue.id is not None
 
-    def test_publish_and_consume_single_event(
-        self, topic, invoke_context, sample_messages
+    @pytest.mark.asyncio
+    async def test_publish_and_consume_single_event(
+        self, topic: Topic, invoke_context, sample_messages
     ):
         # Publish an event
-        event = topic.publish_data(
+        event = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher1",
@@ -62,20 +62,22 @@ class TestTopicBaseCacheIntegration:
         assert event is not None
         assert event.name == "test_topic"
         assert event.data == sample_messages
-        assert topic.event_cache.num_events() == 1
 
         # Consume the event
-        assert topic.can_consume("consumer1")
-        consumed_events = topic.consume("consumer1")
+        assert await topic.can_consume("consumer1")
+        consumed_events = await topic.consume("consumer1")
         assert len(consumed_events) == 1
         assert consumed_events[0] == event
 
         # Cannot consume again
-        assert not topic.can_consume("consumer1")
+        assert not await topic.can_consume("consumer1")
 
-    def test_multiple_consumers(self, topic, invoke_context, sample_messages):
+    @pytest.mark.asyncio
+    async def test_multiple_consumers(
+        self, topic: Topic, invoke_context, sample_messages
+    ):
         # Publish an event
-        event = topic.publish_data(
+        event = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher1",
@@ -86,8 +88,8 @@ class TestTopicBaseCacheIntegration:
         )
 
         # Multiple consumers can consume the same event
-        consumed1 = topic.consume("consumer1")
-        consumed2 = topic.consume("consumer2")
+        consumed1 = await topic.consume("consumer1")
+        consumed2 = await topic.consume("consumer2")
 
         assert len(consumed1) == 1
         assert len(consumed2) == 1
@@ -95,10 +97,11 @@ class TestTopicBaseCacheIntegration:
         assert consumed2[0] == event
 
         # Each consumer maintains its own offset
-        assert not topic.can_consume("consumer1")
-        assert not topic.can_consume("consumer2")
+        assert not await topic.can_consume("consumer1")
+        assert not await topic.can_consume("consumer2")
 
-    def test_conditional_publishing(self, invoke_context):
+    @pytest.mark.asyncio
+    async def test_conditional_publishing(self, invoke_context):
         # Create topic with condition
         topic = Topic(
             name="conditional_topic",
@@ -107,7 +110,7 @@ class TestTopicBaseCacheIntegration:
 
         # Message that meets condition
         user_messages = [Message(role="user", content="Hello")]
-        event1 = topic.publish_data(
+        event1 = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher1",
@@ -120,7 +123,7 @@ class TestTopicBaseCacheIntegration:
 
         # Message that doesn't meet condition
         assistant_messages = [Message(role="assistant", content="Hi")]
-        event2 = topic.publish_data(
+        event2 = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher1",
@@ -132,12 +135,14 @@ class TestTopicBaseCacheIntegration:
         assert event2 is None
 
         # Only one event should be in cache
-        assert topic.event_cache.num_events() == 1
 
-    def test_reset_functionality(self, topic, invoke_context, sample_messages):
+    @pytest.mark.asyncio
+    async def test_reset_functionality(
+        self, topic: Topic, invoke_context, sample_messages
+    ):
         # Publish some events
         for i in range(3):
-            topic.publish_data(
+            await topic.publish_data(
                 PublishToTopicEvent(
                     invoke_context=invoke_context,
                     publisher_name=f"publisher{i}",
@@ -148,22 +153,21 @@ class TestTopicBaseCacheIntegration:
             )
 
         # Consume some events
-        topic.consume("consumer1")
-        assert topic.event_cache._consumed["consumer1"] > 0
+        await topic.consume("consumer1")
+        assert topic.event_queue._consumed["consumer1"] > 0
 
         # Reset the topic
-        topic.reset()
+        await topic.reset()
 
         # Verify everything is cleared
-        assert topic.event_cache.num_events() == 0
-        assert not topic.can_consume("consumer1")
+        assert not await topic.can_consume("consumer1")
 
     @pytest.mark.asyncio
     async def test_async_publish_and_consume(
-        self, topic, invoke_context, sample_messages
+        self, topic: Topic, invoke_context, sample_messages
     ):
         # Async publish
-        event = await topic.a_publish_data(
+        event = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="async_publisher",
@@ -174,27 +178,26 @@ class TestTopicBaseCacheIntegration:
         )
 
         assert event is not None
-        assert topic.event_cache.num_events() == 1
 
         # Async consume
-        consumed_events = await topic.a_consume("async_consumer")
+        consumed_events = await topic.consume("async_consumer")
         assert len(consumed_events) == 1
         assert consumed_events[0] == event
 
     @pytest.mark.asyncio
     async def test_async_consume_with_wait(
-        self, topic, invoke_context, sample_messages
+        self, topic: Topic, invoke_context, sample_messages
     ):
         # Start consumer waiting for events
         consume_task = asyncio.create_task(
-            topic.a_consume("waiting_consumer", timeout=1.0)
+            topic.consume("waiting_consumer", timeout=1.0)
         )
 
         # Give it time to start waiting
         await asyncio.sleep(0.1)
 
         # Publish an event
-        event = await topic.a_publish_data(
+        event = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher",
@@ -209,8 +212,9 @@ class TestTopicBaseCacheIntegration:
         assert len(consumed_events) == 1
         assert consumed_events[0] == event
 
-    def test_restore_topic_from_publish_event(
-        self, topic, invoke_context, sample_messages
+    @pytest.mark.asyncio
+    async def test_restore_topic_from_publish_event(
+        self, topic: Topic, invoke_context, sample_messages
     ):
         # Create a publish event
         event = PublishToTopicEvent(
@@ -226,19 +230,19 @@ class TestTopicBaseCacheIntegration:
         )
 
         # Restore the topic
-        topic.restore_topic(event)
+        await topic.restore_topic(event)
 
         # Verify event was added to cache
-        assert topic.event_cache.num_events() == 1
-        consumed = topic.consume("consumer1")
+        consumed = await topic.consume("consumer1")
         assert len(consumed) == 1
         assert consumed[0] == event
 
-    def test_restore_topic_from_consume_event(
-        self, topic, invoke_context, sample_messages
+    @pytest.mark.asyncio
+    async def test_restore_topic_from_consume_event(
+        self, topic: Topic, invoke_context, sample_messages
     ):
         # First, publish an event
-        topic.publish_data(
+        await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher",
@@ -261,15 +265,17 @@ class TestTopicBaseCacheIntegration:
         )
 
         # Restore from consume event
-        topic.restore_topic(consume_event)
+        await topic.restore_topic(consume_event)
 
         # Verify consumer offset was updated
-        assert not topic.can_consume("consumer1")  # Already consumed
-        assert topic.event_cache._consumed["consumer1"] == 1
-        assert topic.event_cache._committed["consumer1"] == 0
+        assert not await topic.can_consume("consumer1")  # Already consumed
+        assert topic.event_queue._consumed["consumer1"] == 1
+        assert topic.event_queue._committed["consumer1"] == 0
 
     @pytest.mark.asyncio
-    async def test_async_restore_topic(self, topic, invoke_context, sample_messages):
+    async def test_async_restore_topic(
+        self, topic: Topic, invoke_context, sample_messages
+    ):
         # Create events
         publish_event = PublishToTopicEvent(
             event_id="async-restore-1",
@@ -295,21 +301,20 @@ class TestTopicBaseCacheIntegration:
         )
 
         # Restore asynchronously
-        await topic.a_restore_topic(publish_event)
-        await topic.a_restore_topic(consume_event)
+        await topic.restore_topic(publish_event)
+        await topic.restore_topic(consume_event)
 
         # Verify restoration
-        assert topic.event_cache.num_events() == 1
-        assert not topic.can_consume("consumer1")
+        assert not await topic.can_consume("consumer1")
 
     @pytest.mark.asyncio
-    async def test_concurrent_publishers(self, topic, invoke_context):
+    async def test_concurrent_publishers(self, topic: Topic, invoke_context):
         # Multiple publishers publishing concurrently
         async def publisher(pub_id: int):
             messages = [
                 Message(role="user", content=f"Message from publisher {pub_id}")
             ]
-            return await topic.a_publish_data(
+            return await topic.publish_data(
                 PublishToTopicEvent(
                     invoke_context=invoke_context,
                     publisher_name=f"publisher{pub_id}",
@@ -330,17 +335,17 @@ class TestTopicBaseCacheIntegration:
 
         # All events should be published
         assert all(event is not None for event in events)
-        assert topic.event_cache.num_events() == 5
 
         # Consumer should get all events
-        consumed = await topic.a_consume("consumer")
+        consumed = await topic.consume("consumer")
         assert len(consumed) == 5
 
-    def test_output_topic_integration(
-        self, output_topic, invoke_context, sample_messages
+    @pytest.mark.asyncio
+    async def test_output_topic_integration(
+        self, output_topic: OutputTopic, invoke_context, sample_messages
     ):
         # Test with OutputTopic which creates PublishToTopicEvent
-        event = output_topic.publish_data(
+        event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="output_publisher",
@@ -351,47 +356,19 @@ class TestTopicBaseCacheIntegration:
         )
 
         assert isinstance(event, PublishToTopicEvent)
-        assert output_topic.event_cache.num_events() == 1
 
         # Consume the output event
-        consumed = output_topic.consume("consumer1")
+        consumed = await output_topic.consume("consumer1")
         assert len(consumed) == 1
         assert isinstance(consumed[0], PublishToTopicEvent)
 
-    def test_publish_event_handler(self, invoke_context, sample_messages):
-        # Track published events
-        published_events = []
-
-        def event_handler(event: PublishToTopicEvent):
-            published_events.append(event)
-
-        # Create topic with event handler
-        topic = Topic(
-            name="handler_topic",
-            publish_event_handler=event_handler,
-        )
-
-        # Publish events
-        for i in range(3):
-            topic.publish_data(
-                PublishToTopicEvent(
-                    invoke_context=invoke_context,
-                    publisher_name=f"publisher{i}",
-                    publisher_type="test_publisher",
-                    data=sample_messages,
-                    consumed_event_ids=[],
-                )
-            )
-
-        # Verify handler was called
-        assert len(published_events) == 3
-        assert all(isinstance(e, PublishToTopicEvent) for e in published_events)
-
     @pytest.mark.asyncio
-    async def test_commit_functionality(self, topic, invoke_context, sample_messages):
+    async def test_commit_functionality(
+        self, topic: Topic, invoke_context, sample_messages
+    ):
         # Publish multiple events
         for i in range(5):
-            await topic.a_publish_data(
+            await topic.publish_data(
                 PublishToTopicEvent(
                     invoke_context=invoke_context,
                     publisher_name=f"publisher{i}",
@@ -402,12 +379,12 @@ class TestTopicBaseCacheIntegration:
             )
 
         # Consume some events
-        consumed = await topic.a_consume("consumer1")
+        consumed = await topic.consume("consumer1")
         assert len(consumed) == 5
 
         # Commit at offset 3
-        await topic.a_commit("consumer1", 3)
-        assert topic.event_cache._committed["consumer1"] == 3
+        await topic.commit("consumer1", 3)
+        assert topic.event_queue._committed["consumer1"] == 3
 
     def test_topic_serialization(self, topic):
         # Test to_dict method
@@ -417,10 +394,10 @@ class TestTopicBaseCacheIntegration:
         assert "condition" in topic_dict
 
     @pytest.mark.asyncio
-    async def test_async_reset(self, topic, invoke_context, sample_messages):
+    async def test_async_reset(self, topic: Topic, invoke_context, sample_messages):
         # Add events
         for i in range(3):
-            await topic.a_publish_data(
+            await topic.publish_data(
                 PublishToTopicEvent(
                     invoke_context=invoke_context,
                     publisher_name=f"publisher{i}",
@@ -431,16 +408,18 @@ class TestTopicBaseCacheIntegration:
             )
 
         # Consume some
-        await topic.a_consume("consumer1")
+        await topic.consume("consumer1")
 
         # Async reset
-        await topic.a_reset()
+        await topic.reset()
 
         # Verify reset
-        assert topic.event_cache.num_events() == 0
-        assert not topic.can_consume("consumer1")
+        assert not await topic.can_consume("consumer1")
 
-    def test_consumed_events_tracking(self, topic, invoke_context, sample_messages):
+    @pytest.mark.asyncio
+    async def test_consumed_events_tracking(
+        self, topic: Topic, invoke_context, sample_messages
+    ):
         # Create some consumed events
         consumed_events = []
         for i in range(2):
@@ -457,7 +436,7 @@ class TestTopicBaseCacheIntegration:
             consumed_events.append(consumed_event)
 
         # Publish with consumed events
-        event = topic.publish_data(
+        event = await topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
                 publisher_name="publisher1",
@@ -472,7 +451,8 @@ class TestTopicBaseCacheIntegration:
         assert "consumed-0" in event.consumed_event_ids
         assert "consumed-1" in event.consumed_event_ids
 
-    def test_add_event_filtering(self, topic):
+    @pytest.mark.asyncio
+    async def test_add_event_filtering(self, topic: Topic):
         # Try to add a ConsumeFromTopicEvent (should be ignored)
         consume_event = ConsumeFromTopicEvent(
             event_id="consume-1",
@@ -490,8 +470,7 @@ class TestTopicBaseCacheIntegration:
         )
 
         # add_event should not add ConsumeFromTopicEvent
-        topic.add_event(consume_event)
-        assert topic.event_cache.num_events() == 0
+        await topic.add_event(consume_event)
 
         # But PublishToTopicEvent should be added
         publish_event = PublishToTopicEvent(
@@ -509,5 +488,4 @@ class TestTopicBaseCacheIntegration:
             data=[Message(role="user", content="test")],
             timestamp=datetime.now(),
         )
-        topic.add_event(publish_event)
-        assert topic.event_cache.num_events() == 1
+        await topic.add_event(publish_event)

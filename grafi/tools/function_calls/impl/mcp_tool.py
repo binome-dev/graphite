@@ -7,7 +7,6 @@ from typing import List
 from loguru import logger
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.invoke_context import InvokeContext
@@ -54,7 +53,7 @@ class MCPTool(FunctionCallTool):
         Initialize the MCPTool with the given keyword arguments.
         """
         mcp_tool = cls(**kwargs)
-        await mcp_tool._a_get_function_specs()
+        await mcp_tool._get_function_specs()
 
         return mcp_tool
 
@@ -65,7 +64,7 @@ class MCPTool(FunctionCallTool):
         """
         return MCPToolBuilder(cls)
 
-    async def _a_get_function_specs(self) -> None:
+    async def _get_function_specs(self) -> None:
         if not self.mcp_config:
             raise ValueError("mcp_config are not set.")
 
@@ -86,13 +85,7 @@ class MCPTool(FunctionCallTool):
             self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
     @record_tool_invoke
-    def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-        raise NotImplementedError(
-            "MCPTool does not support synchronous invoke. Use a_invoke instead."
-        )
-
-    @record_tool_a_invoke
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
@@ -199,9 +192,9 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
 
     def build(self) -> None:
         raise NotImplementedError(
-            "MCPTool does not support synchronous invoke. Use a_build instead."
+            "MCPTool does not support synchronous invoke. Use build instead."
         )
 
-    async def a_build(self) -> "MCPTool":
+    async def build(self) -> "MCPTool":
         mcp_tool = await self._cls.initialize(**self.kwargs)
         return mcp_tool

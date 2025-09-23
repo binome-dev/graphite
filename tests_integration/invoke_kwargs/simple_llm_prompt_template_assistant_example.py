@@ -7,6 +7,7 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions
 from grafi.common.instrumentations.tracing import setup_tracing
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.invoke_kwargs.simple_llm_prompt_template_assistant import (
@@ -65,14 +66,14 @@ Briefly explain how your sonnet reflects the input and the literary devices used
     )
 
 
-def test_simple_llm_assistant() -> None:
+async def test_simple_llm_assistant() -> None:
     invoke_context = get_invoke_context()
     assistant = (
         SimpleLLMPromptTemplateAssistant.builder()
         .name("SimpleLLMPromptTemplateAssistant")
         .build()
     )
-    event_store.clear_events()
+    await event_store.clear_events()
 
     input_data = [
         Message(
@@ -80,16 +81,18 @@ def test_simple_llm_assistant() -> None:
             role="user",
         )
     ]
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            )
         )
     )
 
     print(output[0].data[0].content)
     assert output is not None
-    assert len(event_store.get_events()) == 12
+    assert len(await event_store.get_events()) == 12
 
 
 test_simple_llm_assistant()

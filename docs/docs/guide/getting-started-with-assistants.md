@@ -129,8 +129,8 @@ Implement the builder pattern for fluent configuration of the assistant. This pi
 
 ```python
 from grafi.nodes.node import Node
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
@@ -188,15 +188,16 @@ Prepare input data and context for workflow execution:
 - Returns both the input data and context
 
 ```python
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.models.invoke_context import InvokeContext
 from typing import Optional
-from grafi.common.models.message import Message
+from grafi.models.message import Message
 
 class FinanceAssistant(Assistant):
 
     ...
 
-    def get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> tuple[list[Message], InvokeContext]:
+    def get_input(self, question: str, invoke_context: Optional[InvokeContext] = None) -> PublishToTopicEvent:
         """Prepare input data and invoke context."""
         if invoke_context is None:
             logger.debug("Creating new InvokeContext with default conversation id for FinanceAssistant")
@@ -214,7 +215,9 @@ class FinanceAssistant(Assistant):
             )
         ]
 
-        return input_data, invoke_context
+        return PublishToTopicEvent(
+            invoke_context=execution_context, data=input_messages
+        )
 ```
 
 
@@ -227,22 +230,22 @@ This function is not part of the framework, but rather a helper function used to
 class FinanceAssistant(Assistant):
 
     ...
-    def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+    async def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
         """Run the assistant with a question and return the response."""
         # Call helper function get_input()
-        input_data, invoke_context = self.get_input(question, invoke_context)
+        input_event= self.get_input(question, invoke_context)
         # This is the line that invokes the workflow
-        output = super().invoke(invoke_context, input_data)
+        response_str = ""
+        async for output in super().invoke(input_event):
+            # Handle different content types
+            if output and len(output) > 0:
+                content = output.data[0].content
+                if isinstance(content, str):
+                    response_str += content
+                elif content is not None:
+                    response_str += str(content)
 
-        # Handle different content types
-        if output and len(output) > 0:
-            content = output[0].content
-            if isinstance(content, str):
-                return content
-            elif content is not None:
-                return str(content)
-
-        return "No response generated"
+        return response_str
 ```
 
 Main execution method that:
@@ -258,6 +261,8 @@ Now that we have created the class for the assistance, we have to instantiate it
 
 ```python
 # main.py
+import asyncio
+
 def main():
     system_message = os.getenv("OPENAI_SYSTEM_MESSAGE")
     api_key = os.getenv("OPENAI_API_KEY")
@@ -274,12 +279,12 @@ def main():
 
     """Main function to run the assistant."""
     user_input = "What are the key factors to consider when choosing between a 401(k) and a Roth IRA?"
-    result = assistant.run(user_input)
+    result = await assistant.run(user_input)
     print("Output message:", result)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 
 ```
 
@@ -319,12 +324,12 @@ def main():
 
     """Main function to run the assistant."""
     user_input = "What are the key factors to consider when choosing between a 401(k) and a Roth IRA?"
-    result = assistant.run(user_input)
+    result = await assistant.run(user_input)
     print("Output message:", result)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 ```
 
 

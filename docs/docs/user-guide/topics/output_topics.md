@@ -65,8 +65,7 @@ A specialized topic for handling workflow output that requires human interaction
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `builder` | `() -> InWorkflowOutputTopicBuilder` | Class method returning builder instance |
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Publish workflow output data |
-| `a_publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Async version of publish_data |
+| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> OutputTopicEvent` | Async version of publish_data |
 
 ### Builders
 
@@ -106,9 +105,9 @@ Workflow topics are typically created as pairs for human-in-the-loop interaction
 ### Basic Output Publishing
 
 ```python
-from grafi.common.topics.output_topic import OutputTopic, agent_output_topic
-from grafi.common.models.message import Message
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.topics.output_topic import OutputTopic, agent_output_topic
+from grafi.models.message import Message
+from grafi.models.invoke_context import InvokeContext
 
 # Create context and messages
 context = InvokeContext()
@@ -132,7 +131,7 @@ if event:
 ```python
 import asyncio
 from typing import AsyncIterator
-from grafi.common.models.message import Messages
+from grafi.models.message import Messages
 
 async def streaming_response() -> AsyncIterator[Messages]:
     """Example async generator for streaming responses."""
@@ -208,8 +207,8 @@ async def managed_streaming():
 ### Publishing Workflow Output for Human Interaction
 
 ```python
-from grafi.common.topics.in_workflow_output_topic import InWorkflowOutputTopic
-from grafi.common.models.message import Message
+from grafi.topics.in_workflow_output_topic import InWorkflowOutputTopic
+from grafi.models.message import Message
 
 # Create workflow output topic (paired with an input topic)
 workflow_output_topic = InWorkflowOutputTopic(
@@ -270,7 +269,7 @@ class HumanApprovalWorkflow:
         )]
 
         # Publish to workflow output topic
-        event = await self.output_topic.a_publish_data(
+        event = await self.output_topic.publish_data(
             invoke_context=InvokeContext(),
             publisher_name="approval_system",
             publisher_type="workflow",
@@ -317,7 +316,7 @@ async def test_output_topic():
 
     # Test basic publishing
     messages = [Message(role="assistant", content="test")]
-    event = topic.publish_data(
+    event = await topic.publish_data(
         invoke_context=InvokeContext(),
         publisher_name="test",
         publisher_type="test",

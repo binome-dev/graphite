@@ -67,7 +67,7 @@ event_store.record_event(event)
 
 # Retrieve events
 all_events = event_store.get_events()
-specific_event = event_store.get_event(event.event_id)
+specific_event = await event_store.get_event(event.event_id)
 request_events = event_store.get_agent_events("req_123")
 ```
 
@@ -78,13 +78,13 @@ class EventStoreInMemory(EventStore):
     def __init__(self) -> None:
         self.events = []
 
-    def record_event(self, event: Event) -> None:
+    async def record_event(self, event: Event) -> None:
         self.events.append(event)
 
-    def get_events(self) -> List[Event]:
+    async def get_events(self) -> List[Event]:
         return self.events.copy()
 
-    def get_event(self, event_id: str) -> Optional[Event]:
+    async def get_event(self, event_id: str) -> Optional[Event]:
         for event in self.events:
             if event.event_id == event_id:
                 return event
@@ -136,24 +136,24 @@ event_store = EventStorePostgres(db_url)
 
 ```python
 # Record single event
-event_store.record_event(event)
+await event_store.record_event(event)
 
 # Record multiple events (batch operation)
 events = [event1, event2, event3]
-event_store.record_events(events)
+await event_store.record_events(events)
 ```
 
 #### Querying Events
 
 ```python
 # Get specific event
-event = event_store.get_event("event_123")
+event = await event_store.get_event("event_123")
 
 # Get all events for an assistant request
-request_events = event_store.get_agent_events("req_456")
+request_events = await event_store.get_agent_events("req_456")
 
 # Get all events for a conversation
-conversation_events = event_store.get_conversation_events("conv_789")
+conversation_events = await event_store.get_conversation_events("conv_789")
 ```
 
 ### Error Handling
@@ -242,7 +242,7 @@ class MyWorkflow:
     def __init__(self, event_store: EventStore):
         self.event_store = event_store
 
-    def process_request(self, request):
+    async def process_request(self, request):
         # Record start event
         start_event = WorkflowInvokeEvent(...)
         self.event_store.record_event(start_event)
@@ -253,22 +253,22 @@ class MyWorkflow:
 
             # Record success event
             success_event = WorkflowRespondEvent(...)
-            self.event_store.record_event(success_event)
+            await self.event_store.record_event(success_event)
 
             return result
         except Exception as e:
             # Record failure event
             failure_event = WorkflowFailedEvent(...)
-            self.event_store.record_event(failure_event)
+            await self.event_store.record_event(failure_event)
             raise
 ```
 
 ### Event Sourcing
 
 ```python
-def rebuild_conversation_state(conversation_id: str, event_store: EventStore):
+async def rebuild_conversation_state(conversation_id: str, event_store: EventStore):
     """Rebuild conversation state from events."""
-    events = event_store.get_conversation_events(conversation_id)
+    events = await event_store.get_conversation_events(conversation_id)
 
     state = ConversationState()
     for event in sorted(events, key=lambda e: e.timestamp):
@@ -280,9 +280,9 @@ def rebuild_conversation_state(conversation_id: str, event_store: EventStore):
 ### Observability and Monitoring
 
 ```python
-def monitor_assistant_performance(assistant_request_id: str, event_store: EventStore):
+async def monitor_assistant_performance(assistant_request_id: str, event_store: EventStore):
     """Monitor assistant performance using events."""
-    events = event_store.get_agent_events(assistant_request_id)
+    events = await event_store.get_agent_events(assistant_request_id)
 
     invoke_events = [e for e in events if isinstance(e, AssistantInvokeEvent)]
     respond_events = [e for e in events if isinstance(e, AssistantRespondEvent)]
@@ -398,7 +398,7 @@ logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Monitor event store operations
 logger.info(f"Recording event: {event.event_type}")
-event_store.record_event(event)
+await event_store.record_event(event)
 logger.info(f"Event recorded successfully: {event.event_id}")
 ```
 

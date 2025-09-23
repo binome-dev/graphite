@@ -107,7 +107,7 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
         collection=create_collection(),
     )
 
-    async for output in simple_rag_assistant.a_invoke(
+    async for output in simple_rag_assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context,
             data=[
@@ -120,8 +120,8 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
     ):
         assert "Amazon EC2" in str(output.data[0].content)
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 12
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 12
 
 
 asyncio.run(test_simple_embedding_retrieval_tool_async())

@@ -122,7 +122,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the weather in 12345?")
     ]
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context_1,
             data=input_question_1,
@@ -131,7 +131,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    assert len(event_store.get_events()) == 34
+    assert len(await event_store.get_events()) == 34
 
     # Test the run method
     invoke_context_2 = get_invoke_context()
@@ -139,7 +139,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the population in 12345?"),
     ]
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context_2,
             data=input_question_2,
@@ -148,8 +148,8 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 68
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 68
 
     # Test the run method
     invoke_context_3 = get_invoke_context()
@@ -157,7 +157,7 @@ async def test_multi_functions_call_assistant_async() -> None:
         Message(role="user", content="Hello, how's the house price in 12345?"),
     ]
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=invoke_context_3,
             data=input_question_3,
@@ -166,8 +166,8 @@ async def test_multi_functions_call_assistant_async() -> None:
         print(output)
         assert output is not None
 
-    print(len(event_store.get_events()))
-    assert len(event_store.get_events()) == 102
+    print(len(await event_store.get_events()))
+    assert len(await event_store.get_events()) == 102
 
 
 asyncio.run(test_multi_functions_call_assistant_async())

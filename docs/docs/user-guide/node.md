@@ -23,18 +23,18 @@ The `NodeBase` class serves as the abstract foundation for all nodes in the grap
 - **Command Integration**: Internal command management through the Command Pattern
 - **Builder Pattern**: Provides a fluent interface for node construction via `NodeBaseBuilder`
 
-The base class defines abstract methods `invoke` and `a_invoke` that must be implemented by concrete subclasses to define their specific behavior.
+The base class defines an abstract method `invoke` that must be implemented by concrete subclasses to define their specific behavior.
 
 ## Node Implementation
 
-The `Node` class is a concrete implementation of `NodeBase` that provides a working node with standard invoke behavior. Unlike the abstract base class, `Node` actually implements the `invoke` and `a_invoke` methods by delegating to an internal `Command` object.
+The `Node` class is a concrete implementation of `NodeBase` that provides a working node with standard invoke behavior. Unlike the abstract base class, `Node` actually implements the `invoke` method by delegating to an internal `Command` object.
 
 Key features of the Node class include:
 
 - **Automatic Command Setup**: Creates commands automatically from tools during initialization
 - **Event-Driven Invocation**: Uses `can_invoke()` to determine readiness based on subscribed topics
 - **Event-Based Interface**: Consumes `ConsumeFromTopicEvent` objects and publishes `PublishToTopicEvent` objects
-- **Decorator Support**: Includes built-in instrumentation via `@record_node_invoke` and `@record_node_a_invoke`
+- **Decorator Support**: Includes built-in instrumentation via `@record_node_invoke`
 
 The following table describes each field within the Node class, highlighting its purpose and usage in the workflow:
 
@@ -57,8 +57,7 @@ The following table summarizes the methods available in the Node class, highligh
 |----------------------|----------------------------------------------------------------------------------------------------------|
 | `builder`           | Class method that returns a `NodeBaseBuilder` for fluent node construction.                              |
 | `model_post_init`   | Model post-initialization hook that sets up subscribed topics and auto-creates commands from tools during initialization. |
-| `invoke`            | Synchronously invokes the node's command with a list of `ConsumeFromTopicEvent` and returns a `PublishToTopicEvent`. |
-| `a_invoke`          | Asynchronously invokes the node's command, yielding `PublishToTopicEvent` objects as they become available. |
+| `invoke`          | Asynchronously invokes the node's command, yielding `PublishToTopicEvent` objects as they become available. |
 | `can_invoke`        | Evaluates subscription conditions to determine whether the node is ready to invoke based on available topics. |
 | `can_invoke_with_topics` | Checks if the node can invoke given a specific list of topic names. |
 | `to_dict`            | Serializes node attributes to a dictionary, suitable for persistence or transmission.                    |
@@ -82,8 +81,8 @@ Example usage:
 
 ```python
 from grafi.nodes.node import Node
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
 
 node = Node.builder()
     .name("ProcessorNode")
@@ -94,17 +93,15 @@ node = Node.builder()
     .build()
 
 # Node invoke signature
-from grafi.common.models.invoke_context import InvokeContext
+from grafi.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
-# Synchronous invocation
+# Asynchronous invocation
 context = InvokeContext(session_id="session-123")
 input_datas = [ConsumeFromTopicEvent(...)]  # List of consumed events
-output_event: PublishToTopicEvent = node.invoke(context, input_datas)
 
-# Asynchronous invocation
-async for output_event in node.a_invoke(context, input_datas):
+async for output_event in node.invoke(context, input_datas):
     # Process each PublishToTopicEvent as it's generated
     pass
 ```

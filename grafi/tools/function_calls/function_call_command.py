@@ -3,15 +3,15 @@ from typing import List
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
+from grafi.tools.command import Command
 
 
 class FunctionCallCommand(Command):
     """A command that calls a function on the context object."""
 
-    def get_tool_input(
+    async def get_tool_input(
         self, _: InvokeContext, node_input: List[ConsumeFromTopicEvent]
     ) -> Messages:
         tool_calls_messages = []

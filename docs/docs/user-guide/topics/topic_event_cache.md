@@ -1,10 +1,10 @@
 # Topic Event Cache
 
-The TopicEventCache is a sophisticated in-memory caching system that provides Kafka-like functionality for managing topic events, consumer offsets, and reliable message processing in Graphite workflows. It acts as a miniature message broker within each topic, supporting concurrent producers and consumers with proper offset management.
+The TopicEventQueue is a sophisticated in-memory caching system that provides Kafka-like functionality for managing topic events, consumer offsets, and reliable message processing in Graphite workflows. It acts as a miniature message broker within each topic, supporting concurrent producers and consumers with proper offset management.
 
 ## Overview
 
-The TopicEventCache implements:
+The TopicEventQueue implements:
 
 - **Event Storage**: Contiguous log of topic events with offset-based indexing
 - **Consumer Tracking**: Per-consumer offset management (consumed and committed)
@@ -17,7 +17,7 @@ The TopicEventCache implements:
 ### Core Components
 
 ```python
-class TopicEventCache:
+class TopicEventQueue:
     def __init__(self, name: str = ""):
         self.name: str = name
         self._records: List[TopicEvent] = []  # contiguous log
@@ -52,11 +52,11 @@ def put(self, event: TopicEvent) -> TopicEvent:
     return event
 ```
 
-#### async a_put(event: TopicEvent) → TopicEvent
+#### async put(event: TopicEvent) → TopicEvent
 Asynchronously append an event and notify waiting consumers.
 
 ```python
-async def a_put(self, event: TopicEvent) -> TopicEvent:
+async def put(self, event: TopicEvent) -> TopicEvent:
     async with self._cond:
         self._records.append(event)
         self._cond.notify_all()  # wake waiting consumers
@@ -101,11 +101,11 @@ def fetch(self, consumer_id: str, offset: Optional[int] = None) -> List[TopicEve
     return []
 ```
 
-#### async a_fetch(consumer_id: str, offset: Optional[int] = None, timeout: Optional[float] = None) → List[TopicEvent]
+#### async fetch(consumer_id: str, offset: Optional[int] = None, timeout: Optional[float] = None) → List[TopicEvent]
 Asynchronously fetch events with blocking and timeout support.
 
 ```python
-async def a_fetch(
+async def fetch(
     self,
     consumer_id: str,
     offset: Optional[int] = None,
@@ -158,11 +158,11 @@ def commit_to(self, consumer_id: str, offset: int) -> int:
     return self._committed[consumer_id]
 ```
 
-#### async a_commit_to(consumer_id: str, offset: int) → None
+#### async commit_to(consumer_id: str, offset: int) → None
 Asynchronously commit processed messages.
 
 ```python
-async def a_commit_to(self, consumer_id: str, offset: int) -> None:
+async def commit_to(self, consumer_id: str, offset: int) -> None:
     """Commit all offsets up to and including the specified offset."""
     async with self._cond:
         self._ensure_consumer(consumer_id)
@@ -176,7 +176,7 @@ async def a_commit_to(self, consumer_id: str, offset: int) -> None:
 
 ```python
 # Producer
-cache = TopicEventCache("my_topic")
+cache = TopicEventQueue("my_topic")
 event = PublishToTopicEvent(...)
 cache.put(event)
 
@@ -199,19 +199,19 @@ if cache.can_consume(consumer_id):
 
 ```python
 async def producer():
-    cache = TopicEventCache("async_topic")
+    cache = TopicEventQueue("async_topic")
     for i in range(10):
         event = create_event(i)
-        await cache.a_put(event)
+        await cache.put(event)
         await asyncio.sleep(0.1)
 
 async def consumer():
-    cache = TopicEventCache("async_topic")
+    cache = TopicEventQueue("async_topic")
     consumer_id = "async_consumer"
 
     while True:
         # Fetch with timeout
-        events = await cache.a_fetch(consumer_id, timeout=1.0)
+        events = await cache.fetch(consumer_id, timeout=1.0)
         if not events:
             break  # Timeout occurred
 
@@ -222,13 +222,13 @@ async def consumer():
         # Commit after processing
         if events:
             last_offset = events[-1].offset
-            await cache.a_commit_to(consumer_id, last_offset)
+            await cache.commit_to(consumer_id, last_offset)
 ```
 
 ### Multiple Consumers
 
 ```python
-cache = TopicEventCache("shared_topic")
+cache = TopicEventQueue("shared_topic")
 
 # Each consumer tracks its own offsets
 consumers = ["consumer_1", "consumer_2", "consumer_3"]
@@ -251,11 +251,11 @@ for consumer_id in consumers:
 
 ```python
 async def robust_consumer():
-    cache = TopicEventCache("robust_topic")
+    cache = TopicEventQueue("robust_topic")
     consumer_id = "robust_consumer"
 
     try:
-        events = await cache.a_fetch(consumer_id, timeout=5.0)
+        events = await cache.fetch(consumer_id, timeout=5.0)
         if not events:
             return  # No events or timeout
 
@@ -272,7 +272,7 @@ async def robust_consumer():
         # Only commit successfully processed events
         if processed_events:
             last_offset = processed_events[-1].offset
-            await cache.a_commit_to(consumer_id, last_offset)
+            await cache.commit_to(consumer_id, last_offset)
 
     except asyncio.TimeoutError:
         logger.info("No events available within timeout")
@@ -291,25 +291,25 @@ async def robust_consumer():
 
 ```python
 async def test_cache_behavior():
-    cache = TopicEventCache("test_topic")
+    cache = TopicEventQueue("test_topic")
 
     # Test basic put/fetch
     event = create_test_event()
-    await cache.a_put(event)
+    await cache.put(event)
 
     consumer_id = "test_consumer"
     assert cache.can_consume(consumer_id)
 
-    events = await cache.a_fetch(consumer_id)
+    events = await cache.fetch(consumer_id)
     assert len(events) == 1
     assert events[0] == event
 
     # Test duplicate fetch prevention
-    events2 = await cache.a_fetch(consumer_id)
+    events2 = await cache.fetch(consumer_id)
     assert len(events2) == 0  # Should be empty due to consumed offset
 
     # Test commit and reset
-    await cache.a_commit_to(consumer_id, 0)
+    await cache.commit_to(consumer_id, 0)
 
     cache.reset()
     assert len(cache._records) == 0
@@ -319,20 +319,20 @@ async def test_cache_behavior():
 
 ## Integration with Topics
 
-The TopicEventCache is used internally by all TopicBase implementations:
+The TopicEventQueue is used internally by all TopicBase implementations:
 
 ```python
 class TopicBase(BaseModel):
-    event_cache: TopicEventCache = Field(default_factory=TopicEventCache)
+    event_cache: TopicEventQueue = Field(default_factory=TopicEventQueue)
 
     def can_consume(self, consumer_name: str) -> bool:
         return self.event_cache.can_consume(consumer_name)
 
-    async def a_consume(self, consumer_name: str, timeout: Optional[float] = None) -> List[TopicEvent]:
-        return await self.event_cache.a_fetch(consumer_name, timeout=timeout)
+    async def consume(self, consumer_name: str, timeout: Optional[float] = None) -> List[TopicEvent]:
+        return await self.event_cache.fetch(consumer_name, timeout=timeout)
 
-    async def a_commit(self, consumer_name: str, offset: int) -> None:
-        await self.event_cache.a_commit_to(consumer_name, offset)
+    async def commit(self, consumer_name: str, offset: int) -> None:
+        await self.event_cache.commit_to(consumer_name, offset)
 ```
 
 This provides a consistent, reliable messaging substrate for all topic types in Graphite workflows, ensuring proper event ordering, delivery guarantees, and offset management across the entire system.

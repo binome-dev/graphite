@@ -17,30 +17,30 @@ class EventStoreInMemory(EventStore):
         """Initialize the event store."""
         self.events = []
 
-    def record_event(self, event: Event) -> None:
+    async def record_event(self, event: Event) -> None:
         """Record an event to the store."""
         self.events.append(event)
 
-    def record_events(self, events: List[Event]) -> None:
+    async def record_events(self, events: List[Event]) -> None:
         """Record events to the store."""
         self.events.extend(events)
 
-    def clear_events(self) -> None:
+    async def clear_events(self) -> None:
         """Clear all events."""
         self.events.clear()
 
-    def get_events(self) -> List[Event]:
+    async def get_events(self) -> List[Event]:
         """Get all events."""
         return self.events.copy()
 
-    def get_event(self, event_id: str) -> Optional[Event]:
+    async def get_event(self, event_id: str) -> Optional[Event]:
         """Get an event by ID."""
         for event in self.events:
             if event.event_id == event_id:
                 return event
         return None
 
-    def get_agent_events(self, assistant_request_id: str) -> List[Event]:
+    async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given agent request ID."""
         return [
             event
@@ -48,7 +48,7 @@ class EventStoreInMemory(EventStore):
             if event.invoke_context.assistant_request_id == assistant_request_id
         ]
 
-    def get_conversation_events(self, conversation_id: str) -> List[Event]:
+    async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID."""
         return [
             event
@@ -56,7 +56,7 @@ class EventStoreInMemory(EventStore):
             if event.invoke_context.conversation_id == conversation_id
         ]
 
-    def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
+    async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets."""
 
         # Convert offsets to a set for faster lookup

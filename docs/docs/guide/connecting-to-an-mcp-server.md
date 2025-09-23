@@ -176,10 +176,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.subscription_builder import SubscriptionBuilder
-from grafi.common.topics.topic import Topic
+from grafi.topics.input_topic import InputTopic
+from grafi.topics.output_topic import OutputTopic
+from grafi.topics.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic import Topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -337,7 +337,7 @@ class StockAssistantBuilder(
 ```
 
 
-Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines as well. For this case we are making a fully asynchronous workflow by overrding the  `async def a_run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchrnously.
+Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines as well. For this case we are making a fully asynchronous workflow by overrding the  `async def run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchrnously.
 
 ```python
 #main.py
@@ -347,9 +347,10 @@ import uuid
 from typing import Dict
 
 from grafi.common.containers.container import container
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.mcp_connections import StreamableHttpConnection
-from grafi.common.models.message import Message
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.models.invoke_context import InvokeContext
+from grafi.models.mcp_connections import StreamableHttpConnection
+from grafi.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 from assistant import StockAssistant
@@ -372,7 +373,7 @@ async def create_assistant():
         .model(model)
         .api_key(api_key)
         .function_call_llm_system_message(function_call_llm_system_message)
-        .function_tool(await MCPTool.builder().connections(mcp_config).a_build())
+        .function_tool(await MCPTool.builder().connections(mcp_config).build())
         .summary_llm_system_message(
             "You are a helpful assistant that provides a summary of the company overview. return all output as json formatted string")
         .build()
@@ -392,7 +393,11 @@ async def main():
     question = "What is the overview of the company Tesla?"
     input_data = [Message(role="user", content=question)]
 
-    async for response in assistant.a_invoke(invoke_context, input_data):
+    publish_event = PublishToTopicEvent(
+        invoke_context=execution_context, data=input_messages
+    )
+
+    async for response in assistant.invoke(publish_event):
         print("Assistant output:")
         for output in response:
             print(output.content)
@@ -524,11 +529,11 @@ Topics can have conditions attached to them to trigger them, in the case of `Inp
 
 
 
-When you call the assistant's `a_invoke()` method from `main.py`
+When you call the assistant's `invoke()` method from `main.py`
 
 ```python
 
-async for output in assistant.a_invoke(invoke_context, input_data):
+async for output in assistant.invoke(invoke_context, input_data):
 ```
 
 The `input_data` gets published on the assistants `InputTopic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/0b6b666b6f0e122ac970f437ee24f5d87c30a81a/grafi/workflows/impl/event_driven_workflow.py#L681-L687) but we are outlying it here so you can follow the flow of data.

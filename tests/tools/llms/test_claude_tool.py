@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
@@ -50,7 +51,8 @@ def test_init(claude_instance):
 # --------------------------------------------------------------------------- #
 #  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
-def test_invoke_simple_response(monkeypatch, claude_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_context):
     import grafi.tools.llms.impl.claude_tool as cl_module
 
     # fake AnthropicMessage: .content is list of blocks that each have .text
@@ -60,20 +62,24 @@ def test_invoke_simple_response(monkeypatch, claude_instance, invoke_context):
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = MagicMock(return_value=fake_response)
+    mock_client.messages.create = AsyncMock(return_value=fake_response)
 
-    # patch Anthropic constructor
-    monkeypatch.setattr(cl_module, "Anthropic", MagicMock(return_value=mock_client))
+    # patch AsyncAnthropic constructor
+    monkeypatch.setattr(
+        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
+    )
 
     input_data = [Message(role="user", content="Say hello")]
-    result = claude_instance.invoke(invoke_context, input_data)
+    result = []
+    async for messages in claude_instance.invoke(invoke_context, input_data):
+        result.extend(messages)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
     assert result[0].content == "Hello, world!"
 
     # verify constructor args
-    cl_module.Anthropic.assert_called_once_with(api_key="test_api_key")
+    cl_module.AsyncAnthropic.assert_called_once_with(api_key="test_api_key")
 
     # verify create() called with right kwargs
     kwargs = mock_client.messages.create.call_args[1]
@@ -92,7 +98,8 @@ def test_invoke_simple_response(monkeypatch, claude_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  invoke() – function / tool call path
 # --------------------------------------------------------------------------- #
-def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
     import grafi.tools.llms.impl.claude_tool as cl_module
 
     fake_block = Mock()
@@ -100,8 +107,10 @@ def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = MagicMock(return_value=fake_response)
-    monkeypatch.setattr(cl_module, "Anthropic", MagicMock(return_value=mock_client))
+    mock_client.messages.create = AsyncMock(return_value=fake_response)
+    monkeypatch.setattr(
+        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
+    )
 
     tools = [
         FunctionSpec(
@@ -116,7 +125,8 @@ def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
 
     msgs = [Message(role="user", content="Weather?")]
     claude_instance.add_function_specs(tools)
-    claude_instance.invoke(invoke_context, msgs)
+    async for _ in claude_instance.invoke(invoke_context, msgs):
+        pass  # Just consume the generator to trigger the API call
 
     kwargs = mock_client.messages.create.call_args[1]
     assert kwargs["tools"] is not None
@@ -125,7 +135,8 @@ def test_invoke_function_call(monkeypatch, claude_instance, invoke_context):
 # --------------------------------------------------------------------------- #
 #  Error propagation
 # --------------------------------------------------------------------------- #
-def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
+@pytest.mark.asyncio
+async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
     import grafi.tools.llms.impl.claude_tool as cl_module
 
     def _raise(*_a, **_kw):  # pragma: no cover
@@ -133,12 +144,17 @@ def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
 
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = _raise
-    monkeypatch.setattr(cl_module, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(
+        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
+    )
 
     from grafi.common.exceptions import LLMToolException
 
-    with pytest.raises(LLMToolException, match="Boom"):
-        claude_instance.invoke(invoke_context, [Message(role="user", content="Hi")])
+    with pytest.raises(LLMToolException, match="Anthropic async call failed"):
+        async for _ in claude_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass  # Exception should be raised before we get any results
 
 
 # --------------------------------------------------------------------------- #

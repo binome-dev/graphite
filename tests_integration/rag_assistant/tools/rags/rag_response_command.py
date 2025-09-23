@@ -3,15 +3,15 @@ from typing import List
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.models.command import Command
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
+from grafi.tools.command import Command
 
 
 class RagResponseCommand(Command):
     """A command that responds with a message."""
 
-    def get_tool_input(
+    async def get_tool_input(
         self, invoke_context: InvokeContext, node_input: List[ConsumeFromTopicEvent]
     ) -> Messages:
         # Only consider the last message contains the content to query

@@ -19,14 +19,14 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.base_builder import BaseBuilder
-from grafi.common.models.command import Command
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.topics.topic_base import TopicBase
-from grafi.common.topics.topic_expression import SubExpr
-from grafi.common.topics.topic_expression import TopicExpr
-from grafi.common.topics.topic_expression import evaluate_subscription
+from grafi.tools.command import Command
 from grafi.tools.tool import Tool
+from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import TopicExpr
+from grafi.topics.expressions.topic_expression import evaluate_subscription
+from grafi.topics.topic_base import TopicBase
 
 
 class NodeBase(BaseModel):
@@ -60,20 +60,7 @@ class NodeBase(BaseModel):
         """Return a list of subscribed topics."""
         return list(self._subscribed_topics.values())
 
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        node_input: List[ConsumeFromTopicEvent],
-    ) -> PublishToTopicEvent:
-        """
-        Process the input data and return a response.
-
-        This method should be implemented by all subclasses to define
-        the specific behavior of each node.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    async def a_invoke(
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
@@ -84,10 +71,11 @@ class NodeBase(BaseModel):
         This method should be implemented by all subclasses to define
         the specific behavior of each node.
         """
-        yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement this method.")
+        # The yield after raise is unreachable but needed for type checking
+        yield  # pragma: no cover
 
-    def can_invoke(self) -> bool:
+    async def can_invoke(self) -> bool:
         """
         Check if this node can invoke given which topics currently have new data.
         If ALL of the node's subscribed_expressions is True, we return True.
@@ -100,7 +88,7 @@ class NodeBase(BaseModel):
 
         # Evaluate each expression; if any is satisfied, we can invoke.
         for topic in self._subscribed_topics.values():
-            if topic.can_consume(self.name):
+            if await topic.can_consume(self.name):
                 topics_with_new_msgs.add(topic.name)
 
         for expr in self.subscribed_expressions:

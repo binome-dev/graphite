@@ -6,8 +6,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import TopicType
+from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 
@@ -21,7 +21,7 @@ class MockOutputTopic(OutputTopic):
         self._events = []
         self._consumed_offset = -1
 
-    async def a_consume(self, consumer_name: str):
+    async def consume(self, consumer_name: str):
         """Mock async consume that returns events."""
         # Simulate waiting for events
         await asyncio.sleep(0.01)
@@ -32,7 +32,7 @@ class MockOutputTopic(OutputTopic):
             self._consumed_offset = new_events[-1].offset
         return new_events
 
-    def can_consume(self, consumer_name: str) -> bool:
+    async def can_consume(self, consumer_name: str) -> bool:
         """Check if there are events to consume."""
         return any(e.offset > self._consumed_offset for e in self._events)
 

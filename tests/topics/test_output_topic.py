@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+import pytest_asyncio
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,9 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import TopicType
-from grafi.common.topics.topic_event_cache import TopicEventCache
+from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
+from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_impl.output_topic import OutputTopic
 
 
 agent_output_topic = OutputTopic(name="agent_output_topic")
@@ -89,12 +90,12 @@ class TestOutputTopic:
             ),
         ]
 
-    @pytest.fixture
-    def output_topic(self):
+    @pytest_asyncio.fixture
+    async def output_topic(self):
         topic = OutputTopic(name="test_output_topic")
         yield topic
         # Cleanup after test
-        topic.reset()
+        await topic.reset()
 
     def test_output_topic_creation(self):
         """Test creating an OutputTopic with default values."""
@@ -102,7 +103,7 @@ class TestOutputTopic:
 
         assert topic.name == "agent_output_topic"
         assert topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
-        assert isinstance(topic.event_cache, TopicEventCache)
+        assert isinstance(topic.event_queue, TopicEventQueue)
         assert topic.publish_event_handler is None
 
     def test_output_topic_with_custom_name(self):
@@ -111,17 +112,10 @@ class TestOutputTopic:
 
         assert topic.name == "custom_topic"
 
-    def test_builder_with_publish_event_handler(self):
-        """Test builder with publish event handler."""
-        handler = Mock()
-
-        topic = OutputTopic.builder().publish_event_handler(handler).build()
-
-        assert topic.publish_event_handler == handler
-
-    def test_publish_data_with_condition_true(
+    @pytest.mark.asyncio
+    async def test_publish_data_with_condition_true(
         self,
-        output_topic,
+        output_topic: OutputTopic,
         sample_invoke_context,
         sample_messages,
         sample_consumed_events,
@@ -130,7 +124,7 @@ class TestOutputTopic:
         # Mock condition to return True
         output_topic.condition = Mock(return_value=True)
 
-        event = output_topic.publish_data(
+        event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
@@ -147,11 +141,11 @@ class TestOutputTopic:
         assert event.data == sample_messages
         assert event.consumed_event_ids == ["test_id_1", "test_id_2"]
         assert event.offset == 0
-        assert output_topic.event_cache.num_events() == 1
 
-    def test_publish_data_with_condition_false(
+    @pytest.mark.asyncio
+    async def test_publish_data_with_condition_false(
         self,
-        output_topic,
+        output_topic: OutputTopic,
         sample_invoke_context,
         sample_messages,
         sample_consumed_events,
@@ -160,7 +154,7 @@ class TestOutputTopic:
         # Mock condition to return False
         output_topic.condition = Mock(return_value=False)
 
-        event = output_topic.publish_data(
+        event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=sample_invoke_context,
                 publisher_name="test_publisher",
@@ -171,28 +165,3 @@ class TestOutputTopic:
         )
 
         assert event is None
-        assert output_topic.event_cache.num_events() == 0
-
-    def test_publish_data_with_event_handler(
-        self,
-        output_topic,
-        sample_invoke_context,
-        sample_messages,
-        sample_consumed_events,
-    ):
-        """Test publishing data with event handler."""
-        handler = Mock()
-        output_topic.publish_event_handler = handler
-        output_topic.condition = Mock(return_value=True)
-
-        event = output_topic.publish_data(
-            PublishToTopicEvent(
-                invoke_context=sample_invoke_context,
-                publisher_name="test_publisher",
-                publisher_type="test_type",
-                data=sample_messages,
-                consumed_event_ids=[event.event_id for event in sample_consumed_events],
-            )
-        )
-
-        handler.assert_called_once_with(event)

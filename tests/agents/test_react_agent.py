@@ -1,11 +1,45 @@
 """Tests for the ReAct agent implementation."""
 
 import os
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
+# Now import after setting the environment variable
 from grafi.agents.react_agent import ReActAgent
 from grafi.agents.react_agent import ReActAgentBuilder
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
+
+
+# Set environment variable before any imports to prevent API key errors
+# os.environ["TAVILY_API_KEY"] = "mock-api-key-for-testing"
+
+
+@pytest.fixture(autouse=True)
+def mock_tavily_client():
+    """Automatically mock TavilyClient for all tests."""
+    with patch(
+        "grafi.tools.function_calls.impl.tavily_tool.TavilyClient"
+    ) as mock_client_class:
+        # Create a mock instance
+        mock_instance = MagicMock()
+        mock_instance.search.return_value = {
+            "query": "test query",
+            "answer": "Mock search result",
+            "results": [
+                {
+                    "title": "Mock Result",
+                    "url": "https://example.com/mock",
+                    "content": "Mock content for testing",
+                    "score": 0.9,
+                }
+            ],
+        }
+
+        # Make the class return our mock instance when instantiated
+        mock_client_class.return_value = mock_instance
+        yield mock_client_class
 
 
 class TestReActAgentBuilder:
@@ -24,7 +58,7 @@ class TestReActAgentBuilder:
         assert agent.type == "ReActAgent"
         assert agent.model == "gpt-4o-mini"
         assert agent.system_prompt is not None
-        assert isinstance(agent.function_call_tool, GoogleSearchTool)
+        assert isinstance(agent.function_call_tool, TavilyTool)
 
     def test_agent_creation_with_custom_values(self):
         """Test creating a ReAct agent with custom values."""
@@ -50,8 +84,8 @@ class TestReActAgentBuilder:
         agent = ReActAgent()
 
         assert agent.function_call_tool is not None
-        assert isinstance(agent.function_call_tool, GoogleSearchTool)
-        assert agent.function_call_tool.name == "GoogleSearchTool"
+        assert isinstance(agent.function_call_tool, TavilyTool)
+        assert agent.function_call_tool.name == "TavilyTestTool"
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "env-test-key"})
     def test_api_key_from_environment(self):

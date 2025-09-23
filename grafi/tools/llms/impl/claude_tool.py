@@ -16,7 +16,6 @@ from typing import Union
 
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_a_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -29,7 +28,6 @@ from grafi.tools.llms.llm import LLMBuilder
 
 try:
     from anthropic import NOT_GIVEN
-    from anthropic import Anthropic
     from anthropic import AsyncAnthropic
     from anthropic import NotGiven
     from anthropic.types import Message as AnthropicMessage
@@ -95,40 +93,10 @@ class ClaudeTool(LLM):
         return messages, tools or NOT_GIVEN
 
     # ------------------------------------------------------------------ #
-    # Blocking call                                                      #
-    # ------------------------------------------------------------------ #
-    @record_tool_invoke
-    def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> Messages:
-        messages, tools = self.prepare_api_input(input_data)
-
-        client = Anthropic(api_key=self.api_key)
-        try:
-            resp: AnthropicMessage = client.messages.create(
-                max_tokens=self.max_tokens,
-                model=self.model,
-                messages=messages,
-                tools=tools,  # None is fine here
-                **self.chat_params,
-            )
-            return self.to_messages(resp)
-        except Exception as exc:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message=f"Anthropic API call failed: {exc}",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
-
-    # ------------------------------------------------------------------ #
     # Async call                                                         #
     # ------------------------------------------------------------------ #
-    @record_tool_a_invoke
-    async def a_invoke(
+    @record_tool_invoke
+    async def invoke(
         self,
         invoke_context: InvokeContext,
         input_data: Messages,

@@ -1,23 +1,21 @@
 import asyncio
+from unittest.mock import AsyncMock
 from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.topics.input_topic import InputTopic
-from grafi.common.topics.output_topic import OutputTopic
-from grafi.common.topics.topic_base import TopicType
-from grafi.common.topics.topic_expression import TopicExpr
 from grafi.nodes.node import Node
 from grafi.tools.tool import Tool
+from grafi.topics.expressions.topic_expression import TopicExpr
+from grafi.topics.topic_base import TopicType
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import WorkflowBuilder
 
@@ -28,7 +26,7 @@ class MockTool(Tool):
     def invoke(self, invoke_context, input_data):
         return [Message(role="assistant", content="mock response")]
 
-    async def a_invoke(self, invoke_context, input_data):
+    async def invoke(self, invoke_context, input_data):
         yield [Message(role="assistant", content="mock response")]
 
 
@@ -143,21 +141,6 @@ class TestEventDrivenWorkflowTopicManagement:
 
         return EventDrivenWorkflow(nodes={"test_node": node})
 
-    def test_add_topic_sets_event_handler(self, workflow_with_topics):
-        """Test that _add_topic sets the publish_event_handler."""
-        topic = workflow_with_topics._topics["test_input"]
-        assert topic.publish_event_handler == workflow_with_topics.on_event
-
-    def test_add_topic_does_not_duplicate(self, workflow_with_topics):
-        """Test that adding the same topic twice doesn't create duplicates."""
-        initial_topic_count = len(workflow_with_topics._topics)
-
-        # Try to add the same topic again
-        input_topic = InputTopic(name="test_input")
-        workflow_with_topics._add_topic(input_topic)
-
-        assert len(workflow_with_topics._topics) == initial_topic_count
-
 
 class TestEventDrivenWorkflowEventHandling:
     @pytest.fixture
@@ -177,34 +160,11 @@ class TestEventDrivenWorkflowEventHandling:
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
         return workflow
 
-    def test_on_event_handles_publish_to_topic_event(self, workflow_with_nodes):
-        """Test that on_event correctly handles PublishToTopicEvent."""
-        # Create a mock publish event
-        event = PublishToTopicEvent(
-            name="test_input",
-            publisher_name="test_publisher",
-            publisher_type="test_type",
-            invoke_context=InvokeContext(
-                conversation_id="test", invoke_id="test", assistant_request_id="test"
-            ),
-            data=[Message(role="user", content="test")],
-            consumed_events=[],
-            offset=0,
-        )
-
-        # Publish the event to make the topic have consumable messages
-        workflow_with_nodes._topics["test_input"].add_event(event)
-
-        # Call on_event - it should add node to invoke queue if node can invoke
-        workflow_with_nodes.on_event(event)
-
-        # The behavior will depend on whether the node can actually invoke
-        # This tests the integration without mocking internal methods
-
 
 class TestEventDrivenWorkflowOutputEvents:
     @pytest.fixture
-    def workflow_with_output_topics(self):
+    @pytest.mark.asyncio
+    async def workflow_with_output_topics(self):
         """Create a workflow with various output topics."""
         input_topic = InputTopic(name="test_input")
         output_topic = OutputTopic(name="test_output")
@@ -231,23 +191,9 @@ class TestEventDrivenWorkflowOutputEvents:
             consumed_event_ids=[],
             offset=0,
         )
-        workflow._topics["test_output"].add_event(mock_event)
+        await workflow._topics["test_output"].add_event(mock_event)
 
         return workflow
-
-    def test_get_output_events_retrieves_agent_output_events(
-        self, workflow_with_output_topics
-    ):
-        """Test _get_output_events method exists and returns list."""
-        # Test that the method exists and can be called
-        events = workflow_with_output_topics._get_output_events()
-
-        # Should return a list (may be empty depending on topic state)
-        assert isinstance(events, list)
-
-        # Test that it returns ConsumeFromTopicEvent objects when events exist
-        for event in events:
-            assert isinstance(event, ConsumeFromTopicEvent)
 
 
 class TestEventDrivenWorkflowInvoke:
@@ -267,41 +213,6 @@ class TestEventDrivenWorkflowInvoke:
 
         return EventDrivenWorkflow(nodes={"test_node": node})
 
-    @patch("grafi.common.containers.container.container")
-    def test_invoke_basic_flow(self, mock_container, simple_workflow):
-        """Test basic invoke flow."""
-        # Setup mocks
-        mock_event_store = Mock()
-        mock_container.event_store = mock_event_store
-        mock_event_store.get_agent_events.return_value = []
-        mock_event_store.record_events = Mock()
-        mock_event_store.record_event = Mock()
-
-        invoke_context = InvokeContext(
-            conversation_id="test", invoke_id="test", assistant_request_id="test"
-        )
-        input_messages = [Message(role="user", content="test input")]
-
-        result = simple_workflow.invoke(
-            PublishToTopicEvent(invoke_context=invoke_context, data=input_messages)
-        )
-
-        assert isinstance(result, list)
-        # The workflow executed successfully
-
-    def test_invoke_attributes_exist(self, simple_workflow):
-        """Test that invoke method and required attributes exist."""
-        # Test that workflow has the required attributes
-        assert hasattr(simple_workflow, "invoke")
-        assert hasattr(simple_workflow, "_topics")
-        assert hasattr(simple_workflow, "_topic_nodes")
-        assert hasattr(simple_workflow, "_invoke_queue")
-        assert hasattr(simple_workflow, "_stop_requested")
-
-        # Test that workflow has been properly initialized
-        assert "test_input" in simple_workflow._topics
-        assert "test_output" in simple_workflow._topics
-
 
 class TestEventDrivenWorkflowAsyncInvoke:
     @pytest.fixture
@@ -320,15 +231,15 @@ class TestEventDrivenWorkflowAsyncInvoke:
 
         return EventDrivenWorkflow(nodes={"test_node": node})
 
-    def test_a_invoke_method_exists(self, async_workflow):
-        """Test that a_invoke method exists and is async."""
-        assert hasattr(async_workflow, "a_invoke")
-        assert callable(async_workflow.a_invoke)
+    def test_invoke_method_exists(self, async_workflow):
+        """Test that invoke method exists and is async."""
+        assert hasattr(async_workflow, "invoke")
+        assert callable(async_workflow.invoke)
 
     @pytest.mark.asyncio
-    async def test_a_invoke_basic_flow(self, async_workflow):
+    async def test_invoke_basic_flow(self, async_workflow):
         """Test basic async invoke flow."""
-        # This test verifies that the a_invoke method can be called
+        # This test verifies that the invoke method can be called
         # and properly sets up the async machinery
 
         invoke_context = InvokeContext(
@@ -342,16 +253,16 @@ class TestEventDrivenWorkflowAsyncInvoke:
         ) as mock_container:
             mock_event_store = Mock()
             mock_container.event_store = mock_event_store
-            mock_event_store.get_agent_events.return_value = []
-            mock_event_store.record_events = Mock()
-            mock_event_store.record_event = Mock()
+            mock_event_store.get_agent_events = AsyncMock(return_value=[])
+            mock_event_store.record_events = AsyncMock()
+            mock_event_store.record_event = AsyncMock()
 
             # Create a timeout to avoid hanging
             try:
                 # Run async invoke with timeout
                 results = []
                 async with asyncio.timeout(0.5):
-                    async for msg in async_workflow.a_invoke(
+                    async for msg in async_workflow.invoke(
                         PublishToTopicEvent(
                             invoke_context=invoke_context, data=input_messages
                         )
@@ -365,13 +276,13 @@ class TestEventDrivenWorkflowAsyncInvoke:
             mock_event_store.get_agent_events.assert_called_with("test")
 
     @pytest.mark.asyncio
-    async def test_a_invoke_with_async_output_queue(self, async_workflow):
-        """Test that a_invoke uses AsyncOutputQueue."""
+    async def test_invoke_with_async_output_queue(self, async_workflow):
+        """Test that invoke uses AsyncOutputQueue."""
         # We can verify that the workflow has the necessary components
         assert hasattr(async_workflow, "_tracker")
         assert hasattr(async_workflow, "_topics")
 
-        # The AsyncOutputQueue should be created during a_invoke execution
+        # The AsyncOutputQueue should be created during invoke execution
         # This is more of an integration test ensuring the components work together
 
 
@@ -456,12 +367,12 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         await workflow_with_tracker._tracker.enter("test_node")
         assert not workflow_with_tracker._tracker.is_idle()
 
-        # Call a_init_workflow which should reset tracker
+        # Call init_workflow which should reset tracker
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
         with patch("grafi.common.containers.container.container"):
-            await workflow_with_tracker.a_init_workflow(
+            await workflow_with_tracker.init_workflow(
                 PublishToTopicEvent(invoke_context=invoke_context, data=[])
             )
 

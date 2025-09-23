@@ -5,15 +5,17 @@ import uuid
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
 
 
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
+tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 observation_llm_system_message = """
 You are an AI assistant that records and reports the results obtained from invoked actions.
@@ -43,7 +45,12 @@ assistant = (
     .action_llm_system_message(action_llm_system_message)
     .summary_llm_system_message(summary_llm_system_message)
     .search_tool(
-        GoogleSearchTool.builder().name("GoogleSearchTool").fixed_max_results(3).build()
+        TavilyTool.builder()
+        .name("TavilyTestTool")
+        .api_key(tavily_api_key)
+        .max_tokens(6000)
+        .search_depth("advanced")
+        .build()
     )
     .build()
 )
@@ -57,7 +64,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-def test_react_assistant() -> None:
+async def test_react_assistant() -> None:
     invoke_context = get_invoke_context()
 
     input_data = [
@@ -72,10 +79,13 @@ def test_react_assistant() -> None:
     stop_thread.start()
 
     # Invoke the assistant's function call
-    output = assistant.invoke(
-        PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=input_data,
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
         )
     )
     print("Assistant output:", output)
@@ -84,7 +94,7 @@ def test_react_assistant() -> None:
     assert output is not None
     print(
         "Number of events recorded:",
-        len(event_store.get_events()),
+        len(await event_store.get_events()),
     )
 
     # Wait for the stop thread to complete

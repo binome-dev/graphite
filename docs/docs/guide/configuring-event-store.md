@@ -130,20 +130,25 @@ event_store = container.event_store
 Graphite has a built in react agent that can be used out of the box for your needs, we will use it for the simple use case of passing in input and retrieving the output from OpenAI.
 
 ```python
+import asyncio
 from grafi.agents.react_agent import create_react_agent
 
-react_agent = create_react_agent()
+async def run_agent():
 
-result = react_agent.run(user_input, invoke_context)
+    react_agent = create_react_agent()
 
-print("Output from React Agent:", result)
+    result = await react_agent.run(user_input, invoke_context)
+
+    print("Output from React Agent:", result)
 
 
-events = event_store.get_conversation_events(conversation_id)
+    events = event_store.get_conversation_events(conversation_id)
 
-print(f"Events for conversation {conversation_id}:")
+    print(f"Events for conversation {conversation_id}:")
 
-print(f"Events: {events} ")
+    print(f"Events: {events} ")
+
+asyncio.run(run_agent())
 
 ```
 
@@ -167,8 +172,8 @@ import uuid
 from grafi.agents.react_agent import create_react_agent
 from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
+from grafi.models.invoke_context import InvokeContext
+from grafi.models.message import Message
 
 postgres_event_store = EventStorePostgres(
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
@@ -202,21 +207,22 @@ invoke_context = InvokeContext(
     assistant_request_id=assistant_request_id,
 )
 
-message = Message(role="user", content=user_input)
+async def run_agent():
+
+    react_agent = create_react_agent()
+
+    result = await react_agent.run(user_input, invoke_context)
+
+    print("Output from React Agent:", result)
 
 
-react_agent = create_react_agent()
+    events = event_store.get_conversation_events(conversation_id)
 
-result = react_agent.run(user_input, invoke_context)
+    print(f"Events for conversation {conversation_id}:")
 
+    print(f"Events: {events} ")
 
-for output_message in result:
-    print("Output message:", output_message)
-
-events = event_store.get_conversation_events(conversation_id)
-
-print(f"Events for conversation {conversation_id}:")
-print(f"Events: {events} ")
+asyncio.run(run_agent())
 
 ```
 
@@ -246,10 +252,10 @@ print(f"Events: {events} ")
 2025-07-12 17:38:55.566 | WARNING  | grafi.tools.function_calls.function_call_tool:__init_subclass__:86 - GoogleSearchTool: no method decorated with @llm_function found.
 2025-07-12 17:38:55.895 | DEBUG    | grafi.common.instrumentations.tracing:is_local_endpoint_available:30 - Endpoint check failed: [Errno 111] Connection refused
 2025-07-12 17:38:55.895 | DEBUG    | grafi.common.instrumentations.tracing:setup_tracing:117 - OTLP endpoint is not available. Using InMemorySpanExporter.
-2025-07-12 17:38:55.905 | INFO     | grafi.common.topics.topic:publish_data:64 - [agent_input_topic] Message published with event_id: 1da4f45008264dc98fd63dc154dcaa6e
+2025-07-12 17:38:55.905 | INFO     | grafi.topics.topic:publish_data:64 - [agent_input_topic] Message published with event_id: 1da4f45008264dc98fd63dc154dcaa6e
 2025-07-12 17:38:55.912 | DEBUG    | grafi.nodes.node:invoke:49 - Executing Node with inputs: [ConsumeFromTopicEvent(event_id='8dd13f159fbc40b29ca030501f4d2859', event_version='1.0', invoke_context=InvokeContext(conversation_id='9051491ca7a84b71a3f3e9d790b79e4f', invoke_id='6e56da25ca824bf4a8d454a731b6f336', assistant_request_id='0e0317d25c9b40e4a76a130bbbb7bc43', user_id='9e396be8f8c442bc9269a31a9b3f69a2'), event_type=<EventType.CONSUME_FROM_TOPIC: 'ConsumeFromTopic'>, timestamp=datetime.datetime(2025, 7, 12, 16, 38, 55, 909090, tzinfo=datetime.timezone.utc), name='agent_input_topic', offset=0, data=[Message(name=None, message_id='ae2638fa5f3047fbbfb43dbd1545e6d2', timestamp=1752338335885634346, content='What is the capital of the United Kingdom', refusal=None, annotations=None, audio=None, role='user', tool_call_id=None, tools=None, function_call=None, tool_calls=None, is_streaming=False)], consumer_name='OpenAIInputNode', consumer_type='OpenAIInputNode')]
-2025-07-12 17:38:57.400 | INFO     | grafi.common.topics.topic:publish_data:69 - [function_call_topic] Message NOT published (condition not met)
-2025-07-12 17:38:57.400 | INFO     | grafi.common.topics.output_topic:publish_data:91 - [agent_output_topic] Message published with event_id: d83d3339fbd94d6e983fc51965177891
+2025-07-12 17:38:57.400 | INFO     | grafi.topics.topic:publish_data:69 - [function_call_topic] Message NOT published (condition not met)
+2025-07-12 17:38:57.400 | INFO     | grafi.topics.output_topic:publish_data:91 - [agent_output_topic] Message published with event_id: d83d3339fbd94d6e983fc51965177891
 <span style="color:#FF4689">Output from React Agent:</span>  The capital of the United Kingdom is London.
 <span style="color:#FF4689">Events for conversation: </span> 9051491ca7a84b71a3f3e9d790b79e4f:
 <span style="color:#FF4689">Events: </span>[AssistantInvokeEvent(event_id='7d97059ad3404c74be582ed4d01e365e', event_version='1.0', invoke_context=InvokeContext(conversation_id='9051491ca7a84b71a3f3e9d790b79e4f', invoke_id='6e56da25ca824bf4a8d454a731b6f336', assistant_request_id='0e0317d25c9b40e4a76a130bbbb7bc43', user_id='9e396be8f8c442bc9269a31a9b3f69a2'), event_type=<EventType.ASSISTANT_INVOKE: 'AssistantInvoke'>, timestamp=datetime.datetime(2025, 7, 12, 16, 38, 55, 885710), assistant_id='de51912ecc6c44ce803a0cd5eb358ba5', assistant_name='ReActAgent', assistant_type='ReActAgent', input_data=[Message(name=None, message_id='ae2638fa5f3047fbbfb43dbd1545e6d2', timestamp=1752338335885634346, content='What is the capital of the United Kingdom', refusal=None, annotations=No```</code></pre></div>

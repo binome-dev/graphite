@@ -81,13 +81,13 @@ async def test_simple_hitl_assistant() -> None:
     ]
 
     outputs: List[ConsumeFromTopicEvent] = []
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(invoke_context=get_invoke_context(), data=input_data)
     ):
         outputs.append(output)
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 18
 
@@ -102,7 +102,7 @@ async def test_simple_hitl_assistant() -> None:
 
     outputs_1: List[ConsumeFromTopicEvent] = []
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=human_input,
@@ -112,7 +112,7 @@ async def test_simple_hitl_assistant() -> None:
         outputs_1.append(output)
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 36
 
@@ -125,7 +125,7 @@ async def test_simple_hitl_assistant() -> None:
 
     logger.info(f"Human input: {human_input}")
 
-    async for output in assistant.a_invoke(
+    async for output in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=human_input,
@@ -134,7 +134,7 @@ async def test_simple_hitl_assistant() -> None:
     ):
         print(output)
 
-    events = event_store.get_events()
+    events = await event_store.get_events()
     print(len(events))
     assert len(events) == 54
 

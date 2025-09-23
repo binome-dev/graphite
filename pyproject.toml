@@ -1,6 +1,6 @@
 [project]
 name = "grafi"
-version = "0.0.27"
+version = "0.0.28"
 description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI agents through composable agentic workflows."
 authors = [{name = "Craig Li", email = "craig@binome.dev"}]
 license = {text = "Mozilla Public License Version 2.0"}
@@ -14,7 +14,8 @@ dependencies = [
     "arize-otel>=0.8.2",
     "loguru>=0.7.3",
     "jsonpickle>=4.1.0",
-    "arize-phoenix-otel>=0.10.3"
+    "arize-phoenix-otel>=0.10.3",
+    "anyio>=4.9.0",
 ]
 
 [dependency-groups]
@@ -36,6 +37,7 @@ dev = [
     "ollama>=0.5.1",
     "pre-commit>=4.2.0",
     "psycopg2-binary>=2.9.10",
+    "asyncpg>=0.29.0",
     "pycountry>=24.6.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",

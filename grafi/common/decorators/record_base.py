@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 """Base decorator utilities for recording component invoke events and tracing."""
 
 import functools
@@ -58,112 +57,6 @@ class ComponentConfig:
     span_name_suffix: str = "invoke"  # Suffix for span name
 
 
-def create_sync_decorator(config: ComponentConfig) -> Callable:
-    """
-    Factory to create synchronous decorators for different component types.
-
-    Args:
-        config: Component-specific configuration
-
-    Returns:
-        A decorator function for the component type
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(
-            self: Union[AssistantBase, Workflow, NodeBase, Tool],
-            *args,
-            **kwargs,
-        ) -> Union[PublishToTopicEvent, List[Message]]:
-            # Extract metadata using component-specific logic
-            metadata = config.extract_metadata(self)
-
-            input_data: Union[
-                List[ConsumeFromTopicEvent], List[Message], PublishToTopicEvent
-            ] = None
-
-            invoke_context: InvokeContext = None
-
-            if len(args) == 1:
-                # Assistant and workflow
-                input_data = args[0]
-                invoke_context = input_data.invoke_context
-            elif len(args) == 2:
-                # Node and Tool
-                invoke_context: InvokeContext = args[0]
-                input_data = args[1]
-
-            # Create invoke event
-            invoke_event = config.event_types["invoke"](
-                id=metadata.id,
-                name=metadata.name,
-                type=metadata.type,
-                input_data=input_data,
-                invoke_context=invoke_context,
-            )
-            container.event_store.record_event(invoke_event)
-
-            # Execute with tracing
-            try:
-                with container.tracer.start_as_current_span(
-                    f"{metadata.name}.{config.span_name_suffix}"
-                ) as span:
-                    # Set span attributes
-                    for key, value in metadata.model_dump().items():
-                        if value is not None:
-                            span.set_attribute(key, value)
-
-                    # Set context attributes
-                    span.set_attributes(invoke_context.model_dump())
-
-                    # Set input
-                    span.set_attribute(
-                        "input", json.dumps(input_data, default=to_jsonable_python)
-                    )
-
-                    # Execute function
-                    result = func(self, *args, **kwargs)
-
-                    # Set output
-                    span.set_attribute(
-                        "output", json.dumps(result, default=to_jsonable_python)
-                    )
-
-            except Exception as e:
-                # Record failed event
-                if "error" in locals():
-                    span.set_attribute("error", str(e))
-
-                failed_event = config.event_types["failed"](
-                    id=metadata.id,
-                    name=metadata.name,
-                    type=metadata.type,
-                    invoke_context=invoke_context,
-                    input_data=input_data,
-                    error=str(e),
-                )
-                container.event_store.record_event(failed_event)
-                raise
-            else:
-                # Record respond event
-                respond_event = config.event_types["respond"](
-                    id=metadata.id,
-                    name=metadata.name,
-                    type=metadata.type,
-                    input_data=input_data,
-                    invoke_context=invoke_context,
-                    output_data=result,
-                )
-                container.event_store.record_event(respond_event)
-
-            return result
-
-        return wrapper
-
-    return decorator
-
-
 def create_async_decorator(config: ComponentConfig) -> Callable:
     """
     Factory to create asynchronous decorators for different component types.
@@ -189,14 +82,13 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 List[ConsumeFromTopicEvent], List[Message], PublishToTopicEvent
             ] = None
 
-            if len(args) == 1:
+            if isinstance(args[0], InvokeContext):
+                invoke_context: InvokeContext = args[0]
+                input_data = args[1]
+            else:
                 # Assistant and workflow
                 input_data: PublishToTopicEvent = args[0]
                 invoke_context = input_data.invoke_context
-            elif len(args) == 2:
-                # Node and Tool
-                invoke_context: InvokeContext = args[0]
-                input_data = args[1]
 
             # Create invoke event
             invoke_event = config.event_types["invoke"](
@@ -206,7 +98,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 input_data=input_data,
                 invoke_context=invoke_context,
             )
-            container.event_store.record_event(invoke_event)
+            await container.event_store.record_event(invoke_event)
 
             # Execute with tracing
             result_list = []
@@ -254,7 +146,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     invoke_context=invoke_context,
                     error=str(e),
                 )
-                container.event_store.record_event(failed_event)
+                await container.event_store.record_event(failed_event)
                 raise
             else:
                 # Record respond event
@@ -266,7 +158,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     invoke_context=invoke_context,
                     output_data=output_data,
                 )
-                container.event_store.record_event(respond_event)
+                await container.event_store.record_event(respond_event)
 
         return wrapper
 
