@@ -45,14 +45,11 @@ class ReActAgent(Assistant):
     name: str = Field(default="ReActAgent")
     type: str = Field(default="ReActAgent")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    tavily_api_key: Optional[str] = Field(
-        default_factory=lambda: os.getenv("TAVILY_API_KEY")
-    )
     system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
     function_call_tool: FunctionCallTool = Field(
         default=TavilyTool.builder()
         .name("TavilyTestTool")
-        .api_key(tavily_api_key)
+        .api_key(os.getenv("TAVILY_API_KEY"))
         .max_tokens(6000)
         .search_depth("advanced")
         .build()
