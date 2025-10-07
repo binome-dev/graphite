@@ -229,8 +229,8 @@ class StockAssistant(Assistant):
         assistant_output_topic = OutputTopic(name="assistant_output_topic",
                     condition = (
             lambda event: event.data[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != ""
         ))
 
         assistant_root_topic = InputTopic(name="assistant_root_topic")
@@ -520,8 +520,8 @@ and subsequentially the final node has to be an instance of `OutputTopic`
 assistant_output_topic = OutputTopic(name="assistant_output_topic",
                     condition = (
             lambda event: event.data[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != ""
         ))
 ```
 
