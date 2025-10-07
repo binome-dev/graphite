@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import uuid
@@ -109,4 +110,4 @@ async def test_react_assistant() -> None:
     print("Assistant output:", output)
 
 
-test_react_assistant()
+asyncio.run(test_react_assistant())

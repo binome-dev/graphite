@@ -54,15 +54,15 @@ class HumanApprovalAssistant(Assistant):
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(
             name="agent_output_topic",
-            condition=lambda msgs: msgs[-1].tool_calls is None,
+            condition=lambda event: event.data[-1].tool_calls is None,
         )
         in_workflow_input_approval_topic = InWorkflowInputTopic(
             name="human_approval_topic",
-            condition=lambda msgs: msgs[-1].content == "YES",
+            condition=lambda event: event.data[-1].content == "YES",
         )
         in_workflow_input_disapproval_topic = InWorkflowInputTopic(
             name="human_disapproval_topic",
-            condition=lambda msgs: msgs[-1].content.startswith("NO"),  # type: ignore
+            condition=lambda event: event.data[-1].content.startswith("NO"),  # type: ignore
         )
         in_workflow_output_topic = InWorkflowOutputTopic(
             name="human_tool_call_request_topic",
@@ -70,7 +70,7 @@ class HumanApprovalAssistant(Assistant):
                 in_workflow_input_approval_topic.name,
                 in_workflow_input_disapproval_topic.name,
             ],
-            condition=lambda msgs: msgs[-1].tool_calls is not None,
+            condition=lambda event: event.data[-1].tool_calls is not None,
         )
 
         function_output_topic = Topic(name="human_tool_call_response_topic")
@@ -143,9 +143,9 @@ class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs[
-            "function_call_llm_system_message"
-        ] = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:

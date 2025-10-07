@@ -35,7 +35,7 @@ class TopicBase(BaseModel):
 
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
-    condition: Callable[[Messages], bool] = Field(default=lambda _: True)
+    condition: Callable[[PublishToTopicEvent], bool] = Field(default=lambda _: True)
     event_queue: TopicEventQueue = Field(default_factory=InMemTopicEventQueue)
     publish_event_handler: Optional[Callable] = None
 
@@ -47,7 +47,7 @@ class TopicBase(BaseModel):
         """
         Publish data to the topic if it meets the condition.
         """
-        if self.condition(publish_event.data):
+        if self.condition(publish_event):
             event = publish_event.model_copy(
                 update={
                     "name": self.name,

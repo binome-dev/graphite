@@ -1,3 +1,4 @@
+import asyncio
 import os
 import threading
 import time
@@ -108,4 +109,4 @@ def stop_workflow() -> None:
     print("Workflow stopped.")
 
 
-test_react_assistant()
+asyncio.run(test_react_assistant())

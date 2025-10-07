@@ -54,7 +54,7 @@ class SimpleClaudeFunctionCallAssistant(Assistant):
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is not None,  # only when the last message is a function call
         )
 
@@ -80,7 +80,7 @@ class SimpleClaudeFunctionCallAssistant(Assistant):
         function_result_topic = Topic(name="function_result_topic")
 
         agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None
+            lambda event: event.data[-1].content is not None
             and isinstance(msgs[-1].content, str)
             and msgs[-1].content.strip() != ""
         )
@@ -147,9 +147,9 @@ class SimpleClaudeFunctionCallAssistantBuilder(
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs[
-            "function_call_llm_system_message"
-        ] = function_call_llm_system_message
+        self.kwargs["function_call_llm_system_message"] = (
+            function_call_llm_system_message
+        )
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
