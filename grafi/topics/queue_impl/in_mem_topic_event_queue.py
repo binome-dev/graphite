@@ -21,7 +21,9 @@ class InMemTopicEventQueue(TopicEventQueue):
 
     def __init__(self) -> None:
         self.id: str = default_id
-        self._records: List[TopicEvent] = (
+        self._records: List[
+            TopicEvent
+        ] = (
             []
         )  # contiguous in memory log, persistent all the topic events generated from publishers
 

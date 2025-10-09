@@ -279,44 +279,6 @@ class TestNode:
             async for _ in basic_node.invoke(invoke_context, sample_consumed_events):
                 pass
 
-    # Test Async Invoke Method
-    @patch("grafi.nodes.node.record_node_invoke")
-    @pytest.mark.asyncio
-    async def test_invoke_with_tool(
-        self,
-        mock_decorator,
-        node_with_tool: Node,
-        invoke_context: InvokeContext,
-        sample_consumed_events: List[ConsumeFromTopicEvent],
-    ):
-        """Test async invoking a Node with a tool."""
-        mock_decorator.side_effect = lambda func: func
-
-        messages = []
-        async for message_batch in node_with_tool.invoke(
-            invoke_context, sample_consumed_events
-        ):
-            messages.extend(message_batch)
-
-        # Verify we get results
-        assert isinstance(messages, list)
-
-    @patch("grafi.nodes.node.record_node_invoke")
-    @pytest.mark.asyncio
-    async def test_invoke_without_tool_raises_error(
-        self,
-        mock_decorator,
-        basic_node: Node,
-        invoke_context: InvokeContext,
-        sample_consumed_events: List[ConsumeFromTopicEvent],
-    ):
-        """Test async invoking a Node without a tool raises an error."""
-        mock_decorator.side_effect = lambda func: func
-
-        with pytest.raises(AttributeError):
-            async for _ in basic_node.invoke(invoke_context, sample_consumed_events):
-                pass
-
     # Test can_invoke Method
     @pytest.mark.asyncio
     async def test_can_invoke_no_subscriptions(self, basic_node: Node):

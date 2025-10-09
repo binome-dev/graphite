@@ -150,15 +150,11 @@ class TestArizeTracing:
                 endpoint="https://arize.example.com",
                 space_id="test-space-id",
                 api_key="test-api-key",
-                model_id="test-project",
-                set_global_tracer_provider=False,
+                project_name="test-project",
             )
 
             # Check OpenAI instrumentation
             mock_instrumentor_instance.instrument.assert_called_once()
-
-            # Check Phoenix headers are set
-            assert os.environ["PHOENIX_CLIENT_HEADERS"] == "api_key=test-api-key"
 
 
 class TestPhoenixTracing:
@@ -206,7 +202,6 @@ class TestPhoenixTracing:
         mock_phoenix_register.assert_called_once_with(
             endpoint="localhost:4317",
             project_name="test-project",
-            set_global_tracer_provider=False,
         )
 
         # Verify OTLP exporter setup

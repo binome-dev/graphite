@@ -190,11 +190,6 @@ class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
         }
         return self
 
-    def build(self) -> None:
-        raise NotImplementedError(
-            "MCPTool does not support synchronous invoke. Use build instead."
-        )
-
     async def build(self) -> "MCPTool":
         mcp_tool = await self._cls.initialize(**self.kwargs)
         return mcp_tool
