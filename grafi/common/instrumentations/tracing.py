@@ -103,8 +103,7 @@ def _setup_arize_tracing(collector_endpoint: str) -> None:
         endpoint=collector_endpoint,
         space_id=space_id,
         api_key=api_key,
-        model_id=project_name,
-        set_global_tracer_provider=False,
+        project_name=project_name,
     )
 
     logger.info(f"Arize tracing configured with endpoint: {collector_endpoint}")
@@ -147,7 +146,6 @@ def _setup_phoenix_tracing(
     tracer_provider = phoenix.otel.register(
         endpoint=endpoint_url,
         project_name=project_name,
-        set_global_tracer_provider=False,
     )
 
     # Configure OTLP exporter
