@@ -1,0 +1,235 @@
+{
+    "assistant_id": "d7bd6e5ead6143e486ed732ab47b06dd",
+    "name": "ReActAssistant",
+    "type": "ReActAssistant",
+    "oi_span_type": "AGENT",
+    "workflow": {
+        "workflow_id": "4e850fefd1964a589d0d32f10b2b9f49",
+        "name": "ReActAssistantWorkflow",
+        "type": "EventDrivenWorkflow",
+        "oi_span_type": "AGENT",
+        "nodes": {
+            "ThoughtNode": {
+                "class": "Node",
+                "node_id": "f51f392bda414722905f66f394f4c91e",
+                "name": "ThoughtNode",
+                "type": "Node",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "tool_id": "80f7608a7a604473ab828ec5fa6acbdf",
+                    "name": "ThoughtLLMTool",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": "\nYou are an AI assistant tasked with analyzing the user's question and considering the provided observation to determine the next logical step required to answer the question.\nYour response should describe what would be the most effective action to take based on the information gathered.\nIf the information is sufficient to answer the question, return the answer with confirmation the answer is ready.\n",
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "op": "OR",
+                        "left": {
+                            "topic": "agent_input_topic"
+                        },
+                        "right": {
+                            "topic": "observation_result"
+                        }
+                    }
+                ],
+                "publish_to": [
+                    "thought_result"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            },
+            "ActionNode": {
+                "class": "Node",
+                "node_id": "6e7c59de9df7489ba52a5abfd7a64747",
+                "name": "ActionNode",
+                "type": "Node",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "tool_id": "f7feb8d8aaa845469c1d3d3f10726261",
+                    "name": "ActionLLMTool",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": "\nYou are an AI assistant responsible for executing actions based on a given plan to retrieve information.\nSpecify the appropriate action to take, such as performing a search query or accessing a specific resource, to gather the necessary data.\nIf answer is ready, return **FINISH REACT**.\n",
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "thought_result"
+                    }
+                ],
+                "publish_to": [
+                    "action_search_result",
+                    "action_finish_result"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            },
+            "SearchNode": {
+                "class": "Node",
+                "node_id": "33a2d7b1349b406c9b4f8b7b81526392",
+                "name": "SearchNode",
+                "type": "Node",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "TavilyTool",
+                    "tool_id": "bb2e6039b9bb440ba979b2da84cd5060",
+                    "name": "TavilyTestTool",
+                    "type": "TavilyTool",
+                    "oi_span_type": "TOOL",
+                    "function_specs": [
+                        {
+                            "name": "web_search_using_tavily",
+                            "description": "Function to search online given a query using the Tavily API. The query can be anything.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "query": {
+                                        "type": "string",
+                                        "description": "The query to search for."
+                                    },
+                                    "max_results": {
+                                        "type": "integer",
+                                        "description": "The maximum number of results to return (default is 5)."
+                                    }
+                                },
+                                "required": [
+                                    "query"
+                                ]
+                            }
+                        }
+                    ],
+                    "function": [
+                        "web_search_using_tavily"
+                    ],
+                    "api_key": "****************",
+                    "search_depth": "advanced",
+                    "max_tokens": 6000
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "action_search_result"
+                    }
+                ],
+                "publish_to": [
+                    "search_function_result"
+                ],
+                "command": {
+                    "class": "FunctionCallCommand"
+                }
+            },
+            "ObservationNode": {
+                "class": "Node",
+                "node_id": "f581056fe48743f2ae106dd27ac8f5f3",
+                "name": "ObservationNode",
+                "type": "Node",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "tool_id": "448fc1118720455bb4c1ce1c5f3cefff",
+                    "name": "ObservationLLMTool",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": "\nYou are an AI assistant that records and reports the results obtained from invoked actions.\nAfter performing an action, provide a clear and concise summary of the findings relevant to the user's question.\n",
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "search_function_result"
+                    }
+                ],
+                "publish_to": [
+                    "observation_result"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            },
+            "SummariesNode": {
+                "class": "Node",
+                "node_id": "407415040e4d4bb09dd3d7cba7cc9f3d",
+                "name": "SummariesNode",
+                "type": "Node",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "tool_id": "f809b9315db54d6dbab3342ad052cc7a",
+                    "name": "SummariesLLMTool",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": "\nYou are an AI assistant tasked with summarizing the findings from previous observations to provide a clear and accurate answer to the user's question.\nEnsure the summary directly addresses the query based on the information gathered.\n",
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "action_finish_result"
+                    }
+                ],
+                "publish_to": [
+                    "agent_output_topic"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            }
+        },
+        "topics": {
+            "agent_input_topic": {
+                "name": "agent_input_topic",
+                "type": "AgentInputTopic",
+                "condition": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsnQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            },
+            "observation_result": {
+                "name": "observation_result",
+                "type": "Topic",
+                "condition": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsnQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            },
+            "thought_result": {
+                "name": "thought_result",
+                "type": "Topic",
+                "condition": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsnQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            },
+            "action_search_result": {
+                "name": "action_search_result",
+                "type": "Topic",
+                "condition": "gAWVXgMAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAksTQziXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQFTAJROSv////+GlIwEZGF0YZSMCnRvb2xfY2FsbHOUhpSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtVQxeAAKBFp0qhSqhyoU7XJD3RJD3AVNEkSZRDAJQpKXSUUpR9lCiMC19fcGFja2FnZV9flIwhdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50lIwIX19uYW1lX1+UjDF0ZXN0c19pbnRlZ3JhdGlvbi5yZWFjdF9hc3Npc3RhbnQucmVhY3RfYXNzaXN0YW50lIwIX19maWxlX1+UjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lHVOTk50lFKUaACMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGgefZR9lChoGYwIPGxhbWJkYT6UjAxfX3F1YWxuYW1lX1+UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoGowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            },
+            "action_finish_result": {
+                "name": "action_finish_result",
+                "type": "Topic",
+                "condition": "gAWVagQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLBEsTQ+KXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQF4AXJTAQB0BQAAAAAAAAAAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAdAYAAAAAAAAAAKsCAAAAAAAAeAFyKgEAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAagkAAAAAAAAAAAAAAAAAAAAAAACrAAAAAAAAAGQCazcAAFMAlE5K/////4wAlIeUKIwEZGF0YZSMB2NvbnRlbnSUjAppc2luc3RhbmNllIwDc3RylIwFc3RyaXCUdJSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtZQ12AAKBFp0qhSqhyoU7XJDrRJDrAJNAkRvIAAiU13BAamDWfOpk6oGKZPtcbMdEbMbQz0xA38gMCJTXgEBWXCpEKmDKRDtcQJtEQJtcQLNEQLNMQLrAi0RA08AUCJTWUQwCUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5SMIXRlc3RzX2ludGVncmF0aW9uLnJlYWN0X2Fzc2lzdGFudJSMCF9fbmFtZV9flIwxdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50LnJlYWN0X2Fzc2lzdGFudJSMCF9fZmlsZV9flIxSL1VzZXJzL2d1YW55aWxpL2NvZGUvZ3JhcGhpdGUvdGVzdHNfaW50ZWdyYXRpb24vcmVhY3RfYXNzaXN0YW50L3JlYWN0X2Fzc2lzdGFudC5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoIn2UfZQoaB2MCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIw0UmVBY3RBc3Npc3RhbnQuX2NvbnN0cnVjdF93b3JrZmxvdy48bG9jYWxzPi48bGFtYmRhPpSMD19fYW5ub3RhdGlvbnNfX5R9lIwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaB6MB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UdYaUhlIwLg=="
+            },
+            "search_function_result": {
+                "name": "search_function_result",
+                "type": "Topic",
+                "condition": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsnQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            },
+            "agent_output_topic": {
+                "name": "agent_output_topic",
+                "type": "AgentOutputTopic",
+                "condition": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsnQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+            }
+        }
+    }
+}

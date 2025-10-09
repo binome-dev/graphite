@@ -25,7 +25,7 @@ class TopicExpr(SubExpr):
     topic: TopicBase
 
     def to_dict(self) -> dict[str, Any]:
-        return {"topic": self.topic.to_dict()}
+        return {"topic": self.topic.name}
 
 
 class CombinedExpr(SubExpr):

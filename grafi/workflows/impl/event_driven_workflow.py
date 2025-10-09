@@ -673,5 +673,4 @@ class EventDrivenWorkflow(Workflow):
         return {
             **super().to_dict(),
             "topics": {name: topic.to_dict() for name, topic in self._topics.items()},
-            "topic_nodes": self._topic_nodes,
         }

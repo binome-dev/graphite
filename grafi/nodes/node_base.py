@@ -124,7 +124,7 @@ class NodeBase(BaseModel):
             "subscribed_expressions": [
                 expr.to_dict() for expr in self.subscribed_expressions
             ],
-            "publish_to": [topic.to_dict() for topic in self.publish_to],
+            "publish_to": [topic.name for topic in self.publish_to],
             "command": self.command.to_dict() if self.command else None,
         }
 

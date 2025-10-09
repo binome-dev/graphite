@@ -61,7 +61,7 @@ class Command(BaseModel):
         return all_messages
 
     def to_dict(self) -> dict[str, Any]:
-        return {"tool": self.tool.to_dict()}
+        return {"class": self.__class__.__name__}
 
 
 # Registry for tool types to command classes
