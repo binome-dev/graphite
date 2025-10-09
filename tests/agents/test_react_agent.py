@@ -6,14 +6,14 @@ from unittest.mock import patch
 
 import pytest
 
+
+# Set a dummy TAVILY_API_KEY to prevent initialization errors
+os.environ["TAVILY_API_KEY"] = "test-tavily-key"
+
 # Now import after setting the environment variable
 from grafi.agents.react_agent import ReActAgent
 from grafi.agents.react_agent import ReActAgentBuilder
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
-
-
-# Set a dummy TAVILY_API_KEY to prevent initialization errors
-os.environ["TAVILY_API_KEY"] = "test-tavily-key"
 
 
 @pytest.fixture(autouse=True)
