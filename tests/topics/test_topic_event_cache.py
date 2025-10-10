@@ -186,39 +186,10 @@ class TestTopicEventQueue:
         assert cache._consumed["consumer2"] == 1
 
     @pytest.mark.asyncio
-    async def test_commit_to(self, cache: TopicEventQueue):
-        # Commit for a consumer
-        result = await cache.commit_to("consumer1", 5)
-        assert result == 5
-        assert cache._committed["consumer1"] == 5
-
-        # Update commit
-        result = await cache.commit_to("consumer1", 10)
-        assert result == 10
-        assert cache._committed["consumer1"] == 10
-
-    @pytest.mark.asyncio
-    async def test_put(self, cache: TopicEventQueue, sample_event):
-        # Put event asynchronously
-        result = await cache.put(sample_event)
-
-        assert result == sample_event
-        assert cache._records[0] == sample_event
-
-    @pytest.mark.asyncio
     async def test_fetch_no_events_with_timeout(self, cache: TopicEventQueue):
         # Try to fetch with timeout when no events
         result = await cache.fetch("consumer1", timeout=0.1)
         assert result == []
-
-    @pytest.mark.asyncio
-    async def test_fetch_single_event(self, cache: TopicEventQueue, sample_event):
-        await cache.put(sample_event)
-
-        # Fetch event
-        result = await cache.fetch("consumer1", timeout=0.1)
-        assert result == [sample_event]
-        assert cache._consumed["consumer1"] == 1
 
     @pytest.mark.asyncio
     async def test_fetch_wait_for_event(self, cache: TopicEventQueue, sample_event):
@@ -234,35 +205,6 @@ class TestTopicEventQueue:
         # Fetch should complete with the event
         result = await fetch_task
         assert result == [sample_event]
-
-    @pytest.mark.asyncio
-    async def test_fetch_with_offset(self, cache: TopicEventQueue):
-        # Add 5 events
-        events = []
-        for i in range(5):
-            invoke_context = InvokeContext(
-                conversation_id="test-conversation",
-                invoke_id=f"test-invoke-{i}",
-                assistant_request_id="test-request",
-            )
-            event = PublishToTopicEvent(
-                event_id=f"event-{i}",
-                name="test_topic",
-                offset=i,
-                publisher_name="test_publisher",
-                publisher_type="test_type",
-                consumed_event_ids=[],
-                invoke_context=invoke_context,
-                data=[Message(role="user", content=f"message {i}")],
-                timestamp=datetime.now(),
-            )
-            events.append(event)
-            await cache.put(event)
-
-        # Fetch only up to offset 3
-        result = await cache.fetch("consumer1", offset=3, timeout=0.1)
-        assert len(result) == 4
-        assert result == events[:4]
 
     @pytest.mark.asyncio
     async def test_commit_to(self, cache: TopicEventQueue):

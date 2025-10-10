@@ -95,16 +95,12 @@ def _setup_arize_tracing(collector_endpoint: str) -> None:
     """
     api_key, space_id, project_name = _get_arize_config()
 
-    # Set Phoenix client headers for authentication
-    os.environ["PHOENIX_CLIENT_HEADERS"] = f"api_key={api_key}"
-
     # Register with Arize
     arize.otel.register(
         endpoint=collector_endpoint,
         space_id=space_id,
         api_key=api_key,
-        model_id=project_name,
-        set_global_tracer_provider=False,
+        project_name=project_name,
     )
 
     logger.info(f"Arize tracing configured with endpoint: {collector_endpoint}")
@@ -147,7 +143,6 @@ def _setup_phoenix_tracing(
     tracer_provider = phoenix.otel.register(
         endpoint=endpoint_url,
         project_name=project_name,
-        set_global_tracer_provider=False,
     )
 
     # Configure OTLP exporter
@@ -258,7 +253,7 @@ def setup_tracing(
         >>> tracer = setup_tracing(TracingOptions.IN_MEMORY)
     """
     if tracing_options == TracingOptions.ARIZE:
-        logger.info(f"Trying Arize tracing at {collector_endpoint}:{collector_port}")
+        logger.info(f"Trying Arize tracing at {collector_endpoint}")
         _setup_arize_tracing(collector_endpoint)
 
     elif tracing_options == TracingOptions.PHOENIX:
