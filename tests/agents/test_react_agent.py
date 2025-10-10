@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+
 # Set a dummy TAVILY_API_KEY to prevent initialization errors
 os.environ["TAVILY_API_KEY"] = "test-tavily-key"
 

@@ -23,9 +23,6 @@ from grafi.workflows.workflow import WorkflowBuilder
 class MockTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
-    def invoke(self, invoke_context, input_data):
-        return [Message(role="assistant", content="mock response")]
-
     async def invoke(self, invoke_context, input_data):
         yield [Message(role="assistant", content="mock response")]
 
