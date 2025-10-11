@@ -11,9 +11,9 @@ import pytest
 os.environ["TAVILY_API_KEY"] = "test-tavily-key"
 
 # Now import after setting the environment variable
-from grafi.agents.react_agent import ReActAgent
-from grafi.agents.react_agent import ReActAgentBuilder
-from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
+from grafi.agents.react_agent import ReActAgent  # noqa: E402
+from grafi.agents.react_agent import ReActAgentBuilder  # noqa: E402
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

@@ -6,7 +6,7 @@ This guide walks you through installing Graphite using uv.
 
 **Prerequisites:**
 
-- Python >=3.10, < 3.13
+- Python >=3.11
 - [uv](https://docs.astral.sh/uv/#installation)
 
 ## Installation
