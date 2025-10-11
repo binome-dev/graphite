@@ -5,7 +5,7 @@ description = "Grafi - a flexible, event-driven framework that enables the creat
 authors = [{name = "Craig Li", email = "craig@binome.dev"}]
 license = {text = "Mozilla Public License Version 2.0"}
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.11.5",
     "openai>=1.88.0",
