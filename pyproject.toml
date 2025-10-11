@@ -5,28 +5,28 @@ description = "Grafi - a flexible, event-driven framework that enables the creat
 authors = [{name = "Craig Li", email = "craig@binome.dev"}]
 license = {text = "Mozilla Public License Version 2.0"}
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.11.5",
     "openai>=1.88.0",
     "docstring-parser>=0.16",
     "openinference-instrumentation-openai>=0.1.30",
-    "arize-otel>=0.8.2",
+    "arize-otel>=0.10.0",
     "loguru>=0.7.3",
     "jsonpickle>=4.1.0",
-    "arize-phoenix-otel>=0.10.3",
+    "arize-phoenix-otel>=0.13.1",
     "anyio>=4.9.0",
     "cloudpickle>=3.1.1",
 ]
 
 [dependency-groups]
 dev = [
-    "anthropic>=0.57.1",
-    "arize-phoenix>=11.6.2",
-    "chromadb>=1.0.15",
+    "anthropic>=0.69.0",
+    "arize-phoenix>=12.5.0",
+    "chromadb>=1.1.1",
     "duckduckgo-search>=8.1.1",
-    "fastmcp>=2.10.4",
-    "google-genai>=1.25.0",
+    "fastmcp>=2.12.4",
+    "google-genai>=1.43.0",
     "googlesearch-python>=1.3.0",
     "h11>=0.16.0",
     "llama-index-core>=0.12.48",
@@ -34,8 +34,8 @@ dev = [
     "llama-index-llms-openai>=0.4.7",
     "markdown>=3.8.2",
     "mcp>=1.11.0",
-    "mypy>=1.16.1",
-    "ollama>=0.5.1",
+    "mypy>=1.18.2",
+    "ollama>=0.6.0",
     "pre-commit>=4.2.0",
     "psycopg2-binary>=2.9.10",
     "asyncpg>=0.29.0",
@@ -44,7 +44,7 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "ruff>=0.12.2",
     "sqlalchemy>=2.0.41",
-    "tavily-python>=0.7.9",
+    "tavily-python>=0.7.12",
 ]
 docs = [
     "mkdoc>=0.1",

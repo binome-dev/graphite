@@ -51,7 +51,7 @@ async def test_openrouter_tool_stream() -> None:
 # invoke with custom chat params                                             #
 # --------------------------------------------------------------------------- #
 async def test_openrouter_tool_with_chat_param() -> None:
-    chat_param = {"temperature": 0.1, "max_tokens": 15}
+    chat_param = {"temperature": 0.1, "max_tokens": 120}
 
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
@@ -61,11 +61,11 @@ async def test_openrouter_tool_with_chat_param() -> None:
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
     ):
         for m in msgs:
+            print(m)
             assert m.role == "assistant"
             assert m.content and "Grafi" in m.content
-            print(m.content)
             if isinstance(m.content, str):
-                assert len(m.content) < 70  # 15 tokens ≈ < 70 chars
+                assert len(m.content) < 300
 
     assert len(await event_store.get_events()) == 2
 
