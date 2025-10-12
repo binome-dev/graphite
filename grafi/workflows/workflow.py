@@ -68,7 +68,7 @@ class Workflow(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Workflow":
+    async def from_dict(cls, data: dict[str, Any]) -> "Workflow":
         """Create a Workflow instance from a dictionary representation."""
         raise NotImplementedError("from_dict must be implemented in subclasses.")
 

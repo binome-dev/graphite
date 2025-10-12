@@ -29,7 +29,7 @@ class Topic(TopicBase):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Topic":
+    async def from_dict(cls, data: dict[str, Any]) -> "Topic":
         """
         Create a Topic instance from a dictionary representation.
 

@@ -70,7 +70,7 @@ class Tool(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Tool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "Tool":
         """
         Create a tool instance from a dictionary representation.
 

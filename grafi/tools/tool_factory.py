@@ -67,7 +67,7 @@ class ToolFactory:
     }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> Tool:
+    async def from_dict(cls, data: Dict[str, Any]) -> Tool:
         """
         Create a tool instance from a dictionary representation.
 
@@ -102,7 +102,7 @@ class ToolFactory:
             ...     "is_streaming": False,
             ...     "structured_output": False
             ... }
-            >>> tool = ToolFactory.from_dict(data)
+            >>> tool = await ToolFactory.from_dict(data)
             >>> isinstance(tool, OpenAITool)
             True
         """
@@ -123,7 +123,7 @@ class ToolFactory:
 
         # Instantiate using the class's from_dict method
         try:
-            return tool_class.from_dict(data)
+            return await tool_class.from_dict(data)
         except NotImplementedError as e:
             raise NotImplementedError(
                 f"Tool class '{class_name}' does not implement from_dict(). "
@@ -145,7 +145,7 @@ class ToolFactory:
         Example:
             >>> class CustomTool(Tool):
             ...     @classmethod
-            ...     def from_dict(cls, data):
+            ...     async def from_dict(cls, data):
             ...         return cls(**data)
             >>> ToolFactory.register_tool_class("CustomTool", CustomTool)
         """

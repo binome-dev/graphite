@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from pathlib import Path
 
@@ -23,7 +24,7 @@ async def test_deserialized_assistant() -> None:
         manifest_json = f.read()
 
     # Deserialize the assistant using the new method
-    assistant = Assistant.load_from_manifest(manifest_json)
+    assistant = await Assistant.from_dict(json.loads(manifest_json))
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")

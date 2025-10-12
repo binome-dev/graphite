@@ -71,7 +71,7 @@ class DuckDuckGoTool(FunctionCallTool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DuckDuckGoTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "DuckDuckGoTool":
         """
         Create a DuckDuckGoTool instance from a dictionary representation.
 

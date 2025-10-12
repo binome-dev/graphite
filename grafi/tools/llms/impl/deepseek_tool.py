@@ -182,7 +182,7 @@ class DeepseekTool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DeepseekTool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "DeepseekTool":
         """
         Create a DeepseekTool instance from a dictionary representation.
 

@@ -56,7 +56,7 @@ class TopicFactory:
     }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TopicBase:
+    async def from_dict(cls, data: Dict[str, Any]) -> TopicBase:
         """
         Create a topic instance from a dictionary representation.
 
@@ -83,7 +83,7 @@ class TopicFactory:
             ...     "type": "AgentInputTopic",
             ...     "condition": "<serialized_condition>"
             ... }
-            >>> topic = TopicFactory.from_dict(data)
+            >>> topic = await TopicFactory.from_dict(data)
             >>> isinstance(topic, InputTopic)
             True
         """
@@ -119,7 +119,7 @@ class TopicFactory:
             )
 
         # Instantiate using the class's from_dict method
-        return topic_class.from_dict(data)
+        return await topic_class.from_dict(data)
 
     @classmethod
     def register_topic_type(

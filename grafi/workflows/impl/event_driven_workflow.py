@@ -678,7 +678,7 @@ class EventDrivenWorkflow(Workflow):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "EventDrivenWorkflow":
+    async def from_dict(cls, data: dict[str, Any]) -> "EventDrivenWorkflow":
         """
         Create a EventDrivenWorkflow instance from a dictionary representation.
 
@@ -695,11 +695,11 @@ class EventDrivenWorkflow(Workflow):
         )
         topics: Dict[str, TopicBase] = {}
         for topic_dict in data.get("topics", {}).values():
-            topic = TopicFactory.from_dict(topic_dict)
+            topic = await TopicFactory.from_dict(topic_dict)
             topics[topic.name] = topic
 
         for node_dict in data.get("nodes", {}).values():
-            node = Node.from_dict(node_dict, topics)
+            node = await Node.from_dict(node_dict, topics)
             workflow_builder = workflow_builder.node(node)
 
         return workflow_builder.build()

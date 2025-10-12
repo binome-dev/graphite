@@ -104,7 +104,6 @@ class TestOutputTopic:
         assert topic.name == "agent_output_topic"
         assert topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
         assert isinstance(topic.event_queue, TopicEventQueue)
-        assert topic.publish_event_handler is None
 
     def test_output_topic_with_custom_name(self):
         """Test creating an OutputTopic with custom name."""

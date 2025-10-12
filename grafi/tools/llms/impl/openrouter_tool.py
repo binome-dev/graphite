@@ -180,7 +180,7 @@ class OpenRouterTool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OpenRouterTool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "OpenRouterTool":
         """
         Create an OpenRouterTool instance from a dictionary representation.
 

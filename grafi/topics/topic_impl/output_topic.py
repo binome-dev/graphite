@@ -28,7 +28,7 @@ class OutputTopic(Topic):
     type: TopicType = Field(default=TopicType.AGENT_OUTPUT_TOPIC_TYPE)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "OutputTopic":
+    async def from_dict(cls, data: dict[str, Any]) -> "OutputTopic":
         """
         Create a Topic instance from a dictionary representation.
 

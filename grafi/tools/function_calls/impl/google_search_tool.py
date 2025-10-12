@@ -112,7 +112,7 @@ class GoogleSearchTool(FunctionCallTool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "GoogleSearchTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "GoogleSearchTool":
         """
         Create a GoogleSearchTool instance from a dictionary representation.
 

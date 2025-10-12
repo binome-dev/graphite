@@ -33,7 +33,7 @@ class InWorkflowInputTopic(Topic):
     type: TopicType = Field(default=TopicType.IN_WORKFLOW_INPUT_TOPIC_TYPE)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "InWorkflowInputTopic":
+    async def from_dict(cls, data: dict[str, Any]) -> "InWorkflowInputTopic":
         """
         Create a Topic instance from a dictionary representation.
 

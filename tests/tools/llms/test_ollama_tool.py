@@ -140,3 +140,52 @@ def test_to_messages():
     assert len(message[0].tool_calls) == 1
     assert message[0].tool_calls[0].function.name == "test_function"
     assert message[0].tool_calls[0].function.arguments == '{"arg1": "value1"}'
+
+
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "OllamaTool",
+        "tool_id": "test-id",
+        "name": "TestOllama",
+        "type": "OllamaTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "qwen3",
+        "api_url": "http://localhost:11434",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await OllamaTool.from_dict(data)
+
+    assert isinstance(tool, OllamaTool)
+    assert tool.name == "TestOllama"
+    assert tool.model == "qwen3"
+    assert tool.api_url == "http://localhost:11434"
+    assert tool.system_message == "You are helpful"
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip():
+    """Test that serialization and deserialization are consistent."""
+    original = OllamaTool(
+        system_message="Test system",
+        name="TestOllama",
+        model="qwen3",
+        api_url="http://localhost:11434",
+    )
+
+    # Serialize to dict
+    data = original.to_dict()
+
+    # Deserialize back
+    restored = await OllamaTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == original.name
+    assert restored.model == original.model
+    assert restored.api_url == original.api_url
+    assert restored.system_message == original.system_message

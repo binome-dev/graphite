@@ -121,7 +121,7 @@ class TopicBase(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TopicBase":
+    async def from_dict(cls, data: dict[str, Any]) -> "TopicBase":
         """
         Create a TopicBase instance from a dictionary representation.
 

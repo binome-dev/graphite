@@ -291,3 +291,49 @@ def test_to_dict(deepseek_instance):
     assert result["api_key"] == "****************"
     assert result["model"] == "deepseek-chat"
     assert result["base_url"] == "https://api.deepseek.com"
+
+
+# --------------------------------------------------------------------------- #
+#  from_dict()                                                                 #
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "DeepseekTool",
+        "tool_id": "test-id",
+        "name": "TestDeepseek",
+        "type": "DeepseekTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "deepseek-chat",
+        "base_url": "https://api.deepseek.com",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await DeepseekTool.from_dict(data)
+
+    assert isinstance(tool, DeepseekTool)
+    assert tool.name == "TestDeepseek"
+    assert tool.model == "deepseek-chat"
+    assert tool.base_url == "https://api.deepseek.com"
+    assert tool.system_message == "You are helpful"
+    assert tool.chat_params == {"temperature": 0.7}
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(deepseek_instance):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = deepseek_instance.to_dict()
+
+    # Deserialize back
+    restored = await DeepseekTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == deepseek_instance.name
+    assert restored.model == deepseek_instance.model
+    assert restored.base_url == deepseek_instance.base_url
+    assert restored.system_message == deepseek_instance.system_message

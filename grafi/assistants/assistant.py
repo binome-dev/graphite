@@ -70,7 +70,7 @@ class Assistant(AssistantBase):
             f.write(json.dumps(manifest_dict, indent=4))
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Assistant":
+    async def from_dict(cls, data: dict[str, Any]) -> "Assistant":
         """
         Load an assistant from a manifest dictionary.
 
@@ -91,6 +91,8 @@ class Assistant(AssistantBase):
         instance.oi_span_type = OpenInferenceSpanKindValues(
             data.get("oi_span_type", "AGENT")
         )
-        instance.workflow = EventDrivenWorkflow.from_dict(data.get("workflow", {}))
+        instance.workflow = await EventDrivenWorkflow.from_dict(
+            data.get("workflow", {})
+        )
 
         return instance

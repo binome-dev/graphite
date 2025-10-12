@@ -84,7 +84,7 @@ class TavilyTool(FunctionCallTool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TavilyTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "TavilyTool":
         """
         Create a TavilyTool instance from a dictionary representation.
 

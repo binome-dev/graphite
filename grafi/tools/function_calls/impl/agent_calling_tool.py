@@ -128,7 +128,7 @@ class AgentCallingTool(FunctionCallTool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentCallingTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "AgentCallingTool":
         """
         Create an AgentCallingTool instance from a dictionary representation.
 

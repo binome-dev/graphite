@@ -166,7 +166,7 @@ class FunctionCallTool(Tool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FunctionCallTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "FunctionCallTool":
         """
         Create a FunctionCallTool instance from a dictionary representation.
 

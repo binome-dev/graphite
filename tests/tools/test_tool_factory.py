@@ -8,7 +8,6 @@ import pytest
 
 from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
-from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
@@ -19,7 +18,8 @@ from grafi.tools.tool import Tool
 from grafi.tools.tool_factory import ToolFactory
 
 
-def test_tool_factory_openai_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_openai_tool():
     """Test factory creates OpenAITool correctly."""
     data = {
         "class": "OpenAITool",
@@ -34,14 +34,15 @@ def test_tool_factory_openai_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, OpenAITool)
     assert tool.name == "OpenAITool"
     assert tool.model == "gpt-4o-mini"
 
 
-def test_tool_factory_claude_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_claude_tool():
     """Test factory creates ClaudeTool correctly."""
     data = {
         "class": "ClaudeTool",
@@ -57,7 +58,7 @@ def test_tool_factory_claude_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, ClaudeTool)
     assert tool.name == "ClaudeTool"
@@ -65,7 +66,8 @@ def test_tool_factory_claude_tool():
     assert tool.max_tokens == 4096
 
 
-def test_tool_factory_deepseek_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_deepseek_tool():
     """Test factory creates DeepseekTool correctly."""
     data = {
         "class": "DeepseekTool",
@@ -81,14 +83,15 @@ def test_tool_factory_deepseek_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, DeepseekTool)
     assert tool.name == "DeepseekTool"
     assert tool.base_url == "https://api.deepseek.com"
 
 
-def test_tool_factory_gemini_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_gemini_tool():
     """Test factory creates GeminiTool correctly."""
     data = {
         "class": "GeminiTool",
@@ -103,14 +106,15 @@ def test_tool_factory_gemini_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, GeminiTool)
     assert tool.name == "GeminiTool"
     assert tool.model == "gemini-2.0-flash-lite"
 
 
-def test_tool_factory_ollama_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_ollama_tool():
     """Test factory creates OllamaTool correctly."""
     data = {
         "class": "OllamaTool",
@@ -126,14 +130,15 @@ def test_tool_factory_ollama_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, OllamaTool)
     assert tool.name == "OllamaTool"
     assert tool.api_url == "http://localhost:11434"
 
 
-def test_tool_factory_openrouter_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_openrouter_tool():
     """Test factory creates OpenRouterTool correctly."""
     data = {
         "class": "OpenRouterTool",
@@ -150,14 +155,15 @@ def test_tool_factory_openrouter_tool():
         "structured_output": False,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, OpenRouterTool)
     assert tool.name == "OpenRouterTool"
     assert tool.base_url == "https://openrouter.ai/api/v1"
 
 
-def test_tool_factory_duckduckgo_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_duckduckgo_tool():
     """Test factory creates DuckDuckGoTool correctly."""
     data = {
         "class": "DuckDuckGoTool",
@@ -169,14 +175,15 @@ def test_tool_factory_duckduckgo_tool():
         "timeout": 10,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, DuckDuckGoTool)
     assert tool.name == "DuckDuckGoTool"
     assert tool.timeout == 10
 
 
-def test_tool_factory_tavily_tool():
+@pytest.mark.asyncio
+async def test_tool_factory_tavily_tool():
     """Test factory creates TavilyTool correctly."""
     # Set a dummy API key for test
     os.environ["TAVILY_API_KEY"] = "test_key"
@@ -191,7 +198,7 @@ def test_tool_factory_tavily_tool():
         "max_tokens": 6000,
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, TavilyTool)
     assert tool.name == "TavilyTool"
@@ -201,7 +208,8 @@ def test_tool_factory_tavily_tool():
     del os.environ["TAVILY_API_KEY"]
 
 
-def test_tool_factory_missing_class():
+@pytest.mark.asyncio
+async def test_tool_factory_missing_class():
     """Test factory raises KeyError when class is missing."""
     data = {
         "tool_id": "test-id",
@@ -209,10 +217,11 @@ def test_tool_factory_missing_class():
     }
 
     with pytest.raises(KeyError, match="Missing required key 'class'"):
-        ToolFactory.from_dict(data)
+        await ToolFactory.from_dict(data)
 
 
-def test_tool_factory_unknown_class():
+@pytest.mark.asyncio
+async def test_tool_factory_unknown_class():
     """Test factory raises ValueError for unknown class."""
     data = {
         "class": "UnknownTool",
@@ -220,10 +229,11 @@ def test_tool_factory_unknown_class():
     }
 
     with pytest.raises(ValueError, match="Unknown tool class: UnknownTool"):
-        ToolFactory.from_dict(data)
+        await ToolFactory.from_dict(data)
 
 
-def test_tool_factory_roundtrip_openai():
+@pytest.mark.asyncio
+async def test_tool_factory_roundtrip_openai():
     """Test serialization and deserialization roundtrip for OpenAITool."""
     # Create original tool using builder
     original = (
@@ -238,7 +248,7 @@ def test_tool_factory_roundtrip_openai():
     data = original.to_dict()
 
     # Deserialize back
-    restored = ToolFactory.from_dict(data)
+    restored = await ToolFactory.from_dict(data)
 
     # Verify
     assert isinstance(restored, OpenAITool)
@@ -247,7 +257,8 @@ def test_tool_factory_roundtrip_openai():
     assert restored.system_message == original.system_message
 
 
-def test_tool_factory_roundtrip_claude():
+@pytest.mark.asyncio
+async def test_tool_factory_roundtrip_claude():
     """Test serialization and deserialization roundtrip for ClaudeTool."""
     # Create original tool using builder
     original = (
@@ -263,7 +274,7 @@ def test_tool_factory_roundtrip_claude():
     data = original.to_dict()
 
     # Deserialize back
-    restored = ToolFactory.from_dict(data)
+    restored = await ToolFactory.from_dict(data)
 
     # Verify
     assert isinstance(restored, ClaudeTool)
@@ -272,14 +283,15 @@ def test_tool_factory_roundtrip_claude():
     assert restored.max_tokens == original.max_tokens
 
 
-def test_tool_factory_register_custom_class():
+@pytest.mark.asyncio
+async def test_tool_factory_register_custom_class():
     """Test registering a custom tool class."""
 
     class CustomTool(Tool):
         custom_field: str = "custom"
 
         @classmethod
-        def from_dict(cls, data):
+        async def from_dict(cls, data):
             return cls(
                 tool_id=data.get("tool_id", "default-id"),
                 name=data.get("name", "CustomTool"),
@@ -299,7 +311,7 @@ def test_tool_factory_register_custom_class():
         "custom_field": "test_value",
     }
 
-    tool = ToolFactory.from_dict(data)
+    tool = await ToolFactory.from_dict(data)
 
     assert isinstance(tool, CustomTool)
     assert tool.name == "my_custom"
@@ -314,7 +326,7 @@ def test_tool_factory_unregister_class():
 
     class TempTool(Tool):
         @classmethod
-        def from_dict(cls, data):
+        async def from_dict(cls, data):
             return cls(**data)
 
     # Register and then unregister

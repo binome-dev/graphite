@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from pathlib import Path
 
@@ -21,14 +22,14 @@ event_store = container.event_store
 
 
 async def test_deserialized_assistant() -> None:
-    """Test the deserialized assistant using the new load_from_manifest method."""
+    """Test the deserialized assistant using the new from_dict method."""
     # Read the manifest JSON file
     invoke_context = get_invoke_context()
     with open(Path(__file__).parent / "MCPAssistant_manifest.json", "r") as f:
         manifest_json = f.read()
 
     # Deserialize the assistant using the new method
-    assistant = Assistant.load_from_manifest(manifest_json)
+    assistant = await Assistant.from_dict(json.loads(manifest_json))
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")

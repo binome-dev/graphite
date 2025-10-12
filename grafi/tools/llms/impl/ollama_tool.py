@@ -212,7 +212,7 @@ class OllamaTool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "OllamaTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "OllamaTool":
         """
         Create an OllamaTool instance from a dictionary representation.
 

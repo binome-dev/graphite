@@ -342,7 +342,7 @@ class TestNode:
         assert "node_id" in result
         assert result["subscribed_expressions"] == []
         assert len(result["publish_to"]) == 1
-        assert result["publish_to"][0] == {"name": "test_topic", "type": "MockTopic"}
+        assert result["publish_to"][0] == "test_topic"
 
     def test_to_dict_complete_node(self, mock_tool: MockTool, mock_topic: MockTopic):
         """Test to_dict for a Node with all features."""
@@ -360,7 +360,7 @@ class TestNode:
         assert "node_id" in result
         assert len(result["subscribed_expressions"]) == 1
         assert len(result["publish_to"]) == 1
-        assert result["publish_to"][0] == {"name": "test_topic", "type": "MockTopic"}
+        assert result["publish_to"][0] == "test_topic"
         assert result["command"] is not None
 
     # Test Property Access

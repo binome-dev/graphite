@@ -202,7 +202,7 @@ class OpenAITool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OpenAITool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "OpenAITool":
         """
         Create an OpenAITool instance from a dictionary representation.
 

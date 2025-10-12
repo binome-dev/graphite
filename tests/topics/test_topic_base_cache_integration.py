@@ -105,7 +105,7 @@ class TestTopicBaseCacheIntegration:
         # Create topic with condition
         topic = Topic(
             name="conditional_topic",
-            condition=lambda messages: any(m.role == "user" for m in messages),
+            condition=lambda event: any(m.role == "user" for m in event.data),
         )
 
         # Message that meets condition

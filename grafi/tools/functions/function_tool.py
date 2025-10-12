@@ -94,7 +94,7 @@ class FunctionTool(Tool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FunctionTool":
+    async def from_dict(cls, data: dict[str, Any]) -> "FunctionTool":
         """
         Create a FunctionTool instance from a dictionary representation.
 

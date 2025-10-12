@@ -29,7 +29,7 @@ class TopicExpr(SubExpr):
         return {"topic": self.topic.name}
 
     @classmethod
-    def from_dict(
+    async def from_dict(
         cls, data: dict[str, Any], topics: Dict[str, TopicBase]
     ) -> "TopicExpr":
         topic_name = data["topic"]
@@ -53,7 +53,7 @@ class CombinedExpr(SubExpr):
         }
 
     @classmethod
-    def from_dict(
+    async def from_dict(
         cls, data: dict[str, Any], topics: Dict[str, TopicBase]
     ) -> "CombinedExpr":
         op = LogicalOp(data["op"])
@@ -61,14 +61,14 @@ class CombinedExpr(SubExpr):
         right_data = data["right"]
 
         if "topic" in left_data:
-            left_expr = TopicExpr.from_dict(left_data, topics)
+            left_expr = await TopicExpr.from_dict(left_data, topics)
         else:
-            left_expr = CombinedExpr.from_dict(left_data, topics)
+            left_expr = await CombinedExpr.from_dict(left_data, topics)
 
         if "topic" in right_data:
-            right_expr = TopicExpr.from_dict(right_data, topics)
+            right_expr = await TopicExpr.from_dict(right_data, topics)
         else:
-            right_expr = CombinedExpr.from_dict(right_data, topics)
+            right_expr = await CombinedExpr.from_dict(right_data, topics)
 
         return cls(op=op, left=left_expr, right=right_expr)
 

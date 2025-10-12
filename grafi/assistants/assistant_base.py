@@ -77,7 +77,7 @@ class AssistantBase(BaseModel):
             )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AssistantBase":
+    async def from_dict(cls, data: dict[str, Any]) -> "AssistantBase":
         """
         Create an Assistant instance from a dictionary representation.
 

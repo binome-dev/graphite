@@ -16,7 +16,8 @@ from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_types import TopicType
 
 
-def test_topic_factory_default_topic():
+@pytest.mark.asyncio
+async def test_topic_factory_default_topic():
     """Test factory creates default Topic correctly."""
     condition = lambda x: True
     data = {
@@ -25,14 +26,15 @@ def test_topic_factory_default_topic():
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, Topic)
     assert topic.name == "test_topic"
     assert topic.type == TopicType.DEFAULT_TOPIC_TYPE
 
 
-def test_topic_factory_input_topic():
+@pytest.mark.asyncio
+async def test_topic_factory_input_topic():
     """Test factory creates InputTopic correctly."""
     condition = lambda x: True
     data = {
@@ -41,14 +43,15 @@ def test_topic_factory_input_topic():
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, InputTopic)
     assert topic.name == "input_topic"
     assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
 
 
-def test_topic_factory_output_topic():
+@pytest.mark.asyncio
+async def test_topic_factory_output_topic():
     """Test factory creates OutputTopic correctly."""
     condition = lambda x: True
     data = {
@@ -57,14 +60,15 @@ def test_topic_factory_output_topic():
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, OutputTopic)
     assert topic.name == "output_topic"
     assert topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
 
 
-def test_topic_factory_in_workflow_input_topic():
+@pytest.mark.asyncio
+async def test_topic_factory_in_workflow_input_topic():
     """Test factory creates InWorkflowInputTopic correctly."""
     condition = lambda x: True
     data = {
@@ -73,14 +77,15 @@ def test_topic_factory_in_workflow_input_topic():
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, InWorkflowInputTopic)
     assert topic.name == "in_workflow_input"
     assert topic.type == TopicType.IN_WORKFLOW_INPUT_TOPIC_TYPE
 
 
-def test_topic_factory_in_workflow_output_topic():
+@pytest.mark.asyncio
+async def test_topic_factory_in_workflow_output_topic():
     """Test factory creates InWorkflowOutputTopic correctly."""
     condition = lambda x: True
     data = {
@@ -90,7 +95,7 @@ def test_topic_factory_in_workflow_output_topic():
         "paired_in_workflow_input_topic_names": ["approval", "rejection"],
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, InWorkflowOutputTopic)
     assert topic.name == "in_workflow_output"
@@ -98,7 +103,8 @@ def test_topic_factory_in_workflow_output_topic():
     assert topic.paired_in_workflow_input_topic_names == ["approval", "rejection"]
 
 
-def test_topic_factory_with_topic_type_enum():
+@pytest.mark.asyncio
+async def test_topic_factory_with_topic_type_enum():
     """Test factory works with TopicType enum values."""
     condition = lambda x: True
     data = {
@@ -107,13 +113,14 @@ def test_topic_factory_with_topic_type_enum():
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
     }
 
-    topic = TopicFactory.from_dict(data)
+    topic = await TopicFactory.from_dict(data)
 
     assert isinstance(topic, Topic)
     assert topic.name == "test_topic"
 
 
-def test_topic_factory_unknown_type_string():
+@pytest.mark.asyncio
+async def test_topic_factory_unknown_type_string():
     """Test factory raises ValueError for unknown type string."""
     condition = lambda x: True
     data = {
@@ -123,10 +130,11 @@ def test_topic_factory_unknown_type_string():
     }
 
     with pytest.raises(ValueError, match="Unknown topic type string"):
-        TopicFactory.from_dict(data)
+        await TopicFactory.from_dict(data)
 
 
-def test_topic_factory_missing_type():
+@pytest.mark.asyncio
+async def test_topic_factory_missing_type():
     """Test factory raises KeyError when type is missing."""
     condition = lambda x: True
     data = {
@@ -135,10 +143,11 @@ def test_topic_factory_missing_type():
     }
 
     with pytest.raises(KeyError, match="Missing required key 'type'"):
-        TopicFactory.from_dict(data)
+        await TopicFactory.from_dict(data)
 
 
-def test_topic_factory_invalid_type():
+@pytest.mark.asyncio
+async def test_topic_factory_invalid_type():
     """Test factory raises ValueError for invalid type format."""
     condition = lambda x: True
     data = {
@@ -148,10 +157,11 @@ def test_topic_factory_invalid_type():
     }
 
     with pytest.raises(ValueError, match="Invalid topic type"):
-        TopicFactory.from_dict(data)
+        await TopicFactory.from_dict(data)
 
 
-def test_topic_factory_roundtrip():
+@pytest.mark.asyncio
+async def test_topic_factory_roundtrip():
     """Test serialization and deserialization roundtrip."""
     # Create original topic
     original = InWorkflowOutputTopic(
@@ -163,7 +173,7 @@ def test_topic_factory_roundtrip():
     data = original.to_dict()
 
     # Deserialize back
-    restored = TopicFactory.from_dict(data)
+    restored = await TopicFactory.from_dict(data)
 
     # Verify
     assert isinstance(restored, InWorkflowOutputTopic)

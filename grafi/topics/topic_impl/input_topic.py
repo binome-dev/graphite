@@ -30,7 +30,7 @@ class InputTopic(Topic):
     type: TopicType = Field(default=TopicType.AGENT_INPUT_TOPIC_TYPE)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "InputTopic":
+    async def from_dict(cls, data: dict[str, Any]) -> "InputTopic":
         """
         Create a Topic instance from a dictionary representation.
 

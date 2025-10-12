@@ -64,7 +64,7 @@ class Command(BaseModel):
         return {"class": self.__class__.__name__}
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Command":
+    async def from_dict(cls, data: dict[str, Any]) -> "Command":
         """
         Create a command instance from a dictionary representation.
 

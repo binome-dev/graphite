@@ -182,7 +182,7 @@ class ClaudeTool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ClaudeTool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "ClaudeTool":
         """
         Create a ClaudeTool instance from a dictionary representation.
 

@@ -179,7 +179,7 @@ class MCPTool(FunctionCallTool):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MCPTool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "MCPTool":
         """
         Create an MCPTool instance from a dictionary representation.
 
@@ -196,7 +196,7 @@ class MCPTool(FunctionCallTool):
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
         return (
-            cls.builder()
+            await cls.builder()
             .name(data.get("name", "MCPTool"))
             .type(data.get("type", "MCPTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))

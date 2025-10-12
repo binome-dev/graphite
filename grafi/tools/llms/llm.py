@@ -64,7 +64,7 @@ class LLM(Tool):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LLM":
+    async def from_dict(cls, data: dict[str, Any]) -> "LLM":
         """
         Create an LLM instance from a dictionary representation.
 

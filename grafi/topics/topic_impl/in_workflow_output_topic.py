@@ -61,7 +61,7 @@ class InWorkflowOutputTopic(Topic):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "InWorkflowOutputTopic":
+    async def from_dict(cls, data: dict[str, Any]) -> "InWorkflowOutputTopic":
         """
         Create a Topic instance from a dictionary representation.
 

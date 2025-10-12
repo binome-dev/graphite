@@ -66,14 +66,14 @@ class Node(NodeBase):
         }
 
     @classmethod
-    def from_dict(
+    async def from_dict(
         cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
     ) -> "Node":
         """Create a Node instance from a dictionary representation."""
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
         # Deserialize the tool
-        tool = ToolFactory.from_dict(node_dict["tool"])
+        tool = await ToolFactory.from_dict(node_dict["tool"])
 
         node_builder = (
             Node.builder()
@@ -88,11 +88,9 @@ class Node(NodeBase):
         # Deserialize subscribed expressions
         for expr_dict in node_dict["subscribed_expressions"]:
             if "topic" in expr_dict:
-                node_builder.subscribe(TopicExpr.from_dict(expr_dict, topics))
+                node_builder.subscribe(await TopicExpr.from_dict(expr_dict, topics))
             elif "op" in expr_dict:
-                node_builder.subscribe(
-                    CombinedExpr.from_dict(expr_dict, topics.values())
-                )
+                node_builder.subscribe(await CombinedExpr.from_dict(expr_dict, topics))
 
         for topic_name in node_dict["publish_to"]:
             # Check if topic already exists in topics dict

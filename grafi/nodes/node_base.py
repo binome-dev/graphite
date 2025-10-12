@@ -129,7 +129,7 @@ class NodeBase(BaseModel):
         }
 
     @classmethod
-    def from_dict(
+    async def from_dict(
         cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
     ) -> "NodeBase":
         """

@@ -244,7 +244,7 @@ class GeminiTool(LLM):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GeminiTool":
+    async def from_dict(cls, data: Dict[str, Any]) -> "GeminiTool":
         """
         Create a GeminiTool instance from a dictionary representation.
 
