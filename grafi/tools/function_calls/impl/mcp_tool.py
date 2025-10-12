@@ -178,6 +178,32 @@ class MCPTool(FunctionCallTool):
             "prompts": [prompt.model_dump_json() for prompt in self.prompts],
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MCPTool":
+        """
+        Create an MCPTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the MCPTool.
+
+        Returns:
+            MCPTool: An MCPTool instance created from the dictionary.
+
+        Note:
+            This method cannot fully reconstruct the MCP connections.
+            The tool needs to be re-initialized with proper MCP configuration.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "MCPTool"))
+            .type(data.get("type", "MCPTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .connections(data.get("mcp_config", {}).get("mcpServers", {}))
+            .build()
+        )
+
 
 class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):
     """

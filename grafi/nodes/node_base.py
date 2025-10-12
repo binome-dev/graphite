@@ -128,6 +128,20 @@ class NodeBase(BaseModel):
             "command": self.command.to_dict() if self.command else None,
         }
 
+    @classmethod
+    def from_dict(
+        cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
+    ) -> "NodeBase":
+        """
+        Create a NodeBase instance from a dictionary representation.
+        Args:
+            node_dict (dict[str, Any]): A dictionary representation of the node.
+            topics (dict[str, Any]): A dictionary of topic instances keyed by topic name.
+        Returns:
+            NodeBase: A NodeBase instance created from the dictionary.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
+
 
 T_N = TypeVar("T_N", bound=NodeBase)
 

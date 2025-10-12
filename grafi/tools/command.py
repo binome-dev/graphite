@@ -63,6 +63,28 @@ class Command(BaseModel):
     def to_dict(self) -> dict[str, Any]:
         return {"class": self.__class__.__name__}
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Command":
+        """
+        Create a command instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the command.
+
+        Returns:
+            Command: A command instance created from the dictionary.
+
+        Note:
+            This base implementation returns a Command instance without a tool.
+            Subclasses should override this method if they need to reconstruct
+            the tool from the dictionary data.
+        """
+        # Base Command doesn't serialize tool, so we can't reconstruct it
+        # Subclasses should override this if they need tool reconstruction
+        raise NotImplementedError(
+            "from_dict must be implemented by subclasses that need tool reconstruction"
+        )
+
 
 # Registry for tool types to command classes
 TOOL_COMMAND_REGISTRY: Dict[Type[Tool], Type[Command]] = {}

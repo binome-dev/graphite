@@ -63,6 +63,23 @@ class LLM(Tool):
             "structured_output": self.structured_output,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LLM":
+        """
+        Create an LLM instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the LLM.
+
+        Returns:
+            LLM: An LLM instance created from the dictionary.
+
+        Note:
+            The api_key is masked in to_dict() for security, so from_dict()
+            will need to retrieve it from environment or other sources.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
+
 
 T_L = TypeVar("T_L", bound=LLM)
 

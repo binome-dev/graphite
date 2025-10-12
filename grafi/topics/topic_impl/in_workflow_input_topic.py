@@ -1,3 +1,7 @@
+import base64
+from typing import Any
+
+import cloudpickle
 from pydantic import Field
 
 from grafi.topics.topic_impl.topic import Topic
@@ -27,3 +31,23 @@ class InWorkflowInputTopic(Topic):
     """
 
     type: TopicType = Field(default=TopicType.IN_WORKFLOW_INPUT_TOPIC_TYPE)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "InWorkflowInputTopic":
+        """
+        Create a Topic instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the Topic.
+
+        Returns:
+            InWorkflowInputTopic: A Topic instance created from the dictionary.
+
+        """
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            condition=cloudpickle.loads(
+                base64.b64decode(data["condition"].encode("utf-8"))
+            ),
+        )

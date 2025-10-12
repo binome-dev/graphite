@@ -76,6 +76,20 @@ class AssistantBase(BaseModel):
                 f"Workflow {self.workflow.__class__.__name__} does not support stop method"
             )
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AssistantBase":
+        """
+        Create an Assistant instance from a dictionary representation.
+
+        Args:
+            data (dict): A dictionary containing the assistant's attributes.
+        Returns:
+            Assistant: An instance of the Assistant class.
+        Raises:
+            NotImplementedError: If the method is not implemented by a subclass.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
+
 
 T_A = TypeVar("T_A", bound=AssistantBase)
 

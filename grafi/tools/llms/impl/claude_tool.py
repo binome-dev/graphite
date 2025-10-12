@@ -181,6 +181,35 @@ class ClaudeTool(LLM):
             "max_tokens": self.max_tokens,
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ClaudeTool":
+        """
+        Create a ClaudeTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the ClaudeTool.
+
+        Returns:
+            ClaudeTool: A ClaudeTool instance created from the dictionary.
+        """
+        # Create base instance from parent and add ClaudeTool-specific fields
+
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "ClaudeTool"))
+            .type(data.get("type", "ClaudeTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("ANTHROPIC_API_KEY"))
+            .model(data.get("model", "claude-3-5-haiku-20241022"))
+            .max_tokens(data.get("max_tokens", 4096))
+            .build()
+        )
+
 
 class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
     """

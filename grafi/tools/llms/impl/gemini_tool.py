@@ -211,9 +211,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided
@@ -242,6 +242,33 @@ class GeminiTool(LLM):
             "api_key": "****************",
             "model": self.model,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GeminiTool":
+        """
+        Create a GeminiTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the GeminiTool.
+
+        Returns:
+            GeminiTool: A GeminiTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        # GeminiTool uses the same fields as base LLM
+        return (
+            cls.builder()
+            .name(data.get("name", "GeminiTool"))
+            .type(data.get("type", "GeminiTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("GEMINI_API_KEY"))
+            .model(data.get("model", "gemini-2.0-flash-lite"))
+            .build()
+        )
 
 
 class GeminiToolBuilder(LLMBuilder[GeminiTool]):

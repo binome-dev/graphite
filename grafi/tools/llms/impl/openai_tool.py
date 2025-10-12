@@ -201,6 +201,32 @@ class OpenAITool(LLM):
             **super().to_dict(),
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OpenAITool":
+        """
+        Create an OpenAITool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the OpenAITool.
+
+        Returns:
+            OpenAITool: An OpenAITool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "OpenAITool"))
+            .type(data.get("type", "OpenAITool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("OPENAI_API_KEY"))
+            .model(data.get("model", "gpt-4o-mini"))
+            .build()
+        )
+
 
 class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
     def api_key(self, api_key: Optional[str]) -> Self:

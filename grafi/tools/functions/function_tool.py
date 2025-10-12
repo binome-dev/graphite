@@ -1,3 +1,4 @@
+import base64
 import inspect
 import json
 from typing import Any
@@ -6,6 +7,7 @@ from typing import List
 from typing import Self
 from typing import Union
 
+import cloudpickle
 import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
@@ -86,8 +88,39 @@ class FunctionTool(Tool):
         """
         return {
             **super().to_dict(),
-            "function": self.function.__name__,  # will add functionality to serialize the function later
+            "function": base64.b64encode(cloudpickle.dumps(self.function)).decode(
+                "utf-8"
+            ),
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FunctionTool":
+        """
+        Create a FunctionTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the FunctionTool.
+
+        Returns:
+            FunctionTool: A FunctionTool instance created from the dictionary.
+
+        Note:
+            Functions cannot be fully reconstructed from serialized data as they
+            contain executable code. This method creates an instance with a
+            placeholder function that needs to be re-registered after deserialization.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "FunctionTool"))
+            .type(data.get("type", "FunctionTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .function(
+                cloudpickle.loads(base64.b64decode(data["function"].encode("utf-8")))
+            )
+            .build()
+        )
 
 
 class FunctionToolBuilder(ToolBuilder[FunctionTool]):

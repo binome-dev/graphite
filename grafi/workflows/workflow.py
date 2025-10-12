@@ -67,6 +67,11 @@ class Workflow(BaseModel):
             "nodes": {name: node.to_dict() for name, node in self.nodes.items()},
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Workflow":
+        """Create a Workflow instance from a dictionary representation."""
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
+
 
 T_W = TypeVar("T_W", bound="Workflow")  # the Tool subclass
 

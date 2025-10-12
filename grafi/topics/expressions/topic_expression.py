@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any
+from typing import Dict
 from typing import List
 
 from pydantic import BaseModel
@@ -27,6 +28,15 @@ class TopicExpr(SubExpr):
     def to_dict(self) -> dict[str, Any]:
         return {"topic": self.topic.name}
 
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], topics: Dict[str, TopicBase]
+    ) -> "TopicExpr":
+        topic_name = data["topic"]
+        if topic_name in topics:
+            return cls(topic=topics[topic_name])
+        raise ValueError(f"Topic with name {topic_name} not found in provided topics.")
+
 
 class CombinedExpr(SubExpr):
     """Represents (left_expr op right_expr)."""
@@ -41,6 +51,26 @@ class CombinedExpr(SubExpr):
             "left": self.left.to_dict(),
             "right": self.right.to_dict(),
         }
+
+    @classmethod
+    def from_dict(
+        cls, data: dict[str, Any], topics: Dict[str, TopicBase]
+    ) -> "CombinedExpr":
+        op = LogicalOp(data["op"])
+        left_data = data["left"]
+        right_data = data["right"]
+
+        if "topic" in left_data:
+            left_expr = TopicExpr.from_dict(left_data, topics)
+        else:
+            left_expr = CombinedExpr.from_dict(left_data, topics)
+
+        if "topic" in right_data:
+            right_expr = TopicExpr.from_dict(right_data, topics)
+        else:
+            right_expr = CombinedExpr.from_dict(right_data, topics)
+
+        return cls(op=op, left=left_expr, right=right_expr)
 
 
 def evaluate_subscription(expr: SubExpr, topics_with_new_msgs: List[str]) -> bool:

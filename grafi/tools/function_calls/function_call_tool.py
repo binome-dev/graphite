@@ -165,6 +165,27 @@ class FunctionCallTool(Tool):
             "function": list(self.functions.keys()),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FunctionCallTool":
+        """
+        Create a FunctionCallTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the FunctionCallTool.
+
+        Returns:
+            FunctionCallTool: A FunctionCallTool instance created from the dictionary.
+
+        Note:
+            Functions cannot be fully reconstructed from serialized data as they
+            contain executable code. This method creates an instance with the
+            function specifications but without the actual callable functions.
+            The functions would need to be re-registered after deserialization.
+        """
+        raise NotImplementedError(
+            "FunctionCallTool cannot be deserialized from dict as functions cannot be reconstructed. Use the builder to create an instance."
+        )
+
 
 T_F = TypeVar("T_F", bound=FunctionCallTool)
 

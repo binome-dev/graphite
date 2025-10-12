@@ -120,6 +120,19 @@ class TopicBase(BaseModel):
             ),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TopicBase":
+        """
+        Create a TopicBase instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the TopicBase.
+
+        Returns:
+            TopicBase: A TopicBase instance created from the dictionary.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
+
 
 T_T = TypeVar("T_T", bound=TopicBase)
 

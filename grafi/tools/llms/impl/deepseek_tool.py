@@ -181,6 +181,33 @@ class DeepseekTool(LLM):
             "base_url": self.base_url,
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DeepseekTool":
+        """
+        Create a DeepseekTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the DeepseekTool.
+
+        Returns:
+            DeepseekTool: A DeepseekTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "DeepseekTool"))
+            .type(data.get("type", "DeepseekTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .model(data.get("model", "deepseek-chat"))
+            .api_key(os.getenv("DEEPSEEK_API_KEY"))
+            .base_url(data.get("base_url", "https://api.deepseek.com"))
+            .build()
+        )
+
 
 class DeepseekToolBuilder(LLMBuilder[DeepseekTool]):
     """Builder for DeepseekTool instances."""
