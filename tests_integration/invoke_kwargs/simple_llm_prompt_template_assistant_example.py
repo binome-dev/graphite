@@ -1,5 +1,6 @@
 # We will test the SimpleLLMAssistant class in this file.
 
+import asyncio
 import os
 import uuid
 
@@ -95,4 +96,4 @@ async def test_simple_llm_assistant() -> None:
     assert len(await event_store.get_events()) == 12
 
 
-test_simple_llm_assistant()
+asyncio.run(test_simple_llm_assistant())

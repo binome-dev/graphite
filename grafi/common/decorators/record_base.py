@@ -87,7 +87,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 input_data = args[1]
             else:
                 # Assistant and workflow
-                input_data: PublishToTopicEvent = args[0]
+                input_data = args[0]
                 invoke_context = input_data.invoke_context
 
             # Create invoke event

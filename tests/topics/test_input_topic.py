@@ -183,7 +183,7 @@ async def test_from_dict():
 
     import cloudpickle
 
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_input_topic",
         "type": "AgentInputTopic",

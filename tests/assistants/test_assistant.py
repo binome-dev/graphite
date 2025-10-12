@@ -379,9 +379,7 @@ class TestAssistant:
 
         # Create a simple mock tool for testing
         class SimpleMockTool(Tool):
-            oi_span_type: OpenInferenceSpanKindValues = (
-                OpenInferenceSpanKindValues.TOOL
-            )
+            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
             async def invoke(self, invoke_context, input_data):
                 yield [Message(role="assistant", content="mock response")]
@@ -453,9 +451,7 @@ class TestAssistant:
 
         # Create a simple mock tool for testing
         class RoundtripMockTool(Tool):
-            oi_span_type: OpenInferenceSpanKindValues = (
-                OpenInferenceSpanKindValues.TOOL
-            )
+            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
             async def invoke(self, invoke_context, input_data):
                 yield [Message(role="assistant", content="roundtrip response")]
@@ -522,7 +518,6 @@ class TestAssistant:
     @pytest.mark.asyncio
     async def test_from_dict_with_defaults(self):
         """Test from_dict with missing fields uses defaults."""
-        from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
         # Minimal data with only workflow
         data = {
@@ -537,4 +532,4 @@ class TestAssistant:
 
         # This should fail because EventDrivenWorkflow needs input/output topics
         with pytest.raises(Exception):  # Will raise WorkflowError
-            restored = await Assistant.from_dict(data)
+            await Assistant.from_dict(data)

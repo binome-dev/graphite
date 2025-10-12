@@ -19,7 +19,7 @@ from grafi.topics.topic_types import TopicType
 @pytest.mark.asyncio
 async def test_topic_factory_default_topic():
     """Test factory creates default Topic correctly."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": "Topic",
@@ -36,7 +36,7 @@ async def test_topic_factory_default_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_input_topic():
     """Test factory creates InputTopic correctly."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "input_topic",
         "type": "AgentInputTopic",
@@ -53,7 +53,7 @@ async def test_topic_factory_input_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_output_topic():
     """Test factory creates OutputTopic correctly."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "output_topic",
         "type": "AgentOutputTopic",
@@ -70,7 +70,7 @@ async def test_topic_factory_output_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_in_workflow_input_topic():
     """Test factory creates InWorkflowInputTopic correctly."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "in_workflow_input",
         "type": "InWorkflowInputTopic",
@@ -87,7 +87,7 @@ async def test_topic_factory_in_workflow_input_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_in_workflow_output_topic():
     """Test factory creates InWorkflowOutputTopic correctly."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "in_workflow_output",
         "type": "InWorkflowOutputTopic",
@@ -106,7 +106,7 @@ async def test_topic_factory_in_workflow_output_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_with_topic_type_enum():
     """Test factory works with TopicType enum values."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": TopicType.DEFAULT_TOPIC_TYPE,
@@ -122,7 +122,7 @@ async def test_topic_factory_with_topic_type_enum():
 @pytest.mark.asyncio
 async def test_topic_factory_unknown_type_string():
     """Test factory raises ValueError for unknown type string."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": "UnknownTopicType",
@@ -136,7 +136,7 @@ async def test_topic_factory_unknown_type_string():
 @pytest.mark.asyncio
 async def test_topic_factory_missing_type():
     """Test factory raises KeyError when type is missing."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
@@ -149,7 +149,7 @@ async def test_topic_factory_missing_type():
 @pytest.mark.asyncio
 async def test_topic_factory_invalid_type():
     """Test factory raises ValueError for invalid type format."""
-    condition = lambda x: True
+    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": 12345,  # Invalid type

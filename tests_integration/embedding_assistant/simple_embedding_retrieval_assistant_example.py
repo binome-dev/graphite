@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import uuid
@@ -127,4 +128,4 @@ async def test_simple_embedding_retrieval_tool() -> None:
     assert len(await event_store.get_events()) == 12
 
 
-test_simple_embedding_retrieval_tool()
+asyncio.run(test_simple_embedding_retrieval_tool())

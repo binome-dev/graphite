@@ -124,14 +124,6 @@ class GoogleSearchTool(FunctionCallTool):
         """
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-        from grafi.common.models.function_spec import FunctionSpec
-
-        # Reconstruct function specs
-        function_specs = [
-            FunctionSpec.model_validate(spec_dict)
-            for spec_dict in data.get("function_specs", [])
-        ]
-
         return (
             cls.builder()
             .name(data.get("name", "GoogleSearchTool"))

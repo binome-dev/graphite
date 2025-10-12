@@ -280,7 +280,7 @@ class EventDrivenWorkflow(Workflow):
                         events.extend(node_consumed_events)
                         events.extend(published_events)
 
-                        await container.event_store.record_events(events)  # type: ignore[arg-type]
+                        await container.event_store.record_events(events)
                     except Exception as e:
                         raise NodeExecutionError(
                             node_name=node.name,
@@ -291,11 +291,11 @@ class EventDrivenWorkflow(Workflow):
 
             consumed_events = await self._get_output_events()
 
-            for event in consumed_events:  # type: ignore[arg-type]
-                yield event  # type: ignore[arg-type]
+            for event in consumed_events:
+                yield event
         finally:
             if consumed_events:
-                await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
+                await container.event_store.record_events(consumed_events)
 
     async def invoke_parallel(
         self, input_data: PublishToTopicEvent

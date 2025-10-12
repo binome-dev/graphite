@@ -1,5 +1,6 @@
 # We will test the MIMOLLMAssistant class in this file.
 
+import asyncio
 import os
 import uuid
 
@@ -109,4 +110,4 @@ async def test_mimo_llm_assistant() -> None:
     assert len(await event_store.get_events()) == 70
 
 
-test_mimo_llm_assistant()
+asyncio.run(test_mimo_llm_assistant())

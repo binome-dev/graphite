@@ -154,7 +154,11 @@ async def test_nested_combined_expr_from_dict(mock_topics):
     # (topic_1 AND topic_2) OR topic_3
     data = {
         "op": "OR",
-        "left": {"op": "AND", "left": {"topic": "topic_1"}, "right": {"topic": "topic_2"}},
+        "left": {
+            "op": "AND",
+            "left": {"topic": "topic_1"},
+            "right": {"topic": "topic_2"},
+        },
         "right": {"topic": "topic_3"},
     }
 
