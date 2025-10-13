@@ -67,7 +67,7 @@ pip install arize-phoenix
 
 ### Docker Compose
 
-To run Phoneix you can run it on your local machine via docker compose
+To run Phoenix you can run it on your local machine via docker compose
 
 ```yaml
 
