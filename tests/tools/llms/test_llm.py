@@ -2,7 +2,6 @@
 Tests for LLM base class utility functions.
 """
 
-import pytest
 from pydantic import BaseModel
 
 from grafi.tools.llms.llm import LLM
@@ -184,7 +183,6 @@ class TestAddAdditionalProperties:
         """Test that the original schema is not modified."""
         schema = {"type": "object", "properties": {"name": {"type": "string"}}}
 
-        original_schema = schema.copy()
         result = add_additional_properties(schema)
 
         # Original schema should be unchanged
@@ -353,9 +351,7 @@ class TestLLMSerializeChatParams:
         llm = LLM(model="test-model")
         sample = SampleModel(name="Deep", age=40)
         params = {
-            "level1": {
-                "level2": {"level3": {"response_format": sample, "value": 123}}
-            }
+            "level1": {"level2": {"level3": {"response_format": sample, "value": 123}}}
         }
 
         result = llm._serialize_chat_params(params)
