@@ -44,6 +44,7 @@ nav:
     - Getting Started with Assistants: guide/getting-started-with-assistants.md
     - Configuring Event Store: guide/configuring-event-store.md
     - Connecting to an MCP Server: guide/connecting-to-an-mcp-server.md
+    - Integration with Arize : guide/configuring-integration-with-arize.md
   - Core Concepts:
     - Architecture Overview: user-guide/architecture.md
     - Event Interfaces: user-guide/event-interfaces.md
