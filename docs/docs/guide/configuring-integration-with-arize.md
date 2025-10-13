@@ -37,8 +37,8 @@ Grafi includes the following observability dependencies by default:
 ```toml
 dependencies = [
     "openinference-instrumentation-openai>=0.1.30",
-    "arize-otel>=0.8.2",
-    "arize-phoenix-otel>=0.10.3",
+    "arize-otel>=0.10.0",
+    "arize-phoenix-otel>=0.13.1",
 ]
 ```
 
