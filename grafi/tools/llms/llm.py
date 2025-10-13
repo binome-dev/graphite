@@ -1,10 +1,14 @@
+import inspect
+from copy import deepcopy
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Self
 from typing import TypeVar
+from typing import Union
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import BaseModel
 from pydantic import Field
 from pydantic import PrivateAttr
 
@@ -14,6 +18,107 @@ from grafi.tools.command import use_command
 from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
+
+
+Json = Dict[str, Any]
+
+
+def add_additional_properties(
+    schema: Json,
+    value: Union[bool, dict] = False,
+    *,
+    only_when_missing: bool = True,
+    skip_when_unevaluated_present: bool = True,
+) -> Json:
+    """
+    Return a new schema dict where every object schema has `additionalProperties`
+    set to `value` (default False).
+
+    - only_when_missing: if True, do not overwrite an existing `additionalProperties`.
+    - skip_when_unevaluated_present: if True, do not add AP when `unevaluatedProperties`
+      is present on the same schema node (common in Pydantic v2 when extra='forbid').
+    """
+    schema = deepcopy(schema)
+
+    def _is_object_schema(node: Json) -> bool:
+        # Treat as object if type explicitly "object" OR it has properties-like keys
+        if node.get("type") == "object":
+            return True
+        return any(
+            k in node
+            for k in (
+                "properties",
+                "required",
+                "patternProperties",
+                "additionalProperties",
+            )
+        )
+
+    # JSON Schema keywords that contain nested schema(s)
+    SCHEMA_KEYS_SINGLE = ("contains", "propertyNames", "if", "then", "else", "not")
+    SCHEMA_KEYS_ARRAY = ("allOf", "anyOf", "oneOf")
+
+    # keys that can hold a schema or array of schemas
+    def _recurse(node: Any):
+        if isinstance(node, dict):
+            # Dive into $defs/definitions first (Pydantic v2 uses $defs)
+            for defs_key in ("$defs", "definitions"):
+                if defs_key in node and isinstance(node[defs_key], dict):
+                    for _, sub in node[defs_key].items():
+                        _recurse(sub)
+
+            # Recurse common composition keys
+            for k in SCHEMA_KEYS_SINGLE:
+                if k in node:
+                    _recurse(node[k])
+            for k in SCHEMA_KEYS_ARRAY:
+                if k in node and isinstance(node[k], list):
+                    for sub in node[k]:
+                        _recurse(sub)
+
+            # items can be schema or list of schemas (tuple validation)
+            if "items" in node:
+                items = node["items"]
+                if isinstance(items, list):
+                    for sub in items:
+                        _recurse(sub)
+                else:
+                    _recurse(items)
+            # prefixItems (2020-12)
+            if "prefixItems" in node and isinstance(node["prefixItems"], list):
+                for sub in node["prefixItems"]:
+                    _recurse(sub)
+            # properties / patternProperties values are schemas
+            if "properties" in node and isinstance(node["properties"], dict):
+                for sub in node["properties"].values():
+                    _recurse(sub)
+            if "patternProperties" in node and isinstance(
+                node["patternProperties"], dict
+            ):
+                for sub in node["patternProperties"].values():
+                    _recurse(sub)
+            # additionalProperties itself can be a schema; recurse into it if dict
+            if "additionalProperties" in node and isinstance(
+                node["additionalProperties"], dict
+            ):
+                _recurse(node["additionalProperties"])
+
+            # Now, possibly inject at this node if it's an object schema
+            if _is_object_schema(node):
+                has_ap = "additionalProperties" in node
+                has_uneval = "unevaluatedProperties" in node
+                if (not has_ap or not only_when_missing) and not (
+                    skip_when_unevaluated_present and has_uneval
+                ):
+                    # Don’t overwrite explicitly set AP if only_when_missing=True
+                    if not (has_ap and only_when_missing):
+                        node["additionalProperties"] = value
+        elif isinstance(node, list):
+            for sub in node:
+                _recurse(sub)
+
+    _recurse(schema)
+    return schema
 
 
 @use_command(LLMCommand)
@@ -52,13 +157,62 @@ class LLM(Tool):
         """Prepare input data for API consumption."""
         raise NotImplementedError
 
+    def _serialize_chat_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Serialize chat_params to ensure JSON compatibility.
+
+        Converts Pydantic v2 model instances and classes to their dict representation.
+        """
+        serialized_params = {}
+        for key, value in params.items():
+            if isinstance(value, BaseModel):
+                # Use model_dump() for Pydantic v2 model instances
+                serialized_params[key] = value.model_dump()
+            elif inspect.isclass(value) and issubclass(value, BaseModel):
+                # Handle Pydantic v2 model classes by getting their schema
+                serialized_params[key] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": value.__name__,
+                        "strict": True,
+                        "schema": add_additional_properties(value.model_json_schema()),
+                    },
+                }
+            elif isinstance(value, dict):
+                # Recursively serialize nested dictionaries
+                serialized_params[key] = self._serialize_chat_params(value)
+            elif isinstance(value, list):
+                # Handle lists that might contain Pydantic models or classes
+                serialized_params[key] = [
+                    (
+                        item.model_dump()
+                        if isinstance(item, BaseModel)
+                        else (
+                            {
+                                "type": f"{item.__module__}.{item.__name__}",
+                                "json_schema": add_additional_properties(
+                                    item.model_json_schema()
+                                ),
+                            }
+                            if (inspect.isclass(item) and issubclass(item, BaseModel))
+                            else item
+                        )
+                    )
+                    for item in value
+                ]
+            else:
+                # Keep other types as-is (they should be JSON serializable)
+                serialized_params[key] = value
+        return serialized_params
+
     def to_dict(self) -> dict[str, Any]:
         return {
             **super().to_dict(),
+            "base_class": "LLMTool",
             "system_message": self.system_message,
             "api_key": "****************",
             "model": self.model,
-            "chat_params": self.chat_params,
+            "chat_params": self._serialize_chat_params(self.chat_params),
             "is_streaming": self.is_streaming,
             "structured_output": self.structured_output,
         }

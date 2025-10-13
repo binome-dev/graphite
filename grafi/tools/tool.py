@@ -63,6 +63,7 @@ class Tool(BaseModel):
         """
         return {
             "class": self.__class__.__name__,
+            "base_class": "Tool",
             "tool_id": self.tool_id,
             "name": self.name,
             "type": self.type,

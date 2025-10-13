@@ -106,5 +106,7 @@ async def test_simple_function_call_assistant() -> None:
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) == 18
 
+    assistant.generate_manifest()
+
 
 asyncio.run(test_simple_function_call_assistant())

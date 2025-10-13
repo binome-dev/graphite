@@ -1,50 +1,14 @@
 import asyncio
-import os
+import json
 import uuid
+from pathlib import Path
 
+from grafi.assistants.assistant import Assistant
 from grafi.common.containers.container import container
-from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.tools.function_calls.function_call_tool import FunctionCallTool
-from tests_integration.function_call_assistant.simple_function_call_assistant import (
-    SimpleFunctionCallAssistant,
-)
-
-
-event_store = container.event_store
-
-api_key = os.getenv("OPENAI_API_KEY", "")
-
-
-class LocalInfoMock(FunctionCallTool):
-    @llm_function
-    def get_weather_mock(self, postcode: str) -> str:
-        """
-        Function to get weather information for a given postcode.
-
-        Args:
-            postcode (str): The postcode for which to retrieve weather information.
-
-        Returns:
-            str: A string containing a weather report for the given postcode.
-        """
-        return f"The weather of {postcode} is bad now."
-
-    @llm_function
-    def get_population_mock(self, postcode: str) -> str:
-        """
-        Function to get population information for a given postcode.
-
-        Args:
-            postcode (str): The postcode for which to retrieve population information.
-
-        Returns:
-            int: An integer representing the population for the given postcode.
-        """
-        return "200000"
 
 
 def get_invoke_context() -> InvokeContext:
@@ -55,14 +19,23 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-async def test_simple_function_call_assistant() -> None:
-    assistant = (
-        SimpleFunctionCallAssistant.builder()
-        .name("SimpleFunctionCallAssistant")
-        .api_key(api_key)
-        .function_tool(LocalInfoMock(name="LocalInfoMock"))
-        .build()
-    )
+event_store = container.event_store
+
+
+async def test_deserialized_assistant() -> None:
+    """Test the deserialized assistant using the new load_from_manifest method."""
+    # Read the manifest JSON file
+    with open(
+        Path(__file__).parent / "SimpleFunctionCallAssistant_manifest.json", "r"
+    ) as f:
+        manifest_json = f.read()
+
+    # Deserialize the assistant using the new method
+    assistant = await Assistant.from_dict(json.loads(manifest_json))
+
+    print(f"Successfully deserialized assistant: {assistant.name}")
+    print(f"Workflow: {assistant.workflow.name}")
+    print(f"Number of nodes: {len(assistant.workflow.nodes)}")
 
     # Test the run method
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
@@ -105,7 +78,6 @@ async def test_simple_function_call_assistant() -> None:
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) == 48
 
-    # assistant.generate_manifest()
 
-
-asyncio.run(test_simple_function_call_assistant())
+if __name__ == "__main__":
+    asyncio.run(test_deserialized_assistant())

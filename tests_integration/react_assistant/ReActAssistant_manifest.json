@@ -1,23 +1,24 @@
 {
-    "assistant_id": "d7bd6e5ead6143e486ed732ab47b06dd",
+    "assistant_id": "ad4eb105886445d2aff57a31d337e5f9",
     "name": "ReActAssistant",
     "type": "ReActAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "4e850fefd1964a589d0d32f10b2b9f49",
+        "workflow_id": "c1409c3ea452431c92542804f9a171d5",
         "name": "ReActAssistantWorkflow",
         "type": "EventDrivenWorkflow",
         "oi_span_type": "AGENT",
         "nodes": {
             "ThoughtNode": {
                 "class": "Node",
-                "node_id": "f51f392bda414722905f66f394f4c91e",
+                "node_id": "4bebe6ab76d147f186d1d5835688ddd0",
                 "name": "ThoughtNode",
                 "type": "Node",
                 "oi_span_type": "CHAIN",
                 "tool": {
                     "class": "OpenAITool",
-                    "tool_id": "80f7608a7a604473ab828ec5fa6acbdf",
+                    "base_class": "LLMTool",
+                    "tool_id": "69b0f09e54284f2a87adbcfb190e6ff1",
                     "name": "ThoughtLLMTool",
                     "type": "OpenAITool",
                     "oi_span_type": "LLM",
@@ -48,13 +49,14 @@
             },
             "ActionNode": {
                 "class": "Node",
-                "node_id": "6e7c59de9df7489ba52a5abfd7a64747",
+                "node_id": "7bbb0f4280ec4b9d80bef26112d1e67a",
                 "name": "ActionNode",
                 "type": "Node",
                 "oi_span_type": "CHAIN",
                 "tool": {
                     "class": "OpenAITool",
-                    "tool_id": "f7feb8d8aaa845469c1d3d3f10726261",
+                    "base_class": "LLMTool",
+                    "tool_id": "1d0fcf761ca24acbac24e630ecbb7fc7",
                     "name": "ActionLLMTool",
                     "type": "OpenAITool",
                     "oi_span_type": "LLM",
@@ -80,13 +82,14 @@
             },
             "SearchNode": {
                 "class": "Node",
-                "node_id": "33a2d7b1349b406c9b4f8b7b81526392",
+                "node_id": "5c0056c804764a5c896fdf31d2a02813",
                 "name": "SearchNode",
                 "type": "Node",
                 "oi_span_type": "CHAIN",
                 "tool": {
                     "class": "TavilyTool",
-                    "tool_id": "bb2e6039b9bb440ba979b2da84cd5060",
+                    "base_class": "FunctionCallTool",
+                    "tool_id": "053f465f8a1f4a728e850459391cebc2",
                     "name": "TavilyTestTool",
                     "type": "TavilyTool",
                     "oi_span_type": "TOOL",
@@ -112,9 +115,9 @@
                             }
                         }
                     ],
-                    "function": [
-                        "web_search_using_tavily"
-                    ],
+                    "functions": {
+                        "web_search_using_tavily": "gAWVVgAAAAAAAACMK2dyYWZpLnRvb2xzLmZ1bmN0aW9uX2NhbGxzLmltcGwudGF2aWx5X3Rvb2yUjCJUYXZpbHlUb29sLndlYl9zZWFyY2hfdXNpbmdfdGF2aWx5lJOULg=="
+                    },
                     "api_key": "****************",
                     "search_depth": "advanced",
                     "max_tokens": 6000
@@ -133,13 +136,14 @@
             },
             "ObservationNode": {
                 "class": "Node",
-                "node_id": "f581056fe48743f2ae106dd27ac8f5f3",
+                "node_id": "a1c2b0f08c10412196cd6edba079c515",
                 "name": "ObservationNode",
                 "type": "Node",
                 "oi_span_type": "CHAIN",
                 "tool": {
                     "class": "OpenAITool",
-                    "tool_id": "448fc1118720455bb4c1ce1c5f3cefff",
+                    "base_class": "LLMTool",
+                    "tool_id": "5d5b1a79492045df8c1942c2a076cde5",
                     "name": "ObservationLLMTool",
                     "type": "OpenAITool",
                     "oi_span_type": "LLM",
@@ -164,13 +168,14 @@
             },
             "SummariesNode": {
                 "class": "Node",
-                "node_id": "407415040e4d4bb09dd3d7cba7cc9f3d",
+                "node_id": "8199cdde689f40ffa9d01a800c3b12d5",
                 "name": "SummariesNode",
                 "type": "Node",
                 "oi_span_type": "CHAIN",
                 "tool": {
                     "class": "OpenAITool",
-                    "tool_id": "f809b9315db54d6dbab3342ad052cc7a",
+                    "base_class": "LLMTool",
+                    "tool_id": "2d0a756369424ae093bf5dd565b1cf4c",
                     "name": "SummariesLLMTool",
                     "type": "OpenAITool",
                     "oi_span_type": "LLM",
@@ -213,12 +218,12 @@
             "action_search_result": {
                 "name": "action_search_result",
                 "type": "Topic",
-                "condition": "gAWVXgMAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAksTQziXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQFTAJROSv////+GlIwEZGF0YZSMCnRvb2xfY2FsbHOUhpSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtVQxeAAKBFp0qhSqhyoU7XJD3RJD3AVNEkSZRDAJQpKXSUUpR9lCiMC19fcGFja2FnZV9flIwhdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50lIwIX19uYW1lX1+UjDF0ZXN0c19pbnRlZ3JhdGlvbi5yZWFjdF9hc3Npc3RhbnQucmVhY3RfYXNzaXN0YW50lIwIX19maWxlX1+UjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lHVOTk50lFKUaACMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGgefZR9lChoGYwIPGxhbWJkYT6UjAxfX3F1YWxuYW1lX1+UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoGowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+                "condition": "gAWVXgMAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAksTQziXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQFTAJROSv////+GlIwEZGF0YZSMCnRvb2xfY2FsbHOUhpSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtRQxeAAKBFp0qhSqhyoU7XJD3RJD3AVNEkSZRDAJQpKXSUUpR9lCiMC19fcGFja2FnZV9flIwhdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50lIwIX19uYW1lX1+UjDF0ZXN0c19pbnRlZ3JhdGlvbi5yZWFjdF9hc3Npc3RhbnQucmVhY3RfYXNzaXN0YW50lIwIX19maWxlX1+UjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lHVOTk50lFKUaACMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGgefZR9lChoGYwIPGxhbWJkYT6UjAxfX3F1YWxuYW1lX1+UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoGowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
             },
             "action_finish_result": {
                 "name": "action_finish_result",
                 "type": "Topic",
-                "condition": "gAWVagQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLBEsTQ+KXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQF4AXJTAQB0BQAAAAAAAAAAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAdAYAAAAAAAAAAKsCAAAAAAAAeAFyKgEAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAagkAAAAAAAAAAAAAAAAAAAAAAACrAAAAAAAAAGQCazcAAFMAlE5K/////4wAlIeUKIwEZGF0YZSMB2NvbnRlbnSUjAppc2luc3RhbmNllIwDc3RylIwFc3RyaXCUdJSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtZQ12AAKBFp0qhSqhyoU7XJDrRJDrAJNAkRvIAAiU13BAamDWfOpk6oGKZPtcbMdEbMbQz0xA38gMCJTXgEBWXCpEKmDKRDtcQJtEQJtcQLNEQLNMQLrAi0RA08AUCJTWUQwCUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5SMIXRlc3RzX2ludGVncmF0aW9uLnJlYWN0X2Fzc2lzdGFudJSMCF9fbmFtZV9flIwxdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50LnJlYWN0X2Fzc2lzdGFudJSMCF9fZmlsZV9flIxSL1VzZXJzL2d1YW55aWxpL2NvZGUvZ3JhcGhpdGUvdGVzdHNfaW50ZWdyYXRpb24vcmVhY3RfYXNzaXN0YW50L3JlYWN0X2Fzc2lzdGFudC5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoIn2UfZQoaB2MCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIw0UmVBY3RBc3Npc3RhbnQuX2NvbnN0cnVjdF93b3JrZmxvdy48bG9jYWxzPi48bGFtYmRhPpSMD19fYW5ub3RhdGlvbnNfX5R9lIwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaB6MB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UdYaUhlIwLg=="
+                "condition": "gAWVagQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLBEsTQ+KXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQF4AXJTAQB0BQAAAAAAAAAAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAdAYAAAAAAAAAAKsCAAAAAAAAeAFyKgEAfABqAAAAAAAAAAAAAAAAAAAAAAAAAGQBGQAAAGoCAAAAAAAAAAAAAAAAAAAAAAAAagkAAAAAAAAAAAAAAAAAAAAAAACrAAAAAAAAAGQCazcAAFMAlE5K/////4wAlIeUKIwEZGF0YZSMB2NvbnRlbnSUjAppc2luc3RhbmNllIwDc3RylIwFc3RyaXCUdJSMBWV2ZW50lIWUjFIvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9yZWFjdF9hc3Npc3RhbnQvcmVhY3RfYXNzaXN0YW50LnB5lIwIPGxhbWJkYT6UjDRSZUFjdEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtVQ12AAKBFp0qhSqhyoU7XJDrRJDrAJNAkRvIAAiU13BAamDWfOpk6oGKZPtcbMdEbMbQz0xA38gMCJTXgEBWXCpEKmDKRDtcQJtEQJtcQLNEQLNMQLrAi0RA08AUCJTWUQwCUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5SMIXRlc3RzX2ludGVncmF0aW9uLnJlYWN0X2Fzc2lzdGFudJSMCF9fbmFtZV9flIwxdGVzdHNfaW50ZWdyYXRpb24ucmVhY3RfYXNzaXN0YW50LnJlYWN0X2Fzc2lzdGFudJSMCF9fZmlsZV9flIxSL1VzZXJzL2d1YW55aWxpL2NvZGUvZ3JhcGhpdGUvdGVzdHNfaW50ZWdyYXRpb24vcmVhY3RfYXNzaXN0YW50L3JlYWN0X2Fzc2lzdGFudC5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoIn2UfZQoaB2MCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIw0UmVBY3RBc3Npc3RhbnQuX2NvbnN0cnVjdF93b3JrZmxvdy48bG9jYWxzPi48bGFtYmRhPpSMD19fYW5ub3RhdGlvbnNfX5R9lIwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaB6MB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UdYaUhlIwLg=="
             },
             "search_function_result": {
                 "name": "search_function_result",

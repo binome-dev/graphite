@@ -37,7 +37,7 @@ async def test_invoke_returns_message(function_tool):
     async for msg in agen:
         messages.extend(msg)
     assert isinstance(messages[0], Message)
-    assert messages[0].role == "function"
+    assert messages[0].role == "assistant"
     assert "42" in messages[0].content
 
 

@@ -10,6 +10,7 @@ from typing import Any
 from typing import Dict
 from typing import Type
 
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
 from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
@@ -50,6 +51,7 @@ class ToolFactory:
     # Registry mapping class name strings to their corresponding classes
     _TOOL_REGISTRY: Dict[str, Type[Tool]] = {
         # Base classes
+        "FunctionCallTool": FunctionCallTool,
         "FunctionTool": FunctionTool,
         # LLM implementations
         "OpenAITool": OpenAITool,
@@ -114,6 +116,9 @@ class ToolFactory:
 
         # Look up the appropriate class
         tool_class = cls._TOOL_REGISTRY.get(class_name)
+
+        if tool_class is None and data.get("base_class") is not None:
+            tool_class = cls._TOOL_REGISTRY.get(data.get("base_class"))
 
         if tool_class is None:
             raise ValueError(

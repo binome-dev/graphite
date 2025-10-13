@@ -10,6 +10,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
+from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
 
@@ -136,7 +137,77 @@ async def test_llm_stream_node_gemini() -> None:
     assert len(await event_store.get_events()) == 4
 
 
+# --------------------------------------------------------------------------- #
+#  Serialization/Deserialization Tests                                        #
+# --------------------------------------------------------------------------- #
+async def test_gemini_tool_serialization() -> None:
+    """Test serialization and deserialization of Gemini tool."""
+    await event_store.clear_events()
+
+    # Create original tool
+    original_tool = GeminiTool.builder().api_key(api_key).build()
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+    print(f"Serialized: {serialized}")
+
+    # Deserialize back using ToolFactory
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works correctly
+    content = ""
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for message in messages:
+            assert message.role == "assistant"
+            if isinstance(message.content, str):
+                content += message.content
+
+    print(content)
+    assert "Grafi" in content
+    assert len(await event_store.get_events()) == 2
+
+
+async def test_gemini_tool_with_chat_param_serialization() -> None:
+    """Test serialization with chat params."""
+    await event_store.clear_events()
+
+    chat_param = {
+        "temperature": 0.1,
+        "max_output_tokens": 15,
+    }
+
+    # Create original tool
+    original_tool = (
+        GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
+    )
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+
+    # Deserialize back
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for message in messages:
+            assert message.role == "assistant"
+            assert message.content and "Grafi" in message.content
+            print(message.content)
+            if isinstance(message.content, str):
+                assert len(message.content) < 150
+
+    assert len(await event_store.get_events()) == 2
+
+
 asyncio.run(test_gemini_tool_with_chat_param())
 asyncio.run(test_gemini_tool_stream())
 asyncio.run(test_gemini_tool_async())
 asyncio.run(test_llm_stream_node_gemini())
+asyncio.run(test_gemini_tool_serialization())
+asyncio.run(test_gemini_tool_with_chat_param_serialization())

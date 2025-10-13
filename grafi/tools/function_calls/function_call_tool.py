@@ -1,3 +1,4 @@
+import base64
 import inspect
 import json
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Optional
 from typing import Self
 from typing import TypeVar
 
+import cloudpickle
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -159,10 +161,15 @@ class FunctionCallTool(Tool):
         Returns:
             Dict[str, Any]: A dictionary representation of the tool.
         """
+
         return {
             **super().to_dict(),
+            "base_class": "FunctionCallTool",
             "function_specs": [spec.model_dump() for spec in self.function_specs],
-            "function": list(self.functions.keys()),
+            "functions": {
+                name: base64.b64encode(cloudpickle.dumps(func)).decode("utf-8")
+                for name, func in self.functions.items()
+            },
         }
 
     @classmethod
@@ -177,14 +184,21 @@ class FunctionCallTool(Tool):
             FunctionCallTool: A FunctionCallTool instance created from the dictionary.
 
         Note:
-            Functions cannot be fully reconstructed from serialized data as they
-            contain executable code. This method creates an instance with the
-            function specifications but without the actual callable functions.
-            The functions would need to be re-registered after deserialization.
+            Functions are reconstructed from cloudpickle serialized data.
         """
-        raise NotImplementedError(
-            "FunctionCallTool cannot be deserialized from dict as functions cannot be reconstructed. Use the builder to create an instance."
+
+        function_call_tool_builder = (
+            cls.builder()
+            .name(data.get("name", "FunctionCallTool"))
+            .type(data.get("type", "FunctionCallTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
         )
+
+        for func_name, func_serialized in data.get("functions", {}).items():
+            func = cloudpickle.loads(base64.b64decode(func_serialized.encode("utf-8")))
+            function_call_tool_builder.function(func)
+
+        return function_call_tool_builder.build()
 
 
 T_F = TypeVar("T_F", bound=FunctionCallTool)

@@ -31,6 +31,7 @@ OutputType = Union[BaseModel, List[BaseModel]]
 class FunctionTool(Tool):
     name: str = "FunctionTool"
     type: str = "FunctionTool"
+    role: str = "assistant"
     function: Callable[[Messages], OutputType]
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
@@ -75,7 +76,7 @@ class FunctionTool(Tool):
         else:
             response_str = jsonpickle.encode(response)
 
-        message_args = {"role": "function", "content": response_str}
+        message_args = {"role": self.role, "content": response_str}
 
         return [Message.model_validate(message_args)]
 
@@ -88,6 +89,8 @@ class FunctionTool(Tool):
         """
         return {
             **super().to_dict(),
+            "role": self.role,
+            "base_class": "FunctionTool",
             "function": base64.b64encode(cloudpickle.dumps(self.function)).decode(
                 "utf-8"
             ),
@@ -116,6 +119,7 @@ class FunctionTool(Tool):
             .name(data.get("name", "FunctionTool"))
             .type(data.get("type", "FunctionTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .role(data.get("role", "assistant"))
             .function(
                 cloudpickle.loads(base64.b64decode(data["function"].encode("utf-8")))
             )
@@ -125,6 +129,10 @@ class FunctionTool(Tool):
 
 class FunctionToolBuilder(ToolBuilder[FunctionTool]):
     """Builder for FunctionTool instances."""
+
+    def role(self, role: str) -> Self:
+        self.kwargs["role"] = role
+        return self
 
     def function(self, function: Callable[[Messages], OutputType]) -> Self:
         self.kwargs["function"] = function
