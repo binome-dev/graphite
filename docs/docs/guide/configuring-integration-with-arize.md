@@ -470,6 +470,7 @@ def setup_test_tracing():
    ```
 
 2. Check the endpoint and port are correct:
+
    ```python
    tracer = setup_tracing(
        tracing_options=TracingOptions.PHOENIX,
@@ -479,6 +480,7 @@ def setup_test_tracing():
    ```
 
 3. Use AUTO mode for graceful fallback:
+
    ```python
    tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
    ```
@@ -581,6 +583,7 @@ tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
 ## Support
 
 For issues related to:
+
 - **Graphite tracing integration**: Open an issue on the Grafi repository
 - **Arize platform**: Contact Arize support or consult their documentation
 - **Phoenix**: Check the Phoenix GitHub issues or documentation
