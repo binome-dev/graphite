@@ -1,5 +1,4 @@
 from datetime import datetime
-from datetime import timezone
 from typing import List
 from typing import Optional
 
@@ -10,7 +9,6 @@ from grafi.common.events.event import Event
 
 
 try:
-    from sqlalchemy import JSON
     from sqlalchemy import Column
     from sqlalchemy import DateTime
     from sqlalchemy import Integer
@@ -35,12 +33,11 @@ class Base(DeclarativeBase):
 class EventModel(Base):
     """
     SQLAlchemy model representing an event record.
-    Storing:
-      - an auto-increment primary key,
-      - the `event_id` (from your domain event),
-      - the `event_type`,
-      - a JSON field for the entire event data,
-      - a creation timestamp.
+    Stores event data with proper indexing for efficient queries.
+
+    Note: Timestamps are stored as timezone-naive UTC datetimes.
+    Event timestamps are created as timezone-aware (UTC) but converted
+    to naive for storage to avoid timezone comparison issues.
     """
 
     __tablename__ = "events"
@@ -49,10 +46,10 @@ class EventModel(Base):
     event_id = Column(String, unique=True, index=True, nullable=False)
     conversation_id = Column(String, index=True, nullable=False)
     assistant_request_id = Column(String, index=True, nullable=False)
-    event_type = Column(String, nullable=False)
-    event_context = Column(JSONB, nullable=False)
-    data = Column(JSON, nullable=False)
-    timestamp = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    event_type = Column(String, index=True, nullable=False)
+    event_version = Column(String, nullable=False, default="1.0")
+    event_data = Column(JSONB, nullable=False)
+    timestamp = Column(DateTime, nullable=False)  # Stored as naive UTC
 
 
 class EventStorePostgres(EventStore):
@@ -77,6 +74,14 @@ class EventStorePostgres(EventStore):
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
 
+    async def clear_events(self) -> None:
+        """Clear all events from the database."""
+        pass
+
+    async def get_events(self) -> List[Event]:
+        """Get all events from the database."""
+        pass
+
     async def record_event(self, event: Event) -> None:
         """Record a single event into the database asynchronously."""
         async with self.AsyncSession() as session:
@@ -84,17 +89,23 @@ class EventStorePostgres(EventStore):
                 # Convert Event object to dict
                 event_dict = event.to_dict()
 
+                # Extract conversation_id from invoke_context
+                # The invoke_context is nested inside event_context
+                event_context = event_dict.get("event_context", {})
+                invoke_context = event_context.get("invoke_context", {})
+                conversation_id = invoke_context.get("conversation_id", "")
+
                 # Create SQLAlchemy model instance
                 model = EventModel(
                     event_id=event_dict["event_id"],
-                    conversation_id=event_dict["event_context"]["invoke_context"][
-                        "conversation_id"
-                    ],
+                    conversation_id=conversation_id,
                     assistant_request_id=event_dict["assistant_request_id"],
                     event_type=event_dict["event_type"],
-                    event_context=event_dict["event_context"],
-                    data=event_dict["data"],
-                    timestamp=event_dict["timestamp"],
+                    event_version=event_dict.get("event_version", "1.0"),
+                    event_data=event_dict,
+                    timestamp=datetime.fromisoformat(event_dict["timestamp"]).replace(
+                        tzinfo=None
+                    ),
                 )
                 session.add(model)
                 await session.commit()
@@ -110,17 +121,23 @@ class EventStorePostgres(EventStore):
                 models = []
                 for event in events:
                     event_dict = event.to_dict()
+
+                    # Extract conversation_id from invoke_context
+                    event_context = event_dict.get("event_context", {})
+                    invoke_context = event_context.get("invoke_context", {})
+                    conversation_id = invoke_context.get("conversation_id", "")
+
                     models.append(
                         EventModel(
                             event_id=event_dict["event_id"],
-                            conversation_id=event_dict["event_context"][
-                                "invoke_context"
-                            ]["conversation_id"],
+                            conversation_id=conversation_id,
                             assistant_request_id=event_dict["assistant_request_id"],
                             event_type=event_dict["event_type"],
-                            event_context=event_dict["event_context"],
-                            data=event_dict["data"],
-                            timestamp=event_dict["timestamp"],
+                            event_version=event_dict.get("event_version", "1.0"),
+                            event_data=event_dict,
+                            timestamp=datetime.fromisoformat(
+                                event_dict["timestamp"]
+                            ).replace(tzinfo=None),
                         )
                     )
                 session.add_all(models)
@@ -142,15 +159,7 @@ class EventStorePostgres(EventStore):
                 if not row:
                     return None
 
-                event_data = {
-                    "event_id": row.event_id,
-                    "assistant_request_id": row.assistant_request_id,
-                    "event_type": row.event_type,
-                    "event_context": row.event_context,
-                    "data": row.data,
-                    "timestamp": str(row.timestamp),
-                }
-                return self._create_event_from_dict(event_data)
+                return self._create_event_from_dict(row.event_data)
             except Exception as e:
                 logger.error(f"Failed to get event {event_id}: {e}")
                 raise e
@@ -160,9 +169,9 @@ class EventStorePostgres(EventStore):
         async with self.AsyncSession() as session:
             try:
                 result = await session.execute(
-                    select(EventModel).where(
-                        EventModel.assistant_request_id == assistant_request_id
-                    )
+                    select(EventModel)
+                    .where(EventModel.assistant_request_id == assistant_request_id)
+                    .order_by(EventModel.timestamp)
                 )
                 rows = result.scalars().all()
 
@@ -171,15 +180,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event_data = {
-                        "event_id": r.event_id,
-                        "assistant_request_id": r.assistant_request_id,
-                        "event_type": r.event_type,
-                        "event_context": r.event_context,
-                        "data": r.data,
-                        "timestamp": str(r.timestamp),
-                    }
-                    event = self._create_event_from_dict(event_data)
+                    event = self._create_event_from_dict(r.event_data)
                     if event:
                         events.append(event)
 
@@ -193,9 +194,9 @@ class EventStorePostgres(EventStore):
         async with self.AsyncSession() as session:
             try:
                 result = await session.execute(
-                    select(EventModel).where(
-                        EventModel.conversation_id == conversation_id
-                    )
+                    select(EventModel)
+                    .where(EventModel.conversation_id == conversation_id)
+                    .order_by(EventModel.timestamp)
                 )
                 rows = result.scalars().all()
 
@@ -204,15 +205,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event_data = {
-                        "event_id": r.event_id,
-                        "assistant_request_id": r.assistant_request_id,
-                        "event_type": r.event_type,
-                        "event_context": r.event_context,
-                        "data": r.data,
-                        "timestamp": str(r.timestamp),
-                    }
-                    event = self._create_event_from_dict(event_data)
+                    event = self._create_event_from_dict(r.event_data)
                     if event:
                         events.append(event)
 
@@ -231,20 +224,27 @@ class EventStorePostgres(EventStore):
         async with self.AsyncSession() as session:
             try:
                 # Use JSONB operators for efficient filtering at the database level
+                # The topic name and offset are now in event_context
                 stmt = (
                     select(EventModel).where(
                         # Filter by event type
-                        EventModel.event_type.in_(["PublishToTopic", "OutputTopic"]),
-                        # Use JSONB ->> operator to extract name and compare
-                        EventModel.event_context.op("->>")("name") == name,
-                        # Use JSONB -> operator to extract offset and check if it's in our list
-                        EventModel.event_context.op("->")("offset")
+                        EventModel.event_type.in_(["PublishToTopic", "TopicEvent"]),
+                        # Use JSONB -> operator to navigate to event_context -> name
+                        EventModel.event_data.op("->")('"event_context"').op("->>")(
+                            '"name"'
+                        )
+                        == name,
+                        # Use JSONB -> operator to navigate to event_context -> offset
+                        EventModel.event_data.op("->")('"event_context"')
+                        .op("->")('"offset"')
                         .astext.cast(Integer)
                         .in_(offsets),
                     )
                     # Order by offset for consistent results
                     .order_by(
-                        EventModel.event_context.op("->")("offset").astext.cast(Integer)
+                        EventModel.event_data.op("->")('"event_context"')
+                        .op("->")('"offset"')
+                        .astext.cast(Integer)
                     )
                 )
 
@@ -253,15 +253,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event_data = {
-                        "event_id": r.event_id,
-                        "assistant_request_id": r.assistant_request_id,
-                        "event_type": r.event_type,
-                        "event_context": r.event_context,
-                        "data": r.data,
-                        "timestamp": str(r.timestamp),
-                    }
-                    event = self._create_event_from_dict(event_data)
+                    event = self._create_event_from_dict(r.event_data)
                     if event:
                         events.append(event)
 
