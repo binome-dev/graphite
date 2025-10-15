@@ -185,3 +185,46 @@ def test_to_dict(gemini_instance):
     assert d["type"] == "GeminiTool"
     assert d["api_key"] == "****************"
     assert d["model"] == "gemini-2.0-flash-lite"
+
+
+# --------------------------------------------------------------------------- #
+#  from_dict()                                                                 #
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "GeminiTool",
+        "tool_id": "test-id",
+        "name": "TestGemini",
+        "type": "GeminiTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "gemini-2.0-flash-lite",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await GeminiTool.from_dict(data)
+
+    assert isinstance(tool, GeminiTool)
+    assert tool.name == "TestGemini"
+    assert tool.model == "gemini-2.0-flash-lite"
+    assert tool.system_message == "You are helpful"
+    assert tool.chat_params == {"temperature": 0.7}
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(gemini_instance):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = gemini_instance.to_dict()
+
+    # Deserialize back
+    restored = await GeminiTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == gemini_instance.name
+    assert restored.model == gemini_instance.model
+    assert restored.system_message == gemini_instance.system_message

@@ -3,12 +3,15 @@ import os
 from typing import Any
 from typing import AsyncGenerator
 
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 class Assistant(AssistantBase):
@@ -65,3 +68,31 @@ class Assistant(AssistantBase):
         output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
         with open(output_path, "w") as f:
             f.write(json.dumps(manifest_dict, indent=4))
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "Assistant":
+        """
+        Load an assistant from a manifest dictionary.
+
+        Args:
+            manifest_dict (dict[str, Any]): Dictionary containing the assistant manifest
+
+        Returns:
+            Assistant: The deserialized assistant instance
+
+        Raises:
+            NotImplementedError: Subclasses must implement this method
+        """
+
+        # Create a new instance
+        instance = cls.model_construct()
+        instance.name = data.get("name", "Assistant")
+        instance.type = data.get("type", "assistant")
+        instance.oi_span_type = OpenInferenceSpanKindValues(
+            data.get("oi_span_type", "AGENT")
+        )
+        instance.workflow = await EventDrivenWorkflow.from_dict(
+            data.get("workflow", {})
+        )
+
+        return instance

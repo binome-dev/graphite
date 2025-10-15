@@ -211,6 +211,32 @@ class OllamaTool(LLM):
             "api_url": self.api_url,
         }
 
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "OllamaTool":
+        """
+        Create an OllamaTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the OllamaTool.
+
+        Returns:
+            OllamaTool: An OllamaTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "OllamaTool"))
+            .type(data.get("type", "OllamaTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_url(data.get("api_url", "http://localhost:11434"))
+            .model(data.get("model", "qwen3"))
+            .build()
+        )
+
 
 class OllamaToolBuilder(LLMBuilder[OllamaTool]):
     """

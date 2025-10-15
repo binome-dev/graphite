@@ -10,6 +10,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
+from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
 
@@ -130,7 +131,74 @@ async def test_llm_stream_node_openrouter() -> None:
     assert len(await event_store.get_events()) == 4
 
 
+# --------------------------------------------------------------------------- #
+#  Serialization/Deserialization Tests                                        #
+# --------------------------------------------------------------------------- #
+async def test_openrouter_tool_serialization() -> None:
+    """Test serialization and deserialization of OpenRouter tool."""
+    await event_store.clear_events()
+
+    # Create original tool
+    original_tool = OpenRouterTool.builder().api_key(api_key).build()
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+    print(f"Serialized: {serialized}")
+
+    # Deserialize back using ToolFactory
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works correctly
+    content = ""
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for m in messages:
+            assert m.role == "assistant"
+            if isinstance(m.content, str):
+                content += m.content
+
+    print(content)
+    assert "Grafi" in content
+    assert len(await event_store.get_events()) == 2
+
+
+async def test_openrouter_tool_with_chat_param_serialization() -> None:
+    """Test serialization with chat params."""
+    await event_store.clear_events()
+
+    chat_param = {"temperature": 0.1, "max_tokens": 120}
+
+    # Create original tool
+    original_tool = (
+        OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
+    )
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+
+    # Deserialize back
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for m in messages:
+            print(m)
+            assert m.role == "assistant"
+            assert m.content and "Grafi" in m.content
+            if isinstance(m.content, str):
+                assert len(m.content) < 300
+
+    assert len(await event_store.get_events()) == 2
+
+
 asyncio.run(test_openrouter_tool_with_chat_param())
 asyncio.run(test_openrouter_tool_stream())
 asyncio.run(test_openrouter_tool_async())
 asyncio.run(test_llm_stream_node_openrouter())
+asyncio.run(test_openrouter_tool_serialization())
+asyncio.run(test_openrouter_tool_with_chat_param_serialization())

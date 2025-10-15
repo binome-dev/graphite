@@ -364,3 +364,172 @@ class TestAssistant:
 
             expected_file = tmp_path / "special_assistant_name_manifest.json"
             assert expected_file.exists()
+
+    # Test from_dict Method
+    @pytest.mark.asyncio
+    async def test_from_dict_basic(self):
+        """Test basic deserialization from dictionary."""
+        from grafi.nodes.node import Node
+        from grafi.tools.tool import Tool
+        from grafi.tools.tool_factory import ToolFactory
+        from grafi.topics.expressions.topic_expression import TopicExpr
+        from grafi.topics.topic_impl.input_topic import InputTopic
+        from grafi.topics.topic_impl.output_topic import OutputTopic
+        from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+        # Create a simple mock tool for testing
+        class SimpleMockTool(Tool):
+            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+
+            async def invoke(self, invoke_context, input_data):
+                yield [Message(role="assistant", content="mock response")]
+
+            @classmethod
+            async def from_dict(cls, data):
+                return cls(
+                    tool_id=data.get("tool_id", "default-id"),
+                    name=data.get("name", "SimpleMockTool"),
+                    type=data.get("type", "SimpleMockTool"),
+                    oi_span_type=data.get(
+                        "oi_span_type", OpenInferenceSpanKindValues.TOOL
+                    ),
+                )
+
+        # Register the mock tool
+        ToolFactory.register_tool_class("SimpleMockTool", SimpleMockTool)
+
+        try:
+            # Create a complete workflow
+            input_topic = InputTopic(name="test_input")
+            output_topic = OutputTopic(name="test_output")
+            mock_tool = SimpleMockTool()
+            node = Node(
+                name="test_node",
+                tool=mock_tool,
+                subscribed_expressions=[TopicExpr(topic=input_topic)],
+                publish_to=[output_topic],
+            )
+            workflow = EventDrivenWorkflow(nodes={"test_node": node})
+
+            # Create an assistant with the workflow
+            with patch.object(Assistant, "_construct_workflow"):
+                original = Assistant(
+                    assistant_id="test_id",
+                    name="test_assistant",
+                    type="test_type",
+                    oi_span_type=OpenInferenceSpanKindValues.AGENT,
+                    workflow=workflow,
+                )
+
+            # Serialize to dict
+            data = original.to_dict()
+
+            # Deserialize back
+            restored = await Assistant.from_dict(data)
+
+            # Verify key properties match
+            assert isinstance(restored, Assistant)
+            assert restored.name == "test_assistant"
+            assert restored.type == "test_type"
+            assert restored.oi_span_type == OpenInferenceSpanKindValues.AGENT
+            assert restored.workflow is not None
+            assert isinstance(restored.workflow, EventDrivenWorkflow)
+        finally:
+            # Clean up
+            ToolFactory.unregister_tool_class("SimpleMockTool")
+
+    @pytest.mark.asyncio
+    async def test_from_dict_roundtrip(self):
+        """Test serialization and deserialization roundtrip."""
+        from grafi.nodes.node import Node
+        from grafi.tools.tool import Tool
+        from grafi.tools.tool_factory import ToolFactory
+        from grafi.topics.expressions.topic_expression import TopicExpr
+        from grafi.topics.topic_impl.input_topic import InputTopic
+        from grafi.topics.topic_impl.output_topic import OutputTopic
+        from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+        # Create a simple mock tool for testing
+        class RoundtripMockTool(Tool):
+            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+
+            async def invoke(self, invoke_context, input_data):
+                yield [Message(role="assistant", content="roundtrip response")]
+
+            @classmethod
+            async def from_dict(cls, data):
+                return cls(
+                    tool_id=data.get("tool_id", "default-id"),
+                    name=data.get("name", "RoundtripMockTool"),
+                    type=data.get("type", "RoundtripMockTool"),
+                    oi_span_type=data.get(
+                        "oi_span_type", OpenInferenceSpanKindValues.TOOL
+                    ),
+                )
+
+        # Register the mock tool
+        ToolFactory.register_tool_class("RoundtripMockTool", RoundtripMockTool)
+
+        try:
+            # Create a complete workflow
+            input_topic = InputTopic(name="roundtrip_input")
+            output_topic = OutputTopic(name="roundtrip_output")
+            mock_tool = RoundtripMockTool()
+            node = Node(
+                name="roundtrip_node",
+                tool=mock_tool,
+                subscribed_expressions=[TopicExpr(topic=input_topic)],
+                publish_to=[output_topic],
+            )
+            workflow = EventDrivenWorkflow(nodes={"roundtrip_node": node})
+
+            # Create an assistant with the workflow
+            with patch.object(Assistant, "_construct_workflow"):
+                original = Assistant(
+                    assistant_id="roundtrip_id",
+                    name="roundtrip_assistant",
+                    type="roundtrip_type",
+                    oi_span_type=OpenInferenceSpanKindValues.CHAIN,
+                    workflow=workflow,
+                )
+
+            # Serialize to dict
+            data = original.to_dict()
+
+            # Deserialize back
+            restored = await Assistant.from_dict(data)
+
+            # Verify structure matches
+            assert isinstance(restored, Assistant)
+            assert restored.name == original.name
+            assert restored.type == original.type
+            assert restored.oi_span_type == original.oi_span_type
+            assert isinstance(restored.workflow, EventDrivenWorkflow)
+
+            # Verify workflow structure
+            assert len(restored.workflow.nodes) == len(original.workflow.nodes)
+            assert "roundtrip_node" in restored.workflow.nodes
+            assert "roundtrip_input" in restored.workflow._topics
+            assert "roundtrip_output" in restored.workflow._topics
+        finally:
+            # Clean up
+            ToolFactory.unregister_tool_class("RoundtripMockTool")
+
+    @pytest.mark.asyncio
+    async def test_from_dict_with_defaults(self):
+        """Test from_dict with missing fields uses defaults."""
+
+        # Minimal data with only workflow
+        data = {
+            "workflow": {
+                "name": "EventDrivenWorkflow",
+                "type": "EventDrivenWorkflow",
+                "oi_span_type": "AGENT",
+                "nodes": {},
+                "topics": {},
+            }
+        }
+
+        # This should fail because EventDrivenWorkflow needs input/output topics
+        with pytest.raises(Exception):  # Will raise WorkflowError
+            await Assistant.from_dict(data)

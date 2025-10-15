@@ -26,6 +26,16 @@ class MockTool(Tool):
     async def invoke(self, invoke_context, input_data):
         yield [Message(role="assistant", content="mock response")]
 
+    @classmethod
+    async def from_dict(cls, data):
+        """Create a MockTool from a dictionary."""
+        return cls(
+            tool_id=data.get("tool_id", "default-id"),
+            name=data.get("name", "MockTool"),
+            type=data.get("type", "MockTool"),
+            oi_span_type=data.get("oi_span_type", OpenInferenceSpanKindValues.TOOL),
+        )
+
 
 class TestEventDrivenWorkflowBuilder:
     def test_builder_returns_workflow_builder(self):
@@ -325,12 +335,9 @@ class TestEventDrivenWorkflowToDict:
         result = workflow.to_dict()
 
         assert "topics" in result
-        assert "topic_nodes" in result
         assert isinstance(result["topics"], dict)
-        assert isinstance(result["topic_nodes"], dict)
         assert "test_input" in result["topics"]
         assert "test_output" in result["topics"]
-        assert "test_input" in result["topic_nodes"]
 
 
 class TestEventDrivenWorkflowAsyncNodeTracker:
@@ -406,3 +413,97 @@ class TestEventDrivenWorkflowStopFlag:
         assert stoppable_workflow._stop_requested
         stoppable_workflow.reset_stop_flag()
         assert not stoppable_workflow._stop_requested
+
+
+class TestEventDrivenWorkflowSerialization:
+    @pytest.mark.asyncio
+    async def test_from_dict(self):
+        """Test deserialization from dictionary."""
+        from grafi.tools.tool_factory import ToolFactory
+
+        # Register MockTool with ToolFactory before the test
+        ToolFactory.register_tool_class("MockTool", MockTool)
+
+        try:
+            input_topic = InputTopic(name="test_input")
+            output_topic = OutputTopic(name="test_output")
+
+            mock_tool = MockTool()
+            node = Node(
+                name="test_node",
+                tool=mock_tool,
+                subscribed_expressions=[TopicExpr(topic=input_topic)],
+                publish_to=[output_topic],
+            )
+
+            # Create original workflow
+            original = EventDrivenWorkflow(nodes={"test_node": node})
+
+            # Serialize to dict
+            data = original.to_dict()
+
+            # Deserialize back
+            restored = await EventDrivenWorkflow.from_dict(data)
+
+            # Verify key properties match
+            assert isinstance(restored, EventDrivenWorkflow)
+            assert restored.name == original.name
+            assert restored.type == original.type
+            assert "test_input" in restored._topics
+            assert "test_output" in restored._topics
+            assert "test_node" in restored.nodes
+        finally:
+            # Clean up: unregister MockTool
+            ToolFactory.unregister_tool_class("MockTool")
+
+    @pytest.mark.asyncio
+    async def test_from_dict_roundtrip(self):
+        """Test serialization and deserialization roundtrip."""
+        from grafi.tools.tool_factory import ToolFactory
+
+        # Register MockTool with ToolFactory before the test
+        ToolFactory.register_tool_class("MockTool", MockTool)
+
+        try:
+            input_topic = InputTopic(name="roundtrip_input")
+            output_topic = OutputTopic(name="roundtrip_output")
+
+            mock_tool = MockTool()
+            node = Node(
+                name="roundtrip_node",
+                tool=mock_tool,
+                subscribed_expressions=[TopicExpr(topic=input_topic)],
+                publish_to=[output_topic],
+            )
+
+            # Create original workflow
+            original = EventDrivenWorkflow(nodes={"roundtrip_node": node})
+
+            # Serialize to dict
+            data = original.to_dict()
+
+            # Deserialize back
+            restored = await EventDrivenWorkflow.from_dict(data)
+
+            # Verify structure matches
+            assert isinstance(restored, EventDrivenWorkflow)
+            assert restored.name == original.name
+            assert restored.type == original.type
+            assert len(restored._topics) == len(original._topics)
+            assert len(restored.nodes) == len(original.nodes)
+
+            # Verify topics
+            for topic_name in original._topics.keys():
+                assert topic_name in restored._topics
+                assert (
+                    restored._topics[topic_name].type
+                    == original._topics[topic_name].type
+                )
+
+            # Verify nodes
+            for node_name in original.nodes.keys():
+                assert node_name in restored.nodes
+                assert restored.nodes[node_name].name == original.nodes[node_name].name
+        finally:
+            # Clean up: unregister MockTool
+            ToolFactory.unregister_tool_class("MockTool")

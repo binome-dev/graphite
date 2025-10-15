@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
@@ -12,7 +10,6 @@ from grafi.topics.topic_impl.topic import Topic
 def topic() -> Topic:
     """Fixture to create a Topic instance with a mocked publish event handler."""
     topic = Topic(name="test_topic")
-    topic.publish_event_handler = MagicMock()  # Mock the event handler
     return topic
 
 

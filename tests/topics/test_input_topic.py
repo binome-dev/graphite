@@ -174,3 +174,44 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
     # Consumer 2 has no more messages to consume
     assert not await topic.can_consume("consumer_2")
+
+
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    import base64
+
+    import cloudpickle
+
+    condition = lambda x: True  # noqa: E731
+    data = {
+        "name": "test_input_topic",
+        "type": "AgentInputTopic",
+        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+    }
+
+    topic = await InputTopic.from_dict(data)
+
+    assert isinstance(topic, InputTopic)
+    assert topic.name == "test_input_topic"
+    assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
+    assert topic.condition is not None
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip():
+    """Test serialization and deserialization roundtrip."""
+    # Create original topic
+    original = InputTopic(name="roundtrip_input_topic")
+
+    # Serialize to dict
+    data = original.to_dict()
+
+    # Deserialize back
+    restored = await InputTopic.from_dict(data)
+
+    # Verify key properties match
+    assert isinstance(restored, InputTopic)
+    assert restored.name == original.name
+    assert restored.type == original.type
+    assert restored.condition is not None

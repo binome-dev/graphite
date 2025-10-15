@@ -1,3 +1,7 @@
+import base64
+from typing import Any
+
+import cloudpickle
 from pydantic import Field
 
 from grafi.topics.topic_impl.topic import Topic
@@ -22,3 +26,22 @@ class OutputTopic(Topic):
     """
 
     type: TopicType = Field(default=TopicType.AGENT_OUTPUT_TOPIC_TYPE)
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "OutputTopic":
+        """
+        Create a Topic instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the Topic.
+
+        Returns:
+            OutputTopic: A Topic instance created from the dictionary.
+        """
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            condition=cloudpickle.loads(
+                base64.b64decode(data["condition"].encode("utf-8"))
+            ),
+        )

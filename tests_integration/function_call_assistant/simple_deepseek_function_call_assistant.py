@@ -54,7 +54,7 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is not None,  # only when the last message is a function call
         )
 
@@ -80,9 +80,9 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
         function_result_topic = Topic(name="function_result_topic")
 
         agent_output_topic.condition = (
-            lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            lambda event: event.data[-1].content is not None
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != ""
         )
 
         # Create a function call node

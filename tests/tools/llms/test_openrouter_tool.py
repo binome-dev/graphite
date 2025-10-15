@@ -239,3 +239,50 @@ def test_to_dict(openrouter_instance):
     assert d["api_key"] == "****************"
     assert d["model"] == "openrouter/auto"
     assert d["base_url"] == "https://openrouter.ai/api/v1"
+
+
+# --------------------------------------------------------------------------- #
+#  from_dict
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "OpenRouterTool",
+        "tool_id": "test-id",
+        "name": "TestOpenRouter",
+        "type": "OpenRouterTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "openrouter/auto",
+        "base_url": "https://openrouter.ai/api/v1",
+        "extra_headers": {"X-Title": "Test"},
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await OpenRouterTool.from_dict(data)
+
+    assert isinstance(tool, OpenRouterTool)
+    assert tool.name == "TestOpenRouter"
+    assert tool.model == "openrouter/auto"
+    assert tool.base_url == "https://openrouter.ai/api/v1"
+    assert tool.extra_headers == {"X-Title": "Test"}
+    assert tool.system_message == "You are helpful"
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(openrouter_instance):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = openrouter_instance.to_dict()
+
+    # Deserialize back
+    restored = await OpenRouterTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == openrouter_instance.name
+    assert restored.model == openrouter_instance.model
+    assert restored.base_url == openrouter_instance.base_url
+    assert restored.system_message == openrouter_instance.system_message

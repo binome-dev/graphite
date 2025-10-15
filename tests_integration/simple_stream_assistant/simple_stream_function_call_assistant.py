@@ -50,13 +50,13 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is not None,  # only when the last message is a function call
         )
 
         summary_topic = Topic(
             name="summary_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is None,  # only when the last message is a function call
         )
 

@@ -63,11 +63,25 @@ class Tool(BaseModel):
         """
         return {
             "class": self.__class__.__name__,
+            "base_class": "Tool",
             "tool_id": self.tool_id,
             "name": self.name,
             "type": self.type,
             "oi_span_type": self.oi_span_type.value,
         }
+
+    @classmethod
+    async def from_dict(cls, data: Dict[str, Any]) -> "Tool":
+        """
+        Create a tool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the tool.
+
+        Returns:
+            Tool: A tool instance created from the dictionary.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
 
 
 T_T = TypeVar("T_T", bound="Tool")  # the Tool subclass

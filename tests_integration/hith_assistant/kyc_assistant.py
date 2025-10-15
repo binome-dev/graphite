@@ -76,20 +76,20 @@ class KycAssistant(Assistant):
 
         hitl_call_topic = Topic(
             name="hitl_call_topic",
-            condition=lambda msgs: msgs is not None
-            and len(msgs) > 0
-            and msgs[-1].tool_calls is not None
-            and len(msgs[-1].tool_calls) > 0
-            and msgs[-1].tool_calls[0].function.name != "register_client",
+            condition=lambda event: event is not None
+            and len(event.data) > 0
+            and event.data[-1].tool_calls is not None
+            and len(event.data[-1].tool_calls) > 0
+            and event.data[-1].tool_calls[0].function.name != "register_client",
         )
 
         register_user_topic = Topic(
             name="register_user_topic",
-            condition=lambda msgs: msgs is not None
-            and len(msgs) > 0
-            and msgs[-1].tool_calls is not None
-            and len(msgs[-1].tool_calls) > 0
-            and msgs[-1].tool_calls[0].function.name == "register_client",
+            condition=lambda event: event is not None
+            and len(event.data) > 0
+            and event.data[-1].tool_calls is not None
+            and len(event.data[-1].tool_calls) > 0
+            and event.data[-1].tool_calls[0].function.name == "register_client",
         )
 
         action_node = (

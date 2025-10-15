@@ -133,3 +133,55 @@ def test_to_dict(agent_calling_tool: AgentCallingTool):
     assert isinstance(result, dict)
     assert result["name"] == "test_agent"
     assert result["agent_description"] == "Test agent description"
+
+
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    import base64
+
+    import cloudpickle
+
+    async def test_agent_call(*args, **kwargs):
+        return "test response"
+
+    # Encode the function
+    encoded_func = base64.b64encode(cloudpickle.dumps(test_agent_call)).decode("utf-8")
+
+    data = {
+        "class": "AgentCallingTool",
+        "tool_id": "test-id",
+        "name": "test_agent",
+        "type": "AgentCallingTool",
+        "oi_span_type": "TOOL",
+        "agent_name": "test_agent",
+        "agent_description": "Test description",
+        "argument_description": "Test args",
+        "agent_call": encoded_func,
+    }
+
+    tool = await AgentCallingTool.from_dict(data)
+
+    assert isinstance(tool, AgentCallingTool)
+    assert tool.name == "test_agent"
+    assert tool.agent_name == "test_agent"
+    assert tool.agent_description == "Test description"
+    assert tool.argument_description == "Test args"
+    assert tool.agent_call is not None
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(agent_calling_tool):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = agent_calling_tool.to_dict()
+
+    # Deserialize back
+    restored = await AgentCallingTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == agent_calling_tool.name
+    assert restored.agent_name == agent_calling_tool.agent_name
+    assert restored.agent_description == agent_calling_tool.agent_description
+    assert restored.argument_description == agent_calling_tool.argument_description
+    assert restored.agent_call is not None

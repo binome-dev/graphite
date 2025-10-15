@@ -1,4 +1,4 @@
-import inspect
+import base64
 from typing import Any
 from typing import Callable
 from typing import List
@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Self
 from typing import TypeVar
 
+import cloudpickle
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -35,9 +36,8 @@ class TopicBase(BaseModel):
 
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
-    condition: Callable[[Messages], bool] = Field(default=lambda _: True)
+    condition: Callable[[PublishToTopicEvent], bool] = Field(default=lambda _: True)
     event_queue: TopicEventQueue = Field(default_factory=InMemTopicEventQueue)
-    publish_event_handler: Optional[Callable] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -47,7 +47,7 @@ class TopicBase(BaseModel):
         """
         Publish data to the topic if it meets the condition.
         """
-        if self.condition(publish_event.data):
+        if self.condition(publish_event):
             event = publish_event.model_copy(
                 update={
                     "name": self.name,
@@ -108,33 +108,6 @@ class TopicBase(BaseModel):
         if isinstance(event, PublishToTopicEvent):
             return await self.event_queue.put(event)
 
-    def serialize_callable(self) -> dict:
-        """
-        Serialize the condition field. If it's a function, return the function name.
-        If it's a lambda, return the source code.
-        """
-        if callable(self.condition):
-            if inspect.isfunction(self.condition):
-                if self.condition.__name__ == "<lambda>":
-                    # It's a lambda, extract source code
-                    try:
-                        source = inspect.getsource(self.condition).strip()
-                    except (OSError, TypeError):
-                        source = "<unable to retrieve source>"
-                    return {"type": "lambda", "code": source}
-                else:
-                    # It's a regular function, return its name
-                    return {"type": "function", "name": self.condition.__name__}
-            elif inspect.isbuiltin(self.condition):
-                return {"type": "builtin", "name": self.condition.__name__}
-            elif hasattr(self.condition, "__call__"):
-                # Handle callable objects
-                return {
-                    "type": "callable_object",
-                    "class_name": self.condition.__class__.__name__,
-                }
-        return {"type": "unknown"}
-
     def to_dict(self) -> dict[str, Any]:
         """
         Convert the topic to a dictionary representation.
@@ -142,8 +115,23 @@ class TopicBase(BaseModel):
         return {
             "name": self.name,
             "type": self.type.value,
-            "condition": self.serialize_callable(),
+            "condition": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
+                "utf-8"
+            ),
         }
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "TopicBase":
+        """
+        Create a TopicBase instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the TopicBase.
+
+        Returns:
+            TopicBase: A TopicBase instance created from the dictionary.
+        """
+        raise NotImplementedError("from_dict must be implemented in subclasses.")
 
 
 T_T = TypeVar("T_T", bound=TopicBase)

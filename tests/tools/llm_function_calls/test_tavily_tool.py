@@ -111,3 +111,60 @@ def test_invoke_with_format_json(tavily_tool):
     ):
         result = tavily_tool.web_search_using_tavily("AI")
         assert isinstance(result, str) and result.startswith("{")  # JSON string
+
+
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    import os
+
+    os.environ["TAVILY_API_KEY"] = "test_key"
+
+    data = {
+        "class": "TavilyTool",
+        "tool_id": "test-id",
+        "name": "TestTavily",
+        "type": "TavilyTool",
+        "oi_span_type": "TOOL",
+        "search_depth": "advanced",
+        "max_tokens": 6000,
+    }
+
+    tool = await TavilyTool.from_dict(data)
+
+    assert isinstance(tool, TavilyTool)
+    assert tool.name == "TestTavily"
+    assert tool.search_depth == "advanced"
+    assert tool.max_tokens == 6000
+
+    del os.environ["TAVILY_API_KEY"]
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip():
+    """Test that serialization and deserialization are consistent."""
+    import os
+
+    os.environ["TAVILY_API_KEY"] = "test_key"
+
+    original = (
+        TavilyTool.builder()
+        .name("TestTavily")
+        .api_key("test_key")
+        .search_depth("advanced")
+        .max_tokens(6000)
+        .build()
+    )
+
+    # Serialize to dict
+    data = original.to_dict()
+
+    # Deserialize back
+    restored = await TavilyTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == original.name
+    assert restored.search_depth == original.search_depth
+    assert restored.max_tokens == original.max_tokens
+
+    del os.environ["TAVILY_API_KEY"]

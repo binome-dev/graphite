@@ -13,14 +13,14 @@ from grafi.tools.llms.llm_command import LLMCommand
 
 
 class LLMPromptTemplateCommand(LLMCommand):
-    def get_tool_input(
+    async def get_tool_input(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> Messages:
         """Prepare the input for the LLM command based on the node input and invoke context."""
 
-        messages = super().get_tool_input(invoke_context, node_input)
+        messages = await super().get_tool_input(invoke_context, node_input)
 
         message = messages[-1] if messages else None
 

@@ -183,3 +183,53 @@ def test_to_dict(claude_instance):
     assert d["type"] == "ClaudeTool"
     assert d["api_key"] == "****************"
     assert d["model"] == "claude-3-5-haiku-20241022"
+
+
+# --------------------------------------------------------------------------- #
+#  from_dict                                                                   #
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "ClaudeTool",
+        "tool_id": "test-id",
+        "name": "TestClaude",
+        "type": "ClaudeTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "claude-3-5-haiku-20241022",
+        "max_tokens": 2048,
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await ClaudeTool.from_dict(data)
+
+    assert isinstance(tool, ClaudeTool)
+    assert tool.name == "TestClaude"
+    assert tool.model == "claude-3-5-haiku-20241022"
+    assert tool.max_tokens == 2048
+    assert tool.system_message == "You are helpful"
+    assert tool.chat_params == {"temperature": 0.7}
+    assert tool.is_streaming is False
+    assert tool.structured_output is False
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(claude_instance):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = claude_instance.to_dict()
+
+    # Deserialize back
+    restored = await ClaudeTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == claude_instance.name
+    assert restored.model == claude_instance.model
+    assert restored.max_tokens == claude_instance.max_tokens
+    assert restored.system_message == claude_instance.system_message
+    assert restored.chat_params == claude_instance.chat_params
+    assert restored.is_streaming == claude_instance.is_streaming

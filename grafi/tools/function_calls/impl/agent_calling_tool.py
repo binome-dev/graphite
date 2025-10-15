@@ -1,9 +1,11 @@
+import base64
 import inspect
 import json
 from typing import Any
 from typing import Callable
 from typing import Self
 
+import cloudpickle
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -119,9 +121,43 @@ class AgentCallingTool(FunctionCallTool):
             "agent_name": self.agent_name,
             "agent_description": self.agent_description,
             "argument_description": self.argument_description,
-            "agent_call": self.agent_call.__dict__,
+            "agent_call": base64.b64encode(cloudpickle.dumps(self.agent_call)).decode(
+                "utf-8"
+            ),
             "oi_span_type": self.oi_span_type.value,
         }
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "AgentCallingTool":
+        """
+        Create an AgentCallingTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the AgentCallingTool.
+
+        Returns:
+            AgentCallingTool: An AgentCallingTool instance created from the dictionary.
+
+        Note:
+            The agent_call function cannot be fully reconstructed from serialized data.
+            This method creates an instance with the metadata but without the actual
+            callable function, which would need to be re-registered after deserialization.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "AgentCallingTool"))
+            .type(data.get("type", "AgentCallingTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .agent_name(data.get("agent_name", ""))
+            .agent_description(data.get("agent_description", ""))
+            .argument_description(data.get("argument_description", ""))
+            .agent_call(
+                cloudpickle.loads(base64.b64decode(data["agent_call"].encode("utf-8")))
+            )
+            .build()
+        )
 
 
 class AgentCallingToolBuilder(FunctionCallToolBuilder[AgentCallingTool]):

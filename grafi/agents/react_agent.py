@@ -64,7 +64,7 @@ class ReActAgent(Assistant):
     def _construct_workflow(self) -> "ReActAgent":
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is not None,  # only when the last message is a function call
         )
         function_result_topic = Topic(name="function_result_topic")
@@ -73,9 +73,9 @@ class ReActAgent(Assistant):
 
         agent_output_topic = OutputTopic(
             name="agent_output_topic",
-            condition=lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != "",
+            condition=lambda event: event.data[-1].content is not None
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != "",
         )
 
         llm_node = (

@@ -169,6 +169,50 @@ def test_to_dict(openai_instance):
     assert result["oi_span_type"] == "LLM"
 
 
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "OpenAITool",
+        "tool_id": "test-id",
+        "name": "TestOpenAI",
+        "type": "OpenAITool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "gpt-4o-mini",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await OpenAITool.from_dict(data)
+
+    assert isinstance(tool, OpenAITool)
+    assert tool.name == "TestOpenAI"
+    assert tool.model == "gpt-4o-mini"
+    assert tool.system_message == "You are helpful"
+    assert tool.chat_params == {"temperature": 0.7}
+    assert tool.is_streaming is False
+    assert tool.structured_output is False
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(openai_instance):
+    """Test that serialization and deserialization are consistent."""
+    # Serialize to dict
+    data = openai_instance.to_dict()
+
+    # Deserialize back
+    restored = await OpenAITool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == openai_instance.name
+    assert restored.model == openai_instance.model
+    assert restored.system_message == openai_instance.system_message
+    assert restored.chat_params == openai_instance.chat_params
+    assert restored.is_streaming == openai_instance.is_streaming
+
+
 def test_prepare_api_input(openai_instance):
     input_data = [
         Message(role="system", content="You are a helpful assistant."),

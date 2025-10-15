@@ -10,6 +10,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
+from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
 
@@ -146,6 +147,75 @@ async def test_llm_stream_node_claude() -> None:
 
 
 # --------------------------------------------------------------------------- #
+#  Serialization/Deserialization Tests                                        #
+# --------------------------------------------------------------------------- #
+async def test_claude_tool_serialization() -> None:
+    """Test serialization and deserialization of Claude tool."""
+    await event_store.clear_events()
+
+    # Create original tool
+    original_tool = ClaudeTool.builder().api_key(api_key).build()
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+    print(f"Serialized: {serialized}")
+
+    # Deserialize back using ToolFactory
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works correctly
+    content = ""
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for msg in messages:
+            assert msg.role == "assistant"
+            if isinstance(msg.content, str):
+                content += msg.content
+
+    print(content)
+    assert "Grafi" in content
+    assert len(await event_store.get_events()) == 2
+
+
+async def test_claude_tool_with_chat_param_serialization() -> None:
+    """Test serialization with chat params."""
+    await event_store.clear_events()
+
+    chat_param = {"temperature": 0.2}
+
+    # Create original tool
+    original_tool = (
+        ClaudeTool.builder()
+        .api_key(api_key)
+        .max_tokens(50)
+        .chat_params(chat_param)
+        .build()
+    )
+
+    # Serialize to dict
+    serialized = original_tool.to_dict()
+
+    # Deserialize back
+    restored_tool = await ToolFactory.from_dict(serialized)
+
+    # Test that the restored tool works
+    async for messages in restored_tool.invoke(
+        get_invoke_context(),
+        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
+    ):
+        for msg in messages:
+            assert msg.role == "assistant"
+            assert msg.content and "Grafi" in msg.content
+            print(msg.content)
+            if isinstance(msg.content, str):
+                assert len(msg.content) < 250
+
+    assert len(await event_store.get_events()) == 2
+
+
+# --------------------------------------------------------------------------- #
 #  Run directly                              #
 # --------------------------------------------------------------------------- #
 
@@ -153,3 +223,5 @@ asyncio.run(test_claude_tool_with_chat_param())
 asyncio.run(test_claude_tool_stream())
 asyncio.run(test_claude_tool_async())
 asyncio.run(test_llm_stream_node_claude())
+asyncio.run(test_claude_tool_serialization())
+asyncio.run(test_claude_tool_with_chat_param_serialization())

@@ -1,5 +1,6 @@
 from typing import Any
 from typing import AsyncGenerator
+from typing import Dict
 from typing import List
 
 from grafi.common.decorators.record_decorators import record_node_invoke
@@ -11,7 +12,11 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
 from grafi.tools.command import Command
+from grafi.tools.tool_factory import ToolFactory
+from grafi.topics.expressions.topic_expression import CombinedExpr
+from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.expressions.topic_expression import extract_topics
+from grafi.topics.topic_base import TopicBase
 
 
 class Node(NodeBase):
@@ -59,3 +64,39 @@ class Node(NodeBase):
         return {
             **super().to_dict(),
         }
+
+    @classmethod
+    async def from_dict(
+        cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
+    ) -> "Node":
+        """Create a Node instance from a dictionary representation."""
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        # Deserialize the tool
+        tool = await ToolFactory.from_dict(node_dict["tool"])
+
+        node_builder = (
+            Node.builder()
+            .name(node_dict["name"])
+            .type(node_dict["type"])
+            .oi_span_type(
+                OpenInferenceSpanKindValues(node_dict.get("oi_span_type", "TOOL"))
+            )
+            .tool(tool)
+        )
+
+        # Deserialize subscribed expressions
+        for expr_dict in node_dict["subscribed_expressions"]:
+            if "topic" in expr_dict:
+                node_builder.subscribe(await TopicExpr.from_dict(expr_dict, topics))
+            elif "op" in expr_dict:
+                node_builder.subscribe(await CombinedExpr.from_dict(expr_dict, topics))
+
+        for topic_name in node_dict["publish_to"]:
+            # Check if topic already exists in topics dict
+            if topic_name in topics:
+                node_builder.publish_to(topics[topic_name])
+            else:
+                raise ValueError(f"Unknown topic: {topic_name}")
+
+        return node_builder.build()

@@ -21,11 +21,13 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.nodes.node import Node
 from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
 from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.topics.topic_types import TopicType
@@ -278,7 +280,7 @@ class EventDrivenWorkflow(Workflow):
                         events.extend(node_consumed_events)
                         events.extend(published_events)
 
-                        await container.event_store.record_events(events)  # type: ignore[arg-type]
+                        await container.event_store.record_events(events)
                     except Exception as e:
                         raise NodeExecutionError(
                             node_name=node.name,
@@ -289,11 +291,11 @@ class EventDrivenWorkflow(Workflow):
 
             consumed_events = await self._get_output_events()
 
-            for event in consumed_events:  # type: ignore[arg-type]
-                yield event  # type: ignore[arg-type]
+            for event in consumed_events:
+                yield event
         finally:
             if consumed_events:
-                await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
+                await container.event_store.record_events(consumed_events)
 
     async def invoke_parallel(
         self, input_data: PublishToTopicEvent
@@ -673,5 +675,31 @@ class EventDrivenWorkflow(Workflow):
         return {
             **super().to_dict(),
             "topics": {name: topic.to_dict() for name, topic in self._topics.items()},
-            "topic_nodes": self._topic_nodes,
         }
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "EventDrivenWorkflow":
+        """
+        Create a EventDrivenWorkflow instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the EventDrivenWorkflow.
+        """
+        workflow_builder = (
+            cls.builder()
+            .name(data["name"])
+            .type(data["type"])
+            .oi_span_type(
+                OpenInferenceSpanKindValues(data.get("oi_span_type", "AGENT"))
+            )
+        )
+        topics: Dict[str, TopicBase] = {}
+        for topic_dict in data.get("topics", {}).values():
+            topic = await TopicFactory.from_dict(topic_dict)
+            topics[topic.name] = topic
+
+        for node_dict in data.get("nodes", {}).values():
+            node = await Node.from_dict(node_dict, topics)
+            workflow_builder = workflow_builder.node(node)
+
+        return workflow_builder.build()

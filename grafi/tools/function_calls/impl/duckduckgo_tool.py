@@ -70,6 +70,31 @@ class DuckDuckGoTool(FunctionCallTool):
             "timeout": self.timeout,
         }
 
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "DuckDuckGoTool":
+        """
+        Create a DuckDuckGoTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the DuckDuckGoTool.
+
+        Returns:
+            DuckDuckGoTool: A DuckDuckGoTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "DuckDuckGoTool"))
+            .type(data.get("type", "DuckDuckGoTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .fixed_max_results(data.get("fixed_max_results"))
+            .headers(data.get("headers"))
+            .proxy(data.get("proxy"))
+            .timeout(data.get("timeout", 10))
+            .build()
+        )
+
 
 class DuckDuckGoToolBuilder(FunctionCallToolBuilder[DuckDuckGoTool]):
     """Builder for DuckDuckGoTool instances."""

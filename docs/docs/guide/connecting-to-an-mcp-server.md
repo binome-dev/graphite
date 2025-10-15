@@ -222,15 +222,15 @@ class StockAssistant(Assistant):
 
         mcp_tool_call_topic = Topic(
             name="mcp_tool_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls
+            condition=lambda event: event.data[-1].tool_calls
             is not None,  # Checking if the
         )
 
         assistant_output_topic = OutputTopic(name="assistant_output_topic",
                     condition = (
-            lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            lambda event: event.data[-1].content is not None
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != ""
         ))
 
         assistant_root_topic = InputTopic(name="assistant_root_topic")
@@ -519,9 +519,9 @@ and subsequentially the final node has to be an instance of `OutputTopic`
 ```python
 assistant_output_topic = OutputTopic(name="assistant_output_topic",
                     condition = (
-            lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != ""
+            lambda event: event.data[-1].content is not None
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != ""
         ))
 ```
 
@@ -630,7 +630,7 @@ This is the reason why when we declare the topic `mcp_tool_call_topic` we add a 
 ```python
  mcp_tool_call_topic = Topic(
     name="mcp_tool_call_topic",
-    condition=lambda msgs: msgs[-1].tool_calls
+    condition=lambda event: event.data[-1].tool_calls
     is not None,
 )
 ```

@@ -179,6 +179,33 @@ class OpenRouterTool(LLM):
             "extra_headers": self.extra_headers,
         }
 
+    @classmethod
+    async def from_dict(cls, data: Dict[str, Any]) -> "OpenRouterTool":
+        """
+        Create an OpenRouterTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the OpenRouterTool.
+
+        Returns:
+            OpenRouterTool: An OpenRouterTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "OpenRouterTool"))
+            .type(data.get("type", "OpenRouterTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("OPENROUTER_API_KEY"))
+            .base_url(data.get("base_url", "https://openrouter.ai/api/v1"))
+            .extra_headers(data.get("extra_headers", {}))
+            .build()
+        )
+
 
 class OpenRouterToolBuilder(LLMBuilder[OpenRouterTool]):
     """

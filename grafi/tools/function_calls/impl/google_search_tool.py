@@ -111,6 +111,32 @@ class GoogleSearchTool(FunctionCallTool):
             "timeout": self.timeout,
         }
 
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "GoogleSearchTool":
+        """
+        Create a GoogleSearchTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the GoogleSearchTool.
+
+        Returns:
+            GoogleSearchTool: A GoogleSearchTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "GoogleSearchTool"))
+            .type(data.get("type", "GoogleSearchTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .fixed_max_results(data.get("fixed_max_results"))
+            .fixed_language(data.get("fixed_language"))
+            .headers(data.get("headers"))
+            .proxy(data.get("proxy"))
+            .timeout(data.get("timeout", 10))
+            .build()
+        )
+
 
 class GoogleSearchToolBuilder(FunctionCallToolBuilder[GoogleSearchTool]):
     """Builder for GoogleSearchTool instances."""

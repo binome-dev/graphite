@@ -212,3 +212,58 @@ async def test_error_handling(google_search_tool):
             ):
                 assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)
+
+
+# --------------------------------------------------------------------------- #
+#  from_dict
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_from_dict():
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "GoogleSearchTool",
+        "tool_id": "test-id",
+        "name": "TestGoogleSearch",
+        "type": "GoogleSearchTool",
+        "oi_span_type": "TOOL",
+        "fixed_max_results": 5,
+        "fixed_language": "en",
+        "headers": {"User-Agent": "test"},
+        "proxy": "http://proxy.test",
+        "timeout": 15,
+    }
+
+    tool = await GoogleSearchTool.from_dict(data)
+
+    assert isinstance(tool, GoogleSearchTool)
+    assert tool.name == "TestGoogleSearch"
+    assert tool.fixed_max_results == 5
+    assert tool.fixed_language == "en"
+    assert tool.headers == {"User-Agent": "test"}
+    assert tool.proxy == "http://proxy.test"
+    assert tool.timeout == 15
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip():
+    """Test that serialization and deserialization are consistent."""
+    original = (
+        GoogleSearchTool.builder()
+        .name("TestGoogle")
+        .fixed_max_results(3)
+        .fixed_language("en")
+        .headers({"User-Agent": "test"})
+        .build()
+    )
+
+    # Serialize to dict
+    data = original.to_dict()
+
+    # Deserialize back
+    restored = await GoogleSearchTool.from_dict(data)
+
+    # Verify key properties match
+    assert restored.name == original.name
+    assert restored.fixed_max_results == original.fixed_max_results
+    assert restored.fixed_language == original.fixed_language
+    assert restored.headers == original.headers

@@ -54,7 +54,7 @@ class SimpleHITLAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleHITLAssistant":
         hitl_call_topic = Topic(
             name="hitl_call_topic",
-            condition=lambda msgs: msgs[-1].tool_calls is not None,
+            condition=lambda event: event.data[-1].tool_calls is not None,
         )
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
@@ -66,7 +66,7 @@ class SimpleHITLAssistant(Assistant):
 
         register_user_topic = Topic(
             name="register_user_topic",
-            condition=lambda msgs: msgs[-1].tool_calls is None,
+            condition=lambda event: event.data[-1].tool_calls is None,
         )
 
         llm_input_node = (

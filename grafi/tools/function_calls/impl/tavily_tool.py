@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 from typing import Dict
 from typing import Literal
@@ -81,6 +82,34 @@ class TavilyTool(FunctionCallTool):
             "search_depth": self.search_depth,
             "max_tokens": self.max_tokens,
         }
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "TavilyTool":
+        """
+        Create a TavilyTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the TavilyTool.
+
+        Returns:
+            TavilyTool: A TavilyTool instance created from the dictionary.
+
+        Note:
+            The client needs to be recreated with an API key from environment
+            or other secure source as API keys are masked in serialization.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "TavilyTool"))
+            .type(data.get("type", "TavilyTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+            .api_key(os.getenv("TAVILY_API_KEY"))
+            .search_depth(data.get("search_depth", "advanced"))
+            .max_tokens(data.get("max_tokens", 6000))
+            .build()
+        )
 
 
 class TavilyToolBuilder(FunctionCallToolBuilder[TavilyTool]):

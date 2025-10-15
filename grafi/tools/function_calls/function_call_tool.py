@@ -1,3 +1,4 @@
+import base64
 import inspect
 import json
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Optional
 from typing import Self
 from typing import TypeVar
 
+import cloudpickle
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -159,11 +161,44 @@ class FunctionCallTool(Tool):
         Returns:
             Dict[str, Any]: A dictionary representation of the tool.
         """
+
         return {
             **super().to_dict(),
+            "base_class": "FunctionCallTool",
             "function_specs": [spec.model_dump() for spec in self.function_specs],
-            "function": list(self.functions.keys()),
+            "functions": {
+                name: base64.b64encode(cloudpickle.dumps(func)).decode("utf-8")
+                for name, func in self.functions.items()
+            },
         }
+
+    @classmethod
+    async def from_dict(cls, data: dict[str, Any]) -> "FunctionCallTool":
+        """
+        Create a FunctionCallTool instance from a dictionary representation.
+
+        Args:
+            data (dict[str, Any]): A dictionary representation of the FunctionCallTool.
+
+        Returns:
+            FunctionCallTool: A FunctionCallTool instance created from the dictionary.
+
+        Note:
+            Functions are reconstructed from cloudpickle serialized data.
+        """
+
+        function_call_tool_builder = (
+            cls.builder()
+            .name(data.get("name", "FunctionCallTool"))
+            .type(data.get("type", "FunctionCallTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
+        )
+
+        for func_name, func_serialized in data.get("functions", {}).items():
+            func = cloudpickle.loads(base64.b64decode(func_serialized.encode("utf-8")))
+            function_call_tool_builder.function(func)
+
+        return function_call_tool_builder.build()
 
 
 T_F = TypeVar("T_F", bound=FunctionCallTool)

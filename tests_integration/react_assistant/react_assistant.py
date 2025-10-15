@@ -78,13 +78,13 @@ class ReActAssistant(Assistant):
 
         action_result_search_topic = Topic(
             name="action_search_result",
-            condition=lambda msgs: msgs[-1].tool_calls is not None,
+            condition=lambda event: event.data[-1].tool_calls is not None,
         )
         action_result_finish_topic = Topic(
             name="action_finish_result",
-            condition=lambda msgs: msgs[-1].content is not None
-            and isinstance(msgs[-1].content, str)
-            and msgs[-1].content.strip() != "",
+            condition=lambda event: event.data[-1].content is not None
+            and isinstance(event.data[-1].content, str)
+            and event.data[-1].content.strip() != "",
         )
 
         action_node = (

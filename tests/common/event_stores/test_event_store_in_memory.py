@@ -27,7 +27,7 @@ class SampleEvent(Event):
         return {**self.event_dict(), "data": {"test_data": self.test_data}}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SampleEvent":
+    async def from_dict(cls, data: Dict[str, Any]) -> "SampleEvent":
         base = cls.event_base(data)
         return cls(
             **base,

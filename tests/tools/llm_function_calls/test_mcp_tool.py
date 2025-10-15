@@ -221,3 +221,56 @@ async def test_get_prompt_and_resources(dummy_connections):
         print(tool.resources)
         res = await tool.get_resources("user://resource/uri1")
         assert res == ["res1"]
+
+
+@pytest.mark.asyncio
+async def test_from_dict(dummy_connections):
+    """Test deserialization from dictionary."""
+    data = {
+        "class": "MCPTool",
+        "tool_id": "test-id",
+        "name": "TestMCP",
+        "type": "MCPTool",
+        "oi_span_type": "TOOL",
+        "mcp_config": {
+            "mcpServers": dummy_connections,
+        },
+    }
+
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.list_tools = AsyncMock(return_value=[])
+        instance.list_resources = AsyncMock(return_value=[])
+        instance.list_prompts = AsyncMock(return_value=[])
+
+        tool = await MCPTool.from_dict(data)
+
+        assert isinstance(tool, MCPTool)
+        assert tool.name == "TestMCP"
+        assert tool.type == "MCPTool"
+        assert tool.mcp_config is not None
+
+
+@pytest.mark.asyncio
+async def test_from_dict_roundtrip(dummy_connections):
+    """Test serialization and deserialization roundtrip."""
+    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+        instance = MockClient.return_value.__aenter__.return_value
+        instance.list_tools = AsyncMock(return_value=[])
+        instance.list_resources = AsyncMock(return_value=[])
+        instance.list_prompts = AsyncMock(return_value=[])
+
+        # Create original tool
+        original = await MCPTool.builder().connections(dummy_connections).build()
+
+        # Serialize to dict
+        data = original.to_dict()
+
+        # Deserialize back
+        restored = await MCPTool.from_dict(data)
+
+        # Verify key properties match
+        assert isinstance(restored, MCPTool)
+        assert restored.name == original.name
+        assert restored.type == original.type
+        assert restored.mcp_config == original.mcp_config
