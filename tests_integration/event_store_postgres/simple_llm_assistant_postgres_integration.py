@@ -57,6 +57,7 @@ def get_invoke_context() -> InvokeContext:
 
 async def test_simple_llm_assistant() -> None:
     invoke_context = get_invoke_context()
+    await postgres_event_store.initialize()
     assistant = (
         SimpleLLMAssistant.builder()
         .name("SimpleLLMAssistant")
