@@ -326,7 +326,7 @@ event_store = container.event_store
 # Create your assistant
 async def main():
     assistant = (
-        # YourAssistant is an instance of type grafi.assistants.assistant 
+        # YourAssistant is an instance of type grafi.assistants.assistant
         # https://github.com/binome-dev/graphite/blob/main/grafi/assistants/assistant.py
         YourAssistant.builder()
         .name("MyAssistant")
@@ -461,7 +461,7 @@ def setup_test_tracing():
    ```bash
    ➜ docker compose up
     nc -zv localhost 4317
-    
+
     Connection to localhost (::1) 4317 port [tcp/*] succeeded!
 
     nc -zv localhost 6006
