@@ -146,6 +146,7 @@ async def test_openrouter_tool_serialization() -> None:
     print(f"Serialized: {serialized}")
 
     # Deserialize back using ToolFactory
+    ToolFactory.register_tool_class("OpenRouterTool", OpenRouterTool)
     restored_tool = await ToolFactory.from_dict(serialized)
 
     # Test that the restored tool works correctly
@@ -179,6 +180,7 @@ async def test_openrouter_tool_with_chat_param_serialization() -> None:
     serialized = original_tool.to_dict()
 
     # Deserialize back
+    ToolFactory.register_tool_class("OpenRouterTool", OpenRouterTool)
     restored_tool = await ToolFactory.from_dict(serialized)
 
     # Test that the restored tool works

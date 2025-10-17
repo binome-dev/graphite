@@ -6,6 +6,7 @@ import os
 
 import pytest
 
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
@@ -44,6 +45,7 @@ async def test_tool_factory_openai_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_claude_tool():
     """Test factory creates ClaudeTool correctly."""
+    ToolFactory.register_tool_class("ClaudeTool", ClaudeTool)
     data = {
         "class": "ClaudeTool",
         "tool_id": "test-id",
@@ -69,6 +71,7 @@ async def test_tool_factory_claude_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_deepseek_tool():
     """Test factory creates DeepseekTool correctly."""
+    ToolFactory.register_tool_class("DeepseekTool", DeepseekTool)
     data = {
         "class": "DeepseekTool",
         "tool_id": "test-id",
@@ -93,6 +96,7 @@ async def test_tool_factory_deepseek_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_gemini_tool():
     """Test factory creates GeminiTool correctly."""
+    ToolFactory.register_tool_class("GeminiTool", GeminiTool)
     data = {
         "class": "GeminiTool",
         "tool_id": "test-id",
@@ -116,6 +120,7 @@ async def test_tool_factory_gemini_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_ollama_tool():
     """Test factory creates OllamaTool correctly."""
+    ToolFactory.register_tool_class("OllamaTool", OllamaTool)
     data = {
         "class": "OllamaTool",
         "tool_id": "test-id",
@@ -140,6 +145,7 @@ async def test_tool_factory_ollama_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_openrouter_tool():
     """Test factory creates OpenRouterTool correctly."""
+    ToolFactory.register_tool_class("OpenRouterTool", OpenRouterTool)
     data = {
         "class": "OpenRouterTool",
         "tool_id": "test-id",
@@ -165,6 +171,7 @@ async def test_tool_factory_openrouter_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_duckduckgo_tool():
     """Test factory creates DuckDuckGoTool correctly."""
+    ToolFactory.register_tool_class("DuckDuckGoTool", DuckDuckGoTool)
     data = {
         "class": "DuckDuckGoTool",
         "tool_id": "test-id",
@@ -185,6 +192,7 @@ async def test_tool_factory_duckduckgo_tool():
 @pytest.mark.asyncio
 async def test_tool_factory_tavily_tool():
     """Test factory creates TavilyTool correctly."""
+    ToolFactory.register_tool_class("TavilyTool", TavilyTool)
     # Set a dummy API key for test
     os.environ["TAVILY_API_KEY"] = "test_key"
 
@@ -261,6 +269,7 @@ async def test_tool_factory_roundtrip_openai():
 async def test_tool_factory_roundtrip_claude():
     """Test serialization and deserialization roundtrip for ClaudeTool."""
     # Create original tool using builder
+    ToolFactory.register_tool_class("ClaudeTool", ClaudeTool)
     original = (
         ClaudeTool.builder()
         .name("test_claude")
@@ -340,7 +349,6 @@ def test_tool_factory_unregister_class():
 def test_tool_factory_is_registered():
     """Test checking if a class is registered."""
     assert ToolFactory.is_registered("OpenAITool")
-    assert ToolFactory.is_registered("ClaudeTool")
     assert not ToolFactory.is_registered("NonExistentTool")
 
 
@@ -350,15 +358,9 @@ def test_tool_factory_get_registered_classes():
 
     # Check some expected classes are in the registry
     assert "OpenAITool" in registered
-    assert "ClaudeTool" in registered
-    assert "DeepseekTool" in registered
-    assert "GeminiTool" in registered
-    assert "OllamaTool" in registered
-    assert "OpenRouterTool" in registered
-    assert "TavilyTool" in registered
-    assert "DuckDuckGoTool" in registered
+    assert "FunctionCallTool" in registered
     assert "FunctionTool" in registered
 
     # Verify the classes are correct
     assert registered["OpenAITool"] == OpenAITool
-    assert registered["ClaudeTool"] == ClaudeTool
+    assert registered["FunctionCallTool"] == FunctionCallTool

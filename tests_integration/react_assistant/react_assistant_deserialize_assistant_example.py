@@ -7,6 +7,8 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
+from grafi.tools.tool_factory import ToolFactory
 
 
 def get_invoke_context() -> InvokeContext:
@@ -24,6 +26,7 @@ async def test_deserialized_assistant() -> None:
         manifest_json = f.read()
 
     # Deserialize the assistant using the new method
+    ToolFactory.register_tool_class("TavilyTool", TavilyTool)
     assistant = await Assistant.from_dict(json.loads(manifest_json))
 
     print(f"Successfully deserialized assistant: {assistant.name}")
