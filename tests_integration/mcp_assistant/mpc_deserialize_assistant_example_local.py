@@ -8,6 +8,8 @@ from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.tools.function_calls.impl.mcp_tool import MCPTool
+from grafi.tools.tool_factory import ToolFactory
 
 
 def get_invoke_context() -> InvokeContext:
@@ -28,6 +30,7 @@ async def test_deserialized_assistant() -> None:
     with open(Path(__file__).parent / "MCPAssistant_manifest.json", "r") as f:
         manifest_json = f.read()
 
+    ToolFactory.register_tool_class("MCPTool", MCPTool)
     # Deserialize the assistant using the new method
     assistant = await Assistant.from_dict(json.loads(manifest_json))
 

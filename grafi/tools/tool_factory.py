@@ -11,18 +11,8 @@ from typing import Dict
 from typing import Type
 
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
-from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
-from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
-from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
-from grafi.tools.function_calls.impl.mcp_tool import MCPTool
-from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.functions.function_tool import FunctionTool
-from grafi.tools.llms.impl.claude_tool import ClaudeTool
-from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
-from grafi.tools.llms.impl.gemini_tool import GeminiTool
-from grafi.tools.llms.impl.ollama_tool import OllamaTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.tool import Tool
 
 
@@ -55,17 +45,6 @@ class ToolFactory:
         "FunctionTool": FunctionTool,
         # LLM implementations
         "OpenAITool": OpenAITool,
-        "ClaudeTool": ClaudeTool,
-        "DeepseekTool": DeepseekTool,
-        "GeminiTool": GeminiTool,
-        "OllamaTool": OllamaTool,
-        "OpenRouterTool": OpenRouterTool,
-        # FunctionCall implementations
-        "TavilyTool": TavilyTool,
-        "DuckDuckGoTool": DuckDuckGoTool,
-        "GoogleSearchTool": GoogleSearchTool,
-        "MCPTool": MCPTool,
-        "AgentCallingTool": AgentCallingTool,
     }
 
     @classmethod
