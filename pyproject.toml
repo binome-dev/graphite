@@ -1,6 +1,6 @@
 [project]
 name = "grafi"
-version = "0.0.31"
+version = "0.0.32"
 description = "Grafi - a flexible, event-driven framework that enables the creation of domain-specific AI agents through composable agentic workflows."
 authors = [{name = "Craig Li", email = "craig@binome.dev"}]
 license = {text = "Mozilla Public License Version 2.0"}
