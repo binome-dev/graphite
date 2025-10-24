@@ -296,6 +296,56 @@ This tool automatically discovers available functions from connected MCP servers
 
 By integrating `AgentCallingTool` into your event-driven workflow, you can build sophisticated multi-agent systems where each agent can be invoked seamlessly via structured function calls. This approach maintains a clear separation between the LLM's orchestration and the agents' invoke details.
 
+## Synthetic Tool
+
+`SyntheticTool` extends the `FunctionCallTool` that enables LLMs to generate synthetic or modeled data by leveraging another LLM as a data generator. Unlike traditional function call tools that execute predefined logic, `SyntheticTool` uses an LLM to produce plausible, schema-compliant, outputs based on input specifications—perfect for testing, prototyping, or generating realistic mock data.
+
+**Fields**:
+
+| Field                  | Description                                                                                                        |
+|------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `name`                | Descriptive identifier, defaults to `"SyntheticTool"`.                                                              |
+| `type`                | Tool type indicator, defaults to `"SyntheticTool"`.                                                                 |
+| `tool_name`           | Name used for function registration and LLM tool calls.                                                             |
+| `description`         | Explanation of what synthetic data this tool generates.                                                             |
+| `input_model`         | Pydantic `BaseModel` class or JSON schema dict defining expected input structure.                                   |
+| `output_model`        | Pydantic `BaseModel` class or JSON schema dict defining generated output structure.                                 |
+| `model`               | OpenAI model to use for data generation (e.g., `"gpt-4o-mini"`).                                                    |
+| `openai_api_key`      | API key for OpenAI authentication.                                                                                  |
+| `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
+
+**Methods**:
+
+| Method           | Description                                                                                                                                                                                                 |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `get_function_specs` | Returns the function specification (name, description, input schema) for the synthetic. tool                                                                                                                  |
+| `invoke`      | Processes tool calls, generates synthetic data via LLM, returns schema-compliant JSON responses.                                                                                           |
+| `ensure_strict_schema`   | Static method that recursively adds `additionalProperties: false` to JSON schemas for OpenAI strict mode compatibility.                                                                                                                 |
+| `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
+
+**Workflow Example**:
+
+1. **Schema Definition**: Define input and output schemas using either Pydantic models (type-safe Python) or JSON Schema dicts (flexible).
+2. **Function Registration**: The tool automatically generates the `FunctionSpec`, enabling LLMs to discover and call the tool.
+3. **Tool Invocation**: When an LLM invokes the tool with arguments:
+    - Arguments are validated against `input_model` schema
+    - A prompt is constructed with input/output schema specifications
+    - LLM generates synthetic data conforming to `output_model`
+4. **Structured Output**:
+    - **Pydantic Mode**: Uses OpenAI's `beta.chat.completions.parse()` with type safety
+    - **JSON Schema Mode**: Uses `chat.completions.create()` with `strict: True` for schema validation
+5. **Response Handling**: Generated data is returned as a `Message` object linked to the original `tool_call_id`.
+
+**Usage and Customization**:
+
+- **Flexible Schema Definition**: By supporting both Pydantic models and JSON schemas, you can choose type-safe Python development or dynamic schema-based configuration without changing the rest of your workflow.
+- **Runtime Model Selection**: Easily swap between OpenAI models (e.g., `gpt-5-mini` for cost, `gpt-5` for quality) to balance generation quality and API costs without modifying tool logic.
+- **Schema-Driven Generation**: Input and output schemas guide the LLM's data generation, ensuring consistent, validated outputs that conform to your exact specifications.
+- **Composable Data Pipelines**: Chain multiple `SyntheticTool` instances where one tool's output becomes another's input, creating sophisticated data generation workflows.
+
+With SyntheticTool, you can rapidly prototype data-driven workflows without building actual data sources, while maintaining full schema compliance and
+type safety through Pydantic or JSON Schema validation.
+
 ## Best Practices
 
 ### Function Design
