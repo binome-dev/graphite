@@ -1,6 +1,8 @@
 import json
 import uuid
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from pydantic import BaseModel
@@ -104,9 +106,7 @@ def test_make_prompt(synthetic_tool):
 async def test_invoke_successful(synthetic_tool, invoke_context):
     """Test successful invocation with mocked LLM response."""
     mock_parsed_response = WeatherOutput(
-        temperature=22.5,
-        conditions="Sunny",
-        location="San Francisco"
+        temperature=22.5, conditions="Sunny", location="San Francisco"
     )
 
     mock_message = Mock()
@@ -121,7 +121,10 @@ async def test_invoke_successful(synthetic_tool, invoke_context):
     mock_client = AsyncMock()
     mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_completion)
 
-    with patch("grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI", return_value=mock_client):
+    with patch(
+        "grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI",
+        return_value=mock_client,
+    ):
         input_data = [
             Message(
                 role="assistant",
@@ -192,9 +195,7 @@ async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
 async def test_invoke_multiple_tool_calls(synthetic_tool, invoke_context):
     """Test invoke with multiple tool calls."""
     mock_parsed_response = WeatherOutput(
-        temperature=22.5,
-        conditions="Sunny",
-        location="San Francisco"
+        temperature=22.5, conditions="Sunny", location="San Francisco"
     )
 
     mock_message = Mock()
@@ -209,7 +210,10 @@ async def test_invoke_multiple_tool_calls(synthetic_tool, invoke_context):
     mock_client = AsyncMock()
     mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_completion)
 
-    with patch("grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI", return_value=mock_client):
+    with patch(
+        "grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI",
+        return_value=mock_client,
+    ):
         input_data = [
             Message(
                 role="assistant",
@@ -297,13 +301,17 @@ async def test_from_dict():
 
 def test_field_validator_rejects_invalid_input_model():
     """Test that field validator rejects invalid input_model at initialization."""
-    with pytest.raises(ValueError, match="input_model must be a Pydantic BaseModel class"):
+    with pytest.raises(
+        ValueError, match="input_model must be a Pydantic BaseModel class"
+    ):
         SyntheticTool.builder().tool_name("test").input_model(123).build()
 
 
 def test_field_validator_rejects_invalid_output_model():
     """Test that field validator rejects invalid output_model at initialization."""
-    with pytest.raises(ValueError, match="output_model must be a Pydantic BaseModel class"):
+    with pytest.raises(
+        ValueError, match="output_model must be a Pydantic BaseModel class"
+    ):
         SyntheticTool.builder().tool_name("test").output_model("invalid_string").build()
 
 
@@ -311,7 +319,9 @@ def test_field_validator_rejects_model_instance():
     """Test that field validator rejects Pydantic model instances (not classes)."""
     instance = WeatherInput(location="SF")
 
-    with pytest.raises(ValueError, match="input_model must be a Pydantic BaseModel class"):
+    with pytest.raises(
+        ValueError, match="input_model must be a Pydantic BaseModel class"
+    ):
         SyntheticTool.builder().tool_name("test").input_model(instance).build()
 
 
@@ -320,7 +330,7 @@ def test_field_validator_accepts_valid_pydantic_class():
     tool = (
         SyntheticTool.builder()
         .tool_name("test")
-        .input_model(WeatherInput)  
+        .input_model(WeatherInput)
         .output_model(WeatherOutput)
         .model("gpt-4")
         .openai_api_key("key")
@@ -352,12 +362,9 @@ async def test_invoke_with_json_schema_output(invoke_context):
     """Test invocation with JSON schema output model (not Pydantic)."""
     json_output_schema = {
         "type": "object",
-        "properties": {
-            "result": {"type": "string"},
-            "confidence": {"type": "number"}
-        },
+        "properties": {"result": {"type": "string"}, "confidence": {"type": "number"}},
         "required": ["result", "confidence"],
-        "additionalProperties": False
+        "additionalProperties": False,
     }
 
     tool = (
@@ -386,7 +393,10 @@ async def test_invoke_with_json_schema_output(invoke_context):
     mock_client = AsyncMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_completion)
 
-    with patch("grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI", return_value=mock_client):
+    with patch(
+        "grafi.tools.function_calls.impl.synthetic_tool.AsyncOpenAI",
+        return_value=mock_client,
+    ):
         input_data = [
             Message(
                 role="assistant",
@@ -425,8 +435,14 @@ async def test_invoke_with_json_schema_output(invoke_context):
         assert "response_format" in call_kwargs
         assert call_kwargs["response_format"]["type"] == "json_schema"
         assert call_kwargs["response_format"]["json_schema"]["strict"] is True
-        assert call_kwargs["response_format"]["json_schema"]["name"] == "test_json_tool_output"
-        assert call_kwargs["response_format"]["json_schema"]["schema"] == json_output_schema
+        assert (
+            call_kwargs["response_format"]["json_schema"]["name"]
+            == "test_json_tool_output"
+        )
+        assert (
+            call_kwargs["response_format"]["json_schema"]["schema"]
+            == json_output_schema
+        )
 
 
 def test_mixed_pydantic_and_json_schema():
@@ -434,7 +450,7 @@ def test_mixed_pydantic_and_json_schema():
     json_output_schema = {
         "type": "object",
         "properties": {"status": {"type": "string"}},
-        "required": ["status"]
+        "required": ["status"],
     }
 
     tool = (

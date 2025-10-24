@@ -1,19 +1,24 @@
 import inspect
 import json
-from typing import Any, AsyncGenerator, Dict, List
+from typing import Any
+from typing import AsyncGenerator
+from typing import Dict
+from typing import List
 
 from openai import OpenAIError
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
+from pydantic import field_validator
 
 from grafi.common.decorators.record_decorators import record_tool_invoke
-from grafi.common.models.function_spec import FunctionSpec, ParametersSchema
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message, Messages
-from grafi.tools.function_calls.function_call_tool import (
-    FunctionCallTool,
-    FunctionCallToolBuilder,
-)
+from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
+
 
 try:
     from openai import AsyncOpenAI
@@ -21,6 +26,7 @@ except ImportError:
     raise ImportError(
         "`openai` not installed. Please install using `pip install openai`"
     )
+
 
 class SyntheticTool(FunctionCallTool):
     name: str = "SyntheticTool"
@@ -115,7 +121,9 @@ class SyntheticTool(FunctionCallTool):
 
     @record_tool_invoke
     async def invoke(
-        self, invoke_context: InvokeContext, input_data: Messages,
+        self,
+        invoke_context: InvokeContext,
+        input_data: Messages,
     ) -> AsyncGenerator[Messages, None]:
         """
         Invokes the synthetic tool by processing incoming tool calls and generating
@@ -168,7 +176,7 @@ class SyntheticTool(FunctionCallTool):
 
             Return ONLY a JSON object that strictly conforms to the OUTPUT schema.
         """
-    
+
     @staticmethod
     def ensure_strict_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -219,8 +227,8 @@ class SyntheticTool(FunctionCallTool):
                     "json_schema": {
                         "name": f"{self.tool_name}_output",
                         "schema": strict_schema,
-                        "strict": True
-                    }
+                        "strict": True,
+                    },
                 }
 
                 # Use standard chat completion (not parse)
@@ -234,8 +242,8 @@ class SyntheticTool(FunctionCallTool):
                 if not content:
                     return json.dumps({"error": "Empty response"})
 
-                return content 
-            
+                return content
+
             # If output model is pydantic model
             else:
                 # Use Pydantic mode with parse
@@ -301,6 +309,7 @@ class SyntheticTool(FunctionCallTool):
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .build()
         )
+
 
 class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):
     """Builder for SyntheticTool instances."""
