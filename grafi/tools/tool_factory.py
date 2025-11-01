@@ -12,7 +12,12 @@ from typing import Type
 
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.llms.impl.doubao_tool import DoubaoTool
+from grafi.tools.llms.impl.kimi_tool import KimiTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.tools.llms.impl.openkey_tool import OpenKeyTool
+from grafi.tools.llms.impl.qwen_tool import QwenTool
+from grafi.tools.llms.impl.siliconflow_tool import SiliconFlowTool
 from grafi.tools.tool import Tool
 
 
@@ -44,7 +49,12 @@ class ToolFactory:
         "FunctionCallTool": FunctionCallTool,
         "FunctionTool": FunctionTool,
         # LLM implementations
+        "DoubaoTool": DoubaoTool,
+        "KimiTool": KimiTool,
         "OpenAITool": OpenAITool,
+        "OpenKeyTool": OpenKeyTool,
+        "QwenTool": QwenTool,
+        "SiliconFlowTool": SiliconFlowTool,
     }
 
     @classmethod
