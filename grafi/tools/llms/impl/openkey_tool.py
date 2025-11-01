@@ -107,6 +107,7 @@ class OpenKeyTool(LLM):
         input_data: Messages,
     ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
+        client = None
         try:
             client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
 
@@ -151,6 +152,13 @@ class OpenKeyTool(LLM):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
+        finally:
+            if client is not None:
+                try:
+                    await client.close()
+                except (RuntimeError, asyncio.CancelledError):
+                    # Event loop might be closed, ignore cleanup errors
+                    pass
 
     def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """
@@ -205,6 +213,32 @@ class OpenKeyTool(LLM):
         return {
             **super().to_dict(),
         }
+
+    @classmethod
+    async def from_dict(cls, data: Dict[str, Any]) -> "OpenKeyTool":
+        """
+        Create an OpenKeyTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the OpenKeyTool.
+
+        Returns:
+            OpenKeyTool: An OpenKeyTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "OpenKeyTool"))
+            .type(data.get("type", "OpenKeyTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "LLM")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("OPENAI_API_KEY"))
+            .model(data.get("model", "gpt-4o-mini"))
+            .build()
+        )
 
 
 class OpenKeyToolBuilder(LLMBuilder[OpenKeyTool]):

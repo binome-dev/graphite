@@ -121,6 +121,7 @@ class KimiTool(LLM):
             LLMToolException: If the API call fails.
         """
         api_messages, api_tools = self.prepare_api_input(input_data)
+        client = None
         try:
             client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
 
@@ -165,6 +166,13 @@ class KimiTool(LLM):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
+        finally:
+            if client is not None:
+                try:
+                    await client.close()
+                except (RuntimeError, asyncio.CancelledError):
+                    # Event loop might be closed, ignore cleanup errors
+                    pass
 
     def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """
@@ -219,6 +227,33 @@ class KimiTool(LLM):
         return {
             **super().to_dict(),
         }
+
+    @classmethod
+    async def from_dict(cls, data: Dict[str, Any]) -> "KimiTool":
+        """
+        Create a KimiTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the KimiTool.
+
+        Returns:
+            KimiTool: A KimiTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "KimiTool"))
+            .type(data.get("type", "KimiTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "LLM")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("MOONSHOT_API_KEY"))
+            .model(data.get("model", "kimi-k2-0905-preview"))
+            .base_url(data.get("base_url", "https://api.moonshot.cn/v1"))
+            .build()
+        )
 
 
 class KimiToolBuilder(LLMBuilder[KimiTool]):

@@ -1,3 +1,29 @@
+"""
+Qwen (Alibaba Cloud DashScope) Tool Example
+
+This example demonstrates how to use the Qwen language model tool.
+Qwen is provided by Alibaba Cloud through the DashScope API (通义千问).
+
+API Key Configuration:
+    To use this example, you need to obtain an API key from Alibaba Cloud DashScope.
+    
+    Steps to get your API key:
+    1. Visit the Alibaba Cloud DashScope console: https://dashscope.console.aliyun.com/
+    2. Sign up or log in to your Alibaba Cloud account
+    3. Navigate to the API-KEY management section
+    4. Create a new API key or copy an existing one
+    
+    Set the API key as an environment variable:
+        export DASHSCOPE_API_KEY="your-api-key-here"
+    
+    Or set it directly in your environment before running this script.
+
+Note: The API key is automatically read from the DASHSCOPE_API_KEY environment variable.
+If not set, the tool will use an empty string as default.
+
+For more information, visit: https://help.aliyun.com/zh/model-studio/getting-started/models
+"""
+
 import asyncio
 import os
 import uuid

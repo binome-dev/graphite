@@ -1,3 +1,27 @@
+"""
+OpenKey Tool Example
+
+This example demonstrates how to use the OpenKey tool, which provides OpenAI-compatible API access.
+OpenKey is a service that offers OpenAI API compatibility.
+
+API Key Configuration:
+    To use this example, you need to obtain an API key from the OpenKey platform.
+    
+    Steps to get your API key:
+    1. Visit the OpenKey website: https://openkey.cloud/
+    2. Sign up or log in to your account
+    3. Navigate to the API Keys section in your dashboard
+    4. Create a new API key or copy an existing one
+    
+    Set the API key as an environment variable:
+        export OPENAI_API_KEY="your-api-key-here"
+    
+    Or set it directly in your environment before running this script.
+
+Note: The API key is automatically read from the OPENAI_API_KEY environment variable.
+If not set, the tool will use an empty string as default.
+"""
+
 import asyncio
 import os
 import uuid

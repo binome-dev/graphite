@@ -1,3 +1,27 @@
+"""
+Doubao (Volcano Engine) Tool Example
+
+This example demonstrates how to use the Doubao (Volcano Engine) language model tool.
+Doubao is provided by ByteDance's Volcano Engine (火山引擎).
+
+API Key Configuration:
+    To use this example, you need to obtain an API key from the ARK (Volcano Engine) platform.
+    
+    Steps to get your API key:
+    1. Visit the Volcano Engine console: https://console.volcengine.com/
+    2. Navigate to the ARK (AI Open Platform) section
+    3. Create an application or select an existing one
+    4. Generate or copy your API key
+    
+    Set the API key as an environment variable:
+        export ARK_API_KEY="your-api-key-here"
+    
+    Or set it directly in your environment before running this script.
+
+Note: The API key is automatically read from the ARK_API_KEY environment variable.
+If not set, the tool will use an empty string as default.
+"""
+
 import asyncio
 import os
 import uuid
@@ -29,7 +53,7 @@ class UserForm(BaseModel):
 
 event_store = container.event_store
 
-api_key = os.getenv("ARK_API_KEY", "b10e67a6-fc1a-4602-9883-4eb3720a400a")
+api_key = os.getenv("ARK_API_KEY", "")
 
 
 def get_invoke_context() -> InvokeContext:

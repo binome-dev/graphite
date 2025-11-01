@@ -43,7 +43,7 @@ class SiliconFlowTool(LLM):
     name: str = Field(default="SiliconFlowTool")
     type: str = Field(default="SiliconFlowTool")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("SILICONFLOW_API_KEY"))
-    model: str = Field(default="Qwen/QwQ-32B")
+    model: str = Field(default="deepseek-ai/DeepSeek-V3.1")
     base_url: str = Field(default="https://api.siliconflow.cn/v1")
 
     @classmethod
@@ -121,6 +121,7 @@ class SiliconFlowTool(LLM):
             LLMToolException: If the API call fails.
         """
         api_messages, api_tools = self.prepare_api_input(input_data)
+        client = None
         try:
             client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
 
@@ -165,6 +166,13 @@ class SiliconFlowTool(LLM):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
+        finally:
+            if client is not None:
+                try:
+                    await client.close()
+                except (RuntimeError, asyncio.CancelledError):
+                    # Event loop might be closed, ignore cleanup errors
+                    pass
 
     def to_stream_messages(self, chunk: ChatCompletionChunk) -> Messages:
         """
@@ -219,6 +227,33 @@ class SiliconFlowTool(LLM):
         return {
             **super().to_dict(),
         }
+
+    @classmethod
+    async def from_dict(cls, data: Dict[str, Any]) -> "SiliconFlowTool":
+        """
+        Create a SiliconFlowTool instance from a dictionary representation.
+
+        Args:
+            data (Dict[str, Any]): A dictionary representation of the SiliconFlowTool.
+
+        Returns:
+            SiliconFlowTool: A SiliconFlowTool instance created from the dictionary.
+        """
+        from openinference.semconv.trace import OpenInferenceSpanKindValues
+
+        return (
+            cls.builder()
+            .name(data.get("name", "SiliconFlowTool"))
+            .type(data.get("type", "SiliconFlowTool"))
+            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "LLM")))
+            .chat_params(data.get("chat_params", {}))
+            .is_streaming(data.get("is_streaming", False))
+            .system_message(data.get("system_message", ""))
+            .api_key(os.getenv("SILICONFLOW_API_KEY"))
+            .model(data.get("model", "Qwen/QwQ-32B"))
+            .base_url(data.get("base_url", "https://api.siliconflow.cn/v1"))
+            .build()
+        )
 
 
 class SiliconFlowToolBuilder(LLMBuilder[SiliconFlowTool]):

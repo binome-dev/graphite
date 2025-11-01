@@ -1,3 +1,27 @@
+"""
+SiliconFlow Tool Example
+
+This example demonstrates how to use the SiliconFlow language model tool.
+SiliconFlow provides access to various AI models through a unified API platform.
+
+API Key Configuration:
+    To use this example, you need to obtain an API key from the SiliconFlow platform.
+    
+    Steps to get your API key:
+    1. Visit the SiliconFlow website: https://siliconflow.cn/
+    2. Sign up or log in to your account
+    3. Navigate to the API Keys section in your dashboard
+    4. Create a new API key or copy an existing one
+    
+    Set the API key as an environment variable:
+        export SILICONFLOW_API_KEY="your-api-key-here"
+    
+    Or set it directly in your environment before running this script.
+
+Note: The API key is automatically read from the SILICONFLOW_API_KEY environment variable.
+If not set, the tool will use an empty string as default.
+"""
+
 import asyncio
 import os
 import uuid

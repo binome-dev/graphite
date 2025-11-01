@@ -1,3 +1,27 @@
+"""
+Kimi (Moonshot AI) Tool Example
+
+This example demonstrates how to use the Kimi language model tool.
+Kimi is provided by Moonshot AI (月之暗面).
+
+API Key Configuration:
+    To use this example, you need to obtain an API key from the Moonshot AI platform.
+    
+    Steps to get your API key:
+    1. Visit the Moonshot AI console: https://platform.moonshot.cn/
+    2. Sign up or log in to your account
+    3. Navigate to the API Keys section
+    4. Create a new API key or copy an existing one
+    
+    Set the API key as an environment variable:
+        export MOONSHOT_API_KEY="your-api-key-here"
+    
+    Or set it directly in your environment before running this script.
+
+Note: The API key is automatically read from the MOONSHOT_API_KEY environment variable.
+If not set, the tool will use an empty string as default.
+"""
+
 import asyncio
 import os
 import uuid
@@ -262,12 +286,44 @@ async def test_kimi_tool_structured_output_serialization() -> None:
     assert len(await event_store.get_events()) == 2
 
 
-asyncio.run(test_kimi_tool_with_chat_param())
-asyncio.run(test_kimi_tool_with_structured_output())
-asyncio.run(test_kimi_tool_stream())
-asyncio.run(test_kimi_tool_async())
-asyncio.run(test_llm_stream_node())
-asyncio.run(test_kimi_tool_serialization())
-asyncio.run(test_kimi_tool_with_chat_param_serialization())
-asyncio.run(test_kimi_tool_structured_output_serialization())
+async def main():
+    """
+    Main function to run all tests sequentially with delays to avoid rate limiting.
+    
+    Note: Kimi API has a rate limit of 3 requests per minute (RPM) for free accounts.
+    We add a 25-second delay between each test to stay within the limit.
+    """
+    # Run all tests sequentially with delays to respect rate limits
+    # Kimi API limit: 3 requests per minute, so we wait 25 seconds between tests
+    test_functions = [
+        test_kimi_tool_with_chat_param,
+        test_kimi_tool_with_structured_output,
+        test_kimi_tool_stream,
+        test_kimi_tool_async,
+        test_llm_stream_node,
+        test_kimi_tool_serialization,
+        test_kimi_tool_with_chat_param_serialization,
+        test_kimi_tool_structured_output_serialization,
+    ]
+    
+    for i, test_func in enumerate(test_functions):
+        print(f"\n{'='*60}")
+        print(f"Running test {i+1}/{len(test_functions)}: {test_func.__name__}")
+        print(f"{'='*60}\n")
+        
+        try:
+            await test_func()
+            print(f"✓ Test {test_func.__name__} completed successfully")
+        except Exception as e:
+            print(f"✗ Test {test_func.__name__} failed: {e}")
+        
+        # Add delay between tests (except after the last one)
+        # 25 seconds ensures we stay within 3 RPM limit (60/3 = 20, add buffer)
+        if i < len(test_functions) - 1:
+            print("\nWaiting 25 seconds to avoid rate limiting...")
+            await asyncio.sleep(25)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
