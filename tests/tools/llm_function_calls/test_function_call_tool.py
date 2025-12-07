@@ -1,8 +1,13 @@
 import json
 import warnings
+from datetime import datetime
+from typing import Any
+from typing import Dict
 from typing import List
+from typing import Optional
 
 import pytest
+from pydantic import BaseModel
 
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.event_stores import EventStoreInMemory
@@ -27,6 +32,31 @@ class SampleFunction(FunctionCallTool):
             str: The result of the function.
         """
         return f"{arg1} - {arg2}"
+
+
+class ComplexMock(BaseModel):
+    name: str = "Alice"
+    age: Optional[int] = None
+    birthday: datetime
+
+
+class ComplexFunction(FunctionCallTool):
+    name: str = "SampleFunction"
+
+    @llm_function
+    def test_func(self, arg1: List[Dict[str, Any]], arg2: Optional[ComplexMock]) -> str:
+        """A test function.
+
+        Args:
+            arg1 (List[Dict[str, Any]]): A list of dictionaries.
+            arg2 (Optional[ComplexMock]): An optional complex mock object.
+
+        Returns:
+            str: The result of the function.
+        """
+        return json.dumps(
+            {"arg1": arg1, "arg2": arg2.model_dump_json() if arg2 else None}
+        )
 
 
 @pytest.fixture
@@ -226,3 +256,45 @@ def test_function_spec_structure(function_instance):
     assert "arg2" in spec[0].parameters.properties
     assert spec[0].parameters.properties["arg1"].type == "string"
     assert spec[0].parameters.properties["arg2"].type == "integer"
+
+
+def test_complex_function_invocation():
+    complex_function = ComplexFunction()
+    arg1 = [{"key1": "value1"}, {"key2": 2}]
+    arg2 = ComplexMock(name="Alice", age=30, birthday=datetime(1993, 1, 1))
+
+    result = complex_function.test_func(arg1=arg1, arg2=arg2)
+    result_dict = json.loads(result)
+
+    assert result_dict["arg1"] == arg1
+    assert result_dict["arg2"] == arg2.model_dump_json()
+
+
+@pytest.mark.asyncio
+async def test_function_call_deserialization(function_instance):
+    function_call: SampleFunction = function_instance
+    dict_representation = function_call.to_dict()
+
+    deserialized_function: SampleFunction = await SampleFunction.from_dict(
+        dict_representation
+    )
+
+    assert isinstance(deserialized_function, FunctionCallTool)
+    assert deserialized_function.name == function_call.name
+    assert deserialized_function.type == function_call.type
+    assert deserialized_function.function_specs == function_call.function_specs
+
+
+@pytest.mark.asyncio
+async def test_complex_function_call_deserialization():
+    complex_function = ComplexFunction()
+    dict_representation = complex_function.to_dict()
+
+    deserialized_function: ComplexFunction = await ComplexFunction.from_dict(
+        dict_representation
+    )
+
+    assert isinstance(deserialized_function, FunctionCallTool)
+    assert deserialized_function.name == complex_function.name
+    assert deserialized_function.type == complex_function.type
+    assert deserialized_function.function_specs == complex_function.function_specs
