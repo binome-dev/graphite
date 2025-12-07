@@ -1,4 +1,5 @@
 import base64
+import inspect
 from typing import Any
 from typing import Callable
 from typing import List
@@ -112,12 +113,20 @@ class TopicBase(BaseModel):
         """
         Convert the topic to a dictionary representation.
         """
+        try:
+            code = inspect.getsource(self.condition)
+        except (OSError, TypeError):
+            code = ""
+
         return {
             "name": self.name,
             "type": self.type.value,
-            "condition": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
-                "utf-8"
-            ),
+            "condition": {
+                "base64": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
+                    "utf-8"
+                ),
+                "code": code,
+            },
         }
 
     @classmethod
@@ -131,7 +140,19 @@ class TopicBase(BaseModel):
         Returns:
             TopicBase: A TopicBase instance created from the dictionary.
         """
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
+        condition_data = data["condition"]
+        if isinstance(condition_data, dict):
+            encoded_condition = condition_data["base64"]
+        else:
+            encoded_condition = condition_data
+
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            condition=cloudpickle.loads(
+                base64.b64decode(encoded_condition.encode("utf-8"))
+            ),
+        )
 
 
 T_T = TypeVar("T_T", bound=TopicBase)
