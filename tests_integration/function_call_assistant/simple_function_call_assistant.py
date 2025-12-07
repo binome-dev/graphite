@@ -153,9 +153,9 @@ class SimpleFunctionCallAssistantBuilder(
     def function_call_llm_system_message(
         self, function_call_llm_system_message: str
     ) -> Self:
-        self.kwargs["function_call_llm_system_message"] = (
-            function_call_llm_system_message
-        )
+        self.kwargs[
+            "function_call_llm_system_message"
+        ] = function_call_llm_system_message
         return self
 
     def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
