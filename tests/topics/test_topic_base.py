@@ -85,7 +85,7 @@ def test_serialize_condition_def_function():
 
 def test_serialize_condition_lambda_literal():
     """Test serialization of a lambda defined at module level."""
-    condition = lambda x: x < 10
+    condition = lambda x: x < 10  # noqa: E731
     result = serialize_condition(condition)
     assert "lambda" in result
     assert result.startswith("lambda")
