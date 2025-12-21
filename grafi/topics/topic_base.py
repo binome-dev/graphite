@@ -1,4 +1,5 @@
 import base64
+import inspect
 from typing import Any
 from typing import Callable
 from typing import List
@@ -22,6 +23,37 @@ from grafi.common.models.message import Messages
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
+
+
+def serialize_condition(fn: Callable) -> str:
+    try:
+        # TODO: improve serialization to handle more cases
+        src = inspect.getsource(fn).strip()
+
+        # Case A: Field(default=lambda ...)
+        if "Field(" in src and "default=" in src and "lambda" in src:
+            s = src[src.index("lambda") :].strip()
+            # remove trailing junk from Field(...), e.g. "lambda _: True)"
+            s = s.rstrip().rstrip("),")
+            return s
+
+        # Case B: assignment to lambda
+        if "=" in src and "lambda" in src:
+            rhs = src.split("=", 1)[1].strip()
+            if rhs.startswith("lambda"):
+                return rhs.rstrip().rstrip("),")
+
+        # Case C: lambda literal already
+        if src.startswith("lambda"):
+            return src.rstrip().rstrip("),")
+
+        # Case D: def function
+        return src
+    except Exception:
+        raise ValueError(
+            f"Cannot serialize callable {fn}. "
+            "Define it in a module, not dynamically."
+        )
 
 
 class TopicBase(BaseModel):
@@ -112,12 +144,20 @@ class TopicBase(BaseModel):
         """
         Convert the topic to a dictionary representation.
         """
+        try:
+            code = serialize_condition(self.condition)
+        except (OSError, TypeError):
+            code = ""
+
         return {
             "name": self.name,
             "type": self.type.value,
-            "condition": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
-                "utf-8"
-            ),
+            "condition": {
+                "base64": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
+                    "utf-8"
+                ),
+                "code": code,
+            },
         }
 
     @classmethod
@@ -131,7 +171,19 @@ class TopicBase(BaseModel):
         Returns:
             TopicBase: A TopicBase instance created from the dictionary.
         """
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
+        condition_data = data["condition"]
+        if isinstance(condition_data, dict):
+            encoded_condition = condition_data["base64"]
+        else:
+            encoded_condition = condition_data
+
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            condition=cloudpickle.loads(
+                base64.b64decode(encoded_condition.encode("utf-8"))
+            ),
+        )
 
 
 T_T = TypeVar("T_T", bound=TopicBase)

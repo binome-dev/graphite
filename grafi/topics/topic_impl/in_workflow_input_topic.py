@@ -44,10 +44,16 @@ class InWorkflowInputTopic(Topic):
             InWorkflowInputTopic: A Topic instance created from the dictionary.
 
         """
+        condition_data = data["condition"]
+        if isinstance(condition_data, dict):
+            encoded_condition = condition_data["base64"]
+        else:
+            encoded_condition = condition_data
+
         return cls(
             name=data["name"],
             type=data["type"],
             condition=cloudpickle.loads(
-                base64.b64decode(data["condition"].encode("utf-8"))
+                base64.b64decode(encoded_condition.encode("utf-8"))
             ),
         )

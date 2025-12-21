@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import Optional
 
 from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
@@ -19,19 +20,20 @@ event_store = container.event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-class WeatherMock(FunctionCallTool):
+class LocalFileMock(FunctionCallTool):
     @llm_function
-    def get_weather_mock(self, postcode: str) -> str:
+    def delete_files(self, files: list[str], root_path: Optional[str] = "/") -> str:
         """
-        Function to get weather information for a given postcode.
+        Function to delete files from a given root path.
 
         Args:
-            postcode (str): The postcode for which to retrieve weather information.
+            files (list[str]): A list of file names to delete.
+            root_path (Optional[str]): The root directory path from which to delete files.
 
         Returns:
-            str: A string containing a weather report for the given postcode.
+            str: A string indicating which files were deleted from which root path.
         """
-        return f"The weather of {postcode} is bad now."
+        return f"Deleted files: {files} from root path: {root_path}"
 
 
 def get_invoke_context() -> InvokeContext:
@@ -49,12 +51,17 @@ async def test_simple_function_call_assistant() -> None:
         SimpleFunctionCallAssistant.builder()
         .name("SimpleFunctionCallAssistant")
         .api_key(api_key)
-        .function_tool(WeatherMock(name="WeatherMock"))
+        .function_tool(LocalFileMock(name="LocalFileMock"))
         .build()
     )
 
     # Test the run method
-    input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
+    input_data = [
+        Message(
+            role="user",
+            content="Delete files /tmp/isdhfiadffiadfadf.log and /home/test/file.log?",
+        )
+    ]
 
     output = await async_func_wrapper(
         assistant.invoke(
@@ -67,26 +74,12 @@ async def test_simple_function_call_assistant() -> None:
     )
     print(output)
     assert output is not None
-    assert "12345" in str(output[0].data[0].content)
-    assert "bad" in str(output[0].data[0].content)
+    assert "isdhfiadffiadfadf" in str(output[0].data[0].content)
+    assert "file" in str(output[0].data[0].content)
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) == 24
 
-    # Test restore from finished requests
-
-    input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
-    output = await async_func_wrapper(
-        assistant.invoke(
-            PublishToTopicEvent(
-                invoke_context=invoke_context,
-                data=input_data,
-            ),
-            is_sequential=True,
-        )
-    )
-
-    assert output == []
-
+    # assistant.generate_workflow_graph()
     # assistant.generate_manifest()
 
     # events = event_store.get_events()

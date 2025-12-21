@@ -1,0 +1,177 @@
+{
+    "assistant_id": "f0f4d36e8e31488084b0b43a41e8e181",
+    "name": "SimpleFunctionCallAssistant",
+    "type": "SimpleFunctionCallAssistant",
+    "oi_span_type": "AGENT",
+    "workflow": {
+        "workflow_id": "407b698f2d6f4904aefd9484f0aaa2f4",
+        "name": "simple_function_call_workflow",
+        "type": "EventDrivenWorkflow",
+        "oi_span_type": "AGENT",
+        "nodes": {
+            "OpenAIInputNode": {
+                "class": "Node",
+                "node_id": "fd92d82f05ad45a9bdb43384c25df659",
+                "name": "OpenAIInputNode",
+                "type": "LLMNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "base_class": "LLMTool",
+                    "tool_id": "bc681910cdb64d29a726338c9b81e3ac",
+                    "name": "UserInputLLM",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": null,
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "agent_input_topic"
+                    }
+                ],
+                "publish_to": [
+                    "function_call_topic",
+                    "agent_output_topic"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            },
+            "FunctionCallNode": {
+                "class": "Node",
+                "node_id": "c62ba06934934d31b5275e9b7f65e21a",
+                "name": "FunctionCallNode",
+                "type": "FunctionCallNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "LocalFileMock",
+                    "base_class": "FunctionCallTool",
+                    "tool_id": "992233fd00d843e98b98aef81769f152",
+                    "name": "LocalFileMock",
+                    "type": "FunctionCallTool",
+                    "oi_span_type": "TOOL",
+                    "function_specs": [
+                        {
+                            "name": "delete_files",
+                            "description": "Function to delete files from a given root path.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "description": "A list of file names to delete.",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "root_path": {
+                                        "description": "The root directory path from which to delete files.",
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            },
+                            "output_schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "functions": {
+                        "delete_files": "gAWVMwcAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwNLAEsASwNLBEsDQxKXAGQBfAGbAGQCfAKbAJ0EUwCUWFEBAAAKICAgICAgICBGdW5jdGlvbiB0byBkZWxldGUgZmlsZXMgZnJvbSBhIGdpdmVuIHJvb3QgcGF0aC4KCiAgICAgICAgQXJnczoKICAgICAgICAgICAgZmlsZXMgKGxpc3Rbc3RyXSk6IEEgbGlzdCBvZiBmaWxlIG5hbWVzIHRvIGRlbGV0ZS4KICAgICAgICAgICAgcm9vdF9wYXRoIChPcHRpb25hbFtzdHJdKTogVGhlIHJvb3QgZGlyZWN0b3J5IHBhdGggZnJvbSB3aGljaCB0byBkZWxldGUgZmlsZXMuCgogICAgICAgIFJldHVybnM6CiAgICAgICAgICAgIHN0cjogQSBzdHJpbmcgaW5kaWNhdGluZyB3aGljaCBmaWxlcyB3ZXJlIGRlbGV0ZWQgZnJvbSB3aGljaCByb290IHBhdGguCiAgICAgICAglIwPRGVsZXRlZCBmaWxlczoglIwRIGZyb20gcm9vdCBwYXRoOiCUh5QpjARzZWxmlIwFZmlsZXOUjAlyb290X3BhdGiUh5SMgi9Vc2Vycy9ndWFueWlsaS9jb2RlL2dyYXBoaXRlL3Rlc3RzX2ludGVncmF0aW9uL2Z1bmN0aW9uX2NhbGxfYXNzaXN0YW50L3NpbXBsZV9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudF9jb21wbGV4X2Z1bmN0aW9uX2V4YW1wbGUucHmUjAxkZWxldGVfZmlsZXOUjBpMb2NhbEZpbGVNb2NrLmRlbGV0ZV9maWxlc5RLGEMYgADwGAASIaAVoAfQJzi4GbgL0A9E0AhElEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UTowIX19uYW1lX1+UjAhfX21haW5fX5SMCF9fZmlsZV9flGgRdU5OTnSUUpRoAIwSX2Z1bmN0aW9uX3NldHN0YXRllJOUaB59lIwOX2Z1bmN0aW9uX3NwZWOUjCFncmFmaS5jb21tb24ubW9kZWxzLmZ1bmN0aW9uX3NwZWOUjAxGdW5jdGlvblNwZWOUk5QpgZR9lCiMCF9fZGljdF9flH2UKIwEbmFtZZSMDGRlbGV0ZV9maWxlc5SMC2Rlc2NyaXB0aW9ulIwwRnVuY3Rpb24gdG8gZGVsZXRlIGZpbGVzIGZyb20gYSBnaXZlbiByb290IHBhdGgulIwKcGFyYW1ldGVyc5RoI4wQUGFyYW1ldGVyc1NjaGVtYZSTlCmBlH2UKGgofZQojAR0eXBllIwGb2JqZWN0lIwKcHJvcGVydGllc5R9lChoDmgjjA9QYXJhbWV0ZXJTY2hlbWGUk5QpgZR9lChoKH2UaCyMH0EgbGlzdCBvZiBmaWxlIG5hbWVzIHRvIGRlbGV0ZS6Uc4wSX19weWRhbnRpY19leHRyYV9flH2UKGg0jAVhcnJheZSMBWl0ZW1zlH2UaDSMBnN0cmluZ5RzdYwXX19weWRhbnRpY19maWVsZHNfc2V0X1+Uj5QoaEFoNGgskIwUX19weWRhbnRpY19wcml2YXRlX1+UTnViaA9oOSmBlH2UKGgofZRoLIwzVGhlIHJvb3QgZGlyZWN0b3J5IHBhdGggZnJvbSB3aGljaCB0byBkZWxldGUgZmlsZXMulHNoPn2UjAVhbnlPZpRdlCh9lGg0aENzfZRoNIwEbnVsbJRzZXNoRI+UKGhMaCyQaEZOdWJ1jAhyZXF1aXJlZJRdlGgOYXVoPk5oRI+UKGhSaDZoNJBoRk51YowNb3V0cHV0X3NjaGVtYZR9lGg0aENzdWg+TmhEj5QoaCpoVWgsaC6QaEZOdWJzfZQoaBqMDGRlbGV0ZV9maWxlc5SMDF9fcXVhbG5hbWVfX5SMGkxvY2FsRmlsZU1vY2suZGVsZXRlX2ZpbGVzlIwPX19hbm5vdGF0aW9uc19flH2UKGgOaASMDEdlbmVyaWNBbGlhc5SFlFKUjAhidWlsdGluc5SMBGxpc3SUk5RoYYwDc3RylJOUhZSGlFKUaA+MCV9vcGVyYXRvcpSMB2dldGl0ZW2Uk5SMBnR5cGluZ5SMBVVuaW9ulJOUaGVoYYwEdHlwZZSTlE6FlFKUhpSGlFKUjAZyZXR1cm6UaGV1jA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UjAEvlIWUjApfX21vZHVsZV9flGgbjAdfX2RvY19flGgJjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu"
+                    }
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "function_call_topic"
+                    }
+                ],
+                "publish_to": [
+                    "function_result_topic"
+                ],
+                "command": {
+                    "class": "FunctionCallCommand"
+                }
+            },
+            "OpenAIOutputNode": {
+                "class": "Node",
+                "node_id": "0bc649da3141450db89cb16afe2e7fe2",
+                "name": "OpenAIOutputNode",
+                "type": "LLMNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "base_class": "LLMTool",
+                    "tool_id": "d480c355a97c4dd5999c6346e4a2886c",
+                    "name": "UserOutputLLM",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": null,
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "function_result_topic"
+                    }
+                ],
+                "publish_to": [
+                    "agent_output_topic"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            }
+        },
+        "topics": {
+            "agent_input_topic": {
+                "name": "agent_input_topic",
+                "type": "AgentInputTopic",
+                "condition": {
+                    "base64": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsoQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
+                    "code": "lambda _: True"
+                }
+            },
+            "function_call_topic": {
+                "name": "function_call_topic",
+                "type": "Topic",
+                "condition": {
+                    "base64": "gAWVXgMAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAksTQziXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQFTAJROSv////+GlIwEZGF0YZSMCnRvb2xfY2FsbHOUhpSMBWV2ZW50lIWUjGkvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudC9zaW1wbGVfZnVuY3Rpb25fY2FsbF9hc3Npc3RhbnQucHmUjAg8bGFtYmRhPpSMQVNpbXBsZUZ1bmN0aW9uQ2FsbEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtEQxqAAKBFp0qhSqhyoU7XJD3RJD3YExfxAwElGJRDAJQpKXSUUpR9lCiMC19fcGFja2FnZV9flIwpdGVzdHNfaW50ZWdyYXRpb24uZnVuY3Rpb25fY2FsbF9hc3Npc3RhbnSUjAhfX25hbWVfX5SMSHRlc3RzX2ludGVncmF0aW9uLmZ1bmN0aW9uX2NhbGxfYXNzaXN0YW50LnNpbXBsZV9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudJSMCF9fZmlsZV9flGgPdU5OTnSUUpRoAIwSX2Z1bmN0aW9uX3NldHN0YXRllJOUaB19lH2UKGgZjAg8bGFtYmRhPpSMDF9fcXVhbG5hbWVfX5SMQVNpbXBsZUZ1bmN0aW9uQ2FsbEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoGowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
+                    "code": "lambda event: event.data[-1].tool_calls"
+                }
+            },
+            "agent_output_topic": {
+                "name": "agent_output_topic",
+                "type": "AgentOutputTopic",
+                "condition": {
+                    "base64": "gAWVZwAAAAAAAACMSHRlc3RzX2ludGVncmF0aW9uLmZ1bmN0aW9uX2NhbGxfYXNzaXN0YW50LnNpbXBsZV9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudJSMFmFnZW50X291dHB1dF9jb25kaXRpb26Uk5Qu",
+                    "code": "def agent_output_condition(event: PublishToTopicEvent) -> bool:\n    return (\n        event.data[-1].content is not None\n        and isinstance(event.data[-1].content, str)\n        and event.data[-1].content.strip() != \"\"\n    )"
+                }
+            },
+            "function_result_topic": {
+                "name": "function_result_topic",
+                "type": "Topic",
+                "condition": {
+                    "base64": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsoQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
+                    "code": "lambda _: True"
+                }
+            }
+        }
+    }
+}
