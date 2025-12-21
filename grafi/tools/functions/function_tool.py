@@ -8,7 +8,6 @@ from typing import Self
 from typing import Union
 
 import cloudpickle
-import jsonpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
@@ -74,7 +73,7 @@ class FunctionTool(Tool):
         elif isinstance(response, str):
             response_str = response
         else:
-            response_str = jsonpickle.encode(response)
+            response_str = json.dumps(response, default=str)
 
         message_args = {"role": self.role, "content": response_str}
 

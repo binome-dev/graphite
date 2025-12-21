@@ -25,6 +25,37 @@ from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
 
 
+def serialize_condition(fn: Callable) -> str:
+    try:
+        # TODO: improve serialization to handle more cases
+        src = inspect.getsource(fn).strip()
+
+        # Case A: Field(default=lambda ...)
+        if "Field(" in src and "default=" in src and "lambda" in src:
+            s = src[src.index("lambda") :].strip()
+            # remove trailing junk from Field(...), e.g. "lambda _: True)"
+            s = s.rstrip().rstrip("),")
+            return s
+
+        # Case B: assignment to lambda
+        if "=" in src and "lambda" in src:
+            rhs = src.split("=", 1)[1].strip()
+            if rhs.startswith("lambda"):
+                return rhs.rstrip().rstrip("),")
+
+        # Case C: lambda literal already
+        if src.startswith("lambda"):
+            return src.rstrip().rstrip("),")
+
+        # Case D: def function
+        return src
+    except Exception:
+        raise ValueError(
+            f"Cannot serialize callable {fn}. "
+            "Define it in a module, not dynamically."
+        )
+
+
 class TopicBase(BaseModel):
     """
     Represents a topic in a message queue system.
@@ -114,7 +145,7 @@ class TopicBase(BaseModel):
         Convert the topic to a dictionary representation.
         """
         try:
-            code = inspect.getsource(self.condition)
+            code = serialize_condition(self.condition)
         except (OSError, TypeError):
             code = ""
 

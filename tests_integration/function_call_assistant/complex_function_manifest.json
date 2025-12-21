@@ -145,7 +145,7 @@
                 "type": "AgentInputTopic",
                 "condition": {
                     "base64": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsoQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "    condition: Callable[[PublishToTopicEvent], bool] = Field(default=lambda _: True)\n"
+                    "code": "lambda _: True"
                 }
             },
             "function_call_topic": {
@@ -153,7 +153,7 @@
                 "type": "Topic",
                 "condition": {
                     "base64": "gAWVXgMAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAksTQziXAHwAagAAAAAAAAAAAAAAAAAAAAAAAABkARkAAABqAgAAAAAAAAAAAAAAAAAAAAAAAGQAdQFTAJROSv////+GlIwEZGF0YZSMCnRvb2xfY2FsbHOUhpSMBWV2ZW50lIWUjGkvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS90ZXN0c19pbnRlZ3JhdGlvbi9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudC9zaW1wbGVfZnVuY3Rpb25fY2FsbF9hc3Npc3RhbnQucHmUjAg8bGFtYmRhPpSMQVNpbXBsZUZ1bmN0aW9uQ2FsbEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lEtEQxqAAKBFp0qhSqhyoU7XJD3RJD3YExfxAwElGJRDAJQpKXSUUpR9lCiMC19fcGFja2FnZV9flIwpdGVzdHNfaW50ZWdyYXRpb24uZnVuY3Rpb25fY2FsbF9hc3Npc3RhbnSUjAhfX25hbWVfX5SMSHRlc3RzX2ludGVncmF0aW9uLmZ1bmN0aW9uX2NhbGxfYXNzaXN0YW50LnNpbXBsZV9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudJSMCF9fZmlsZV9flGgPdU5OTnSUUpRoAIwSX2Z1bmN0aW9uX3NldHN0YXRllJOUaB19lH2UKGgZjAg8bGFtYmRhPpSMDF9fcXVhbG5hbWVfX5SMQVNpbXBsZUZ1bmN0aW9uQ2FsbEFzc2lzdGFudC5fY29uc3RydWN0X3dvcmtmbG93Ljxsb2NhbHM+LjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoGowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "            condition=lambda event: event.data[-1].tool_calls\n"
+                    "code": "lambda event: event.data[-1].tool_calls"
                 }
             },
             "agent_output_topic": {
@@ -161,7 +161,7 @@
                 "type": "AgentOutputTopic",
                 "condition": {
                     "base64": "gAWVZwAAAAAAAACMSHRlc3RzX2ludGVncmF0aW9uLmZ1bmN0aW9uX2NhbGxfYXNzaXN0YW50LnNpbXBsZV9mdW5jdGlvbl9jYWxsX2Fzc2lzdGFudJSMFmFnZW50X291dHB1dF9jb25kaXRpb26Uk5Qu",
-                    "code": "def agent_output_condition(event: PublishToTopicEvent) -> bool:\n    return (\n        event.data[-1].content is not None\n        and isinstance(event.data[-1].content, str)\n        and event.data[-1].content.strip() != \"\"\n    )\n"
+                    "code": "def agent_output_condition(event: PublishToTopicEvent) -> bool:\n    return (\n        event.data[-1].content is not None\n        and isinstance(event.data[-1].content, str)\n        and event.data[-1].content.strip() != \"\"\n    )"
                 }
             },
             "function_result_topic": {
@@ -169,7 +169,7 @@
                 "type": "Topic",
                 "condition": {
                     "base64": "gAWVUwIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEsoQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZR1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoG32UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "    condition: Callable[[PublishToTopicEvent], bool] = Field(default=lambda _: True)\n"
+                    "code": "lambda _: True"
                 }
             }
         }

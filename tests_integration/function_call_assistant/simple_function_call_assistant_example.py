@@ -87,7 +87,6 @@ async def test_simple_function_call_assistant() -> None:
 
     assert output == []
 
-    # assistant.generate_workflow_graph()
     # assistant.generate_manifest()
 
     # events = event_store.get_events()

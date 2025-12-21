@@ -13,6 +13,7 @@ from typing import TypeVar
 from typing import Union
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic_core import to_jsonable_python
 
 from grafi.assistants.assistant_base import AssistantBase
@@ -39,8 +40,9 @@ class EventContext(BaseModel):
     type: str = ""
     oi_span_type: str = ""
 
-    class Config:
-        extra = "allow"  # Allow additional fields to be added dynamically
+    model_config = ConfigDict(
+        extra="allow"
+    )  # Allow additional fields to be added dynamically
 
 
 @dataclass

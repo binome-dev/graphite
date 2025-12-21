@@ -6,6 +6,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_base import serialize_condition
 
 
 class MockTopic(TopicBase):
@@ -67,3 +68,51 @@ async def test_restore_topic(topic: TopicBase, invoke_context: InvokeContext):
     consumed_events = await topic.consume("test_consumer")
     assert len(consumed_events) == 1
     assert consumed_events[0].event_id == "event_1"
+
+
+# Module-level definitions for serialize_condition tests
+def module_level_function(x):
+    """A regular function defined at module level."""
+    return x > 0
+
+
+def test_serialize_condition_def_function():
+    """Test serialization of a regular function defined with def."""
+    result = serialize_condition(module_level_function)
+    assert "def module_level_function(x):" in result
+    assert "return x > 0" in result
+
+
+def test_serialize_condition_lambda_literal():
+    """Test serialization of a lambda defined at module level."""
+    condition = lambda x: x < 10
+    result = serialize_condition(condition)
+    assert "lambda" in result
+    assert result.startswith("lambda")
+
+
+def test_serialize_condition_lambda_in_assignment():
+    """Test serialization of lambda from assignment statement."""
+    # This simulates Case B: assignment to lambda
+    result = serialize_condition(lambda x: x < 10)
+    assert "lambda" in result
+
+
+def test_serialize_condition_inline_lambda():
+    """Test serialization of an inline lambda expression."""
+    result = serialize_condition(lambda y: y * 2)
+    assert "lambda" in result
+
+
+def test_serialize_condition_error_on_builtin():
+    """Test that built-in functions raise ValueError."""
+    with pytest.raises(ValueError, match="Cannot serialize callable"):
+        serialize_condition(len)
+
+
+def test_serialize_condition_error_on_dynamic():
+    """Test that dynamically created callables raise ValueError."""
+    # Create a callable that inspect.getsource can't handle
+    dynamic_fn = eval("lambda x: x + 1")
+    with pytest.raises(ValueError, match="Cannot serialize callable"):
+        serialize_condition(dynamic_fn)

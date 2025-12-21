@@ -49,12 +49,12 @@ async def test_deserialized_assistant() -> None:
             is_sequential=True,
         )
     )
-    print(output)
+    print(output[-1].data[0].content)
     assert output is not None
-    assert "12345" in str(output[0].data[0].content)
-    assert "bad" in str(output[0].data[0].content)
+    assert "12345" in str(output[-1].data[0].content)
+    assert "bad" in str(output[-1].data[0].content)
     print(len(await event_store.get_events()))
-    assert len(await event_store.get_events()) == 24
+    assert len(await event_store.get_events()) == 26
 
     # Test restore from finished requests
 
@@ -71,12 +71,12 @@ async def test_deserialized_assistant() -> None:
         )
     )
 
-    print(output)
+    print(output[-1].data[0].content)
     assert output is not None
-    assert "12345" in str(output[0].data[0].content)
-    assert "200,000" in str(output[0].data[0].content)
+    assert "12345" in str(output[-1].data[0].content)
+    assert "200,000" in str(output[-1].data[0].content)
     print(len(await event_store.get_events()))
-    assert len(await event_store.get_events()) == 48
+    assert len(await event_store.get_events()) == 52
 
 
 if __name__ == "__main__":
