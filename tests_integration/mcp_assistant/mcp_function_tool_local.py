@@ -30,15 +30,16 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 class MCPFunctionToolAssistant(Assistant):
     """
-    A simple assistant class that uses OpenAI's language model to process input and generate responses.
+    A simple assistant used in integration tests that routes input through an MCPFunctionTool.
 
-    This class sets up a workflow with a single MCPFunctionTool node using OpenAI's API, and provides a method
-    to run input through this workflow.
+    This class sets up an event-driven workflow with a single node that invokes an MCPFunctionTool and
+    publishes the tool's responses to an output topic.
 
     Attributes:
-        api_key (str): The API key for OpenAI. If not provided, it tries to use the OPENAI_API_KEY environment variable.
-        model (str): The name of the OpenAI model to use.
-        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
+        oi_span_type (OpenInferenceSpanKindValues): Span kind used for OpenInference tracing (set to AGENT).
+        name (str): Logical name of the assistant.
+        type (str): Type identifier for the assistant.
+        mcp_function_tool (Optional[MCPFunctionTool]): The MCPFunctionTool instance invoked by the workflow node.
     """
 
     oi_span_type: OpenInferenceSpanKindValues = Field(
