@@ -188,7 +188,7 @@ class MCPFunctionToolBuilder(FunctionToolBuilder[MCPFunctionTool]):
         }
         return self
 
-    def function_name(self, function_name) -> "MCPFunctionToolBuilder":
+    def function_name(self, function_name: str) -> "MCPFunctionToolBuilder":
         self.kwargs["function_name"] = function_name
 
         return self
