@@ -5,6 +5,7 @@ from typing import Any
 from typing import Callable
 from typing import List
 from typing import Self
+from typing import TypeVar
 from typing import Union
 
 import cloudpickle
@@ -126,7 +127,10 @@ class FunctionTool(Tool):
         )
 
 
-class FunctionToolBuilder(ToolBuilder[FunctionTool]):
+T_FT = TypeVar("T_FT", bound=FunctionTool)
+
+
+class FunctionToolBuilder(ToolBuilder[T_FT]):
     """Builder for FunctionTool instances."""
 
     def role(self, role: str) -> Self:
