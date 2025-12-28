@@ -1,6 +1,7 @@
 import json
 from typing import Any
 from typing import AsyncGenerator
+from typing import Callable
 from typing import Dict
 
 from loguru import logger
@@ -23,8 +24,6 @@ try:
     from mcp.types import CallToolResult
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
-    from mcp.types import Prompt
-    from mcp.types import Resource
     from mcp.types import TextContent
     from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
@@ -42,6 +41,8 @@ class MCPFunctionTool(FunctionTool):
 
     mcp_config: Dict[str, Any] = Field(default_factory=dict)
 
+    function: Callable[[Messages], AsyncGenerator[Messages, None]] = Field(default=None)
+
     function_name: str = Field(default="")
 
     _function_spec: FunctionSpec = PrivateAttr(default=None)
@@ -54,7 +55,7 @@ class MCPFunctionTool(FunctionTool):
         mcp_tool = cls(**kwargs)
         await mcp_tool._get_function_specs()
 
-        cls.function = mcp_tool.invoke_mcp_function
+        mcp_tool.function = mcp_tool.invoke_mcp_function
 
         return mcp_tool
 
@@ -75,23 +76,26 @@ class MCPFunctionTool(FunctionTool):
             all_tools.extend(await client.list_tools())
 
         matching_tools = [
-            tool for tool in all_tools
+            tool
+            for tool in all_tools
             if not self.function_name or tool.name == self.function_name
         ]
 
         if not matching_tools:
             raise ValueError(
-            f"Tool '{self.function_name}' not found in available MCP tools."
-            if self.function_name else "No tools available from MCP server."
+                f"Tool '{self.function_name}' not found in available MCP tools."
+                if self.function_name
+                else "No tools available from MCP server."
             )
 
         tool = matching_tools[0]
-        self._function_spec = FunctionSpec.model_validate({
-            "name": tool.name,
-            "description": tool.description or "",
-            "parameters": tool.inputSchema,
-        })
-
+        self._function_spec = FunctionSpec.model_validate(
+            {
+                "name": tool.name,
+                "description": tool.description or "",
+                "parameters": tool.inputSchema,
+            }
+        )
 
     async def invoke_mcp_function(
         self,
@@ -113,7 +117,7 @@ class MCPFunctionTool(FunctionTool):
             raise ValueError("Function call is None.")
 
         kwargs = json.loads(input_message.content)
-       
+
         response_str = ""
 
         async with Client(self.mcp_config) as client:
@@ -130,16 +134,14 @@ class MCPFunctionTool(FunctionTool):
 
                 elif isinstance(content, EmbeddedResource):
                     # Handle embedded resources
-                    response_str += f"[Embedded resource: {content.resource.model_dump_json()}]\n"
+                    response_str += (
+                        f"[Embedded resource: {content.resource.model_dump_json()}]\n"
+                    )
                 else:
                     # Handle other content types
-                    response_str += (
-                        f"[Unsupported content type: {content.type}]\n"
-                    )
-
+                    response_str += f"[Unsupported content type: {content.type}]\n"
 
         yield response_str
-
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -181,17 +183,18 @@ class MCPFunctionToolBuilder(FunctionToolBuilder[MCPFunctionTool]):
     Builder for MCPFunctionTool.
     """
 
-    def connections(self, connections: Dict[str, Connection]) -> "MCPFunctionToolBuilder":
+    def connections(
+        self, connections: Dict[str, Connection]
+    ) -> "MCPFunctionToolBuilder":
         self.kwargs["mcp_config"] = {
             "mcpServers": connections,
         }
         return self
-    
+
     def function_name(self, function_name) -> "MCPFunctionToolBuilder":
         self.kwargs["function_name"] = function_name
 
         return self
-
 
     async def build(self) -> "MCPFunctionTool":
         mcp_tool = await self._cls.initialize(**self.kwargs)

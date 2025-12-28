@@ -1,6 +1,8 @@
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -36,60 +38,46 @@ def mock_text_content():
     """Create a mock TextContent object."""
     content = MagicMock()
     content.text = "Test response text"
-    # Make isinstance check work for TextContent
     content.__class__.__name__ = "TextContent"
     return content
 
 
-@pytest.fixture
-def mock_image_content():
-    """Create a mock ImageContent object."""
-    content = MagicMock()
-    content.data = "base64encodedimage"
-    content.type = "image"
-    content.__class__.__name__ = "ImageContent"
-    return content
-
-
-@pytest.fixture
-def mock_embedded_resource():
-    """Create a mock EmbeddedResource object."""
-    content = MagicMock()
-    content.type = "resource"
-    content.resource = MagicMock()
-    content.resource.model_dump_json.return_value = '{"uri": "file://test.txt"}'
-    content.__class__.__name__ = "EmbeddedResource"
-    return content
-
-
-@pytest.fixture
-def mock_prompt():
-    """Create a mock Prompt object."""
-    prompt = MagicMock()
-    prompt.name = "test_prompt"
-    return prompt
-
-
-@pytest.fixture
-def mock_resource():
-    """Create a mock Resource object."""
-    resource = MagicMock()
-    resource.uri = MagicMock()
-    resource.uri.encoded_string.return_value = "file://test.txt"
-    return resource
-
-
 class TestMCPFunctionToolInitialize:
     @pytest.mark.asyncio
-    async def test_initialize_creates_tool_with_function_specs(self, mock_mcp_tool):
-        """Test that initialize fetches function specs from MCP server."""
+    async def test_initialize_creates_tool_with_function_spec(self, mock_mcp_tool):
+        """Test that initialize fetches function spec from MCP server."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+
+            mcp_config = {"mcpServers": {"test": {"command": "test"}}}
+            tool = await MCPFunctionTool.initialize(
+                mcp_config=mcp_config, function_name="test_tool"
+            )
+
+            assert tool.name == "MCPFunctionTool"
+            assert tool.function_name == "test_tool"
+            assert tool._function_spec is not None
+            assert tool._function_spec.name == "test_tool"
+            assert tool._function_spec.description == "A test tool"
+
+    @pytest.mark.asyncio
+    async def test_initialize_without_function_name_uses_first_tool(
+        self, mock_mcp_tool
+    ):
+        """Test that initialize uses first available tool when function_name not specified."""
+        with patch(
+            "grafi.tools.functions.impl.mcp_function_tool.Client"
+        ) as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
@@ -99,10 +87,7 @@ class TestMCPFunctionToolInitialize:
             mcp_config = {"mcpServers": {"test": {"command": "test"}}}
             tool = await MCPFunctionTool.initialize(mcp_config=mcp_config)
 
-            assert tool.name == "MCPFunctionTool"
-            assert len(tool._function_spec) == 1
-            assert tool._function_spec[0].name == "test_tool"
-            assert tool._function_spec[0].description == "A test tool"
+            assert tool._function_spec.name == "test_tool"
 
     @pytest.mark.asyncio
     async def test_initialize_raises_error_without_config(self):
@@ -111,6 +96,44 @@ class TestMCPFunctionToolInitialize:
 
         with pytest.raises(ValueError, match="mcp_config are not set"):
             await MCPFunctionTool.initialize(mcp_config={})
+
+    @pytest.mark.asyncio
+    async def test_initialize_raises_error_when_tool_not_found(self, mock_mcp_tool):
+        """Test that initialize raises error when specified function_name not found."""
+        with patch(
+            "grafi.tools.functions.impl.mcp_function_tool.Client"
+        ) as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+
+            mcp_config = {"mcpServers": {"test": {"command": "test"}}}
+            with pytest.raises(ValueError, match="Tool 'nonexistent' not found"):
+                await MCPFunctionTool.initialize(
+                    mcp_config=mcp_config, function_name="nonexistent"
+                )
+
+    @pytest.mark.asyncio
+    async def test_initialize_raises_error_when_no_tools_available(self):
+        """Test that initialize raises error when no tools available from server."""
+        with patch(
+            "grafi.tools.functions.impl.mcp_function_tool.Client"
+        ) as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.list_tools = AsyncMock(return_value=[])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+
+            mcp_config = {"mcpServers": {"test": {"command": "test"}}}
+            with pytest.raises(ValueError, match="No tools available from MCP server"):
+                await MCPFunctionTool.initialize(mcp_config=mcp_config)
 
 
 class TestMCPFunctionToolBuilder:
@@ -122,8 +145,6 @@ class TestMCPFunctionToolBuilder:
         ) as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
@@ -133,20 +154,22 @@ class TestMCPFunctionToolBuilder:
             tool = await (
                 MCPFunctionTool.builder()
                 .name("CustomMCPTool")
-                .connections({"test_server": {"command": "python", "args": ["-m", "test"]}})
+                .connections(
+                    {"test_server": {"command": "python", "args": ["-m", "test"]}}
+                )
+                .function_name("test_tool")
                 .build()
             )
 
             assert tool.name == "CustomMCPTool"
+            assert tool.function_name == "test_tool"
             assert "mcpServers" in tool.mcp_config
 
 
-class TestMCPFunctionToolInvoke:
+class TestMCPFunctionToolInvokeMcpFunction:
     @pytest.mark.asyncio
-    async def test_invoke_calls_mcp_tool(
-        self, invoke_context, mock_mcp_tool, mock_text_content
-    ):
-        """Test invoke calls the correct MCP tool and returns response."""
+    async def test_invoke_mcp_function_calls_tool(self, mock_mcp_tool):
+        """Test invoke_mcp_function calls the correct MCP tool and returns response."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
@@ -154,8 +177,6 @@ class TestMCPFunctionToolInvoke:
 
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
 
             # Mock call_tool response
             call_result = MagicMock()
@@ -170,44 +191,44 @@ class TestMCPFunctionToolInvoke:
             from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 
             tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
+                mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
             )
 
-            # Create input message with tool call
+            # Create input message with tool call and content containing kwargs
             from openai.types.chat.chat_completion_message_tool_call import (
                 ChatCompletionMessageToolCall,
-                Function,
             )
+            from openai.types.chat.chat_completion_message_tool_call import Function
 
             tool_call = ChatCompletionMessageToolCall(
                 id="call_123",
                 type="function",
-                function=Function(
-                    name="test_tool", arguments=json.dumps({"query": "test query"})
-                ),
+                function=Function(name="test_tool", arguments="{}"),
             )
-            input_message = Message(role="assistant", content=None, tool_calls=[tool_call])
+            input_message = Message(
+                role="assistant",
+                content=json.dumps({"query": "test query"}),
+                tool_calls=[tool_call],
+            )
 
-            messages = []
-            async for msg in tool.invoke(invoke_context, [input_message]):
-                messages.extend(msg)
+            results = []
+            async for result in tool.invoke_mcp_function([input_message]):
+                results.append(result)
 
-            assert len(messages) == 1
-            assert "Search result for query" in messages[0].content
-            assert messages[0].tool_call_id == "call_123"
+            assert len(results) == 1
+            assert "Search result for query" in results[0]
 
     @pytest.mark.asyncio
-    async def test_invoke_raises_error_without_tool_calls(
-        self, invoke_context, mock_mcp_tool
+    async def test_invoke_mcp_function_raises_error_without_tool_calls(
+        self, mock_mcp_tool
     ):
-        """Test invoke raises error when no tool_calls in message."""
+        """Test invoke_mcp_function raises error when no tool_calls in message."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
@@ -215,18 +236,19 @@ class TestMCPFunctionToolInvoke:
             from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 
             tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
+                mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
             )
 
-            input_message = Message(role="user", content="test")
+            input_message = Message(role="user", content="{}")
 
             with pytest.raises(ValueError, match="Function call is None"):
-                async for _ in tool.invoke(invoke_context, [input_message]):
+                async for _ in tool.invoke_mcp_function([input_message]):
                     pass
 
     @pytest.mark.asyncio
-    async def test_invoke_handles_image_content(self, invoke_context, mock_mcp_tool):
-        """Test invoke handles ImageContent response."""
+    async def test_invoke_mcp_function_handles_image_content(self, mock_mcp_tool):
+        """Test invoke_mcp_function handles ImageContent response."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
@@ -234,8 +256,6 @@ class TestMCPFunctionToolInvoke:
 
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
 
             # Mock call_tool response with image content
             call_result = MagicMock()
@@ -252,48 +272,53 @@ class TestMCPFunctionToolInvoke:
             from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 
             tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
+                mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
             )
 
             from openai.types.chat.chat_completion_message_tool_call import (
                 ChatCompletionMessageToolCall,
-                Function,
             )
+            from openai.types.chat.chat_completion_message_tool_call import Function
 
             tool_call = ChatCompletionMessageToolCall(
                 id="call_456",
                 type="function",
                 function=Function(name="test_tool", arguments="{}"),
             )
-            input_message = Message(role="assistant", content=None, tool_calls=[tool_call])
+            input_message = Message(
+                role="assistant", content="{}", tool_calls=[tool_call]
+            )
 
-            messages = []
-            async for msg in tool.invoke(invoke_context, [input_message]):
-                messages.extend(msg)
+            results = []
+            async for result in tool.invoke_mcp_function([input_message]):
+                results.append(result)
 
-            assert len(messages) == 1
-            assert messages[0].content == "base64data"
+            assert len(results) == 1
+            assert results[0] == "base64data"
 
-
-class TestMCPFunctionToolGetPrompt:
     @pytest.mark.asyncio
-    async def test_get_prompt_returns_messages(self, mock_mcp_tool, mock_prompt):
-        """Test get_prompt fetches and returns prompt messages."""
+    async def test_invoke_mcp_function_handles_embedded_resource(self, mock_mcp_tool):
+        """Test invoke_mcp_function handles EmbeddedResource response."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
+            from mcp.types import EmbeddedResource as RealEmbeddedResource
+            from mcp.types import TextResourceContents
+
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[mock_prompt])
 
-            # Mock get_prompt response
-            prompt_result = MagicMock()
-            prompt_message = MagicMock()
-            prompt_message.role = "user"
-            prompt_message.content = "This is a prompt template"
-            prompt_result.messages = [prompt_message]
-            mock_client.get_prompt = AsyncMock(return_value=prompt_result)
+            # Mock call_tool response with embedded resource
+            call_result = MagicMock()
+            resource_contents = TextResourceContents(
+                uri="file://test.txt", mimeType="text/plain", text="resource content"
+            )
+            embedded_resource = RealEmbeddedResource(
+                type="resource", resource=resource_contents
+            )
+            call_result.content = [embedded_resource]
+            mock_client.call_tool = AsyncMock(return_value=call_result)
 
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -302,106 +327,41 @@ class TestMCPFunctionToolGetPrompt:
             from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 
             tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
+                mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
             )
 
-            messages = await tool.get_prompt("test_prompt", arguments={"key": "value"})
+            from openai.types.chat.chat_completion_message_tool_call import (
+                ChatCompletionMessageToolCall,
+            )
+            from openai.types.chat.chat_completion_message_tool_call import Function
 
-            assert len(messages) == 1
-            assert messages[0].role == "user"
-            assert messages[0].content == "This is a prompt template"
-
-    @pytest.mark.asyncio
-    async def test_get_prompt_raises_error_for_unknown_prompt(self, mock_mcp_tool):
-        """Test get_prompt raises error for unknown prompt name."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
-            tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
+            tool_call = ChatCompletionMessageToolCall(
+                id="call_789",
+                type="function",
+                function=Function(name="test_tool", arguments="{}"),
+            )
+            input_message = Message(
+                role="assistant", content="{}", tool_calls=[tool_call]
             )
 
-            with pytest.raises(ValueError, match="Prompt 'unknown' not found"):
-                await tool.get_prompt("unknown")
+            results = []
+            async for result in tool.invoke_mcp_function([input_message]):
+                results.append(result)
 
-
-class TestMCPFunctionToolGetResources:
-    @pytest.mark.asyncio
-    async def test_get_resources_returns_resource_content(
-        self, mock_mcp_tool, mock_resource
-    ):
-        """Test get_resources fetches and returns resource content."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[mock_resource])
-            mock_client.list_prompts = AsyncMock(return_value=[])
-            mock_client.read_resource = AsyncMock(
-                return_value=[{"content": "resource data"}]
-            )
-
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
-            tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
-            )
-
-            result = await tool.get_resources("file://test.txt")
-
-            assert result == [{"content": "resource data"}]
-            mock_client.read_resource.assert_called_once_with("file://test.txt")
-
-    @pytest.mark.asyncio
-    async def test_get_resources_raises_error_for_unknown_uri(self, mock_mcp_tool):
-        """Test get_resources raises error for unknown resource URI."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
-            tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}}
-            )
-
-            with pytest.raises(ValueError, match="Resource with URI 'file://unknown' not found"):
-                await tool.get_resources("file://unknown")
+            assert len(results) == 1
+            assert "[Embedded resource:" in results[0]
 
 
 class TestMCPFunctionToolSerialization:
     @pytest.mark.asyncio
-    async def test_to_dict(self, mock_mcp_tool, mock_resource, mock_prompt):
+    async def test_to_dict(self, mock_mcp_tool):
         """Test to_dict serializes the tool correctly."""
         with patch(
             "grafi.tools.functions.impl.mcp_function_tool.Client"
         ) as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[mock_resource])
-            mock_client.list_prompts = AsyncMock(return_value=[mock_prompt])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
@@ -411,6 +371,7 @@ class TestMCPFunctionToolSerialization:
             tool = await MCPFunctionTool.initialize(
                 name="TestMCPTool",
                 mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
             )
 
             result = tool.to_dict()
@@ -418,8 +379,7 @@ class TestMCPFunctionToolSerialization:
             assert result["name"] == "TestMCPTool"
             assert result["type"] == "MCPFunctionTool"
             assert "mcp_config" in result
-            assert "resources" in result
-            assert "prompts" in result
+            assert result["function_name"] == "test_tool"
 
     @pytest.mark.asyncio
     async def test_from_dict(self, mock_mcp_tool):
@@ -429,8 +389,6 @@ class TestMCPFunctionToolSerialization:
         ) as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.list_resources = AsyncMock(return_value=[])
-            mock_client.list_prompts = AsyncMock(return_value=[])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_class.return_value = mock_client
@@ -442,9 +400,38 @@ class TestMCPFunctionToolSerialization:
                 "type": "MCPFunctionTool",
                 "oi_span_type": "TOOL",
                 "mcp_config": {"mcpServers": {"test": {"command": "test"}}},
+                "function_name": "test_tool",
             }
 
             tool = await MCPFunctionTool.from_dict(data)
 
             assert isinstance(tool, MCPFunctionTool)
             assert tool.name == "RestoredMCPTool"
+            assert tool.function_name == "test_tool"
+
+    @pytest.mark.asyncio
+    async def test_to_dict_from_dict_roundtrip(self, mock_mcp_tool):
+        """Test that to_dict and from_dict are consistent."""
+        with patch(
+            "grafi.tools.functions.impl.mcp_function_tool.Client"
+        ) as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+
+            original = await MCPFunctionTool.initialize(
+                name="RoundtripTool",
+                mcp_config={"mcpServers": {"test": {"command": "test"}}},
+                function_name="test_tool",
+            )
+
+            data = original.to_dict()
+            restored = await MCPFunctionTool.from_dict(data)
+
+            assert restored.name == original.name
+            assert restored.function_name == original.function_name
+            assert restored.mcp_config == original.mcp_config
