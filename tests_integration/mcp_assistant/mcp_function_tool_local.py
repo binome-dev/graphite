@@ -120,7 +120,7 @@ async def test_mcp_function_tool_direct_invocation() -> None:
 
     # Create serialized input message
     # The message content should be JSON with the function arguments
-    # The message should have tool_calls to indicate it's a function call
+    # The function call is inferred from this assistant message and its JSON content
     input_kwargs = {"name": "Graphite"}
 
     input_message = Message(
