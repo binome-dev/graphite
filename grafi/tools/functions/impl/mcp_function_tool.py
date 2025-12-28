@@ -54,7 +54,7 @@ class MCPFunctionTool(FunctionTool):
         """
         mcp_tool = cls(**kwargs)
         mcp_tool.function = mcp_tool.invoke_mcp_function
-        await mcp_tool._get_function_specs()
+        await mcp_tool._get_function_spec()
 
         return mcp_tool
 
@@ -65,7 +65,7 @@ class MCPFunctionTool(FunctionTool):
         """
         return MCPFunctionToolBuilder(cls)
 
-    async def _get_function_specs(self) -> None:
+    async def _get_function_spec(self) -> None:
         if not self.mcp_config:
             raise ValueError("mcp_config are not set.")
 
