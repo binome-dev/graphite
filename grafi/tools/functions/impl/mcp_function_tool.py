@@ -104,11 +104,12 @@ class MCPFunctionTool(FunctionTool):
         Invoke the MCPFunctionTool with the provided input data.
 
         Args:
-            invoke_context (InvokeContext): The context for executing the function.
-            input_data (Message): The input data for the function.
+            input_data (Messages): The sequence of messages, where the last message
+                contains the JSON-encoded arguments for the MCP tool call.
 
         Returns:
-            List[Message]: The output messages from the function invoke.
+            AsyncGenerator[Messages, None]: An asynchronous generator yielding the
+                output messages produced by the MCP tool invocation.
         """
         input_message = input_data[-1]
 
