@@ -50,6 +50,10 @@ class FunctionTool(Tool):
     ) -> MsgsAGen:
         try:
             response = self.function(input_data)
+            if inspect.isasyncgen(response):
+                async for item in response:
+                    yield self.to_messages(response=item)
+                return
             if inspect.isawaitable(response):
                 response = await response
 

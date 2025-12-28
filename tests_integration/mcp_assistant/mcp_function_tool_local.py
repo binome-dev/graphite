@@ -10,15 +10,74 @@ Prerequisites:
 
 import asyncio
 import json
+import uuid
+from typing import Optional
 
-from openai.types.chat.chat_completion_message_tool_call import (
-    ChatCompletionMessageToolCall,
-    Function,
-)
+from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import Field
 
+from grafi.assistants.assistant import Assistant
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
+from grafi.nodes.node import Node
 from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+class MCPFunctionToolAssistant(Assistant):
+    """
+    A simple assistant class that uses OpenAI's language model to process input and generate responses.
+
+    This class sets up a workflow with a single MCPFunctionTool node using OpenAI's API, and provides a method
+    to run input through this workflow.
+
+    Attributes:
+        api_key (str): The API key for OpenAI. If not provided, it tries to use the OPENAI_API_KEY environment variable.
+        model (str): The name of the OpenAI model to use.
+        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
+    """
+
+    oi_span_type: OpenInferenceSpanKindValues = Field(
+        default=OpenInferenceSpanKindValues.AGENT
+    )
+    name: str = Field(default="MCPFunctionToolAssistant")
+    type: str = Field(default="MCPFunctionToolAssistant")
+    mcp_function_tool: Optional[MCPFunctionTool] = Field(default=None)
+
+    def _construct_workflow(self) -> "MCPFunctionToolAssistant":
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
+        # Create an LLM node
+        mcp_function_node = (
+            Node.builder()
+            .name("MCPFunctionNode")
+            .subscribe(agent_input_topic)
+            .tool(self.mcp_function_tool)
+            .publish_to(agent_output_topic)
+            .build()
+        )
+
+        # Create a workflow and add the LLM node
+        self.workflow = (
+            EventDrivenWorkflow.builder()
+            .name("MCPFunctionToolWorkflow")
+            .node(mcp_function_node)
+            .build()
+        )
+
+        return self
+
+
+def get_invoke_context() -> InvokeContext:
+    return InvokeContext(
+        conversation_id="conversation_id",
+        invoke_id=uuid.uuid4().hex,
+        assistant_request_id=uuid.uuid4().hex,
+    )
 
 
 async def test_mcp_function_tool_direct_invocation() -> None:
@@ -63,23 +122,16 @@ async def test_mcp_function_tool_direct_invocation() -> None:
     # The message should have tool_calls to indicate it's a function call
     input_kwargs = {"name": "Graphite"}
 
-    tool_call = ChatCompletionMessageToolCall(
-        id="call_test_123",
-        type="function",
-        function=Function(name="hello", arguments=json.dumps(input_kwargs)),
-    )
-
     input_message = Message(
         role="assistant",
         content=json.dumps(input_kwargs),  # kwargs as JSON in content
-        tool_calls=[tool_call],
     )
 
     print(f"Input message: {input_message}")
 
     # Invoke the MCP function
     results = []
-    async for result in mcp_tool.invoke_mcp_function([input_message]):
+    async for result in mcp_tool.function([input_message]):
         results.append(result)
 
     # Verify the response
@@ -92,7 +144,7 @@ async def test_mcp_function_tool_direct_invocation() -> None:
     print("Test passed!")
 
 
-async def test_mcp_function_tool_with_different_input() -> None:
+async def test_mcp_function_tool_in_assistant() -> None:
     """
     Test MCPFunctionTool with different input values.
     """
@@ -113,29 +165,30 @@ async def test_mcp_function_tool_with_different_input() -> None:
         .build()
     )
 
-    # Test with different name
-    input_kwargs = {"name": "World"}
+    mcp_assistant = MCPFunctionToolAssistant(mcp_function_tool=mcp_tool)
 
-    tool_call = ChatCompletionMessageToolCall(
-        id="call_test_456",
-        type="function",
-        function=Function(name="hello", arguments=json.dumps(input_kwargs)),
-    )
+    # Test with different name
+    input_kwargs = {"name": "Graphite"}
 
     input_message = Message(
         role="assistant",
         content=json.dumps(input_kwargs),
-        tool_calls=[tool_call],
+    )
+
+    input_data = PublishToTopicEvent(
+        invoke_context=get_invoke_context(),
+        data=[input_message],
     )
 
     results = []
-    async for result in mcp_tool.invoke_mcp_function([input_message]):
+    async for result in mcp_assistant.invoke(input_data):
         results.append(result)
 
-    assert len(results) == 1
-    assert "Hello, World!" in results[0]
     print(f"Response: {results[0]}")
     print("Test with different input passed!")
+
+    assert len(results) == 1
+    assert "Hello, Graphite!" in results[0].data[0].content
 
 
 async def test_mcp_function_tool_serialization_roundtrip() -> None:
@@ -172,24 +225,18 @@ async def test_mcp_function_tool_serialization_roundtrip() -> None:
 
     # Verify the restored tool still works
     input_kwargs = {"name": "Restored"}
-    tool_call = ChatCompletionMessageToolCall(
-        id="call_test_789",
-        type="function",
-        function=Function(name="hello", arguments=json.dumps(input_kwargs)),
-    )
 
     input_message = Message(
         role="assistant",
         content=json.dumps(input_kwargs),
-        tool_calls=[tool_call],
     )
 
     results = []
-    async for result in restored_tool.invoke_mcp_function([input_message]):
+    async for result in restored_tool.function([input_message]):
         results.append(result)
 
-    assert "Hello, Restored!" in results[0]
     print(f"Restored tool response: {results[0]}")
+    assert "Hello, Restored!" in results[0]
     print("Restored tool invocation passed!")
 
 
@@ -209,7 +256,7 @@ async def run_all_tests() -> None:
     print("\n" + "-" * 60)
     print("Test 2: Different Input")
     print("-" * 60)
-    await test_mcp_function_tool_with_different_input()
+    await test_mcp_function_tool_in_assistant()
 
     print("\n" + "-" * 60)
     print("Test 3: Serialization Roundtrip")

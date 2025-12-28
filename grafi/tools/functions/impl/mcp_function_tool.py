@@ -53,9 +53,8 @@ class MCPFunctionTool(FunctionTool):
         Initialize the MCPFunctionTool with the given keyword arguments.
         """
         mcp_tool = cls(**kwargs)
-        await mcp_tool._get_function_specs()
-
         mcp_tool.function = mcp_tool.invoke_mcp_function
+        await mcp_tool._get_function_specs()
 
         return mcp_tool
 
@@ -112,9 +111,6 @@ class MCPFunctionTool(FunctionTool):
             List[Message]: The output messages from the function invoke.
         """
         input_message = input_data[-1]
-        if input_message.tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
 
         kwargs = json.loads(input_message.content)
 

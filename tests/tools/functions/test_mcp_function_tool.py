@@ -195,21 +195,9 @@ class TestMCPFunctionToolInvokeMcpFunction:
                 function_name="test_tool",
             )
 
-            # Create input message with tool call and content containing kwargs
-            from openai.types.chat.chat_completion_message_tool_call import (
-                ChatCompletionMessageToolCall,
-            )
-            from openai.types.chat.chat_completion_message_tool_call import Function
-
-            tool_call = ChatCompletionMessageToolCall(
-                id="call_123",
-                type="function",
-                function=Function(name="test_tool", arguments="{}"),
-            )
             input_message = Message(
                 role="assistant",
                 content=json.dumps({"query": "test query"}),
-                tool_calls=[tool_call],
             )
 
             results = []
@@ -218,33 +206,6 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
             assert len(results) == 1
             assert "Search result for query" in results[0]
-
-    @pytest.mark.asyncio
-    async def test_invoke_mcp_function_raises_error_without_tool_calls(
-        self, mock_mcp_tool
-    ):
-        """Test invoke_mcp_function raises error when no tool_calls in message."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
-            tool = await MCPFunctionTool.initialize(
-                mcp_config={"mcpServers": {"test": {"command": "test"}}},
-                function_name="test_tool",
-            )
-
-            input_message = Message(role="user", content="{}")
-
-            with pytest.raises(ValueError, match="Function call is None"):
-                async for _ in tool.invoke_mcp_function([input_message]):
-                    pass
 
     @pytest.mark.asyncio
     async def test_invoke_mcp_function_handles_image_content(self, mock_mcp_tool):
@@ -276,19 +237,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
                 function_name="test_tool",
             )
 
-            from openai.types.chat.chat_completion_message_tool_call import (
-                ChatCompletionMessageToolCall,
-            )
-            from openai.types.chat.chat_completion_message_tool_call import Function
-
-            tool_call = ChatCompletionMessageToolCall(
-                id="call_456",
-                type="function",
-                function=Function(name="test_tool", arguments="{}"),
-            )
-            input_message = Message(
-                role="assistant", content="{}", tool_calls=[tool_call]
-            )
+            input_message = Message(role="assistant", content="{}")
 
             results = []
             async for result in tool.invoke_mcp_function([input_message]):
@@ -331,19 +280,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
                 function_name="test_tool",
             )
 
-            from openai.types.chat.chat_completion_message_tool_call import (
-                ChatCompletionMessageToolCall,
-            )
-            from openai.types.chat.chat_completion_message_tool_call import Function
-
-            tool_call = ChatCompletionMessageToolCall(
-                id="call_789",
-                type="function",
-                function=Function(name="test_tool", arguments="{}"),
-            )
-            input_message = Message(
-                role="assistant", content="{}", tool_calls=[tool_call]
-            )
+            input_message = Message(role="assistant", content="{}")
 
             results = []
             async for result in tool.invoke_mcp_function([input_message]):
