@@ -35,7 +35,7 @@ class MCPFunctionTool(FunctionTool):
     MCPFunctionTool extends FunctionTool to provide functionality using the MCP API.
     """
 
-    # Set up API key and MCP client
+    # Class attributes for MCPFunctionTool configuration and behavior
     name: str = "MCPFunctionTool"
     type: str = "MCPFunctionTool"
 
