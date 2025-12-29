@@ -23,6 +23,11 @@ async def async_dummy_function(messages: Messages):
     return DummyOutput(value=99)
 
 
+async def async_generator_function(messages: Messages):
+    for i in range(3):
+        yield DummyOutput(value=i)
+
+
 def list_output_function(messages: Messages):
     return [DummyOutput(value=1), DummyOutput(value=2)]
 
@@ -76,6 +81,21 @@ async def test_invoke_with_async_function(invoke_context):
         messages.extend(msg)
     assert isinstance(messages[0], Message)
     assert "99" in messages[0].content
+
+
+@pytest.mark.asyncio
+async def test_invoke_with_async_generator_function(invoke_context):
+    tool = FunctionTool.builder().function(async_generator_function).build()
+    input_messages = [Message(role="user", content="test")]
+    messages = []
+    async for msg in tool.invoke(invoke_context, input_messages):
+        messages.extend(msg)
+    assert len(messages) == 3
+    for i, msg in enumerate(messages):
+        assert isinstance(msg, Message)
+        assert msg.role == "assistant"
+        content = json.loads(msg.content)
+        assert content["value"] == i
 
 
 @pytest.mark.asyncio

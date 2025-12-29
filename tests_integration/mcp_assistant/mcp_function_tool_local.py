@@ -52,7 +52,8 @@ class MCPFunctionToolAssistant(Assistant):
     def _construct_workflow(self) -> "MCPFunctionToolAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        # Create an LLM node
+
+        # Create a MCP function node
         mcp_function_node = (
             Node.builder()
             .name("MCPFunctionNode")
@@ -62,7 +63,7 @@ class MCPFunctionToolAssistant(Assistant):
             .build()
         )
 
-        # Create a workflow and add the LLM node
+        # Create a workflow and add the MCP function node
         self.workflow = (
             EventDrivenWorkflow.builder()
             .name("MCPFunctionToolWorkflow")
