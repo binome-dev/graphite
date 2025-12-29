@@ -1,96 +1,92 @@
+#!/usr/bin/env python
+"""Run all integration tests by executing run_*.py scripts in each subfolder."""
+
 import argparse
 import io
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 
-def run_scripts_in_directory(ci_only: bool = True, pass_local: bool = True) -> None:
-    # Path to the current Python interpreter in the active virtual environment
-    python_executable = sys.executable
+def run_all_scripts(pass_local: bool = True) -> int:
+    """Run all run_*.py scripts in subdirectories.
 
-    # Get the directory of the current script
+    Args:
+        pass_local: If True, pass --no-pass-local flag is NOT used (skip local tests).
+                   If False, include local/ollama tests.
+
+    Returns:
+        Exit code (0 for success, 1 for failure).
+    """
+    python_executable = sys.executable
     current_directory = Path(__file__).parent
 
-    # Find all Python example files in subdirectories
-    file_list = {}
-    for root, subdir, _ in os.walk(current_directory):
-        for folder in subdir:
-            for _, _, files in os.walk(current_directory / folder):
-                for f in files:
-                    if f.endswith("_example.py"):
-                        # Store the relative path to maintain proper invoke context
-                        rel_path = current_directory / folder / f
+    # Find all run_*.py scripts in subdirectories
+    run_scripts = sorted(current_directory.glob("*/run_*.py"))
 
-                        if folder not in file_list:
-                            file_list[folder] = [rel_path]
-                        else:
-                            file_list[folder].append(rel_path)
+    passed_folders = []
+    failed_folders = {}
 
-    passed_scripts = []
-    failed_scripts = {}
-
-    for key, value in file_list.items():
-        for file in value:
-            if "ollama" in str(file) and pass_local:
-                continue
-
-            print(f"Will run {key} -- {file}")
+    print(f"Found {len(run_scripts)} test runners:")
+    for script in run_scripts:
+        print(f"  - {script.parent.name}/{script.name}")
+    print()
 
     # Run each script
-    for key, value in file_list.items():
-        print(f"Running scripts in folder: {key}")
-        for file in value:
-            if "ollama" in str(file) and pass_local:
-                continue
+    for script in run_scripts:
+        folder_name = script.parent.name
+        print(f"{'=' * 60}")
+        print(f"Running tests in: {folder_name}")
+        print(f"{'=' * 60}")
 
-            file_path = os.path.join(current_directory, file)
-            try:
-                print(f"Running {file} with {python_executable}...")
-                result = subprocess.run(
-                    [python_executable, file_path],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                print(f"Output of {file}:\n{result.stdout}")
-                passed_scripts.append(file)
-            except subprocess.CalledProcessError as e:
-                print(f"Error running {file}:\n{e.stderr}")
-                failed_scripts[file] = e.stderr
+        cmd = [python_executable, str(script)]
+        if not pass_local:
+            cmd.append("--no-pass-local")
 
-    # Summary of invoke
-    print("\nSummary of invoke:")
-    print("Passed scripts:")
-    for script in passed_scripts:
-        print(f" - {script}")
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=script.parent,
+            )
+            print(result.stdout)
+            passed_folders.append(folder_name)
+        except subprocess.CalledProcessError as e:
+            print(f"Output:\n{e.stdout}")
+            print(f"Error:\n{e.stderr}")
+            failed_folders[folder_name] = e.stderr
 
-    if failed_scripts:
-        print("\nFailed scripts:")
-        for script, error in failed_scripts.items():
-            print(f" - {script}")  #: {error}")
+    # Summary
+    print("\n" + "=" * 60)
+    print("FINAL SUMMARY")
+    print("=" * 60)
+    print(f"\nPassed folders: {len(passed_folders)}")
+    for folder in passed_folders:
+        print(f"  ✓ {folder}")
+
+    if failed_folders:
+        print(f"\nFailed folders: {len(failed_folders)}")
+        for folder in failed_folders:
+            print(f"  ✗ {folder}")
+        return 1
+
+    print("\nAll integration tests passed!")
+    return 0
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run scripts with specified flags.")
-
-    # By default, pass_local=True. If user provides --no-pass-local, it sets it to False.
+    parser = argparse.ArgumentParser(description="Run all integration tests.")
     parser.add_argument(
         "--no-pass-local",
         dest="pass_local",
         action="store_false",
-        help="Disable pass_local. Default is True.",
+        help="Include local/ollama tests (default: skip them).",
     )
-
-    # Set the defaults here so if the user doesn't provide the flags,
-    # ci_only and pass_local remain True
-    parser.set_defaults(ci_only=True, pass_local=True)
-
+    parser.set_defaults(pass_local=True)
     args = parser.parse_args()
 
-    # Now pass those values to your function
-    run_scripts_in_directory(ci_only=args.ci_only, pass_local=args.pass_local)
+    sys.exit(run_all_scripts(pass_local=args.pass_local))
