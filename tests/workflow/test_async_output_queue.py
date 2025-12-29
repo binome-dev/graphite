@@ -270,7 +270,6 @@ class TestAsyncOutputQueue:
         assert len(collected) == 3
         assert all(isinstance(e, PublishToTopicEvent) for e in collected)
 
-
     @pytest.mark.asyncio
     async def test_anext_waits_for_activity_count_stabilization(self):
         """
