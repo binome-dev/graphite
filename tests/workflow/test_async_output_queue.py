@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import Mock
 
 import pytest
 
@@ -268,3 +269,147 @@ class TestAsyncOutputQueue:
         # Should have collected all events
         assert len(collected) == 3
         assert all(isinstance(e, PublishToTopicEvent) for e in collected)
+
+
+    @pytest.mark.asyncio
+    async def test_anext_waits_for_activity_count_stabilization(self):
+        """
+        Test that __anext__ doesn't prematurely terminate when activity count changes.
+
+        This tests the race condition fix where the output queue could terminate
+        before downstream nodes finish processing.
+        """
+        tracker = AsyncNodeTracker()
+
+        output_queue = AsyncOutputQueue(
+            output_topics=[],  # Empty - we'll put events directly in queue
+            consumer_name="test_consumer",
+            tracker=tracker,
+        )
+
+        # Simulate: node enters, adds item to queue, leaves
+        # Then another node should enter before we terminate
+
+        async def simulate_node_activity():
+            """Simulate node activity that should prevent premature termination."""
+            # First node processes
+            await tracker.enter("node_1")
+            await output_queue.queue.put(Mock(name="event_1"))
+            await tracker.leave("node_1")
+
+            # Yield control - simulates realistic timing where next node
+            # starts within the same event loop cycle
+            await asyncio.sleep(0)
+
+            # Second node picks up and processes
+            await tracker.enter("node_2")
+            await output_queue.queue.put(Mock(name="event_2"))
+            await tracker.leave("node_2")
+
+        # Start the activity simulation
+        activity_task = asyncio.create_task(simulate_node_activity())
+
+        # Iterate over the queue
+        events = []
+        async for event in output_queue:
+            events.append(event)
+            if len(events) >= 2:
+                break
+
+        await activity_task
+
+        # Should have received both events
+        assert len(events) == 2
+
+    @pytest.mark.asyncio
+    async def test_anext_terminates_when_truly_idle(self):
+        """
+        Test that __anext__ correctly terminates when no more activity.
+        """
+        tracker = AsyncNodeTracker()
+
+        output_queue = AsyncOutputQueue(
+            output_topics=[],  # Empty - we'll put events directly in queue
+            consumer_name="test_consumer",
+            tracker=tracker,
+        )
+
+        # Single node processes and finishes
+        async def simulate_single_node():
+            await tracker.enter("node_1")
+            await output_queue.queue.put(Mock(name="event_1"))
+            await tracker.leave("node_1")
+
+        activity_task = asyncio.create_task(simulate_single_node())
+
+        events = []
+        async for event in output_queue:
+            events.append(event)
+
+        await activity_task
+
+        # Should terminate after receiving the single event
+        assert len(events) == 1
+
+    @pytest.mark.asyncio
+    async def test_activity_count_prevents_premature_exit(self):
+        """
+        Test specifically that activity count tracking prevents race condition.
+
+        Scenario:
+        1. Node A finishes and tracker goes idle
+        2. __anext__ sees idle but activity count changed
+        3. Node B starts before __anext__ decides to terminate
+        4. All events are properly yielded
+        """
+        tracker = AsyncNodeTracker()
+
+        output_queue = AsyncOutputQueue(
+            output_topics=[],  # Empty - we'll put events directly in queue
+            consumer_name="test_consumer",
+            tracker=tracker,
+        )
+
+        events_received = []
+        iteration_complete = asyncio.Event()
+
+        async def consumer():
+            async for event in output_queue:
+                events_received.append(event)
+            iteration_complete.set()
+
+        async def producer():
+            # Node A processes
+            await tracker.enter("node_a")
+            await output_queue.queue.put(Mock(name="event_a"))
+            await tracker.leave("node_a")
+
+            # Critical timing window - yield to let consumer check idle state
+            await asyncio.sleep(0)
+
+            # Node B starts before consumer terminates (if fix works)
+            await tracker.enter("node_b")
+            await output_queue.queue.put(Mock(name="event_b"))
+            await tracker.leave("node_b")
+
+        consumer_task = asyncio.create_task(consumer())
+        producer_task = asyncio.create_task(producer())
+
+        # Wait for producer to finish
+        await producer_task
+
+        # Wait a bit for consumer to process
+        try:
+            await asyncio.wait_for(iteration_complete.wait(), timeout=1.0)
+        except asyncio.TimeoutError:
+            consumer_task.cancel()
+            try:
+                await consumer_task
+            except asyncio.CancelledError:
+                pass
+
+        # With the fix, we should receive both events
+        assert len(events_received) == 2, (
+            f"Expected 2 events but got {len(events_received)}. "
+            "Race condition may have caused premature termination."
+        )

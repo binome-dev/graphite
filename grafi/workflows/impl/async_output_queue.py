@@ -1,5 +1,4 @@
 import asyncio
-from typing import AsyncGenerator
 from typing import List
 
 from grafi.common.events.topic_events.topic_event import TopicEvent
@@ -84,8 +83,9 @@ class AsyncOutputQueue:
             for t in pending:
                 t.cancel()
 
-    def __aiter__(self) -> AsyncGenerator[TopicEvent, None]:
+    def __aiter__(self) -> "AsyncOutputQueue":
         """Make AsyncOutputQueue async iterable."""
+        self._last_activity_count = 0
         return self
 
     async def __anext__(self) -> TopicEvent:
@@ -114,4 +114,8 @@ class AsyncOutputQueue:
             await asyncio.sleep(0)  # one event‑loop tick
 
             if self.tracker.is_idle() and self.queue.empty():
-                raise StopAsyncIteration
+                current_activity = self.tracker.get_activity_count()
+                # Only terminate if no new activity since last check
+                if current_activity == self._last_activity_count:
+                    raise StopAsyncIteration
+                self._last_activity_count = current_activity
