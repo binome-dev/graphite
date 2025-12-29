@@ -84,10 +84,11 @@ jobs:
           echo "### Unit Test Results (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
           echo "Tests completed for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
 
-  integration-tests:
-    name: Run Integration Tests
+  # Integration tests running in parallel
+  integration-agents:
+    name: Integration - agents
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -106,20 +107,491 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run Integration Test ALL
+      - name: Run Integration Tests - agents
         run: |
           set -e
-          output=$(uv run python tests_integration/run_all.py)
+          output=$(uv run python tests_integration/agents/run_agents.py)
           echo "$output"
-
-          # Check if there are any failed tests
-          if echo "$output" | grep -q "Failed scripts:"; then
-            echo "### Integration Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "❌ Integration tests failed! Check the output above for details." >> $GITHUB_STEP_SUMMARY
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - agents" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
-            echo "### Integration Test Results" >> $GITHUB_STEP_SUMMARY
-            echo "✅ All integration tests passed!" >> $GITHUB_STEP_SUMMARY
+            echo "### Integration Test Results - agents" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-embedding-assistant:
+    name: Integration - embedding_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - embedding_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/embedding_assistant/run_embedding_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - embedding_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - embedding_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-function-assistant:
+    name: Integration - function_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - function_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/function_assistant/run_function_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - function_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - function_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-function-call-assistant:
+    name: Integration - function_call_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - function_call_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/function_call_assistant/run_function_call_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - function_call_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - function_call_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-hith-assistant:
+    name: Integration - hith_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - hith_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/hith_assistant/run_hith_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - hith_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - hith_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-input-output-topics:
+    name: Integration - input_output_topics
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - input_output_topics
+        run: |
+          set -e
+          output=$(uv run python tests_integration/input_output_topics/run_input_output_topics.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - input_output_topics" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - input_output_topics" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-invoke-kwargs:
+    name: Integration - invoke_kwargs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - invoke_kwargs
+        run: |
+          set -e
+          output=$(uv run python tests_integration/invoke_kwargs/run_invoke_kwargs.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - invoke_kwargs" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - invoke_kwargs" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-multimodal-assistant:
+    name: Integration - multimodal_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - multimodal_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/multimodal_assistant/run_multimodal_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - multimodal_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - multimodal_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-rag-assistant:
+    name: Integration - rag_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - rag_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/rag_assistant/run_rag_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - rag_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - rag_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-react-assistant:
+    name: Integration - react_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - react_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/react_assistant/run_react_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - react_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - react_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-simple-llm-assistant:
+    name: Integration - simple_llm_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - simple_llm_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/simple_llm_assistant/run_simple_llm_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - simple_llm_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - simple_llm_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  integration-simple-stream-assistant:
+    name: Integration - simple_stream_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - simple_stream_assistant
+        run: |
+          set -e
+          output=$(uv run python tests_integration/simple_stream_assistant/run_simple_stream_assistant.py)
+          echo "$output"
+          if echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - simple_stream_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - simple_stream_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
           fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -137,7 +609,18 @@ jobs:
     needs:
       - code-quality
       - unit-tests
-      - integration-tests
+      - integration-agents
+      - integration-embedding-assistant
+      - integration-function-assistant
+      - integration-function-call-assistant
+      - integration-hith-assistant
+      - integration-input-output-topics
+      - integration-invoke-kwargs
+      - integration-multimodal-assistant
+      - integration-rag-assistant
+      - integration-react-assistant
+      - integration-simple-llm-assistant
+      - integration-simple-stream-assistant
 
     outputs:
       package-version: ${{ steps.package-version.outputs.VERSION }}

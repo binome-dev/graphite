@@ -36,7 +36,7 @@ except (ImportError, ModuleNotFoundError):
 
 class MCPTool(FunctionCallTool):
     """
-    MCPTool extends FunctionCallTool to provide web search functionality using the MCP API.
+    MCPTool extends FunctionCallTool to provide functionality using the MCP API.
     """
 
     # Set up API key and MCP client
