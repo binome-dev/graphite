@@ -87,12 +87,7 @@ class AsyncOutputQueue:
         check_count = 0
         while True:
             check_count += 1
-            if check_count % 20 == 0:  # Log every ~10 seconds (20 * 0.5s)
-                logger.debug(
-                    f"AsyncOutputQueue: still waiting - "
-                    f"queue_empty={self.queue.empty()}, "
-                    f"tracker_metrics={self.tracker.get_metrics()}"
-                )
+
             # Fast path: queue has items
             if not self.queue.empty():
                 try:
@@ -127,6 +122,7 @@ class AsyncOutputQueue:
                 try:
                     return queue_task.result()
                 except asyncio.QueueEmpty:
+                    # Task was cancelled as part of normal cleanup; ignore.
                     continue
 
             # Quiescence or force stop detected

@@ -238,7 +238,7 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
-        published_events = await publish_events(node, publish_to_event, tracker=tracker)
+        published_events = await publish_events(node, publish_to_event, tracker)
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
