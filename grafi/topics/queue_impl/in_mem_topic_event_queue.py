@@ -68,9 +68,9 @@ class InMemTopicEventQueue(TopicEventQueue):
             # If timeout is 0 or None and no data, return immediately
             while not await self.can_consume(consumer_id):
                 try:
-                    # logger.debug(
-                    #     f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
-                    # )
+                    logger.debug(
+                        f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
+                    )
                     await asyncio.wait_for(self._cond.wait(), timeout)
                 except asyncio.TimeoutError:
                     return []
