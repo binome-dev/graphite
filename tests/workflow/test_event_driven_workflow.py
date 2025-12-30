@@ -1,5 +1,7 @@
 import asyncio
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -373,7 +375,9 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
-        with patch("grafi.workflows.impl.event_driven_workflow.container") as mock_container:
+        with patch(
+            "grafi.workflows.impl.event_driven_workflow.container"
+        ) as mock_container:
             mock_event_store = Mock()
             mock_event_store.get_agent_events = AsyncMock(return_value=[])
             mock_event_store.record_events = AsyncMock()

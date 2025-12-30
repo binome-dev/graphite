@@ -10,8 +10,9 @@ from pathlib import Path
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", write_through=True)
-
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", write_through=True
+    )
 
 
 def run_scripts(pass_local: bool = True, collect: bool = False):

@@ -12,8 +12,9 @@ from textwrap import indent
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", write_through=True)
-
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", write_through=True
+    )
 
 
 def _load_runner_module(script: Path):
@@ -62,7 +63,9 @@ def run_all_scripts(pass_local: bool = True) -> int:
 
         try:
             runner_module = _load_runner_module(script)
-            runner_results = runner_module.run_scripts(pass_local=pass_local, collect=True)
+            runner_results = runner_module.run_scripts(
+                pass_local=pass_local, collect=True
+            )
         except Exception as exc:  # noqa: BLE001
             example_rel = script.relative_to(repo_root)
             error_message = f"Runner failed before executing examples: {exc}"

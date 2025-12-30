@@ -1,4 +1,7 @@
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,6 +11,7 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
 from grafi.nodes.node_base import NodeBase
 
+
 if TYPE_CHECKING:
     from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
@@ -15,7 +19,7 @@ if TYPE_CHECKING:
 def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     """
     Process a list of TopicEvents, grouping by name and aggregating streaming messages.
-    
+
     NO CHANGES NEEDED - this is read-only aggregation.
     """
     # Group events by name
@@ -80,12 +84,12 @@ async def publish_events(
 ) -> List[PublishToTopicEvent]:
     """
     Publish events to all topics the node publishes to.
-    
+
     CHANGE: Added optional tracker parameter.
     When provided, notifies tracker of published messages.
     """
     published_events: List[PublishToTopicEvent] = []
-    
+
     for topic in node.publish_to:
         event = await topic.publish_data(publish_event)
         if event:
@@ -101,7 +105,7 @@ async def publish_events(
 async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
     """
     Get input events for a node from its subscribed topics.
-    
+
     NO CHANGES NEEDED - consumption tracking happens at commit time.
     """
     consumed_events: List[ConsumeFromTopicEvent] = []
@@ -130,18 +134,19 @@ async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
 # Alternative: Wrapper approach if you can't modify function signatures
 # =============================================================================
 
+
 class TrackedPublisher:
     """
     Wrapper that adds tracking to publish_events without changing its signature.
-    
+
     Usage:
         publisher = TrackedPublisher(tracker)
         events = await publisher.publish(node, event)
     """
-    
+
     def __init__(self, tracker: "AsyncNodeTracker"):
         self.tracker = tracker
-    
+
     async def publish(
         self,
         node: NodeBase,
@@ -149,13 +154,13 @@ class TrackedPublisher:
     ) -> List[PublishToTopicEvent]:
         """Publish with automatic tracking."""
         published_events: List[PublishToTopicEvent] = []
-        
+
         for topic in node.publish_to:
             event = await topic.publish_data(publish_event)
             if event:
                 published_events.append(event)
-        
+
         if published_events:
             self.tracker.on_messages_published(len(published_events))
-        
+
         return published_events

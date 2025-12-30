@@ -3,7 +3,9 @@
 # ──────────────────────────────────────────────────────────────────────────────
 import asyncio
 from collections import defaultdict
-from typing import Dict, Optional, Set
+from typing import Dict
+from typing import Optional
+from typing import Set
 
 from loguru import logger
 
@@ -11,19 +13,19 @@ from loguru import logger
 class AsyncNodeTracker:
     """
     Central tracker for workflow activity and quiescence detection.
-    
+
     Design: All tracking calls come from the ORCHESTRATOR layer,
     not from TopicBase. This keeps topics as pure message queues.
-    
+
     Quiescence = (no active nodes) AND (no uncommitted messages) AND (work done)
-    
+
     Usage in workflow:
         # In publish_events():
         tracker.on_messages_published(len(published_events))
-        
+
         # In _commit_events():
         tracker.on_messages_committed(len(events))
-        
+
         # In node processing:
         await tracker.enter(node_name)
         ... process ...
@@ -95,7 +97,9 @@ class AsyncNodeTracker:
         self._quiescence_event.clear()
         self._uncommitted_messages += count
 
-        logger.debug(f"Tracker: {count} messages published from {source} (uncommitted={self._uncommitted_messages})")
+        logger.debug(
+            f"Tracker: {count} messages published from {source} (uncommitted={self._uncommitted_messages})"
+        )
 
     def on_messages_committed(self, count: int = 1, source: str = "") -> None:
         """
@@ -137,7 +141,9 @@ class AsyncNodeTracker:
             f"is_quiescent={self.is_quiescent}"
         )
         if self.is_quiescent:
-            logger.info(f"Tracker: quiescence detected (committed={self._total_committed})")
+            logger.info(
+                f"Tracker: quiescence detected (committed={self._total_committed})"
+            )
             self._quiescence_event.set()
 
     @property

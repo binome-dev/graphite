@@ -11,7 +11,7 @@ from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 class AsyncOutputQueue:
     """
     Manages output topics and provides async iteration over output events.
-    
+
     Simplified: All quiescence detection delegated to AsyncNodeTracker.
     """
 
@@ -58,8 +58,12 @@ class AsyncOutputQueue:
                     await self.queue.put(event)
                 # Mark messages as committed when they reach the output queue
                 if events:
-                    logger.debug(f"Output listener: consumed {len(events)} events from {topic.name}")
-                    self.tracker.on_messages_committed(len(events), source=f"output_listener:{topic.name}")
+                    logger.debug(
+                        f"Output listener: consumed {len(events)} events from {topic.name}"
+                    )
+                    self.tracker.on_messages_committed(
+                        len(events), source=f"output_listener:{topic.name}"
+                    )
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
