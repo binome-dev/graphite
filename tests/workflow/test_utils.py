@@ -1,5 +1,4 @@
-from unittest.mock import AsyncMock
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,9 +11,11 @@ from grafi.common.models.message import Message
 from grafi.nodes.node import Node
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_types import TopicType
-from grafi.workflows.impl.utils import get_async_output_events
-from grafi.workflows.impl.utils import get_node_input
-from grafi.workflows.impl.utils import publish_events
+from grafi.workflows.impl.utils import (
+    get_async_output_events,
+    get_node_input,
+    publish_events,
+)
 
 
 class TestGetAsyncOutputEvents:
@@ -200,6 +201,7 @@ class TestPublishEvents:
         # Mock node and topics
         mock_topic1 = AsyncMock(spec=TopicBase)
         mock_topic2 = AsyncMock(spec=TopicBase)
+        tracker = MagicMock()
 
         node = MagicMock(spec=Node)
         node.name = "test_node"
@@ -237,13 +239,14 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
-        published_events = await publish_events(node, publish_to_event)
+        published_events = await publish_events(node, publish_to_event, tracker=tracker)
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
 
         # Verify topics were called correctly
         mock_topic1.publish_data.assert_called_once_with(publish_to_event)
+        tracker.on_messages_published.assert_called_once_with(1, source="node:test_node")
 
 
 class TestGetNodeInput:

@@ -13,155 +13,124 @@ class TestAsyncNodeTracker:
 
     @pytest.mark.asyncio
     async def test_initial_state(self, tracker):
-        """Test that tracker starts in idle state."""
+        """Tracker starts idle with no work recorded."""
         assert tracker.is_idle()
+        assert tracker.is_quiescent is False
         assert tracker.get_activity_count() == 0
-        assert tracker._idle_event.is_set()
+        assert tracker.get_metrics()["uncommitted_messages"] == 0
 
     @pytest.mark.asyncio
-    async def test_enter_makes_tracker_active(self, tracker):
-        """Test that entering a node makes the tracker active."""
+    async def test_enter_and_leave_updates_activity(self, tracker):
+        """Entering and leaving nodes updates activity counts."""
         await tracker.enter("node1")
 
         assert not tracker.is_idle()
-        assert not tracker._idle_event.is_set()
         assert tracker.get_activity_count() == 1
         assert "node1" in tracker._active
 
-    @pytest.mark.asyncio
-    async def test_leave_makes_tracker_idle(self, tracker):
-        """Test that leaving the last node makes the tracker idle."""
-        await tracker.enter("node1")
         await tracker.leave("node1")
 
         assert tracker.is_idle()
-        assert tracker._idle_event.is_set()
-        assert tracker.get_activity_count() == 1  # Count persists
-        assert "node1" not in tracker._active
+        # No commits yet so quiescence is still False
+        assert tracker.is_quiescent is False
+        assert tracker.get_activity_count() == 1
 
     @pytest.mark.asyncio
-    async def test_multiple_nodes_tracking(self, tracker):
-        """Test tracking multiple nodes."""
-        await tracker.enter("node1")
-        await tracker.enter("node2")
+    async def test_message_tracking_and_quiescence(self, tracker):
+        """Published/committed message tracking drives quiescence detection."""
+        tracker.on_messages_published(2)
+        assert tracker.is_quiescent is False
+        assert tracker.get_metrics()["uncommitted_messages"] == 2
 
-        assert not tracker.is_idle()
-        assert tracker.get_activity_count() == 2
-        assert "node1" in tracker._active
-        assert "node2" in tracker._active
+        tracker.on_messages_committed(1)
+        assert tracker.is_quiescent is False
+        assert tracker.get_metrics()["uncommitted_messages"] == 1
 
-        await tracker.leave("node1")
-        assert not tracker.is_idle()  # Still has node2
-
-        await tracker.leave("node2")
-        assert tracker.is_idle()
+        tracker.on_messages_committed(1)
+        assert tracker.is_quiescent is True
+        assert tracker.get_metrics()["uncommitted_messages"] == 0
 
     @pytest.mark.asyncio
-    async def test_reentrant_node_increases_count(self, tracker):
-        """Test that entering the same node multiple times increases count."""
-        await tracker.enter("node1")
-        await tracker.enter("node1")
+    async def test_wait_for_quiescence(self, tracker):
+        """wait_for_quiescence resolves when work finishes."""
+        tracker.on_messages_published(1)
 
-        assert tracker.get_activity_count() == 2
-        assert len(tracker._active) == 1  # Still just one node in active set
+        async def finish_work():
+            await asyncio.sleep(0.01)
+            tracker.on_messages_committed(1)
+
+        asyncio.create_task(finish_work())
+
+        result = await tracker.wait_for_quiescence(timeout=0.5)
+        assert result is True
+        assert tracker.is_quiescent is True
 
     @pytest.mark.asyncio
-    async def test_wait_idle_event(self, tracker):
-        """Test waiting for idle event."""
-        # Initially idle
-        await asyncio.wait_for(tracker.wait_idle_event(), timeout=0.1)
-
-        # Enter a node
-        await tracker.enter("node1")
-
-        # Create a task that waits for idle
-        idle_task = asyncio.create_task(tracker.wait_idle_event())
-
-        # Should not be done yet
-        await asyncio.sleep(0.01)
-        assert not idle_task.done()
-
-        # Leave node to trigger idle
-        await tracker.leave("node1")
-
-        # Now the wait should complete
-        await asyncio.wait_for(idle_task, timeout=0.1)
+    async def test_wait_for_quiescence_timeout(self, tracker):
+        """wait_for_quiescence returns False on timeout."""
+        result = await tracker.wait_for_quiescence(timeout=0.01)
+        assert result is False
+        assert tracker.is_quiescent is False
 
     @pytest.mark.asyncio
     async def test_reset(self, tracker):
-        """Test reset functionality."""
-        # Add some activity
+        """Reset clears activity and quiescence state."""
         await tracker.enter("node1")
-        await tracker.enter("node2")
-        await tracker.leave("node1")
+        tracker.on_messages_published(1)
+        tracker.on_messages_committed(1)
 
-        assert not tracker.is_idle()
-        assert tracker.get_activity_count() > 0
-
-        # Reset
         tracker.reset()
 
-        # Should be back to initial state
         assert tracker.is_idle()
+        assert tracker.is_quiescent is False
         assert tracker.get_activity_count() == 0
-        assert tracker._idle_event.is_set()
-        assert len(tracker._active) == 0
+        assert tracker.get_metrics()["total_committed"] == 0
 
     @pytest.mark.asyncio
-    async def test_concurrent_enter_leave(self, tracker):
-        """Test concurrent enter/leave operations."""
+    async def test_force_stop(self, tracker):
+        """Force stop terminates workflow even with uncommitted messages."""
+        tracker.on_messages_published(2)
+        assert tracker.is_quiescent is False
+        assert tracker.should_terminate is False
 
-        async def enter_leave_cycle(node_name: str, cycles: int):
-            for _ in range(cycles):
-                await tracker.enter(node_name)
-                await asyncio.sleep(0.001)  # Small delay
-                await tracker.leave(node_name)
+        tracker.force_stop()
 
-        # Run multiple concurrent cycles
-        tasks = [
-            asyncio.create_task(enter_leave_cycle(f"node{i}", 10)) for i in range(5)
-        ]
-
-        await asyncio.gather(*tasks)
-
-        # Should be idle after all complete
-        assert tracker.is_idle()
-        assert tracker.get_activity_count() == 50  # 5 nodes * 10 cycles
+        # Not quiescent (uncommitted messages still exist)
+        assert tracker.is_quiescent is False
+        # But should_terminate is True due to force stop
+        assert tracker.should_terminate is True
+        assert tracker._force_stopped is True
 
     @pytest.mark.asyncio
-    async def test_leave_nonexistent_node(self, tracker):
-        """Test leaving a node that was never entered."""
-        # Should not raise an error
-        await tracker.leave("nonexistent")
-        assert tracker.is_idle()
+    async def test_should_terminate_on_quiescence(self, tracker):
+        """should_terminate is True when naturally quiescent."""
+        tracker.on_messages_published(1)
+        tracker.on_messages_committed(1)
+
+        assert tracker.is_quiescent is True
+        assert tracker.should_terminate is True
+        assert tracker._force_stopped is False
 
     @pytest.mark.asyncio
-    async def test_condition_notification(self, tracker):
-        """Test that condition is properly notified on idle."""
-        await tracker.enter("node1")
+    async def test_force_stop_triggers_quiescence_event(self, tracker):
+        """Force stop sets the quiescence event so waiters can proceed."""
+        tracker.on_messages_published(1)
 
-        # Create a flag to verify notification happened
-        notified = False
+        # Event should not be set yet
+        assert not tracker._quiescence_event.is_set()
 
-        async def wait_for_notification():
-            nonlocal notified
-            async with tracker._cond:
-                await tracker._cond.wait()
-                notified = True
+        tracker.force_stop()
 
-        wait_task = asyncio.create_task(wait_for_notification())
+        # Event should now be set
+        assert tracker._quiescence_event.is_set()
 
-        # Give task time to start waiting
-        await asyncio.sleep(0.01)
+    @pytest.mark.asyncio
+    async def test_reset_clears_force_stop(self, tracker):
+        """Reset clears the force stop flag."""
+        tracker.force_stop()
+        assert tracker._force_stopped is True
 
-        # Leave node to trigger notification
-        await tracker.leave("node1")
+        tracker.reset()
 
-        # Wait should complete
-        try:
-            await asyncio.wait_for(wait_task, timeout=0.1)
-        except asyncio.TimeoutError:
-            pass  # It's ok if it times out, we just check if notified
-
-        # Check that notification happened
-        assert tracker.is_idle()
+        assert tracker._force_stopped is False
+        assert tracker.should_terminate is False

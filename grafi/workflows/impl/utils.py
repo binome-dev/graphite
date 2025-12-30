@@ -1,5 +1,4 @@
-from typing import Dict
-from typing import List
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -9,16 +8,15 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
 from grafi.nodes.node_base import NodeBase
 
+if TYPE_CHECKING:
+    from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
+
 
 def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
     """
     Process a list of TopicEvents, grouping by name and aggregating streaming messages.
-
-    Args:
-        events: List of TopicEvents to process
-
-    Returns:
-        List of processed TopicEvents with streaming messages aggregated
+    
+    NO CHANGES NEEDED - this is read-only aggregation.
     """
     # Group events by name
     events_by_topic: Dict[str, List[TopicEvent]] = {}
@@ -35,9 +33,7 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
         non_streaming_events: List[TopicEvent] = []
 
         for event in topic_events:
-            # Check if event.data contains streaming messages
             is_streaming_event = False
-            # Handle both single message and list of messages
             messages = event.data
             if messages and len(messages) > 0 and messages[0].is_streaming:
                 is_streaming_event = True
@@ -47,25 +43,18 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             else:
                 non_streaming_events.append(event)
 
-        # Add non-streaming events as-is
         output_events.extend(non_streaming_events)
 
-        # Aggregate streaming events if any exist
         if streaming_events:
-            # Use the first streaming event as the base for creating the aggregated event
             base_event = streaming_events[0]
-
-            # Aggregate content from all streaming messages
             aggregated_content_parts = []
             for event in streaming_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
                 for message in messages:
                     if message.content:
                         aggregated_content_parts.append(message.content)
-            aggregated_content = "".join(aggregated_content_parts)  # type: ignore[arg-type]
+            aggregated_content = "".join(aggregated_content_parts)
 
-            # Create a new message with aggregated content
-            # Copy properties from the first message but update content and streaming flag
             first_message = (
                 base_event.data
                 if isinstance(base_event.data, list)
@@ -74,40 +63,53 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
             aggregated_message = Message(
                 role=first_message.role,
                 content=aggregated_content,
-                is_streaming=False,  # Aggregated message is no longer streaming
+                is_streaming=False,
             )
 
-            # Create new event based on the base event type
             aggregated_event = base_event
             aggregated_event.data = [aggregated_message]
-
             output_events.append(aggregated_event)
 
     return output_events
 
 
 async def publish_events(
-    node: NodeBase, publish_event: PublishToTopicEvent
+    node: NodeBase,
+    publish_event: PublishToTopicEvent,
+    tracker: Optional["AsyncNodeTracker"] = None,  # NEW: Optional tracker
 ) -> List[PublishToTopicEvent]:
+    """
+    Publish events to all topics the node publishes to.
+    
+    CHANGE: Added optional tracker parameter.
+    When provided, notifies tracker of published messages.
+    """
     published_events: List[PublishToTopicEvent] = []
+    
     for topic in node.publish_to:
         event = await topic.publish_data(publish_event)
-
         if event:
             published_events.append(event)
+
+    # NEW: Notify tracker of published messages
+    if tracker and published_events:
+        tracker.on_messages_published(len(published_events), source=f"node:{node.name}")
 
     return published_events
 
 
 async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
+    """
+    Get input events for a node from its subscribed topics.
+    
+    NO CHANGES NEEDED - consumption tracking happens at commit time.
+    """
     consumed_events: List[ConsumeFromTopicEvent] = []
 
     node_subscribed_topics = node._subscribed_topics.values()
 
-    # Process each topic the node is subscribed to
     for subscribed_topic in node_subscribed_topics:
         if await subscribed_topic.can_consume(node.name):
-            # Get messages from topic and create consume events
             node_consumed_events = await subscribed_topic.consume(node.name)
             for event in node_consumed_events:
                 consumed_event = ConsumeFromTopicEvent(
@@ -122,3 +124,38 @@ async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
                 consumed_events.append(consumed_event)
 
     return consumed_events
+
+
+# =============================================================================
+# Alternative: Wrapper approach if you can't modify function signatures
+# =============================================================================
+
+class TrackedPublisher:
+    """
+    Wrapper that adds tracking to publish_events without changing its signature.
+    
+    Usage:
+        publisher = TrackedPublisher(tracker)
+        events = await publisher.publish(node, event)
+    """
+    
+    def __init__(self, tracker: "AsyncNodeTracker"):
+        self.tracker = tracker
+    
+    async def publish(
+        self,
+        node: NodeBase,
+        publish_event: PublishToTopicEvent,
+    ) -> List[PublishToTopicEvent]:
+        """Publish with automatic tracking."""
+        published_events: List[PublishToTopicEvent] = []
+        
+        for topic in node.publish_to:
+            event = await topic.publish_data(publish_event)
+            if event:
+                published_events.append(event)
+        
+        if published_events:
+            self.tracker.on_messages_published(len(published_events))
+        
+        return published_events
