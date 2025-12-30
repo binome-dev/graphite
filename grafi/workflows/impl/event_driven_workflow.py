@@ -79,7 +79,7 @@ class EventDrivenWorkflow(Workflow):
         Overrides base class to also trigger force stop on the tracker.
         """
         super().stop()
-        self._tracker.force_stop()
+        self._tracker.force_stop_sync()
 
     @classmethod
     def builder(cls) -> WorkflowBuilder:
@@ -237,7 +237,7 @@ class EventDrivenWorkflow(Workflow):
             logger.debug(
                 f"Committing {len(topic_events)} events for {consumer_name}, track_commit={track_commit}"
             )
-            self._tracker.on_messages_committed(
+            await self._tracker.on_messages_committed(
                 len(topic_events), source=f"commit:{consumer_name}"
             )
 
@@ -324,7 +324,7 @@ class EventDrivenWorkflow(Workflow):
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         invoke_context = input_data.invoke_context
         logger.debug(
-            f"invoke_parallel: tracker_id={id(self._tracker)}, metrics={self._tracker.get_metrics()}"
+            f"invoke_parallel: tracker_id={id(self._tracker)}, metrics={await self._tracker.get_metrics()}"
         )
 
         # Start a background task to process all nodes (including streaming generators)
@@ -659,11 +659,11 @@ class EventDrivenWorkflow(Workflow):
                     logger.debug(
                         f"init_workflow: calling on_messages_published({len(events_to_record)})"
                     )
-                    self._tracker.on_messages_published(
+                    await self._tracker.on_messages_published(
                         len(events_to_record), source="init_workflow"
                     )
                     logger.debug(
-                        f"init_workflow: tracker after publish: {self._tracker.get_metrics()}"
+                        f"init_workflow: tracker after publish: {await self._tracker.get_metrics()}"
                     )
                 await container.event_store.record_events(events_to_record)
         else:
@@ -718,7 +718,7 @@ class EventDrivenWorkflow(Workflow):
                             if paired_event:
                                 # Track the published message for quiescence detection
                                 if not is_sequential:
-                                    self._tracker.on_messages_published(
+                                    await self._tracker.on_messages_published(
                                         1, source="restore_paired_input"
                                     )
                                 if is_sequential:

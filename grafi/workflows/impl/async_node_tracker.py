@@ -78,14 +78,14 @@ class AsyncNodeTracker:
         """Called when a node finishes processing."""
         async with self._cond:
             self._active.discard(node_name)
-            self._check_quiescence()
+            self._check_quiescence_unlocked()
             self._cond.notify_all()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Message Tracking (called from orchestrator utilities)
     # ─────────────────────────────────────────────────────────────────────────
 
-    def on_messages_published(self, count: int = 1, source: str = "") -> None:
+    async def on_messages_published(self, count: int = 1, source: str = "") -> None:
         """
         Called when messages are published to topics.
 
@@ -93,15 +93,16 @@ class AsyncNodeTracker:
         """
         if count <= 0:
             return
-        self._has_started = True
-        self._quiescence_event.clear()
-        self._uncommitted_messages += count
+        async with self._cond:
+            self._has_started = True
+            self._quiescence_event.clear()
+            self._uncommitted_messages += count
 
-        logger.debug(
-            f"Tracker: {count} messages published from {source} (uncommitted={self._uncommitted_messages})"
-        )
+            logger.debug(
+                f"Tracker: {count} messages published from {source} (uncommitted={self._uncommitted_messages})"
+            )
 
-    def on_messages_committed(self, count: int = 1, source: str = "") -> None:
+    async def on_messages_committed(self, count: int = 1, source: str = "") -> None:
         """
         Called when messages are committed (consumed and acknowledged).
 
@@ -109,46 +110,56 @@ class AsyncNodeTracker:
         """
         if count <= 0:
             return
-        self._uncommitted_messages = max(0, self._uncommitted_messages - count)
-        self._total_committed += count
-        self._check_quiescence()
+        async with self._cond:
+            self._uncommitted_messages = max(0, self._uncommitted_messages - count)
+            self._total_committed += count
+            self._check_quiescence_unlocked()
 
-        logger.debug(
-            f"Tracker: {count} messages committed from {source} "
-            f"(uncommitted={self._uncommitted_messages}, total={self._total_committed})"
-        )
+            logger.debug(
+                f"Tracker: {count} messages committed from {source} "
+                f"(uncommitted={self._uncommitted_messages}, total={self._total_committed})"
+            )
+            self._cond.notify_all()
 
     # Aliases for clarity
-    def on_message_published(self) -> None:
+    async def on_message_published(self) -> None:
         """Single message version."""
-        self.on_messages_published(1)
+        await self.on_messages_published(1)
 
-    def on_message_committed(self) -> None:
+    async def on_message_committed(self) -> None:
         """Single message version."""
-        self.on_messages_committed(1)
+        await self.on_messages_committed(1)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Quiescence Detection
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _check_quiescence(self) -> None:
-        """Check and signal quiescence if all conditions met."""
+    def _check_quiescence_unlocked(self) -> None:
+        """
+        Check and signal quiescence if all conditions met.
+
+        MUST be called with self._cond lock held.
+        """
+        is_quiescent = self._is_quiescent_unlocked()
         logger.debug(
             f"Tracker: checking quiescence - active={list(self._active)}, "
             f"uncommitted={self._uncommitted_messages}, "
             f"has_started={self._has_started}, "
             f"total_committed={self._total_committed}, "
-            f"is_quiescent={self.is_quiescent}"
+            f"is_quiescent={is_quiescent}"
         )
-        if self.is_quiescent:
+        if is_quiescent:
             logger.info(
                 f"Tracker: quiescence detected (committed={self._total_committed})"
             )
             self._quiescence_event.set()
 
-    @property
-    def is_quiescent(self) -> bool:
+    def _is_quiescent_unlocked(self) -> bool:
         """
+        Internal quiescence check without lock.
+
+        MUST be called with self._cond lock held.
+
         True when workflow is truly idle:
         - No nodes actively processing
         - No messages waiting to be committed
@@ -161,26 +172,66 @@ class AsyncNodeTracker:
             and self._total_committed > 0
         )
 
-    @property
-    def should_terminate(self) -> bool:
+    async def is_quiescent(self) -> bool:
+        """
+        True when workflow is truly idle:
+        - No nodes actively processing
+        - No messages waiting to be committed
+        - At least some work was done
+
+        This method acquires the lock to ensure consistent reads.
+        """
+        async with self._cond:
+            return self._is_quiescent_unlocked()
+
+    def _should_terminate_unlocked(self) -> bool:
+        """
+        Internal termination check without lock.
+
+        MUST be called with self._cond lock held.
+        """
+        return self._is_quiescent_unlocked() or self._force_stopped
+
+    async def should_terminate(self) -> bool:
         """
         True when workflow should stop iteration.
         Either natural quiescence or explicit force stop.
-        """
-        return self.is_quiescent or self._force_stopped
 
-    def force_stop(self) -> None:
+        This method acquires the lock to ensure consistent reads.
         """
-        Force the workflow to stop immediately.
-        Called when workflow.stop() is invoked.
+        async with self._cond:
+            return self._should_terminate_unlocked()
+
+    async def force_stop(self) -> None:
         """
-        logger.info("Tracker: force stop requested")
+        Force the workflow to stop immediately (async version with lock).
+        Called when workflow.stop() is invoked from async context.
+        """
+        async with self._cond:
+            logger.info("Tracker: force stop requested")
+            self._force_stopped = True
+            self._quiescence_event.set()
+            self._cond.notify_all()
+
+    def force_stop_sync(self) -> None:
+        """
+        Force the workflow to stop immediately (sync version).
+
+        This is a synchronous version for use from sync contexts (e.g., stop() method).
+        It sets the stop flag and event without acquiring the async lock.
+        This is safe because:
+        1. Setting _force_stopped to True is atomic for the stop signal
+        2. asyncio.Event.set() is thread-safe
+        3. Readers will see the updated state on their next lock acquisition
+        """
+        logger.info("Tracker: force stop requested (sync)")
         self._force_stopped = True
         self._quiescence_event.set()
 
-    def is_idle(self) -> bool:
+    async def is_idle(self) -> bool:
         """Legacy: just checks if no active nodes."""
-        return not self._active
+        async with self._cond:
+            return not self._active
 
     async def wait_for_quiescence(self, timeout: Optional[float] = None) -> bool:
         """Wait until quiescent. Returns False on timeout."""
@@ -201,15 +252,17 @@ class AsyncNodeTracker:
     # Metrics
     # ─────────────────────────────────────────────────────────────────────────
 
-    def get_activity_count(self) -> int:
+    async def get_activity_count(self) -> int:
         """Total processing count across all nodes."""
-        return sum(self._processing_count.values())
+        async with self._cond:
+            return sum(self._processing_count.values())
 
-    def get_metrics(self) -> Dict:
+    async def get_metrics(self) -> Dict:
         """Detailed metrics for debugging."""
-        return {
-            "active_nodes": list(self._active),
-            "uncommitted_messages": self._uncommitted_messages,
-            "total_committed": self._total_committed,
-            "is_quiescent": self.is_quiescent,
-        }
+        async with self._cond:
+            return {
+                "active_nodes": list(self._active),
+                "uncommitted_messages": self._uncommitted_messages,
+                "total_committed": self._total_committed,
+                "is_quiescent": self._is_quiescent_unlocked(),
+            }

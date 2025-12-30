@@ -162,8 +162,8 @@ class TestAsyncOutputQueue:
     @pytest.mark.asyncio
     async def test_async_iteration_stops_after_quiescence(self, output_queue, tracker):
         """Async iteration ends when tracker reports quiescence and queue is empty."""
-        tracker.on_messages_published(1)
-        tracker.on_messages_committed(1)
+        await tracker.on_messages_published(1)
+        await tracker.on_messages_committed(1)
 
         events = []
         async for event in output_queue:
@@ -177,9 +177,9 @@ class TestAsyncOutputQueue:
         queue = AsyncOutputQueue([], "test_consumer", tracker)
 
         async def signal_quiescence():
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await asyncio.sleep(0.02)
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
         signal_task = asyncio.create_task(signal_quiescence())
 
@@ -198,8 +198,8 @@ class TestAsyncOutputQueue:
         queued_event.name = "queued_event"
         await queue.queue.put(queued_event)
 
-        tracker.on_messages_published(1)
-        tracker.on_messages_committed(1)
+        await tracker.on_messages_published(1)
+        await tracker.on_messages_committed(1)
 
         events = []
         async for event in queue:
@@ -283,22 +283,22 @@ class TestAsyncOutputQueue:
         async def simulate_node_activity():
             """Simulate node activity that should prevent premature termination."""
             # First node processes - simulate full message lifecycle
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await tracker.enter("node_1")
             await output_queue.queue.put(Mock(name="event_1"))
             await tracker.leave("node_1")
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
             # Yield control - simulates realistic timing where next node
             # starts within the same event loop cycle
             await asyncio.sleep(0)
 
             # Second node picks up and processes - simulate full message lifecycle
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await tracker.enter("node_2")
             await output_queue.queue.put(Mock(name="event_2"))
             await tracker.leave("node_2")
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
         # Start the activity simulation
         activity_task = asyncio.create_task(simulate_node_activity())
@@ -330,11 +330,11 @@ class TestAsyncOutputQueue:
 
         # Single node processes and finishes - simulate full message lifecycle
         async def simulate_single_node():
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await tracker.enter("node_1")
             await output_queue.queue.put(Mock(name="event_1"))
             await tracker.leave("node_1")
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
         activity_task = asyncio.create_task(simulate_single_node())
 
@@ -376,22 +376,22 @@ class TestAsyncOutputQueue:
 
         async def producer():
             # Node A processes - simulate full message lifecycle
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await tracker.enter("node_a")
             await output_queue.queue.put(Mock(name="event_a"))
             await tracker.leave("node_a")
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
             # Critical timing window - yield to let consumer check idle state
             await asyncio.sleep(0)
 
             # Node B starts before consumer terminates (if fix works)
             # simulate full message lifecycle
-            tracker.on_messages_published(1)
+            await tracker.on_messages_published(1)
             await tracker.enter("node_b")
             await output_queue.queue.put(Mock(name="event_b"))
             await tracker.leave("node_b")
-            tracker.on_messages_committed(1)
+            await tracker.on_messages_committed(1)
 
         consumer_task = asyncio.create_task(consumer())
         producer_task = asyncio.create_task(producer())
@@ -428,11 +428,11 @@ class TestAsyncOutputQueue:
         )
 
         # Publish messages but don't commit them (simulates incomplete work)
-        tracker.on_messages_published(5)
+        await tracker.on_messages_published(5)
 
         # Not quiescent because uncommitted > 0
-        assert not tracker.is_quiescent
-        assert tracker.get_metrics()["uncommitted_messages"] == 5
+        assert not await tracker.is_quiescent()
+        assert (await tracker.get_metrics())["uncommitted_messages"] == 5
 
         # Start iteration in background
         events = []
@@ -449,7 +449,7 @@ class TestAsyncOutputQueue:
         await asyncio.sleep(0.05)
 
         # Force stop should terminate iteration
-        tracker.force_stop()
+        await tracker.force_stop()
 
         # Wait for iteration to complete
         try:
@@ -474,7 +474,7 @@ class TestAsyncOutputQueue:
         )
 
         # Simulate work with uncommitted messages
-        tracker.on_messages_published(5)
+        await tracker.on_messages_published(5)
 
         # Queue some events
         await output_queue.queue.put(Mock(name="event_1"))
@@ -494,7 +494,7 @@ class TestAsyncOutputQueue:
         await asyncio.sleep(0.05)
 
         # Force stop
-        tracker.force_stop()
+        await tracker.force_stop()
 
         # Wait for iteration to complete
         await asyncio.wait_for(iteration_complete.wait(), timeout=1.0)

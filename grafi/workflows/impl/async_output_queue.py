@@ -61,7 +61,7 @@ class AsyncOutputQueue:
                     logger.debug(
                         f"Output listener: consumed {len(events)} events from {topic.name}"
                     )
-                    self.tracker.on_messages_committed(
+                    await self.tracker.on_messages_committed(
                         len(events), source=f"output_listener:{topic.name}"
                     )
             except asyncio.TimeoutError:
@@ -96,8 +96,13 @@ class AsyncOutputQueue:
                     pass
 
             # Check for completion (natural quiescence or force stop)
-            if self.tracker.should_terminate and self.queue.empty():
-                raise StopAsyncIteration
+            if await self.tracker.should_terminate():
+                # Final drain attempt - try to get any remaining items before stopping
+                # This avoids race where item is added between empty() check and raising
+                try:
+                    return self.queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    raise StopAsyncIteration
 
             # Wait for queue item or quiescence
             queue_task = asyncio.create_task(self.queue.get())
@@ -126,5 +131,10 @@ class AsyncOutputQueue:
                     continue
 
             # Quiescence or force stop detected
-            if self.tracker.should_terminate and self.queue.empty():
-                raise StopAsyncIteration
+            if await self.tracker.should_terminate():
+                # Final drain attempt - try to get any remaining items before stopping
+                # This avoids race where item is added between empty() check and raising
+                try:
+                    return self.queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    raise StopAsyncIteration

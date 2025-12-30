@@ -200,7 +200,7 @@ class TestPublishEvents:
         # Mock node and topics
         mock_topic1 = AsyncMock(spec=TopicBase)
         mock_topic2 = AsyncMock(spec=TopicBase)
-        tracker = MagicMock()
+        tracker = AsyncMock()
 
         node = MagicMock(spec=Node)
         node.name = "test_node"
@@ -245,7 +245,7 @@ class TestPublishEvents:
 
         # Verify topics were called correctly
         mock_topic1.publish_data.assert_called_once_with(publish_to_event)
-        tracker.on_messages_published.assert_called_once_with(
+        tracker.on_messages_published.assert_awaited_once_with(
             1, source="node:test_node"
         )
 

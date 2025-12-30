@@ -369,7 +369,7 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         """Test that tracker is reset on workflow initialization."""
         # Add some activity to tracker
         await workflow_with_tracker._tracker.enter("test_node")
-        assert not workflow_with_tracker._tracker.is_idle()
+        assert not await workflow_with_tracker._tracker.is_idle()
 
         # Call init_workflow which should reset tracker
         invoke_context = InvokeContext(
@@ -388,7 +388,7 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
             )
 
         # Tracker should be reset
-        assert workflow_with_tracker._tracker.is_idle()
+        assert await workflow_with_tracker._tracker.is_idle()
 
 
 class TestEventDrivenWorkflowStopFlag:

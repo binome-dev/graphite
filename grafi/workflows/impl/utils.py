@@ -92,7 +92,9 @@ async def publish_events(
 
     # NEW: Notify tracker of published messages
     if tracker and published_events:
-        tracker.on_messages_published(len(published_events), source=f"node:{node.name}")
+        await tracker.on_messages_published(
+            len(published_events), source=f"node:{node.name}"
+        )
 
     return published_events
 
