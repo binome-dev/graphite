@@ -102,12 +102,13 @@ class AsyncResult:
             try:
                 await self._producer_task
             except asyncio.CancelledError:
+                # The task was cancelled by aclose(); a CancelledError here is expected.
                 pass
-
         # Close the underlying source generator
         try:
             await self._source.aclose()
         except Exception:
+            # Best-effort cleanup: ignore errors from closing the underlying source.
             pass
 
 

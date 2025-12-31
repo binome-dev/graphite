@@ -136,7 +136,7 @@ class AsyncNodeTracker:
             self._uncommitted_messages = max(0, self._uncommitted_messages - count)
             self._check_quiescence_unlocked()
 
-            logger.debug(f"Tracker: {count} messages committed from {source} ")
+            logger.debug(f"Tracker: {count} messages committed from {source}")
             self._cond.notify_all()
 
     # Aliases for clarity
@@ -178,11 +178,12 @@ class AsyncNodeTracker:
         - No messages waiting to be committed
         - At least some work was done
         """
+        is_quiescent = not self._active and self._uncommitted_messages == 0
         logger.debug(
             f"Tracker: _is_quiescent_unlocked check - active={list(self._active)}, "
-            f"uncommitted={self._uncommitted_messages}, "
+            f"uncommitted={self._uncommitted_messages}, is_quiescent={is_quiescent}"
         )
-        return not self._active and self._uncommitted_messages == 0
+        return is_quiescent
 
     async def is_quiescent(self) -> bool:
         """
