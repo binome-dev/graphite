@@ -2,13 +2,30 @@
 """Run all integration tests by executing run_*.py scripts in each subfolder."""
 
 import argparse
+import importlib.util
 import io
-import subprocess
 import sys
 from pathlib import Path
+from textwrap import indent
 
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except AttributeError:
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", write_through=True
+    )
+
+
+def _load_runner_module(script: Path):
+    """Load a run_*.py file as a module so we can call run_scripts directly."""
+    module_name = f"tests_integration.{script.parent.name}.{script.stem}_runner"
+    spec = importlib.util.spec_from_file_location(module_name, script)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load spec for {script}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def run_all_scripts(pass_local: bool = True) -> int:
@@ -23,12 +40,14 @@ def run_all_scripts(pass_local: bool = True) -> int:
     """
     python_executable = sys.executable
     current_directory = Path(__file__).parent
+    repo_root = current_directory.parent
 
     # Find all run_*.py scripts in subdirectories
     run_scripts = sorted(current_directory.glob("*/run_*.py"))
 
-    passed_folders = []
-    failed_folders = {}
+    passed_examples = []
+    failed_examples = {}
+    skipped_examples = []
 
     print(f"Found {len(run_scripts)} test runners:")
     for script in run_scripts:
@@ -42,37 +61,86 @@ def run_all_scripts(pass_local: bool = True) -> int:
         print(f"Running tests in: {folder_name}")
         print(f"{'=' * 60}")
 
-        cmd = [python_executable, str(script)]
-        if not pass_local:
-            cmd.append("--no-pass-local")
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=script.parent,
+            runner_module = _load_runner_module(script)
+            runner_results = runner_module.run_scripts(
+                pass_local=pass_local, collect=True
             )
-            print(result.stdout)
-            passed_folders.append(folder_name)
-        except subprocess.CalledProcessError as e:
-            print(f"Output:\n{e.stdout}")
-            print(f"Error:\n{e.stderr}")
-            failed_folders[folder_name] = e.stderr
+        except Exception as exc:  # noqa: BLE001
+            example_rel = script.relative_to(repo_root)
+            error_message = f"Runner failed before executing examples: {exc}"
+            print(f"  ✗ {example_rel}")
+            print(f"    Error: {error_message}")
+            failed_examples[example_rel] = {
+                "error": error_message,
+                "output": "",
+                "rerun_cmd": f"{python_executable} {example_rel}",
+            }
+            continue
+
+        if not isinstance(runner_results, list):
+            example_rel = script.relative_to(repo_root)
+            error_message = "Runner did not return result details."
+            print(f"  ✗ {example_rel}")
+            print(f"    Error: {error_message}")
+            failed_examples[example_rel] = {
+                "error": error_message,
+                "output": "",
+                "rerun_cmd": f"{python_executable} {example_rel}",
+            }
+            continue
+
+        for result in runner_results:
+            example_rel = (script.parent / result["name"]).relative_to(repo_root)
+            status = result.get("status", "unknown")
+            output = result.get("output", "").rstrip()
+            error = result.get("error", "").rstrip()
+
+            if status == "passed":
+                print(f"  ✓ {example_rel}")
+                if output:
+                    print(indent(output, "    "))
+                passed_examples.append(example_rel)
+            elif status == "failed":
+                print(f"  ✗ {example_rel}")
+                if output:
+                    print("    Output:")
+                    print(indent(output, "      "))
+                if error:
+                    print("    Error:")
+                    print(indent(error, "      "))
+                rerun_cmd = f"{python_executable} {example_rel}"
+                print(f"    Rerun with: {rerun_cmd}")
+                failed_examples[example_rel] = {
+                    "error": error,
+                    "output": output,
+                    "rerun_cmd": rerun_cmd,
+                }
+            else:
+                print(f"  - {example_rel} (skipped)")
+                if error:
+                    print(f"    Reason: {error}")
+                skipped_examples.append(example_rel)
 
     # Summary
     print("\n" + "=" * 60)
     print("FINAL SUMMARY")
     print("=" * 60)
-    print(f"\nPassed folders: {len(passed_folders)}")
-    for folder in passed_folders:
-        print(f"  ✓ {folder}")
+    print(f"\nPassed examples: {len(passed_examples)}")
+    for example in passed_examples:
+        print(f"  ✓ {example}")
 
-    if failed_folders:
-        print(f"\nFailed folders: {len(failed_folders)}")
-        for folder in failed_folders:
-            print(f"  ✗ {folder}")
+    if skipped_examples:
+        print(f"\nSkipped examples: {len(skipped_examples)}")
+        for example in skipped_examples:
+            print(f"  - {example}")
+
+    if failed_examples:
+        print(f"\nFailed examples: {len(failed_examples)}")
+        for example, data in failed_examples.items():
+            print(f"  ✗ {example}")
+            if data.get("rerun_cmd"):
+                print(f"    Rerun with: {data['rerun_cmd']}")
         return 1
 
     print("\nAll integration tests passed!")

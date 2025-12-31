@@ -108,7 +108,7 @@ async def test_kyc_assistant() -> None:
         )
     ]
 
-    output = await async_func_wrapper(
+    outputs = await async_func_wrapper(
         assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
@@ -117,7 +117,7 @@ async def test_kyc_assistant() -> None:
         )
     )
 
-    print(output)
+    print(outputs)
 
     human_input = [
         Message(
@@ -131,6 +131,7 @@ async def test_kyc_assistant() -> None:
             PublishToTopicEvent(
                 invoke_context=get_invoke_context(),
                 data=human_input,
+                consumed_event_ids=[event.event_id for event in outputs],
             )
         )
     )

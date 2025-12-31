@@ -64,7 +64,7 @@ class EventDrivenWorkflow(Workflow):
     # Queue of nodes that are ready to invoke (in response to published events)
     _invoke_queue: deque[NodeBase] = PrivateAttr(default=deque())
 
-    _tracker: AsyncNodeTracker = AsyncNodeTracker()
+    _tracker: AsyncNodeTracker = PrivateAttr(default_factory=AsyncNodeTracker)
 
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
@@ -72,6 +72,14 @@ class EventDrivenWorkflow(Workflow):
     def model_post_init(self, _context: Any) -> None:
         self._add_topics()
         self._handle_function_calling_nodes()
+
+    def stop(self) -> None:
+        """
+        Stop the workflow execution.
+        Overrides base class to also trigger force stop on the tracker.
+        """
+        super().stop()
+        self._tracker.force_stop_sync()
 
     @classmethod
     def builder(cls) -> WorkflowBuilder:
@@ -206,11 +214,13 @@ class EventDrivenWorkflow(Workflow):
         return consumed_events
 
     async def _commit_events(
-        self, consumer_name: str, topic_events: List[ConsumeFromTopicEvent]
+        self,
+        consumer_name: str,
+        topic_events: List[ConsumeFromTopicEvent],
+        track_commit: bool = True,
     ) -> None:
         if not topic_events:
             return
-        # commit all consumed events
         topic_max_offset: Dict[str, int] = {}
 
         for topic_event in topic_events:
@@ -220,6 +230,16 @@ class EventDrivenWorkflow(Workflow):
 
         for topic, offset in topic_max_offset.items():
             await self._topics[topic].commit(consumer_name, offset)
+
+        # Notify tracker that messages have been committed
+        # (skip if already tracked elsewhere, e.g., by output listener)
+        if track_commit:
+            logger.debug(
+                f"Committing {len(topic_events)} events for {consumer_name}, track_commit={track_commit}"
+            )
+            await self._tracker.on_messages_committed(
+                len(topic_events), source=f"commit:{consumer_name}"
+            )
 
     async def _add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
@@ -271,7 +291,9 @@ class EventDrivenWorkflow(Workflow):
                         async for result in node.invoke(
                             invoke_context, node_consumed_events
                         ):
-                            published_events.extend(await publish_events(node, result))
+                            published_events.extend(
+                                await publish_events(node, result, self._tracker)
+                            )
 
                         for event in published_events:
                             await self._add_to_invoke_queue(event)
@@ -301,6 +323,9 @@ class EventDrivenWorkflow(Workflow):
         self, input_data: PublishToTopicEvent
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         invoke_context = input_data.invoke_context
+        logger.debug(
+            f"invoke_parallel: tracker_id={id(self._tracker)}, metrics={await self._tracker.get_metrics()}"
+        )
 
         # Start a background task to process all nodes (including streaming generators)
         node_processing_task = [
@@ -374,9 +399,12 @@ class EventDrivenWorkflow(Workflow):
         finally:
             await output_queue.stop_listeners()
 
-            # Commit all consumed output events
+            # Commit all consumed output events to topics
+            # (tracking already done by output listener, so skip tracker update)
             await self._commit_events(
-                consumer_name=self.name, topic_events=consumed_output_events
+                consumer_name=self.name,
+                topic_events=consumed_output_events,
+                track_commit=False,
             )
 
             # 4. graceful shutdown all the nodes
@@ -500,7 +528,11 @@ class EventDrivenWorkflow(Workflow):
                     if consumed_events:
                         async for event in node.invoke(invoke_context, consumed_events):
                             node_output_events.extend(
-                                await publish_events(node=node, publish_event=event)
+                                await publish_events(
+                                    node=node,
+                                    publish_event=event,
+                                    tracker=self._tracker,
+                                )
                             )
 
                     await self._commit_events(
@@ -576,6 +608,9 @@ class EventDrivenWorkflow(Workflow):
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> Any:
         # 1 – initial seeding
+        logger.debug(
+            f"init_workflow: is_sequential={is_sequential}, tracker_id={id(self._tracker)}"
+        )
         if not is_sequential:
             self._tracker.reset()
 
@@ -615,7 +650,21 @@ class EventDrivenWorkflow(Workflow):
                     if is_sequential:
                         await self._add_to_invoke_queue(event)
 
+            logger.debug(
+                f"init_workflow: events_to_record={len(events_to_record)}, input_topics={len(input_topics)}"
+            )
             if events_to_record:
+                # Track initial input messages for quiescence detection
+                if not is_sequential:
+                    logger.debug(
+                        f"init_workflow: calling on_messages_published({len(events_to_record)})"
+                    )
+                    await self._tracker.on_messages_published(
+                        len(events_to_record), source="init_workflow"
+                    )
+                    logger.debug(
+                        f"init_workflow: tracker after publish: {await self._tracker.get_metrics()}"
+                    )
                 await container.event_store.record_events(events_to_record)
         else:
             # When there is unfinished workflow, we need to restore the workflow topics
@@ -667,6 +716,11 @@ class EventDrivenWorkflow(Workflow):
                                 )
                             )
                             if paired_event:
+                                # Track the published message for quiescence detection
+                                if not is_sequential:
+                                    await self._tracker.on_messages_published(
+                                        1, source="restore_paired_input"
+                                    )
                                 if is_sequential:
                                     await self._add_to_invoke_queue(paired_event)
                                 await container.event_store.record_event(paired_event)

@@ -310,10 +310,10 @@ class TestEventDrivenWorkflowInitialWorkflow:
 
         return EventDrivenWorkflow(nodes={"test_node": node})
 
-    def test_initial_workflow_method_exists(self, workflow_for_initial_test):
-        """Test that initial_workflow method exists."""
-        assert hasattr(workflow_for_initial_test, "initial_workflow")
-        assert callable(workflow_for_initial_test.initial_workflow)
+    def test_init_workflow_method_exists(self, workflow_for_initial_test):
+        """init_workflow should be available for restoring workflow state."""
+        assert hasattr(workflow_for_initial_test, "init_workflow")
+        assert callable(workflow_for_initial_test.init_workflow)
 
 
 class TestEventDrivenWorkflowToDict:
@@ -369,19 +369,26 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         """Test that tracker is reset on workflow initialization."""
         # Add some activity to tracker
         await workflow_with_tracker._tracker.enter("test_node")
-        assert not workflow_with_tracker._tracker.is_idle()
+        assert not await workflow_with_tracker._tracker.is_idle()
 
         # Call init_workflow which should reset tracker
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
-        with patch("grafi.common.containers.container.container"):
+        with patch(
+            "grafi.workflows.impl.event_driven_workflow.container"
+        ) as mock_container:
+            mock_event_store = Mock()
+            mock_event_store.get_agent_events = AsyncMock(return_value=[])
+            mock_event_store.record_events = AsyncMock()
+            mock_event_store.record_event = AsyncMock()
+            mock_container.event_store = mock_event_store
             await workflow_with_tracker.init_workflow(
                 PublishToTopicEvent(invoke_context=invoke_context, data=[])
             )
 
         # Tracker should be reset
-        assert workflow_with_tracker._tracker.is_idle()
+        assert await workflow_with_tracker._tracker.is_idle()
 
 
 class TestEventDrivenWorkflowStopFlag:
