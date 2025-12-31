@@ -61,8 +61,19 @@ async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_conte
     mock_client = MagicMock()
     mock_client.chat.completions.create = mock_create
 
-    # Mock the AsyncClient constructor
-    mock_async_client_cls = MagicMock(return_value=mock_client)
+    # Create async context manager mock
+    async def mock_aenter(self):
+        return mock_client
+
+    async def mock_aexit(self, *args):
+        pass
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+
+    # Mock the AsyncClient constructor to return our context manager
+    mock_async_client_cls = MagicMock(return_value=mock_context_manager)
     monkeypatch.setattr(
         grafi.tools.llms.impl.openai_tool, "AsyncClient", mock_async_client_cls
     )
@@ -115,8 +126,19 @@ async def test_invoke_function_call(monkeypatch, openai_instance, invoke_context
     mock_client = MagicMock()
     mock_client.chat.completions.create = mock_create
 
-    # Mock the AsyncClient constructor
-    mock_async_client_cls = MagicMock(return_value=mock_client)
+    # Create async context manager mock
+    async def mock_aenter(self):
+        return mock_client
+
+    async def mock_aexit(self, *args):
+        pass
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+
+    # Mock the AsyncClient constructor to return our context manager
+    mock_async_client_cls = MagicMock(return_value=mock_context_manager)
     monkeypatch.setattr(
         grafi.tools.llms.impl.openai_tool, "AsyncClient", mock_async_client_cls
     )

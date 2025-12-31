@@ -43,11 +43,12 @@ class AsyncResult:
         self._done = asyncio.Event()
         self._started = False
         self._exc: Optional[BaseException] = None
+        self._producer_task: Optional[asyncio.Task] = None
 
     def _ensure_started(self) -> None:
         if not self._started:
             loop = asyncio.get_running_loop()
-            loop.create_task(self._producer())
+            self._producer_task = loop.create_task(self._producer())
             self._started = True
 
     async def _producer(self) -> None:
@@ -94,10 +95,20 @@ class AsyncResult:
         return result if isinstance(result, list) else [result]
 
     async def aclose(self) -> None:
-        """Attempt to close the underlying async generator (if any)."""
+        """Cancel producer task and close the underlying async generator."""
+        # Cancel the producer task if it's running
+        if self._producer_task is not None and not self._producer_task.done():
+            self._producer_task.cancel()
+            try:
+                await self._producer_task
+            except asyncio.CancelledError:
+                # The task was cancelled by aclose(); a CancelledError here is expected.
+                pass
+        # Close the underlying source generator
         try:
             await self._source.aclose()
         except Exception:
+            # Best-effort cleanup: ignore errors from closing the underlying source.
             pass
 
 

@@ -102,29 +102,29 @@ class ClaudeTool(LLM):
         input_data: Messages,
     ) -> MsgsAGen:
         messages, tools = self.prepare_api_input(input_data)
-        client = AsyncAnthropic(api_key=self.api_key)
 
         try:
-            if self.is_streaming:
-                async with client.messages.stream(
-                    max_tokens=self.max_tokens,
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                    **self.chat_params,
-                ) as stream:
-                    async for event in stream:
-                        if event.type == "text":
-                            yield self.to_stream_messages(event.text)
-            else:
-                resp: AnthropicMessage = await client.messages.create(
-                    max_tokens=self.max_tokens,
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                    **self.chat_params,
-                )
-                yield self.to_messages(resp)
+            async with AsyncAnthropic(api_key=self.api_key) as client:
+                if self.is_streaming:
+                    async with client.messages.stream(
+                        max_tokens=self.max_tokens,
+                        model=self.model,
+                        messages=messages,
+                        tools=tools,
+                        **self.chat_params,
+                    ) as stream:
+                        async for event in stream:
+                            if event.type == "text":
+                                yield self.to_stream_messages(event.text)
+                else:
+                    resp: AnthropicMessage = await client.messages.create(
+                        max_tokens=self.max_tokens,
+                        model=self.model,
+                        messages=messages,
+                        tools=tools,
+                        **self.chat_params,
+                    )
+                    yield self.to_messages(resp)
 
         except asyncio.CancelledError:
             raise

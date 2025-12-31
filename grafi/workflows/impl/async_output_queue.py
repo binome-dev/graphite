@@ -54,6 +54,12 @@ class AsyncOutputQueue:
         while not self._stopped:
             try:
                 events = await topic.consume(self.consumer_name, timeout=0.1)
+
+                if len(events) == 0:
+                    # No events fetched within timeout, check if all node quiescence
+                    if await self.tracker.should_terminate():
+                        break
+
                 for event in events:
                     await self.queue.put(event)
                 # Mark messages as committed when they reach the output queue
@@ -70,7 +76,7 @@ class AsyncOutputQueue:
                 break
             except Exception as e:
                 logger.error(f"Output listener error for {topic.name}: {e}")
-                await asyncio.sleep(0.1)
+                raise e
 
     def __aiter__(self) -> "AsyncOutputQueue":
         return self
