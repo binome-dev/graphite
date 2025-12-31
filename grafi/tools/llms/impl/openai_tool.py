@@ -107,31 +107,30 @@ class OpenAITool(LLM):
     ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
         try:
-            client = AsyncClient(api_key=self.api_key)
+            async with AsyncClient(api_key=self.api_key) as client:
+                if self.is_streaming:
+                    async for chunk in await client.chat.completions.create(
+                        model=self.model,
+                        messages=api_messages,
+                        tools=api_tools,
+                        stream=True,
+                        **self.chat_params,
+                    ):
+                        yield self.to_stream_messages(chunk)
+                else:
+                    req_func = (
+                        client.chat.completions.create
+                        if not self.structured_output
+                        else client.beta.chat.completions.parse
+                    )
+                    response: ChatCompletion = await req_func(
+                        model=self.model,
+                        messages=api_messages,
+                        tools=api_tools,
+                        **self.chat_params,
+                    )
 
-            if self.is_streaming:
-                async for chunk in await client.chat.completions.create(
-                    model=self.model,
-                    messages=api_messages,
-                    tools=api_tools,
-                    stream=True,
-                    **self.chat_params,
-                ):
-                    yield self.to_stream_messages(chunk)
-            else:
-                req_func = (
-                    client.chat.completions.create
-                    if not self.structured_output
-                    else client.beta.chat.completions.parse
-                )
-                response: ChatCompletion = await req_func(
-                    model=self.model,
-                    messages=api_messages,
-                    tools=api_tools,
-                    **self.chat_params,
-                )
-
-                yield self.to_messages(response)
+                    yield self.to_messages(response)
         except asyncio.CancelledError:
             raise  # let caller handle
         except OpenAIError as exc:

@@ -66,7 +66,7 @@ class InMemTopicEventQueue(TopicEventQueue):
 
         async with self._cond:
             # If timeout is 0 or None and no data, return immediately
-            while not await self.can_consume(consumer_id):
+            while not self._can_consume_unlocked(consumer_id):
                 try:
                     logger.debug(
                         f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
@@ -109,8 +109,17 @@ class InMemTopicEventQueue(TopicEventQueue):
             self._consumed = defaultdict(int)
             self._committed = defaultdict(lambda: -1)
 
+    def _can_consume_unlocked(self, consumer_id: str) -> bool:
+        """
+        Internal check without lock. MUST be called with self._cond held.
+        """
+        return self._consumed[consumer_id] < len(self._records)
+
     async def can_consume(self, consumer_id: str) -> bool:
         """
         Check if there are events available for consumption by a consumer asynchronously.
+
+        This method acquires the lock to ensure consistent reads of shared state.
         """
-        return self._consumed[consumer_id] < len(self._records)
+        async with self._cond:
+            return self._can_consume_unlocked(consumer_id)

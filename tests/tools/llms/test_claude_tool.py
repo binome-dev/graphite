@@ -64,10 +64,20 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=fake_response)
 
-    # patch AsyncAnthropic constructor
-    monkeypatch.setattr(
-        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
-    )
+    # Create async context manager mock for AsyncAnthropic
+    async def mock_aenter(self):
+        return mock_client
+
+    async def mock_aexit(self, *args):
+        pass
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+
+    # patch AsyncAnthropic constructor to return context manager
+    mock_async_anthropic_cls = MagicMock(return_value=mock_context_manager)
+    monkeypatch.setattr(cl_module, "AsyncAnthropic", mock_async_anthropic_cls)
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
@@ -79,7 +89,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     assert result[0].content == "Hello, world!"
 
     # verify constructor args
-    cl_module.AsyncAnthropic.assert_called_once_with(api_key="test_api_key")
+    mock_async_anthropic_cls.assert_called_once_with(api_key="test_api_key")
 
     # verify create() called with right kwargs
     kwargs = mock_client.messages.create.call_args[1]
@@ -108,9 +118,20 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
 
     mock_client = MagicMock()
     mock_client.messages.create = AsyncMock(return_value=fake_response)
-    monkeypatch.setattr(
-        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
-    )
+
+    # Create async context manager mock for AsyncAnthropic
+    async def mock_aenter(self):
+        return mock_client
+
+    async def mock_aexit(self, *args):
+        pass
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+
+    mock_async_anthropic_cls = MagicMock(return_value=mock_context_manager)
+    monkeypatch.setattr(cl_module, "AsyncAnthropic", mock_async_anthropic_cls)
 
     tools = [
         FunctionSpec(
@@ -144,9 +165,20 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
 
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = _raise
-    monkeypatch.setattr(
-        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_client)
-    )
+
+    # Create async context manager mock for AsyncAnthropic
+    async def mock_aenter(self):
+        return mock_client
+
+    async def mock_aexit(self, *args):
+        pass
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+
+    mock_async_anthropic_cls = MagicMock(return_value=mock_context_manager)
+    monkeypatch.setattr(cl_module, "AsyncAnthropic", mock_async_anthropic_cls)
 
     from grafi.common.exceptions import LLMToolException
 

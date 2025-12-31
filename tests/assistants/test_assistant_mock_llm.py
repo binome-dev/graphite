@@ -86,7 +86,6 @@ class LLMMockTool(Tool):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
-        
 
     def to_dict(self) -> dict[str, Any]:
         """
@@ -130,8 +129,9 @@ class LLMMockTool(Tool):
         )
 
 
-
-def make_tool_call(call_id: str, name: str, arguments: str) -> ChatCompletionMessageToolCall:
+def make_tool_call(
+    call_id: str, name: str, arguments: str
+) -> ChatCompletionMessageToolCall:
     """Helper to create tool calls."""
     return ChatCompletionMessageToolCall(
         id=call_id,
@@ -167,10 +167,13 @@ class TestReActAgentWithMockLLM:
 
         Flow: Input -> LLM (no function call) -> Output
         """
+
         # Mock LLM that always responds directly without function calls
         def mock_llm(messages: List[Message]) -> List[Message]:
             user_content = messages[-1].content if messages else ""
-            return [Message(role="assistant", content=f"Direct response to: {user_content}")]
+            return [
+                Message(role="assistant", content=f"Direct response to: {user_content}")
+            ]
 
         # Create topics
         agent_input = InputTopic(name="agent_input")
@@ -178,8 +181,7 @@ class TestReActAgentWithMockLLM:
             name="agent_output",
             # Only output when there's content and no tool calls
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -236,24 +238,30 @@ class TestReActAgentWithMockLLM:
 
             if call_count["llm"] == 1:
                 # First call: make a function call
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "call_1",
-                            "search",
-                            '{"query": "weather today"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "call_1",
+                                "search",
+                                '{"query": "weather today"}',
+                            )
+                        ],
+                    )
+                ]
             else:
                 # Second call: respond with the function result
-                last_msg = messages[-1] if messages else Message(role="user", content="")
-                return [Message(
-                    role="assistant",
-                    content=f"Based on search: {last_msg.content}",
-                )]
+                last_msg = (
+                    messages[-1] if messages else Message(role="user", content="")
+                )
+                return [
+                    Message(
+                        role="assistant",
+                        content=f"Based on search: {last_msg.content}",
+                    )
+                ]
 
         def search(self, query: str) -> str:
             """Mock search function."""
@@ -264,8 +272,7 @@ class TestReActAgentWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -296,7 +303,9 @@ class TestReActAgentWithMockLLM:
             Node.builder()
             .name("SearchNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .tool(FunctionCallTool.builder().name("SearchTool").function(search).build())
+            .tool(
+                FunctionCallTool.builder().name("SearchTool").function(search).build()
+            )
             .publish_to(function_result_topic)
             .build()
         )
@@ -340,29 +349,36 @@ class TestReActAgentWithMockLLM:
             call_count["llm"] += 1
 
             if call_count["llm"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("call_1", "get_user", '{"id": "123"}')
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call("call_1", "get_user", '{"id": "123"}')
+                        ],
+                    )
+                ]
             elif call_count["llm"] == 2:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "call_2",
-                            "get_orders",
-                            '{"user_id": "123"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "call_2",
+                                "get_orders",
+                                '{"user_id": "123"}',
+                            )
+                        ],
+                    )
+                ]
             else:
-                return [Message(
-                    role="assistant", content="User John has 3 orders totaling $150."
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content="User John has 3 orders totaling $150.",
+                    )
+                ]
 
         def get_user(self, id: str) -> str:
             """Mock get_user function."""
@@ -377,8 +393,7 @@ class TestReActAgentWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -472,6 +487,7 @@ class TestHumanInTheLoopWithMockLLM:
 
         Flow: Input -> LLM (direct response) -> Output
         """
+
         def mock_llm(messages: List[Message]) -> List[Message]:
             return [Message(role="assistant", content="I can answer this directly!")]
 
@@ -479,8 +495,7 @@ class TestHumanInTheLoopWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         hitl_call_topic = Topic(
@@ -537,30 +552,36 @@ class TestHumanInTheLoopWithMockLLM:
 
             if call_count["llm"] == 1:
                 # First call: request human approval
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "approval_1",
-                            "request_approval",
-                            '{"action": "delete_account", "reason": "user requested"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_1",
+                                "request_approval",
+                                '{"action": "delete_account", "reason": "user requested"}',
+                            )
+                        ],
+                    )
+                ]
             else:
                 # Second call: process approval result
                 last_content = messages[-1].content if messages else ""
                 if "approved" in last_content.lower():
-                    return [Message(
-                        role="assistant",
-                        content="Account deletion has been approved and completed.",
-                    )]
+                    return [
+                        Message(
+                            role="assistant",
+                            content="Account deletion has been approved and completed.",
+                        )
+                    ]
                 else:
-                    return [Message(
-                        role="assistant",
-                        content="Account deletion was rejected.",
-                    )]
+                    return [
+                        Message(
+                            role="assistant",
+                            content="Account deletion was rejected.",
+                        )
+                    ]
 
         def request_approval(self, action: str, reason: str) -> str:
             """Mock HITL request that simulates human approval."""
@@ -573,8 +594,7 @@ class TestHumanInTheLoopWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         hitl_call_topic = Topic(
@@ -657,24 +677,28 @@ class TestHumanInTheLoopWithMockLLM:
             call_count["llm"] += 1
 
             if call_count["llm"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "approval_1",
-                            "request_approval",
-                            '{"action": "transfer_funds", "amount": "$10000"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_1",
+                                "request_approval",
+                                '{"action": "transfer_funds", "amount": "$10000"}',
+                            )
+                        ],
+                    )
+                ]
             else:
                 last_content = messages[-1].content if messages else ""
                 if "rejected" in last_content.lower():
-                    return [Message(
-                        role="assistant",
-                        content="The fund transfer was not approved. No action taken.",
-                    )]
+                    return [
+                        Message(
+                            role="assistant",
+                            content="The fund transfer was not approved. No action taken.",
+                        )
+                    ]
                 return [Message(role="assistant", content="Transfer completed.")]
 
         def request_approval(self, action: str, amount: str) -> str:
@@ -685,8 +709,7 @@ class TestHumanInTheLoopWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         hitl_call_topic = Topic(
@@ -762,36 +785,42 @@ class TestHumanInTheLoopWithMockLLM:
 
             if call_count["llm"] == 1:
                 # First approval: manager
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "approval_1",
-                            "request_manager_approval",
-                            '{"action": "large_purchase", "amount": "$5000"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_1",
+                                "request_manager_approval",
+                                '{"action": "large_purchase", "amount": "$5000"}',
+                            )
+                        ],
+                    )
+                ]
             elif call_count["llm"] == 2:
                 # Second approval: finance
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "approval_2",
-                            "request_finance_approval",
-                            '{"action": "large_purchase", "amount": "$5000"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_2",
+                                "request_finance_approval",
+                                '{"action": "large_purchase", "amount": "$5000"}',
+                            )
+                        ],
+                    )
+                ]
             else:
                 # Final response
-                return [Message(
-                    role="assistant",
-                    content="Purchase approved by manager and finance. Order placed!",
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content="Purchase approved by manager and finance. Order placed!",
+                    )
+                ]
 
         approval_count = {"count": 0}
 
@@ -807,8 +836,7 @@ class TestHumanInTheLoopWithMockLLM:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         approval_call_topic = Topic(
@@ -861,7 +889,9 @@ class TestHumanInTheLoopWithMockLLM:
 
         input_data = PublishToTopicEvent(
             invoke_context=invoke_context,
-            data=[Message(role="user", content="I need to purchase equipment for $5000")],
+            data=[
+                Message(role="user", content="I need to purchase equipment for $5000")
+            ],
         )
 
         results = []
@@ -899,29 +929,35 @@ class TestComplexWorkflowPatterns:
         - If question about math -> Math function -> Response LLM
         - Otherwise -> Direct response
         """
+
         def mock_router(messages: List[Message]) -> List[Message]:
             """Route based on input content."""
             content = messages[-1].content.lower() if messages else ""
             if "weather" in content:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("w1", "weather", '{"location": "NYC"}')
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call("w1", "weather", '{"location": "NYC"}')
+                        ],
+                    )
+                ]
             elif "math" in content or "calculate" in content:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("m1", "math", '{"expr": "2+2"}')
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("m1", "math", '{"expr": "2+2"}')],
+                    )
+                ]
             else:
-                return [Message(
-                    role="assistant", content="I can help with weather or math questions!"
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content="I can help with weather or math questions!",
+                    )
+                ]
 
         def weather(self, location: str) -> str:
             return "Weather in NYC: Sunny, 75°F"
@@ -932,21 +968,26 @@ class TestComplexWorkflowPatterns:
         def mock_response(messages: List[Message]) -> List[Message]:
             """Generate final response from function result."""
             last_content = messages[-1].content if messages else ""
-            return [Message(role="assistant", content=f"Here's what I found: {last_content}")]
+            return [
+                Message(
+                    role="assistant", content=f"Here's what I found: {last_content}"
+                )
+            ]
 
         agent_input = InputTopic(name="agent_input")
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         weather_topic = Topic(
             name="weather_call",
             condition=lambda event: (
                 event.data[-1].tool_calls is not None
-                and any(tc.function.name == "weather" for tc in event.data[-1].tool_calls)
+                and any(
+                    tc.function.name == "weather" for tc in event.data[-1].tool_calls
+                )
             ),
         )
         math_topic = Topic(
@@ -990,7 +1031,9 @@ class TestComplexWorkflowPatterns:
         response_node = (
             Node.builder()
             .name("ResponseNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(function_result_topic).build())
+            .subscribe(
+                SubscriptionBuilder().subscribed_to(function_result_topic).build()
+            )
             .tool(LLMMockTool(function=mock_response))
             .publish_to(agent_output)
             .build()
@@ -1034,20 +1077,24 @@ class TestComplexWorkflowPatterns:
             # Check if we have function results
             has_results = any(msg.role == "tool" for msg in messages)
             if has_results:
-                return [Message(
-                    role="assistant",
-                    content="Combined weather and news: Great day, no major events!",
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content="Combined weather and news: Great day, no major events!",
+                    )
+                ]
             else:
                 # Request both functions at once
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("w1", "weather", "{}"),
-                        make_tool_call("n1", "news", "{}"),
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call("w1", "weather", "{}"),
+                            make_tool_call("n1", "news", "{}"),
+                        ],
+                    )
+                ]
 
         def weather(self) -> str:
             """Handle weather function call."""
@@ -1061,8 +1108,7 @@ class TestComplexWorkflowPatterns:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1137,21 +1183,23 @@ class TestComplexWorkflowPatterns:
         def mock_llm(messages: List[Message]) -> List[Message]:
             call_count["llm"] += 1
             if call_count["llm"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("f1", "failing_func", "{}")
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("f1", "failing_func", "{}")],
+                    )
+                ]
             else:
                 # Handle error from function
                 last_content = messages[-1].content if messages else ""
                 if "error" in last_content.lower():
-                    return [Message(
-                        role="assistant",
-                        content="I encountered an error. Let me try a different approach.",
-                    )]
+                    return [
+                        Message(
+                            role="assistant",
+                            content="I encountered an error. Let me try a different approach.",
+                        )
+                    ]
                 return [Message(role="assistant", content="Success!")]
 
         def failing_func(self) -> str:
@@ -1162,8 +1210,7 @@ class TestComplexWorkflowPatterns:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1237,20 +1284,22 @@ class TestComplexWorkflowPatterns:
             accumulated_context.append([m.content for m in messages if m.content])
 
             if len(accumulated_context) == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("c1", "context_func", "{}")
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("c1", "context_func", "{}")],
+                    )
+                ]
             else:
                 # Return summary of all seen content
                 all_content = [c for ctx in accumulated_context for c in ctx]
-                return [Message(
-                    role="assistant",
-                    content=f"Processed {len(all_content)} messages",
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=f"Processed {len(all_content)} messages",
+                    )
+                ]
 
         def context_func(self) -> str:
             return "Context function executed"
@@ -1259,8 +1308,7 @@ class TestComplexWorkflowPatterns:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1351,14 +1399,15 @@ class TestEdgeCasesAndExceptions:
         """
         Test that exceptions in FunctionCallTool are properly propagated.
         """
+
         def mock_llm(messages: List[Message]) -> List[Message]:
-            return [Message(
-                role="assistant",
-                content=None,
-                tool_calls=[
-                    make_tool_call("err1", "raise_error", '{}')
-                ],
-            )]
+            return [
+                Message(
+                    role="assistant",
+                    content=None,
+                    tool_calls=[make_tool_call("err1", "raise_error", "{}")],
+                )
+            ]
 
         def raise_error(self) -> str:
             raise ValueError("Intentional test error in function call")
@@ -1367,8 +1416,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1417,17 +1465,21 @@ class TestEdgeCasesAndExceptions:
         )
 
         from grafi.common.exceptions import NodeExecutionError
+
         with pytest.raises(NodeExecutionError) as exc_info:
             async for _ in assistant.invoke(input_data):
                 pass
 
-        assert "ErrorNode" in str(exc_info.value) or "Intentional test error" in str(exc_info.value)
+        assert "ErrorNode" in str(exc_info.value) or "Intentional test error" in str(
+            exc_info.value
+        )
 
     @pytest.mark.asyncio
     async def test_exception_in_llm_mock_tool(self, invoke_context):
         """
         Test that exceptions in LLMMockTool are properly propagated.
         """
+
         def failing_llm(messages: List[Message]) -> List[Message]:
             raise RuntimeError("LLM processing failed")
 
@@ -1462,6 +1514,7 @@ class TestEdgeCasesAndExceptions:
         )
 
         from grafi.common.exceptions import NodeExecutionError
+
         with pytest.raises(NodeExecutionError) as exc_info:
             async for _ in assistant.invoke(input_data):
                 pass
@@ -1473,6 +1526,7 @@ class TestEdgeCasesAndExceptions:
         """
         Test handling when LLM returns a message with empty content but no tool calls.
         """
+
         def empty_content_llm(messages: List[Message]) -> List[Message]:
             return [Message(role="assistant", content="")]
 
@@ -1518,6 +1572,7 @@ class TestEdgeCasesAndExceptions:
         """
         Test that LLMMockTool properly wraps single Message in a list.
         """
+
         def single_message_llm(messages: List[Message]) -> Message:
             # Return single Message, not list
             return Message(role="assistant", content="Single message response")
@@ -1564,18 +1619,23 @@ class TestEdgeCasesAndExceptions:
         """
         Test handling of tool calls with malformed JSON arguments.
         """
+
         def mock_llm(messages: List[Message]) -> List[Message]:
-            return [Message(
-                role="assistant",
-                content=None,
-                tool_calls=[
-                    ChatCompletionMessageToolCall(
-                        id="bad_json",
-                        type="function",
-                        function=Function(name="some_func", arguments="not valid json{"),
-                    )
-                ],
-            )]
+            return [
+                Message(
+                    role="assistant",
+                    content=None,
+                    tool_calls=[
+                        ChatCompletionMessageToolCall(
+                            id="bad_json",
+                            type="function",
+                            function=Function(
+                                name="some_func", arguments="not valid json{"
+                            ),
+                        )
+                    ],
+                )
+            ]
 
         def some_func(self) -> str:
             return "Should not reach here"
@@ -1584,8 +1644,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1608,10 +1667,7 @@ class TestEdgeCasesAndExceptions:
             .name("FuncNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder()
-                .name("SomeFunc")
-                .function(some_func)
-                .build()
+                FunctionCallTool.builder().name("SomeFunc").function(some_func).build()
             )
             .publish_to(agent_output)
             .build()
@@ -1634,6 +1690,7 @@ class TestEdgeCasesAndExceptions:
         )
 
         from grafi.common.exceptions import NodeExecutionError
+
         with pytest.raises(NodeExecutionError):
             async for _ in assistant.invoke(input_data):
                 pass
@@ -1652,19 +1709,22 @@ class TestEdgeCasesAndExceptions:
 
             if call_count["llm"] == 1:
                 # First call: make a function call
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("missing", "nonexistent_function", '{}')
-                    ],
-                )
-            ]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call("missing", "nonexistent_function", "{}")
+                        ],
+                    )
+                ]
             else:
-                return [Message(
-                    role="assistant",
-                    content="Function not found.",
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content="Function not found.",
+                    )
+                ]
 
         def existing_func(self) -> str:
             return "This is an existing function"
@@ -1673,8 +1733,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1752,13 +1811,13 @@ class TestEdgeCasesAndExceptions:
         def mock_llm(messages: List[Message]) -> List[Message]:
             call_count["count"] += 1
             if call_count["count"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("fail", "fail_func", '{}')
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("fail", "fail_func", "{}")],
+                    )
+                ]
             # Should not reach here if workflow stops on error
             return [Message(role="assistant", content="Should not see this")]
 
@@ -1769,8 +1828,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1800,10 +1858,7 @@ class TestEdgeCasesAndExceptions:
             .name("FailNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder()
-                .name("FailTool")
-                .function(fail_func)
-                .build()
+                FunctionCallTool.builder().name("FailTool").function(fail_func).build()
             )
             .publish_to(function_result_topic)
             .build()
@@ -1840,6 +1895,7 @@ class TestEdgeCasesAndExceptions:
         """
         Test LLMMockTool to_dict and from_dict methods.
         """
+
         def sample_llm(messages: List[Message]) -> List[Message]:
             return [Message(role="assistant", content="Serialization test")]
 
@@ -1862,21 +1918,26 @@ class TestEdgeCasesAndExceptions:
         """
         Test handling multiple tool calls in a single LLM response.
         """
+
         def mock_llm(messages: List[Message]) -> List[Message]:
             has_results = any(msg.role == "tool" for msg in messages)
             if has_results:
-                return [Message(
+                return [
+                    Message(
+                        role="assistant",
+                        content="Got results from both functions",
+                    )
+                ]
+            return [
+                Message(
                     role="assistant",
-                    content="Got results from both functions",
-                )]
-            return [Message(
-                role="assistant",
-                content=None,
-                tool_calls=[
-                    make_tool_call("t1", "func_a", '{}'),
-                    make_tool_call("t2", "func_b", '{}'),
-                ],
-            )]
+                    content=None,
+                    tool_calls=[
+                        make_tool_call("t1", "func_a", "{}"),
+                        make_tool_call("t2", "func_b", "{}"),
+                    ],
+                )
+            ]
 
         def func_a(self) -> str:
             return "Result A"
@@ -1888,8 +1949,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -1962,40 +2022,44 @@ class TestEdgeCasesAndExceptions:
         def mock_llm(messages: List[Message]) -> List[Message]:
             call_count["llm"] += 1
             if call_count["llm"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call("json1", "get_complex_data", '{}')
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("json1", "get_complex_data", "{}")],
+                    )
+                ]
             # Check if we received the complex data
             last_content = messages[-1].content if messages else ""
-            return [Message(
-                role="assistant",
-                content=f"Received complex data: {last_content[:50]}...",
-            )]
+            return [
+                Message(
+                    role="assistant",
+                    content=f"Received complex data: {last_content[:50]}...",
+                )
+            ]
 
         def get_complex_data(self) -> str:
             import json
-            return json.dumps({
-                "users": [
-                    {"id": 1, "name": "Alice", "roles": ["admin", "user"]},
-                    {"id": 2, "name": "Bob", "roles": ["user"]},
-                ],
-                "metadata": {
-                    "total": 2,
-                    "page": 1,
-                    "nested": {"deep": {"value": True}}
+
+            return json.dumps(
+                {
+                    "users": [
+                        {"id": 1, "name": "Alice", "roles": ["admin", "user"]},
+                        {"id": 2, "name": "Bob", "roles": ["user"]},
+                    ],
+                    "metadata": {
+                        "total": 2,
+                        "page": 1,
+                        "nested": {"deep": {"value": True}},
+                    },
                 }
-            })
+            )
 
         agent_input = InputTopic(name="agent_input")
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -2069,17 +2133,19 @@ class TestEdgeCasesAndExceptions:
         def mock_llm(messages: List[Message]) -> List[Message]:
             call_count["llm"] += 1
             if call_count["llm"] == 1:
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "special",
-                            "process_text",
-                            '{"text": "Hello\\nWorld\\twith\\ttabs", "query": "test \\"quoted\\""}'
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "special",
+                                "process_text",
+                                '{"text": "Hello\\nWorld\\twith\\ttabs", "query": "test \\"quoted\\""}',
+                            )
+                        ],
+                    )
+                ]
             return [Message(role="assistant", content="Processed special chars")]
 
         def process_text(self, text: str, query: str) -> str:
@@ -2091,8 +2157,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -2157,7 +2222,6 @@ class TestEdgeCasesAndExceptions:
         assert "\t" in received_args.get("text", "")
         assert '"' in received_args.get("query", "")
 
-
     @pytest.mark.asyncio
     async def test_react_agent_single_function_call_twice(self):
         """
@@ -2179,24 +2243,30 @@ class TestEdgeCasesAndExceptions:
 
             if call_count["llm"] == 1:
                 # First call: make a function call
-                return [Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        make_tool_call(
-                            "call_1",
-                            "search",
-                            '{"query": "weather today"}',
-                        )
-                    ],
-                )]
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "call_1",
+                                "search",
+                                '{"query": "weather today"}',
+                            )
+                        ],
+                    )
+                ]
             else:
                 # Second call: respond with the function result
-                last_msg = messages[-1] if messages else Message(role="user", content="")
-                return [Message(
-                    role="assistant",
-                    content=f"Based on search: {last_msg.content}",
-                )]
+                last_msg = (
+                    messages[-1] if messages else Message(role="user", content="")
+                )
+                return [
+                    Message(
+                        role="assistant",
+                        content=f"Based on search: {last_msg.content}",
+                    )
+                ]
 
         def search(self, query: str) -> str:
             """Mock search function."""
@@ -2207,8 +2277,7 @@ class TestEdgeCasesAndExceptions:
         agent_output = OutputTopic(
             name="agent_output",
             condition=lambda event: (
-                event.data[-1].content is not None
-                and event.data[-1].tool_calls is None
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
             ),
         )
         function_call_topic = Topic(
@@ -2239,7 +2308,9 @@ class TestEdgeCasesAndExceptions:
             Node.builder()
             .name("SearchNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
-            .tool(FunctionCallTool.builder().name("SearchTool").function(search).build())
+            .tool(
+                FunctionCallTool.builder().name("SearchTool").function(search).build()
+            )
             .publish_to(function_result_topic)
             .build()
         )

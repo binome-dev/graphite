@@ -29,38 +29,52 @@ class Container(metaclass=SingletonMeta):
         # Per-instance attributes:
         self._event_store: Optional[EventStore] = None
         self._tracer: Optional[Tracer] = None
+        # Lock for thread-safe lazy initialization of properties
+        self._init_lock: threading.Lock = threading.Lock()
 
     def register_event_store(self, event_store: EventStore) -> None:
         """Override the default EventStore implementation."""
-        if isinstance(event_store, EventStoreInMemory):
-            logger.warning(
-                "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
-            )
-        self._event_store = event_store
+        with self._init_lock:
+            if isinstance(event_store, EventStoreInMemory):
+                logger.warning(
+                    "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
+                )
+            self._event_store = event_store
 
     def register_tracer(self, tracer: Tracer) -> None:
         """Override the default Tracer implementation."""
-        self._tracer = tracer
+        with self._init_lock:
+            self._tracer = tracer
 
     @property
     def event_store(self) -> EventStore:
-        if self._event_store is None:
-            logger.warning(
-                "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
-            )
-            self._event_store = EventStoreInMemory()
-        return self._event_store
+        # Fast path: already initialized
+        if self._event_store is not None:
+            return self._event_store
+        # Slow path: initialize with lock (double-checked locking)
+        with self._init_lock:
+            if self._event_store is None:
+                logger.warning(
+                    "Using EventStoreInMemory. This is ONLY suitable for local testing but not for production."
+                )
+                self._event_store = EventStoreInMemory()
+            return self._event_store
 
     @property
     def tracer(self) -> Tracer:
-        if self._tracer is None:
-            self._tracer = setup_tracing(
-                tracing_options=TracingOptions.AUTO,
-                collector_endpoint="localhost",
-                collector_port=4317,
-                project_name="grafi-trace",
-            )
-        return self._tracer
+        # Fast path: already initialized
+        if self._tracer is not None:
+            return self._tracer
+        # Slow path: initialize with lock (double-checked locking)
+        with self._init_lock:
+            if self._tracer is None:
+                self._tracer = setup_tracing(
+                    tracing_options=TracingOptions.AUTO,
+                    collector_endpoint="localhost",
+                    collector_port=4317,
+                    project_name="grafi-trace",
+                )
+            return self._tracer
 
 
 container: Container = Container()
