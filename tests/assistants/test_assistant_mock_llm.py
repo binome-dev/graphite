@@ -463,12 +463,18 @@ class TestHumanInTheLoopWithMockLLM:
     """
     Test Human-in-the-Loop (HITL) workflows using FunctionTool to simulate LLM behavior.
 
-    HITL workflow pattern:
-    1. LLM processes input and decides to request human input
-    2. Workflow pauses, emits event for human response
-    3. Human provides input via InWorkflowInputTopic
-    4. Workflow continues with human input
-    5. LLM generates final response
+    HITL workflow pattern (following tests_integration/hith_assistant concepts):
+    1. LLM processes input and decides to request human input via tool call
+    2. Function node executes and publishes to InWorkflowOutputTopic
+    3. Workflow pauses, emits event for human response
+    4. Human provides input via new invoke with consumed_event_ids
+    5. Input goes to InWorkflowInputTopic, LLM continues processing
+    6. LLM generates final response or requests more human input
+
+    Key components:
+    - InWorkflowOutputTopic: Pauses workflow and emits to external consumer (human)
+    - InWorkflowInputTopic: Receives human response to continue workflow
+    - consumed_event_ids: Links human response to previous outputs when resuming
     """
 
     @pytest.fixture
@@ -485,7 +491,7 @@ class TestHumanInTheLoopWithMockLLM:
         """
         Test HITL workflow when LLM can respond without human input.
 
-        Flow: Input -> LLM (direct response) -> Output
+        Flow: Input -> LLM (direct response, no tool call) -> Output
         """
 
         def mock_llm(messages: List[Message]) -> List[Message]:
@@ -536,60 +542,61 @@ class TestHumanInTheLoopWithMockLLM:
         assert results[0].data[0].content == "I can answer this directly!"
 
     @pytest.mark.asyncio
-    async def test_hitl_workflow_with_human_approval(self, invoke_context):
+    async def test_hitl_workflow_with_in_workflow_topics(self, invoke_context):
         """
-        Test HITL workflow that requests and receives human approval.
+        Test proper HITL workflow using InWorkflowInputTopic and InWorkflowOutputTopic.
+
+        This follows the pattern from tests_integration/hith_assistant:
+        1. First invoke: LLM requests human info -> pauses at InWorkflowOutputTopic
+        2. Second invoke: Human provides response via consumed_event_ids -> continues
+        3. LLM generates final response
 
         Flow:
-        1. Input -> LLM (requests approval) -> HITL Output
-        2. Human approval -> HITL Input -> LLM (processes approval) -> Output
+        Invoke 1: Input -> LLM (tool call) -> FunctionNode -> InWorkflowOutputTopic (pauses)
+        Invoke 2: Human response (with consumed_event_ids) -> InWorkflowInputTopic -> LLM -> Output
         """
         call_count = {"llm": 0}
 
         def mock_llm(messages: List[Message]) -> List[Message]:
-            """Mock LLM that requests approval on first call."""
+            """Mock LLM that requests human info on first call, responds on second."""
             call_count["llm"] += 1
 
             if call_count["llm"] == 1:
-                # First call: request human approval
+                # First call: request human information
                 return [
                     Message(
                         role="assistant",
                         content=None,
                         tool_calls=[
                             make_tool_call(
-                                "approval_1",
-                                "request_approval",
-                                '{"action": "delete_account", "reason": "user requested"}',
+                                "info_1",
+                                "request_human_information",
+                                '{"question": "What is your name?"}',
                             )
                         ],
                     )
                 ]
             else:
-                # Second call: process approval result
-                last_content = messages[-1].content if messages else ""
-                if "approved" in last_content.lower():
-                    return [
-                        Message(
-                            role="assistant",
-                            content="Account deletion has been approved and completed.",
-                        )
-                    ]
-                else:
-                    return [
-                        Message(
-                            role="assistant",
-                            content="Account deletion was rejected.",
-                        )
-                    ]
+                # Second call: process human response and generate final answer
+                # Find the user's response in messages
+                user_response = ""
+                for msg in messages:
+                    if msg.role == "user" and msg.content:
+                        user_response = msg.content
+                return [
+                    Message(
+                        role="assistant",
+                        content=f"Thank you! I received your response: {user_response}",
+                    )
+                ]
 
-        def request_approval(self, action: str, reason: str) -> str:
-            """Mock HITL request that simulates human approval."""
-            # In a real scenario, this would pause and wait for human input
-            # For testing, we simulate automatic approval
-            return "Action APPROVED by human reviewer"
+        def request_human_information(self, question: str) -> str:
+            """Mock function that returns a schema for human to fill."""
+            import json
 
-        # Create topics
+            return json.dumps({"question": question, "answer": "string"})
+
+        # Create topics following integration test pattern
         agent_input = InputTopic(name="agent_input")
         agent_output = OutputTopic(
             name="agent_output",
@@ -602,15 +609,14 @@ class TestHumanInTheLoopWithMockLLM:
             condition=lambda event: event.data[-1].tool_calls is not None,
         )
 
-        # HITL topics for human interaction
+        # HITL topics - the key components for true HITL pattern
         human_response_topic = InWorkflowInputTopic(name="human_response")
         human_request_topic = InWorkflowOutputTopic(
             name="human_request",
             paired_in_workflow_input_topic_names=["human_response"],
         )
-        hitl_result_topic = Topic(name="hitl_result")
 
-        # LLM node
+        # LLM node subscribes to both initial input AND human responses
         llm_node = (
             Node.builder()
             .name("MockLLMNode")
@@ -618,7 +624,7 @@ class TestHumanInTheLoopWithMockLLM:
                 SubscriptionBuilder()
                 .subscribed_to(agent_input)
                 .or_()
-                .subscribed_to(hitl_result_topic)
+                .subscribed_to(human_response_topic)
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
@@ -627,18 +633,343 @@ class TestHumanInTheLoopWithMockLLM:
             .build()
         )
 
-        # HITL request node
-        hitl_node = (
+        # Function node publishes to InWorkflowOutputTopic to pause for human
+        function_node = (
             Node.builder()
             .name("HITLRequestNode")
             .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
             .tool(
                 FunctionCallTool.builder()
                 .name("HITLRequest")
+                .function(request_human_information)
+                .build()
+            )
+            .publish_to(human_request_topic)  # InWorkflowOutputTopic - pauses here
+            .build()
+        )
+
+        workflow = (
+            EventDrivenWorkflow.builder()
+            .name("hitl_in_workflow_topics")
+            .node(llm_node)
+            .node(function_node)
+            .build()
+        )
+
+        with patch.object(Assistant, "_construct_workflow"):
+            assistant = Assistant(name="TestHITLAgent", workflow=workflow)
+
+        # First invoke: should pause at InWorkflowOutputTopic
+        first_input = PublishToTopicEvent(
+            invoke_context=invoke_context,
+            data=[Message(role="user", content="I want to register")],
+        )
+
+        first_outputs = []
+        async for event in assistant.invoke(first_input):
+            first_outputs.append(event)
+
+        # Should get output from InWorkflowOutputTopic (the HITL request)
+        assert len(first_outputs) == 1
+        assert call_count["llm"] == 1
+
+        # Second invoke: human provides response with consumed_event_ids
+        human_response = PublishToTopicEvent(
+            invoke_context=InvokeContext(
+                conversation_id=invoke_context.conversation_id,
+                invoke_id=uuid.uuid4().hex,
+                assistant_request_id=invoke_context.assistant_request_id,
+            ),
+            data=[Message(role="user", content="My name is Alice")],
+            consumed_event_ids=[event.event_id for event in first_outputs],
+        )
+
+        second_outputs = []
+        async for event in assistant.invoke(human_response):
+            second_outputs.append(event)
+
+        # Should get final response from LLM
+        assert len(second_outputs) == 1
+        assert "Alice" in second_outputs[0].data[0].content
+        assert call_count["llm"] == 2
+
+    @pytest.mark.asyncio
+    async def test_hitl_workflow_multi_turn_human_input(self, invoke_context):
+        """
+        Test HITL workflow requiring multiple rounds of human input.
+
+        This simulates a registration flow requiring name and age separately.
+
+        Flow:
+        Invoke 1: Input -> LLM (request name) -> pause
+        Invoke 2: Name response -> LLM (request age) -> pause
+        Invoke 3: Age response -> LLM (complete registration) -> Output
+        """
+        call_count = {"llm": 0}
+
+        def mock_llm(messages: List[Message]) -> List[Message]:
+            """Mock LLM that collects info step by step."""
+            call_count["llm"] += 1
+
+            if call_count["llm"] == 1:
+                # First: request name
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "name_req",
+                                "request_info",
+                                '{"field": "name"}',
+                            )
+                        ],
+                    )
+                ]
+            elif call_count["llm"] == 2:
+                # Second: got name, request age
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "age_req",
+                                "request_info",
+                                '{"field": "age"}',
+                            )
+                        ],
+                    )
+                ]
+            else:
+                # Third: got all info, complete registration
+                return [
+                    Message(
+                        role="assistant",
+                        content="Registration complete! Welcome to the gym.",
+                    )
+                ]
+
+        def request_info(self, field: str) -> str:
+            """Request a specific piece of information."""
+            import json
+
+            return json.dumps({"requested_field": field})
+
+        # Topics
+        agent_input = InputTopic(name="agent_input")
+        agent_output = OutputTopic(
+            name="agent_output",
+            condition=lambda event: (
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
+            ),
+        )
+        hitl_call_topic = Topic(
+            name="hitl_call",
+            condition=lambda event: event.data[-1].tool_calls is not None,
+        )
+        human_response_topic = InWorkflowInputTopic(name="human_response")
+        human_request_topic = InWorkflowOutputTopic(
+            name="human_request",
+            paired_in_workflow_input_topic_names=["human_response"],
+        )
+
+        llm_node = (
+            Node.builder()
+            .name("MockLLMNode")
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input)
+                .or_()
+                .subscribed_to(human_response_topic)
+                .build()
+            )
+            .tool(LLMMockTool(function=mock_llm))
+            .publish_to(agent_output)
+            .publish_to(hitl_call_topic)
+            .build()
+        )
+
+        function_node = (
+            Node.builder()
+            .name("InfoRequestNode")
+            .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
+            .tool(
+                FunctionCallTool.builder()
+                .name("InfoRequest")
+                .function(request_info)
+                .build()
+            )
+            .publish_to(human_request_topic)
+            .build()
+        )
+
+        workflow = (
+            EventDrivenWorkflow.builder()
+            .name("hitl_multi_turn")
+            .node(llm_node)
+            .node(function_node)
+            .build()
+        )
+
+        with patch.object(Assistant, "_construct_workflow"):
+            assistant = Assistant(name="TestHITLAgent", workflow=workflow)
+
+        # Invoke 1: Initial request
+        outputs_1 = []
+        async for event in assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=[Message(role="user", content="Register me for the gym")],
+            )
+        ):
+            outputs_1.append(event)
+
+        assert len(outputs_1) == 1
+        assert call_count["llm"] == 1
+
+        # Invoke 2: Provide name
+        outputs_2 = []
+        async for event in assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=InvokeContext(
+                    conversation_id=invoke_context.conversation_id,
+                    invoke_id=uuid.uuid4().hex,
+                    assistant_request_id=invoke_context.assistant_request_id,
+                ),
+                data=[Message(role="user", content="My name is Bob")],
+                consumed_event_ids=[e.event_id for e in outputs_1],
+            )
+        ):
+            outputs_2.append(event)
+
+        assert len(outputs_2) == 1
+        assert call_count["llm"] == 2
+
+        # Invoke 3: Provide age
+        outputs_3 = []
+        async for event in assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=InvokeContext(
+                    conversation_id=invoke_context.conversation_id,
+                    invoke_id=uuid.uuid4().hex,
+                    assistant_request_id=invoke_context.assistant_request_id,
+                ),
+                data=[Message(role="user", content="My age is 25")],
+                consumed_event_ids=[e.event_id for e in outputs_2],
+            )
+        ):
+            outputs_3.append(event)
+
+        assert len(outputs_3) == 1
+        assert "Registration complete" in outputs_3[0].data[0].content
+        assert call_count["llm"] == 3
+
+    @pytest.mark.asyncio
+    async def test_hitl_workflow_with_approval_rejection(self, invoke_context):
+        """
+        Test HITL workflow where human can approve or reject an action.
+
+        This tests the approval pattern with InWorkflowOutputTopic.
+        """
+        call_count = {"llm": 0}
+
+        def mock_llm(messages: List[Message]) -> List[Message]:
+            call_count["llm"] += 1
+
+            if call_count["llm"] == 1:
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_1",
+                                "request_approval",
+                                '{"action": "delete_account"}',
+                            )
+                        ],
+                    )
+                ]
+            else:
+                # Check last user message for approval decision
+                last_user_msg = ""
+                for msg in reversed(messages):
+                    if msg.role == "user" and msg.content:
+                        last_user_msg = msg.content.lower()
+                        break
+
+                if "approve" in last_user_msg or "yes" in last_user_msg:
+                    return [
+                        Message(
+                            role="assistant",
+                            content="Account deletion approved and completed.",
+                        )
+                    ]
+                else:
+                    return [
+                        Message(
+                            role="assistant",
+                            content="Account deletion was rejected. No action taken.",
+                        )
+                    ]
+
+        def request_approval(self, action: str) -> str:
+            """Request human approval for an action."""
+            import json
+
+            return json.dumps(
+                {
+                    "action": action,
+                    "message": f"Do you approve: {action}?",
+                    "options": ["approve", "reject"],
+                }
+            )
+
+        agent_input = InputTopic(name="agent_input")
+        agent_output = OutputTopic(
+            name="agent_output",
+            condition=lambda event: (
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
+            ),
+        )
+        hitl_call_topic = Topic(
+            name="hitl_call",
+            condition=lambda event: event.data[-1].tool_calls is not None,
+        )
+        human_response_topic = InWorkflowInputTopic(name="human_response")
+        human_request_topic = InWorkflowOutputTopic(
+            name="human_request",
+            paired_in_workflow_input_topic_names=["human_response"],
+        )
+
+        llm_node = (
+            Node.builder()
+            .name("MockLLMNode")
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input)
+                .or_()
+                .subscribed_to(human_response_topic)
+                .build()
+            )
+            .tool(LLMMockTool(function=mock_llm))
+            .publish_to(agent_output)
+            .publish_to(hitl_call_topic)
+            .build()
+        )
+
+        hitl_node = (
+            Node.builder()
+            .name("ApprovalNode")
+            .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
+            .tool(
+                FunctionCallTool.builder()
+                .name("ApprovalTool")
                 .function(request_approval)
                 .build()
             )
-            .publish_to(hitl_result_topic)
+            .publish_to(human_request_topic)
             .build()
         )
 
@@ -653,9 +984,138 @@ class TestHumanInTheLoopWithMockLLM:
         with patch.object(Assistant, "_construct_workflow"):
             assistant = Assistant(name="TestHITLAgent", workflow=workflow)
 
+        # First invoke: request approval
+        outputs_1 = []
+        async for event in assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=[Message(role="user", content="Delete my account")],
+            )
+        ):
+            outputs_1.append(event)
+
+        assert len(outputs_1) == 1
+        assert call_count["llm"] == 1
+
+        # Second invoke: human rejects
+        outputs_2 = []
+        async for event in assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=InvokeContext(
+                    conversation_id=invoke_context.conversation_id,
+                    invoke_id=uuid.uuid4().hex,
+                    assistant_request_id=invoke_context.assistant_request_id,
+                ),
+                data=[Message(role="user", content="reject")],
+                consumed_event_ids=[e.event_id for e in outputs_1],
+            )
+        ):
+            outputs_2.append(event)
+
+        assert len(outputs_2) == 1
+        assert "rejected" in outputs_2[0].data[0].content.lower()
+        assert call_count["llm"] == 2
+
+    @pytest.mark.asyncio
+    async def test_hitl_legacy_auto_approval_pattern(self, invoke_context):
+        """
+        Test legacy HITL pattern where function auto-responds (no real human pause).
+
+        This is the simpler pattern where the function immediately returns a result
+        without pausing for actual human input. Useful for testing function call flows.
+        """
+        call_count = {"llm": 0}
+
+        def mock_llm(messages: List[Message]) -> List[Message]:
+            """Mock LLM that requests approval on first call."""
+            call_count["llm"] += 1
+
+            if call_count["llm"] == 1:
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[
+                            make_tool_call(
+                                "approval_1",
+                                "auto_approve",
+                                '{"action": "test_action"}',
+                            )
+                        ],
+                    )
+                ]
+            else:
+                last_content = messages[-1].content if messages else ""
+                if "approved" in last_content.lower():
+                    return [
+                        Message(
+                            role="assistant",
+                            content="Action was automatically approved.",
+                        )
+                    ]
+                return [Message(role="assistant", content="Action completed.")]
+
+        def auto_approve(self, action: str) -> str:
+            """Simulate automatic approval without human intervention."""
+            return "Action APPROVED automatically"
+
+        agent_input = InputTopic(name="agent_input")
+        agent_output = OutputTopic(
+            name="agent_output",
+            condition=lambda event: (
+                event.data[-1].content is not None and event.data[-1].tool_calls is None
+            ),
+        )
+        function_call_topic = Topic(
+            name="function_call",
+            condition=lambda event: event.data[-1].tool_calls is not None,
+        )
+        function_result_topic = Topic(name="function_result")
+
+        llm_node = (
+            Node.builder()
+            .name("MockLLMNode")
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input)
+                .or_()
+                .subscribed_to(function_result_topic)
+                .build()
+            )
+            .tool(LLMMockTool(function=mock_llm))
+            .publish_to(agent_output)
+            .publish_to(function_call_topic)
+            .build()
+        )
+
+        function_node = (
+            Node.builder()
+            .name("AutoApproveNode")
+            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
+            .tool(
+                FunctionCallTool.builder()
+                .name("AutoApprove")
+                .function(auto_approve)
+                .build()
+            )
+            .publish_to(function_result_topic)
+            .build()
+        )
+
+        workflow = (
+            EventDrivenWorkflow.builder()
+            .name("legacy_auto_approval")
+            .node(llm_node)
+            .node(function_node)
+            .build()
+        )
+
+        with patch.object(Assistant, "_construct_workflow"):
+            assistant = Assistant(name="TestHITLAgent", workflow=workflow)
+
         input_data = PublishToTopicEvent(
             invoke_context=invoke_context,
-            data=[Message(role="user", content="Please delete my account")],
+            data=[Message(role="user", content="Do something that needs approval")],
         )
 
         results = []
@@ -665,244 +1125,6 @@ class TestHumanInTheLoopWithMockLLM:
         assert len(results) == 1
         assert "approved" in results[0].data[0].content.lower()
         assert call_count["llm"] == 2
-
-    @pytest.mark.asyncio
-    async def test_hitl_workflow_with_rejection(self, invoke_context):
-        """
-        Test HITL workflow where human rejects the action.
-        """
-        call_count = {"llm": 0}
-
-        def mock_llm(messages: List[Message]) -> List[Message]:
-            call_count["llm"] += 1
-
-            if call_count["llm"] == 1:
-                return [
-                    Message(
-                        role="assistant",
-                        content=None,
-                        tool_calls=[
-                            make_tool_call(
-                                "approval_1",
-                                "request_approval",
-                                '{"action": "transfer_funds", "amount": "$10000"}',
-                            )
-                        ],
-                    )
-                ]
-            else:
-                last_content = messages[-1].content if messages else ""
-                if "rejected" in last_content.lower():
-                    return [
-                        Message(
-                            role="assistant",
-                            content="The fund transfer was not approved. No action taken.",
-                        )
-                    ]
-                return [Message(role="assistant", content="Transfer completed.")]
-
-        def request_approval(self, action: str, amount: str) -> str:
-            """Simulate human rejection."""
-            return "Action REJECTED - amount too high"
-
-        agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        hitl_call_topic = Topic(
-            name="hitl_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
-        hitl_result_topic = Topic(name="hitl_result")
-
-        llm_node = (
-            Node.builder()
-            .name("MockLLMNode")
-            .subscribe(
-                SubscriptionBuilder()
-                .subscribed_to(agent_input)
-                .or_()
-                .subscribed_to(hitl_result_topic)
-                .build()
-            )
-            .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(hitl_call_topic)
-            .build()
-        )
-
-        hitl_node = (
-            Node.builder()
-            .name("HITLRejectNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(hitl_call_topic).build())
-            .tool(
-                FunctionCallTool.builder()
-                .name("HITLReject")
-                .function(request_approval)
-                .build()
-            )
-            .publish_to(hitl_result_topic)
-            .build()
-        )
-
-        workflow = (
-            EventDrivenWorkflow.builder()
-            .name("hitl_rejection_workflow")
-            .node(llm_node)
-            .node(hitl_node)
-            .build()
-        )
-
-        with patch.object(Assistant, "_construct_workflow"):
-            assistant = Assistant(name="TestHITLAgent", workflow=workflow)
-
-        input_data = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=[Message(role="user", content="Transfer $10000 to account X")],
-        )
-
-        results = []
-        async for event in assistant.invoke(input_data):
-            results.append(event)
-
-        assert len(results) == 1
-        assert "not approved" in results[0].data[0].content.lower()
-
-    @pytest.mark.asyncio
-    async def test_hitl_workflow_multi_step_approval(self, invoke_context):
-        """
-        Test HITL workflow with multiple approval steps.
-
-        Flow: Input -> LLM (approval1) -> Human1 -> LLM (approval2) -> Human2 -> LLM -> Output
-        """
-        call_count = {"llm": 0}
-
-        def mock_llm(messages: List[Message]) -> List[Message]:
-            call_count["llm"] += 1
-
-            if call_count["llm"] == 1:
-                # First approval: manager
-                return [
-                    Message(
-                        role="assistant",
-                        content=None,
-                        tool_calls=[
-                            make_tool_call(
-                                "approval_1",
-                                "request_manager_approval",
-                                '{"action": "large_purchase", "amount": "$5000"}',
-                            )
-                        ],
-                    )
-                ]
-            elif call_count["llm"] == 2:
-                # Second approval: finance
-                return [
-                    Message(
-                        role="assistant",
-                        content=None,
-                        tool_calls=[
-                            make_tool_call(
-                                "approval_2",
-                                "request_finance_approval",
-                                '{"action": "large_purchase", "amount": "$5000"}',
-                            )
-                        ],
-                    )
-                ]
-            else:
-                # Final response
-                return [
-                    Message(
-                        role="assistant",
-                        content="Purchase approved by manager and finance. Order placed!",
-                    )
-                ]
-
-        approval_count = {"count": 0}
-
-        def request_manager_approval(self, action: str, amount: str) -> str:
-            approval_count["count"] += 1
-            return "Manager APPROVED"
-
-        def request_finance_approval(self, action: str, amount: str) -> str:
-            approval_count["count"] += 1
-            return "Finance APPROVED"
-
-        agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        approval_call_topic = Topic(
-            name="approval_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
-        approval_result_topic = Topic(name="approval_result")
-
-        llm_node = (
-            Node.builder()
-            .name("MockLLMNode")
-            .subscribe(
-                SubscriptionBuilder()
-                .subscribed_to(agent_input)
-                .or_()
-                .subscribed_to(approval_result_topic)
-                .build()
-            )
-            .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(approval_call_topic)
-            .build()
-        )
-
-        approval_node = (
-            Node.builder()
-            .name("ApprovalNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(approval_call_topic).build())
-            .tool(
-                FunctionCallTool.builder()
-                .name("ApprovalTool")
-                .function(request_manager_approval)
-                .function(request_finance_approval)
-                .build()
-            )
-            .publish_to(approval_result_topic)
-            .build()
-        )
-
-        workflow = (
-            EventDrivenWorkflow.builder()
-            .name("hitl_multi_approval_workflow")
-            .node(llm_node)
-            .node(approval_node)
-            .build()
-        )
-
-        with patch.object(Assistant, "_construct_workflow"):
-            assistant = Assistant(name="TestHITLAgent", workflow=workflow)
-
-        input_data = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            data=[
-                Message(role="user", content="I need to purchase equipment for $5000")
-            ],
-        )
-
-        results = []
-        async for event in assistant.invoke(input_data):
-            results.append(event)
-
-        assert len(results) == 1
-        assert "manager" in results[0].data[0].content.lower()
-        assert "finance" in results[0].data[0].content.lower()
-        assert call_count["llm"] == 3
-        assert approval_count["count"] == 2
 
 
 class TestComplexWorkflowPatterns:
