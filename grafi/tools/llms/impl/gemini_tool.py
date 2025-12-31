@@ -60,7 +60,7 @@ class GeminiTool(LLM):
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
-    model: str = Field(default="gemini-2.0-flash-lite")
+    model: str = Field(default="gemini-2.5-flash-lite")
 
     @classmethod
     def builder(cls) -> "GeminiToolBuilder":

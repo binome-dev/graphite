@@ -39,7 +39,7 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
     name: str = Field(default="SimpleGeminiFunctionCallAssistant")
     type: str = Field(default="SimpleGeminiFunctionCallAssistant")
     api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    model: str = Field(default="gemini-2.0-flash-lite")
+    model: str = Field(default="gemini-2.5-flash-lite")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)
     function_tool: FunctionCallTool

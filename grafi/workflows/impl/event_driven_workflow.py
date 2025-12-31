@@ -543,6 +543,8 @@ class EventDrivenWorkflow(Workflow):
 
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
+                    # Force stop the tracker so the workflow terminates
+                    await self._tracker.force_stop()
                     raise NodeExecutionError(
                         node_name=node.name,
                         message=f"Async node execution failed: {node_error}",
