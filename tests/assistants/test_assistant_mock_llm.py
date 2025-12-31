@@ -2570,6 +2570,5 @@ class TestEdgeCasesAndExceptions:
         async for event in assistant.invoke(input_data, is_sequential=True):
             second_results.append(event)
 
-        
         # The second invocation should not produce any output as the workflow completes after first
         assert len(second_results) == 0
