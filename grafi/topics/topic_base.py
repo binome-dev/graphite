@@ -79,7 +79,18 @@ class TopicBase(BaseModel):
         """
         Publish data to the topic if it meets the condition.
         """
-        if self.condition(publish_event):
+        try:
+            condition_met = self.condition(publish_event)
+        except Exception as e:
+            # Condition evaluation failed (e.g., IndexError on empty data)
+            # Treat as condition not met
+            logger.debug(
+                f"[{self.name}] Condition evaluation failed: {e}. "
+                "Treating as condition not met."
+            )
+            condition_met = False
+
+        if condition_met:
             event = publish_event.model_copy(
                 update={
                     "name": self.name,

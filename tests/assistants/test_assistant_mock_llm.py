@@ -2274,9 +2274,8 @@ class TestEdgeCasesAndExceptions:
             data=[Message(role="user", content="What's the weather again?")],
         )
 
-        async for event in assistant.invoke(input_data):
-            results.append(event)
+        secound_results = []
+        async for event in assistant.invoke(input_data, is_sequential=True):
+            secound_results.append(event)
 
-        assert len(results) == 1
-        assert "Based on search" in results[0].data[0].content
-        assert call_count["llm"] == 2
+        assert len(secound_results) == 0

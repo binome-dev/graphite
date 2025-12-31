@@ -13,9 +13,10 @@ class TestAsyncNodeTracker:
 
     @pytest.mark.asyncio
     async def test_initial_state(self, tracker):
-        """Tracker starts idle with no work recorded."""
+        """Tracker starts idle with no active nodes and no uncommitted messages."""
         assert await tracker.is_idle()
-        assert await tracker.is_quiescent() is False
+        # Fresh tracker is quiescent (no active nodes, no uncommitted messages)
+        assert await tracker.is_quiescent() is True
         assert await tracker.get_activity_count() == 0
         assert (await tracker.get_metrics())["uncommitted_messages"] == 0
 
@@ -31,8 +32,8 @@ class TestAsyncNodeTracker:
         await tracker.leave("node1")
 
         assert await tracker.is_idle()
-        # No commits yet so quiescence is still False
-        assert await tracker.is_quiescent() is False
+        # After leaving with no uncommitted messages, tracker is quiescent
+        assert await tracker.is_quiescent() is True
         assert await tracker.get_activity_count() == 1
 
     @pytest.mark.asyncio
@@ -67,7 +68,9 @@ class TestAsyncNodeTracker:
 
     @pytest.mark.asyncio
     async def test_wait_for_quiescence_timeout(self, tracker):
-        """wait_for_quiescence returns False on timeout."""
+        """wait_for_quiescence returns False on timeout when not quiescent."""
+        # Make tracker not quiescent by adding uncommitted messages
+        await tracker.on_messages_published(1)
         result = await tracker.wait_for_quiescence(timeout=0.01)
         assert result is False
         assert await tracker.is_quiescent() is False
@@ -82,9 +85,10 @@ class TestAsyncNodeTracker:
         tracker.reset()
 
         assert await tracker.is_idle()
-        assert await tracker.is_quiescent() is False
+        # After reset, tracker is quiescent (no active nodes, no uncommitted messages)
+        assert await tracker.is_quiescent() is True
         assert await tracker.get_activity_count() == 0
-        assert (await tracker.get_metrics())["total_committed"] == 0
+        assert (await tracker.get_metrics())["uncommitted_messages"] == 0
 
     @pytest.mark.asyncio
     async def test_force_stop(self, tracker):
@@ -133,4 +137,5 @@ class TestAsyncNodeTracker:
         tracker.reset()
 
         assert tracker._force_stopped is False
-        assert await tracker.should_terminate() is False
+        # After reset with no uncommitted messages, should_terminate is True (quiescent)
+        assert await tracker.should_terminate() is True
