@@ -2113,7 +2113,7 @@ class TestEdgeCasesAndExceptions:
         assert call_count["count"] == 1
 
     @pytest.mark.asyncio
-    async def test_llm_mock_tool_serialization(self, invoke_context):
+    async def test_llm_mock_tool_serialization(self):
         """
         Test LLMMockTool to_dict and from_dict methods.
         """
@@ -2567,8 +2567,8 @@ class TestEdgeCasesAndExceptions:
             data=[Message(role="user", content="What's the weather again?")],
         )
 
-        secound_results = []
+        second_results = []
         async for event in assistant.invoke(input_data, is_sequential=True):
-            secound_results.append(event)
+            second_results.append(event)
 
-        assert len(secound_results) == 0
+        assert len(second_results) == 0
