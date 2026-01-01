@@ -15,8 +15,8 @@ class InMemTopicEventQueue(TopicEventQueue):
     """
     In memory message queue where multiple publishers send events to all subscribers.
 
-    A publisher consists in any object who generates message.
-    A subscriber consists in any object who can consume messages.
+    A publisher consists of any object that generates messages.
+    A subscriber consists of any object that can consume messages.
     """
 
     def __init__(self) -> None:

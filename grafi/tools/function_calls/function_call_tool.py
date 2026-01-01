@@ -104,19 +104,16 @@ class FunctionCallTool(Tool):
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
-        Invoke the registered function with the given arguments.
+        Invoke the registered functions based on tool calls in input_data.
 
         This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to invoke.
-            arguments (Dict[str, Any]): The arguments to pass to the function.
+            invoke_context: Context for tracking the invocation lifecycle.
+            input_data: Messages containing tool_calls to execute.
 
-        Returns:
-            Any: The result of the function invoke.
-
-        Raises:
-            ValueError: If the provided function_name doesn't match the registered function.
+        Yields:
+            Messages: Results from executing the tool calls.
         """
         if not input_data:
             logger.warning("No input data provided.")
@@ -231,6 +228,17 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
     """
 
     def function(self, function: Callable) -> Self:
+        """Add a function that can be called by the LLM.
+
+        If the function is not already decorated with @llm_function,
+        it will be automatically wrapped.
+
+        Args:
+            function: A callable to expose as a tool function.
+
+        Returns:
+            Self for method chaining.
+        """
         if not hasattr(function, "_function_spec"):
             function = llm_function(function)
 

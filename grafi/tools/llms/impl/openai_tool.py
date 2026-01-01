@@ -228,6 +228,16 @@ class OpenAITool(LLM):
 
 
 class OpenAIToolBuilder(LLMBuilder[OpenAITool]):
+    """Builder for OpenAITool instances."""
+
     def api_key(self, api_key: Optional[str]) -> Self:
+        """Set the OpenAI API key.
+
+        Args:
+            api_key: The API key for OpenAI authentication.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["api_key"] = api_key
         return self

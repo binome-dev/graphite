@@ -9,8 +9,6 @@ The page explicitly says you can call the API with the OpenAI SDK by
 setting `base_url="https://api.deepseek.com"`  :contentReference[oaicite:0]{index=0}
 """
 
-from __future__ import annotations
-
 import asyncio
 import os
 from typing import Any

@@ -212,14 +212,41 @@ T_T = TypeVar("T_T", bound=TopicBase)
 
 
 class TopicBaseBuilder(BaseBuilder[T_T]):
+    """Builder for TopicBase instances."""
+
     def name(self, name: str) -> Self:
+        """Set the topic's unique name.
+
+        Args:
+            name: Unique identifier for the topic within a workflow.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
+        """Set the topic's type identifier.
+
+        Args:
+            type_name: Type classification for the topic.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["type"] = type_name
         return self
 
     def condition(self, condition: Callable[[Messages], bool]) -> Self:
+        """Set a condition function that determines when this topic is satisfied.
+
+        Args:
+            condition: A callable that takes Messages and returns True
+                when the topic's output condition is met.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["condition"] = condition
         return self

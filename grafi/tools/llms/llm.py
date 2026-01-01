@@ -242,19 +242,52 @@ class LLMBuilder(ToolBuilder[T_L]):
     """Builder for LLM instances."""
 
     def model(self, model: str) -> Self:
+        """Set the LLM model identifier.
+
+        Args:
+            model: Model name (e.g., 'gpt-4', 'claude-3-opus').
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["model"] = model
         return self
 
     def chat_params(self, params: Dict[str, Any]) -> Self:
+        """Set additional chat completion parameters.
+
+        Args:
+            params: Dictionary of parameters (temperature, max_tokens, etc.).
+                If 'response_format' is included, structured_output is enabled.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["chat_params"] = params
         if "response_format" in params:
             self.kwargs["structured_output"] = True
         return self
 
     def is_streaming(self, is_streaming: bool) -> Self:
+        """Enable or disable streaming responses.
+
+        Args:
+            is_streaming: True to stream responses token-by-token.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["is_streaming"] = is_streaming
         return self
 
     def system_message(self, system_message: Optional[str]) -> Self:
+        """Set the system message for the LLM.
+
+        Args:
+            system_message: Instructions that guide the LLM's behavior.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["system_message"] = system_message
         return self

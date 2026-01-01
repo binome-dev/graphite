@@ -5,8 +5,6 @@ Uses the **new Google Gen AI SDK** (package ``google-genai>=1.5``).
 Docs & examples:  https://ai.google.dev/gemini-api  :contentReference[oaicite:0]{index=0}
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import os
