@@ -108,7 +108,7 @@ class FinanceAssistantBuilder(AssistantBaseBuilder[FinanceAssistant]):
 - Provides methods for setting API key, model, and system message
 - Returns `self` for method chaining
 
-This class is used to set the fields from the `FinanceAssistant` the magic happens on the `builer` method up next.
+This class is used to set the fields from the `FinanceAssistant`. The magic happens in the `builder` method up next.
 
 ### Builder Pattern Implementation
 

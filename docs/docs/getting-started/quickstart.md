@@ -77,11 +77,11 @@ You also need the following two dependencies for this guide.
 
 ---
 
-## Use Build-in ReAct Agent
+## Use Built-in ReAct Agent
 
 In graphite an agent is a specialized assistant that can handle events and perform actions based on the input it receives. We will create a ReAct agent that uses OpenAI's language model to process input, make function calls, and generate responses.
 
-Create a file named `react_agent_app.py` and create a build-in react-agent:
+Create a file named `react_agent_app.py` and create a built-in react-agent:
 
 ```python
 # react_agent_app.py

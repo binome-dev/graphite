@@ -19,7 +19,7 @@ Before getting started, make sure you have:
 - OpenAI API key
 - Basic understanding of Python and AI concepts
 - Basic understanding of what MCP Servers are
-- Understand [Graphtie Assistants](../guide/getting-started-with-assistants.md)
+- Understand [Graphite Assistants](../guide/getting-started-with-assistants.md)
 
 ## Code Walkthrough
 
@@ -337,7 +337,7 @@ class StockAssistantBuilder(
 ```
 
 
-Graphtie is natively asychrnous, but you can chose to run syncrhous coroutines as well. For this case we are making a fully asynchronous workflow by overrding the  `async def run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchrnously.
+Graphite is natively asynchronous, but you can choose to run synchronous coroutines as well. For this case we are making a fully asynchronous workflow by overriding the `async def run()` method of the `Assistant` class. In order to run this create a `main.py` that will instantiate the assistant and execute it asynchronously.
 
 ```python
 #main.py

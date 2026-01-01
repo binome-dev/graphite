@@ -8,50 +8,41 @@ Four critical capabilities—**observability, idempotency, auditability,** and *
 
 Overall, **Graphite** offers a powerful, extensible foundation for building AI solutions that scale, adapt to evolving compliance needs, and gracefully handle failures or user-driven pauses. By combining a robust workflow engine, well-structured nodes and tools, and a complete event model, Graphite enables teams to develop sophisticated conversational agents and automated pipelines with confidence.
 
-## What is Graphite
-
-Graphite is an open-source platform that treats data as interconnected nodes and relationships, allowing you to:
-
-- **Process complex data relationships** with graph-based algorithms
-- **Visualize data connections** through interactive network diagrams
-- **Build analytical pipelines** that leverage graph structures
-- **Scale efficiently** with distributed processing capabilities
-
-Whether you're analyzing social networks, tracking data lineage, exploring knowledge graphs, or building recommendation systems, Graphite provides the tools and abstractions you need to work effectively with connected data.
-
 ## Key Features
 
-**Graph-Native Processing**: Built from the ground up to handle graph data structures efficiently, with optimized algorithms for common graph operations like traversals, clustering, and pathfinding.
+**Event-Driven Architecture**: Built on a pub/sub pattern where Topics manage message flow between Nodes, enabling loose coupling and flexible workflow composition.
 
-**Visual Analytics**: Interactive visualization tools that help you explore and understand complex data relationships through customizable network diagrams and graph layouts.
+**Modular Workflow Components**: Construct AI agents using composable layers - Assistants orchestrate Workflows, Workflows coordinate Nodes, and Nodes execute Tools.
 
-**Flexible Data Integration**: Connect to various data sources including databases, APIs, and file formats, with built-in support for common graph data formats like GraphML, GEXF, and JSON.
+**Multiple LLM Integrations**: Out-of-the-box support for OpenAI, Claude, Gemini, Ollama, DeepSeek, and OpenRouter, with a consistent interface across all providers.
 
-**Extensible Architecture**: Plugin-based system that allows you to extend functionality with custom algorithms, data connectors, and visualization components.
+**Function Calling Support**: Seamlessly integrate custom Python functions with LLMs through the FunctionCallTool, enabling agents to interact with external APIs and services.
 
-**Performance Optimized**: Efficient memory management and parallel processing capabilities designed to handle large-scale graph datasets.
+**MCP Server Integration**: Connect to Model Context Protocol servers for dynamic tool discovery and external data source access.
+
+**Production-Ready Features**: Built-in observability via OpenTelemetry, event sourcing for auditability, idempotent operations, and workflow restorability for fault tolerance.
 
 ## Who Should Use Graphite?
 
-Graphite is designed for data scientists, analysts, researchers, and developers who work with interconnected data, including:
+Graphite is designed for developers and teams building AI-powered applications, including:
 
-- **Data Scientists** building recommendation engines or fraud detection systems
-- **Business Analysts** exploring customer journey maps or organizational networks  
-- **Researchers** analyzing citation networks, protein interactions, or social structures
-- **Developers** building applications that require graph-based computations
+- **AI Engineers** building conversational agents with complex reasoning capabilities
+- **Backend Developers** integrating LLM functionality into production systems
+- **MLOps Teams** deploying observable, auditable AI workflows
+- **Researchers** prototyping multi-step AI agents with tool use
 
 ## Getting Started
 
 This documentation will guide you through:
 
 1. **Installation and Setup** - Get Graphite running in your environment
-2. **Core Concepts** - Understand graphs, nodes, edges, and data models
-3. **Data Import** - Load your data from various sources
-4. **Processing and Analysis** - Apply algorithms and transformations
-5. **Visualization** - Create interactive graph visualizations
-6. **Advanced Topics** - Custom plugins, performance tuning, and deployment
+2. **Core Concepts** - Understand the architecture: Assistants, Workflows, Nodes, and Tools
+3. **Building Workflows** - Create event-driven AI pipelines
+4. **Tool Integration** - Add LLMs, function calls, and MCP servers
+5. **Observability** - Configure tracing with Arize and Phoenix
+6. **Advanced Topics** - Event stores, workflow recovery, and custom tools
 
-Ready to dive in? Start with our [Quick Start Guide](./getting-started/quickstart.md) to get Graphite up and running in minutes, or explore the [Core Concepts](./user-guide/architecture.md) to understand the fundamentals of graph-based data processing.
+Ready to dive in? Start with our [Quick Start Guide](./getting-started/quickstart.md) to build your first AI agent, or explore the [Architecture](./user-guide/architecture.md) to understand how Graphite components work together.
 
 ## Community and Support
 
@@ -61,7 +52,3 @@ Graphite is actively developed and maintained by the open-source community. Join
 - **Issues and Feature Requests**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Join community discussions and get help from other users
 - **Contributing**: Check out our contribution guidelines to help improve Graphite
-
----
-
-*This documentation covers Graphite v0.0.x.*
