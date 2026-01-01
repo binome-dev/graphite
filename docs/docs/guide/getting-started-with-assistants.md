@@ -189,9 +189,9 @@ Prepare input data and context for workflow execution:
 
 ```python
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.invoke_context import InvokeContext
 from typing import Optional
-from grafi.models.message import Message
+from grafi.common.models.message import Message
 
 class FinanceAssistant(Assistant):
 

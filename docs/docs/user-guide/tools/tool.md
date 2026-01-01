@@ -132,8 +132,8 @@ from pydantic import Field
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.tools.tool import Tool, ToolBuilder
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.message import Message, Messages, MsgsAGen
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message, Messages, MsgsAGen
 
 class TextProcessorTool(Tool):
     """A tool for processing text data."""
@@ -309,8 +309,8 @@ async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> M
 
 ```python
 import pytest
-from grafi.models.message import Message
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
 
 @pytest.mark.asyncio
 async def test_tool_invoke():
@@ -332,7 +332,7 @@ async def test_tool_invoke():
 Tools integrate with Graphite's command system:
 
 ```python
-from grafi.models.command import use_command
+from grafi.common.models.command import use_command
 from grafi.tools.tool_command import ToolCommand
 
 @use_command(ToolCommand)

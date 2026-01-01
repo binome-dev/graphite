@@ -258,7 +258,7 @@ Both commands enable a node to delegate specialized retrieval operations to thei
 Register custom commands for specific tool types:
 
 ```python
-from grafi.models.command import use_command
+from grafi.common.models.command import use_command
 
 @use_command(MyCustomCommand)
 class MySpecialTool(Tool):
@@ -306,10 +306,10 @@ Create custom commands when you need:
 
 ```python
 from typing import List
-from grafi.models.command import Command
+from grafi.common.models.command import Command
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.message import Messages
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Messages
 
 class DatabaseQueryCommand(Command):
     """Command for database query tools with caching and optimization."""

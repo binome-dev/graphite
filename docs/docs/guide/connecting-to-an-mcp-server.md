@@ -348,9 +348,9 @@ from typing import Dict
 
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.mcp_connections import StreamableHttpConnection
-from grafi.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.mcp_connections import StreamableHttpConnection
+from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 from assistant import StockAssistant

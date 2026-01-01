@@ -80,7 +80,7 @@ Emitted when an assistant is invoked with input data.
 
 ```python
 from grafi.common.events.assistant_events.assistant_invoke_event import AssistantInvokeEvent
-from grafi.models.message import Message
+from grafi.common.models.message import Message
 
 event = AssistantInvokeEvent(
     invoke_context=context,
@@ -307,8 +307,8 @@ The primary event used when consuming data from topics. This is the input format
 
 ```python
 from grafi.common.events.tool_events.tool_invoke_event import ToolInvokeEvent
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
 
 # Create invoke context
 context = InvokeContext(assistant_request_id="req_123")

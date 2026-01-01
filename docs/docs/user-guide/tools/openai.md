@@ -68,7 +68,7 @@ openai_tool = (
 
 ```python
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.models.message import Message
+from grafi.common.models.message import Message
 
 # Create the tool
 openai_tool = (
@@ -110,7 +110,7 @@ async def stream_example():
 ### Function Calling
 
 ```python
-from grafi.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import FunctionSpec
 
 # Add function specifications
 function_spec = FunctionSpec(

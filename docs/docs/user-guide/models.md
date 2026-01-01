@@ -32,7 +32,7 @@ In Graphite, various models provide the fundamental data structures that underpi
 ### Usage Example
 
 ```python
-from grafi.models.message import Message
+from grafi.common.models.message import Message
 
 # Creating a user message
 user_message = Message(
@@ -64,7 +64,7 @@ assistant_message = Message(
 ### InvokeContext Usage Example
 
 ```python
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.invoke_context import InvokeContext
 
 context = InvokeContext(
     conversation_id="conv_123",
@@ -96,7 +96,7 @@ context = InvokeContext(
 ### Command Usage Example
 
 ```python
-from grafi.models.command import Command
+from grafi.common.models.command import Command
 from grafi.tools.tool import Tool
 
 # Create command from tool

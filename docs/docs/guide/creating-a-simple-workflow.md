@@ -43,8 +43,8 @@ The main function orchestrates the entire workflow. We start by defining a sampl
 
 ```python linenums="9"
 import uuid
-from grafi.models.message import Message
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
 
 def main():
     user_input = "What is the capital of the United Kingdom"
