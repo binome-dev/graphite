@@ -39,10 +39,10 @@ class NodeBase(BaseModel):
     type: str = Field(default="Node")
     tool: Optional[Tool] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
-    subscribed_expressions: List[SubExpr] = Field(default=[])
-    publish_to: List[TopicBase] = Field(default=[])
+    subscribed_expressions: List[SubExpr] = Field(default_factory=list)
+    publish_to: List[TopicBase] = Field(default_factory=list)
 
-    _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default={})
+    _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default_factory=dict)
     _command: Optional[Command] = PrivateAttr(default=None)
 
     @property

@@ -181,12 +181,23 @@ class TopicBase(BaseModel):
 
         Returns:
             TopicBase: A TopicBase instance created from the dictionary.
+
+        Warning:
+            SECURITY: This method deserializes pickled code using cloudpickle.
+            Pickle deserialization can execute arbitrary code. Only use this
+            method with data from trusted sources. For production use with
+            external/untrusted data, consider using a safer serialization format.
         """
         condition_data = data["condition"]
         if isinstance(condition_data, dict):
             encoded_condition = condition_data["base64"]
         else:
             encoded_condition = condition_data
+
+        logger.debug(
+            "Deserializing topic condition from pickle data. "
+            "Ensure data source is trusted."
+        )
 
         return cls(
             name=data["name"],

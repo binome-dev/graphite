@@ -1,4 +1,5 @@
 # container.py
+import os
 import threading
 from typing import Any
 from typing import Optional
@@ -68,11 +69,15 @@ class Container(metaclass=SingletonMeta):
         # Slow path: initialize with lock (double-checked locking)
         with self._init_lock:
             if self._tracer is None:
+                # Use environment variables with sensible defaults
+                endpoint = os.getenv("OTEL_COLLECTOR_ENDPOINT", "localhost")
+                port = int(os.getenv("OTEL_COLLECTOR_PORT", "4317"))
+                project = os.getenv("GRAFI_PROJECT_NAME", "grafi-trace")
                 self._tracer = setup_tracing(
                     tracing_options=TracingOptions.AUTO,
-                    collector_endpoint="localhost",
-                    collector_port=4317,
-                    project_name="grafi-trace",
+                    collector_endpoint=endpoint,
+                    collector_port=port,
+                    project_name=project,
                 )
             return self._tracer
 

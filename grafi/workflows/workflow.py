@@ -7,6 +7,7 @@ from typing import TypeVar
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
+from pydantic import Field
 from pydantic import PrivateAttr
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -26,7 +27,7 @@ class Workflow(BaseModel):
     workflow_id: str = default_id
     name: str = "Workflow"
     type: str = "Workflow"
-    nodes: Dict[str, NodeBase] = {}
+    nodes: Dict[str, NodeBase] = Field(default_factory=dict)
 
     # Stop flag to control workflow execution
     _stop_requested: bool = PrivateAttr(default=False)

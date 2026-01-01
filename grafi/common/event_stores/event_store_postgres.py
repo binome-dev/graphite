@@ -6,6 +6,7 @@ from loguru import logger
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
+from grafi.common.exceptions import EventPersistenceError
 
 
 try:
@@ -14,6 +15,7 @@ try:
     from sqlalchemy import Integer
     from sqlalchemy import String
     from sqlalchemy import create_engine
+    from sqlalchemy import delete
     from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import JSONB
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,13 +57,30 @@ class EventModel(Base):
 class EventStorePostgres(EventStore):
     """Postgres-backed implementation of the EventStore interface with async support."""
 
-    def __init__(self, db_url: str):
+    def __init__(
+        self,
+        db_url: str,
+        pool_size: int = 5,
+        max_overflow: int = 10,
+        pool_timeout: int = 30,
+    ):
         """
         Initialize the Postgres event store.
-        :param db_url: The SQLAlchemy database URL, e.g. 'postgresql://user:pass@host/dbname'.
+
+        Args:
+            db_url: The SQLAlchemy database URL, e.g. 'postgresql://user:pass@host/dbname'.
+            pool_size: The number of connections to keep in the pool (default: 5).
+            max_overflow: Maximum overflow connections beyond pool_size (default: 10).
+            pool_timeout: Seconds to wait for a connection from the pool (default: 30).
         """
         # Keep sync engine for initialization and sync methods
-        self.engine = create_engine(db_url, echo=False)
+        self.engine = create_engine(
+            db_url,
+            echo=False,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+        )
         Base.metadata.create_all(self.engine)
 
         # Create async engine and session for async methods
@@ -69,18 +88,46 @@ class EventStorePostgres(EventStore):
         async_db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
         if "psycopg2" in async_db_url:
             async_db_url = async_db_url.replace("psycopg2", "asyncpg")
-        self.async_engine = create_async_engine(async_db_url, echo=False)
+        self.async_engine = create_async_engine(
+            async_db_url,
+            echo=False,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+        )
         self.AsyncSession = async_sessionmaker(
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
 
     async def clear_events(self) -> None:
         """Clear all events from the database."""
-        pass
+        async with self.AsyncSession() as session:
+            try:
+                await session.execute(delete(EventModel))
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to clear events: {e}")
+                raise
 
     async def get_events(self) -> List[Event]:
         """Get all events from the database."""
-        pass
+        async with self.AsyncSession() as session:
+            try:
+                result = await session.execute(
+                    select(EventModel).order_by(EventModel.timestamp)
+                )
+                rows = result.scalars().all()
+
+                events: List[Event] = []
+                for r in rows:
+                    event = self._create_event_from_dict(r.event_data)
+                    if event:
+                        events.append(event)
+
+                return events
+            except Exception as e:
+                logger.error(f"Failed to get events: {e}")
+                raise
 
     async def record_event(self, event: Event) -> None:
         """Record a single event into the database asynchronously."""
@@ -112,7 +159,10 @@ class EventStorePostgres(EventStore):
             except Exception as e:
                 await session.rollback()
                 logger.error(f"Failed to record event: {e}")
-                raise e
+                raise EventPersistenceError(
+                    message=f"Failed to record event: {e}",
+                    cause=e,
+                ) from e
 
     async def record_events(self, events: List[Event]) -> None:
         """Record multiple events into the database asynchronously."""
@@ -145,7 +195,10 @@ class EventStorePostgres(EventStore):
             except Exception as e:
                 await session.rollback()
                 logger.error(f"Failed to record events: {e}")
-                raise e
+                raise EventPersistenceError(
+                    message=f"Failed to record events: {e}",
+                    cause=e,
+                ) from e
 
     async def get_event(self, event_id: str) -> Optional[Event]:
         """Get an event by ID asynchronously."""
@@ -162,7 +215,7 @@ class EventStorePostgres(EventStore):
                 return self._create_event_from_dict(row.event_data)
             except Exception as e:
                 logger.error(f"Failed to get event {event_id}: {e}")
-                raise e
+                raise
 
     async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given assistant_request_id asynchronously."""
@@ -187,7 +240,7 @@ class EventStorePostgres(EventStore):
                 return events
             except Exception as e:
                 logger.error(f"Failed to get agent events {assistant_request_id}: {e}")
-                raise e
+                raise
 
     async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID asynchronously."""
@@ -214,7 +267,7 @@ class EventStorePostgres(EventStore):
                 logger.error(
                     f"Failed to get conversation events {conversation_id}: {e}"
                 )
-                raise e
+                raise
 
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets asynchronously."""
@@ -260,7 +313,7 @@ class EventStorePostgres(EventStore):
                 return events
             except Exception as e:
                 logger.error(f"Failed to get topic events for {name}: {e}")
-                raise e
+                raise
 
     async def initialize(self) -> None:
         """Initialize the database tables asynchronously."""

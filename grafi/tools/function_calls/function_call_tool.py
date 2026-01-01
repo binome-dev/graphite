@@ -84,7 +84,8 @@ class FunctionCallTool(Tool):
                 function_spec: FunctionSpec = attr._function_spec
                 cls.functions[function_spec.name] = attr
                 cls.function_specs.append(function_spec)
-        else:
+
+        if not cls.function_specs:
             logger.warning(
                 f"{cls.__name__}: no method decorated with @llm_function found."
             )
@@ -117,13 +118,20 @@ class FunctionCallTool(Tool):
         Raises:
             ValueError: If the provided function_name doesn't match the registered function.
         """
-        if len(input_data) > 0 and input_data[0].tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
+        if not input_data:
+            logger.warning("No input data provided.")
+            yield []
+            return
+
+        tool_calls = input_data[0].tool_calls
+        if not tool_calls:
+            logger.warning("No tool calls found in input data.")
+            yield []
+            return
 
         messages: Messages = []
 
-        for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
+        for tool_call in tool_calls:
             if tool_call.function.name in self.functions:
                 func = self.functions[tool_call.function.name]
                 try:
@@ -185,7 +193,17 @@ class FunctionCallTool(Tool):
 
         Note:
             Functions are reconstructed from cloudpickle serialized data.
+
+        Warning:
+            SECURITY: This method deserializes pickled code using cloudpickle.
+            Pickle deserialization can execute arbitrary code. Only use this
+            method with data from trusted sources. For production use with
+            external/untrusted data, consider using a safer serialization format.
         """
+        logger.debug(
+            "Deserializing function call tool from pickle data. "
+            "Ensure data source is trusted."
+        )
 
         function_call_tool_builder = (
             cls.builder()
