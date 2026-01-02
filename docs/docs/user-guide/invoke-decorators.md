@@ -116,7 +116,7 @@ Records synchronous node invocations in event-driven workflows.
 
 ```python
 from grafi.common.decorators.record_node_invoke import record_node_invoke
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from typing import List, AsyncGenerator

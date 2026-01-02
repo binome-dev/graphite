@@ -7,6 +7,7 @@ from typing import TypeVar
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
+from pydantic import Field
 from pydantic import PrivateAttr
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -26,7 +27,7 @@ class Workflow(BaseModel):
     workflow_id: str = default_id
     name: str = "Workflow"
     type: str = "Workflow"
-    nodes: Dict[str, NodeBase] = {}
+    nodes: Dict[str, NodeBase] = Field(default_factory=dict)
 
     # Stop flag to control workflow execution
     _stop_requested: bool = PrivateAttr(default=False)
@@ -73,25 +74,60 @@ class Workflow(BaseModel):
         raise NotImplementedError("from_dict must be implemented in subclasses.")
 
 
-T_W = TypeVar("T_W", bound="Workflow")  # the Tool subclass
+T_W = TypeVar("T_W", bound="Workflow")  # the Workflow subclass
 
 
 class WorkflowBuilder(BaseBuilder[T_W]):
     """Inner builder class for Workflow construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        """Set the OpenInference span type for observability.
+
+        Args:
+            oi_span_type: The span type for tracing (typically AGENT).
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["oi_span_type"] = oi_span_type
         return self
 
     def name(self, name: str) -> Self:
+        """Set the workflow's display name.
+
+        Args:
+            name: Human-readable identifier for the workflow.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
+        """Set the workflow's type identifier.
+
+        Args:
+            type_name: Type classification for the workflow.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["type"] = type_name
         return self
 
     def node(self, node: NodeBase) -> Self:
+        """Add a node to the workflow.
+
+        Args:
+            node: The node to add to this workflow.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            DuplicateNodeError: If a node with the same name already exists.
+        """
         if "nodes" not in self.kwargs:
             self.kwargs["nodes"] = {}
         if node.name in self.kwargs["nodes"]:

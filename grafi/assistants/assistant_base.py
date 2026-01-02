@@ -98,17 +98,49 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
     """Inner builder class for Assistant construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        """Set the OpenInference span type for observability.
+
+        Args:
+            oi_span_type: The span type for tracing (typically AGENT).
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["oi_span_type"] = oi_span_type
         return self
 
     def name(self, name: str) -> Self:
+        """Set the assistant's display name.
+
+        Args:
+            name: Human-readable identifier for the assistant.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
+        """Set the assistant's type identifier.
+
+        Args:
+            type_name: Type classification for the assistant.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["type"] = type_name
         return self
 
     def event_store(self, event_store: EventStore) -> Self:
+        """Register an event store for persistence.
+
+        Args:
+            event_store: The event store implementation to use.
+
+        Returns:
+            Self for method chaining.
+        """
         container.register_event_store(event_store)
         return self

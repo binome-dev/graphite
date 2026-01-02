@@ -65,7 +65,7 @@ function_tool = (
 
 ```python
 from grafi.tools.functions.function_tool import FunctionTool
-from grafi.models.message import Messages
+from grafi.common.models.message import Messages
 from pydantic import BaseModel
 
 class ProcessResult(BaseModel):

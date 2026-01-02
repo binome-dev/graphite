@@ -84,7 +84,8 @@ class FunctionCallTool(Tool):
                 function_spec: FunctionSpec = attr._function_spec
                 cls.functions[function_spec.name] = attr
                 cls.function_specs.append(function_spec)
-        else:
+
+        if not cls.function_specs:
             logger.warning(
                 f"{cls.__name__}: no method decorated with @llm_function found."
             )
@@ -103,27 +104,31 @@ class FunctionCallTool(Tool):
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         """
-        Invoke the registered function with the given arguments.
+        Invoke the registered functions based on tool calls in input_data.
 
         This method is decorated with @record_tool_invoke to log its invoke.
 
         Args:
-            function_name (str): The name of the function to invoke.
-            arguments (Dict[str, Any]): The arguments to pass to the function.
+            invoke_context: Context for tracking the invocation lifecycle.
+            input_data: Messages containing tool_calls to execute.
 
-        Returns:
-            Any: The result of the function invoke.
-
-        Raises:
-            ValueError: If the provided function_name doesn't match the registered function.
+        Yields:
+            Messages: Results from executing the tool calls.
         """
-        if len(input_data) > 0 and input_data[0].tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
+        if not input_data:
+            logger.warning("No input data provided.")
+            yield []
+            return
+
+        tool_calls = input_data[0].tool_calls
+        if not tool_calls:
+            logger.warning("No tool calls found in input data.")
+            yield []
+            return
 
         messages: Messages = []
 
-        for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
+        for tool_call in tool_calls:
             if tool_call.function.name in self.functions:
                 func = self.functions[tool_call.function.name]
                 try:
@@ -185,7 +190,17 @@ class FunctionCallTool(Tool):
 
         Note:
             Functions are reconstructed from cloudpickle serialized data.
+
+        Warning:
+            SECURITY: This method deserializes pickled code using cloudpickle.
+            Pickle deserialization can execute arbitrary code. Only use this
+            method with data from trusted sources. For production use with
+            external/untrusted data, consider using a safer serialization format.
         """
+        logger.debug(
+            "Deserializing function call tool from pickle data. "
+            "Ensure data source is trusted."
+        )
 
         function_call_tool_builder = (
             cls.builder()
@@ -213,6 +228,17 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
     """
 
     def function(self, function: Callable) -> Self:
+        """Add a function that can be called by the LLM.
+
+        If the function is not already decorated with @llm_function,
+        it will be automatically wrapped.
+
+        Args:
+            function: A callable to expose as a tool function.
+
+        Returns:
+            Self for method chaining.
+        """
         if not hasattr(function, "_function_spec"):
             function = llm_function(function)
 

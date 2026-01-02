@@ -23,6 +23,18 @@ class SubscriptionBuilder(BaseModel):
     pending_op: Optional[LogicalOp] = None
 
     def subscribed_to(self, topic: TopicBase) -> "SubscriptionBuilder":
+        """Add a topic subscription to the expression.
+
+        Args:
+            topic: The topic to subscribe to.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If topic is not a TopicBase instance.
+            ValueError: If chaining topics without an operator.
+        """
         if not isinstance(topic, TopicBase):
             raise ValueError("subscribed_to(...) must receive a Topic object.")
         new_expr = TopicExpr(topic=topic)
@@ -40,10 +52,20 @@ class SubscriptionBuilder(BaseModel):
         return self
 
     def and_(self) -> "SubscriptionBuilder":
+        """Chain the next subscription with AND logic.
+
+        Returns:
+            Self for method chaining.
+        """
         self.pending_op = LogicalOp.AND
         return self
 
     def or_(self) -> "SubscriptionBuilder":
+        """Chain the next subscription with OR logic.
+
+        Returns:
+            Self for method chaining.
+        """
         self.pending_op = LogicalOp.OR
         return self
 

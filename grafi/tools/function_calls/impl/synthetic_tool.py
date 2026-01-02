@@ -315,26 +315,74 @@ class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):
     """Builder for SyntheticTool instances."""
 
     def tool_name(self, name: str) -> "SyntheticToolBuilder":
+        """Set the tool's name.
+
+        Args:
+            name: Unique identifier for this synthetic tool.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["tool_name"] = name
         self.kwargs["name"] = name
         return self
 
     def description(self, desc: str) -> "SyntheticToolBuilder":
+        """Set the tool's description for LLM context.
+
+        Args:
+            desc: Human-readable description of what the tool does.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["description"] = desc
         return self
 
     def input_model(self, model: type[BaseModel]) -> "SyntheticToolBuilder":
+        """Set the Pydantic model for input validation.
+
+        Args:
+            model: A Pydantic BaseModel class defining the input schema.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["input_model"] = model
         return self
 
     def output_model(self, model: type[BaseModel]) -> "SyntheticToolBuilder":
+        """Set the Pydantic model for output validation.
+
+        Args:
+            model: A Pydantic BaseModel class defining the output schema.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["output_model"] = model
         return self
 
     def model(self, model: str) -> "SyntheticToolBuilder":
+        """Set the LLM model to use for generation.
+
+        Args:
+            model: Model identifier (e.g., 'gpt-4o-mini').
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["model"] = model
         return self
 
     def openai_api_key(self, openai_api_key: str) -> "SyntheticToolBuilder":
+        """Set the OpenAI API key.
+
+        Args:
+            openai_api_key: The API key for OpenAI authentication.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["openai_api_key"] = openai_api_key
         return self

@@ -39,10 +39,10 @@ class NodeBase(BaseModel):
     type: str = Field(default="Node")
     tool: Optional[Tool] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
-    subscribed_expressions: List[SubExpr] = Field(default=[])
-    publish_to: List[TopicBase] = Field(default=[])
+    subscribed_expressions: List[SubExpr] = Field(default_factory=list)
+    publish_to: List[TopicBase] = Field(default_factory=list)
 
-    _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default={})
+    _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default_factory=dict)
     _command: Optional[Command] = PrivateAttr(default=None)
 
     @property
@@ -150,27 +150,67 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
     """Inner builder class for workflow construction."""
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        """Set the OpenInference span type for observability.
+
+        Args:
+            oi_span_type: The span type for tracing (e.g., CHAIN, TOOL).
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["oi_span_type"] = oi_span_type
         return self
 
     def name(self, name: str) -> Self:
+        """Set the node's display name.
+
+        Args:
+            name: Human-readable identifier for the node.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["name"] = name
         return self
 
     def type(self, type: str) -> Self:
+        """Set the node's type identifier.
+
+        Args:
+            type: Type classification for the node.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["type"] = type
         return self
 
     def tool(self, tool: Tool) -> Self:
-        """Set the tool for this node. Command will be auto-created."""
+        """Set the tool for this node. Command will be auto-created.
+
+        Args:
+            tool: The tool instance to execute when this node is invoked.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["tool"] = tool
         return self
 
     def subscribe(self, subscribe_to: Union[TopicBase, SubExpr]) -> Self:
-        """
-        Begin building a DSL expression. Returns a SubscriptionDSL.Builder,
-        which the user can chain with:
-            .subscribed_to(topicA).and_().subscribed_to(topicB).build()
+        """Subscribe this node to a topic or subscription expression.
+
+        The node will be triggered when the subscription condition is met.
+        Can be chained with boolean expressions using SubscriptionBuilder.
+
+        Args:
+            subscribe_to: A Topic or SubExpr (from SubscriptionBuilder).
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            NodeExecutionError: If subscribe_to is not a Topic or SubExpr.
         """
         if "subscribed_expressions" not in self.kwargs:
             self.kwargs["subscribed_expressions"] = []
@@ -187,6 +227,14 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
         return self
 
     def publish_to(self, topic: TopicBase) -> Self:
+        """Add a topic that this node will publish results to.
+
+        Args:
+            topic: The topic to publish output events to.
+
+        Returns:
+            Self for method chaining.
+        """
         if "publish_to" not in self.kwargs:
             self.kwargs["publish_to"] = []
         self.kwargs["publish_to"].append(topic)

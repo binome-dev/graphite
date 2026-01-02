@@ -91,13 +91,37 @@ class ToolBuilder(BaseBuilder[T_T]):
     """Inner builder class for Tool construction."""
 
     def name(self, name: str) -> Self:
+        """Set the tool's display name.
+
+        Args:
+            name: Human-readable identifier for the tool.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["name"] = name
         return self
 
     def type(self, type_name: str) -> Self:
+        """Set the tool's type identifier.
+
+        Args:
+            type_name: Type classification for the tool.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["type"] = type_name
         return self
 
     def oi_span_type(self, oi_span_type: OpenInferenceSpanKindValues) -> Self:
+        """Set the OpenInference span type for observability.
+
+        Args:
+            oi_span_type: The span type for tracing (e.g., TOOL, LLM, CHAIN).
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["oi_span_type"] = oi_span_type
         return self

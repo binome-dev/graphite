@@ -138,9 +138,25 @@ class FunctionToolBuilder(ToolBuilder[T_FT]):
     """Builder for FunctionTool instances."""
 
     def role(self, role: str) -> Self:
+        """Set the role for messages produced by this function.
+
+        Args:
+            role: The message role (e.g., 'assistant', 'tool').
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["role"] = role
         return self
 
     def function(self, function: Callable[[Messages], OutputType]) -> Self:
+        """Set the function to execute.
+
+        Args:
+            function: A callable that takes Messages and returns output.
+
+        Returns:
+            Self for method chaining.
+        """
         self.kwargs["function"] = function
         return self

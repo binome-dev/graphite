@@ -131,8 +131,8 @@ topic = (Topic.builder()
 ### Publishing Messages
 
 ```python
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
 
 # Create context and messages
 context = InvokeContext()

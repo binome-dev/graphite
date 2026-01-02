@@ -39,8 +39,8 @@ Published when a component sends data to a topic:
 
 ```python
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.models.invoke_context import InvokeContext
-from grafi.models.message import Message
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
 
 event = PublishToTopicEvent(
     publisher_name="ProcessorNode",
@@ -94,7 +94,7 @@ class MyAssistant(Assistant):
 
 ```python
 from grafi.nodes.node import Node
-from grafi.models.invoke_context import InvokeContext
+from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from typing import List, AsyncGenerator
