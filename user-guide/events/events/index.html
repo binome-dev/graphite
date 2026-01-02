@@ -1,0 +1,4387 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../../topics/subscription_expression/">
+      
+      
+        <link rel="next" href="../event_store/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../static/GRAPHITE_Favico_Dark.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Events System - Graphite Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CFira+Code:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"Fira Code"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/custom.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#events-system" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Graphite Documentation" class="md-header__button md-logo" aria-label="Graphite Documentation" data-md-component="logo">
+      
+  <img src="../../../static/GRAPHITE_Logotype.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Graphite Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Events System
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/binome-dev/graphite" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    binome-dev/graphite
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Graphite Documentation" class="md-nav__button md-logo" aria-label="Graphite Documentation" data-md-component="logo">
+      
+  <img src="../../../static/GRAPHITE_Logotype.png" alt="logo">
+
+    </a>
+    Graphite Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/binome-dev/graphite" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    binome-dev/graphite
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/creating-a-simple-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simple Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/getting-started-with-assistants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Assistants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/configuring-event-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Event Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/connecting-to-an-mcp-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to an MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/configuring-integration-with-arize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration with Arize
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../event-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assistant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assistant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../event-driven-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Driven Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../workflow-components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_8" id="__nav_5_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/tool/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/openai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenAI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/ollama/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ollama
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/function/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/function-call/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Call Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_9" id="__nav_5_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Topics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/input_topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input Topics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/output_topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Topics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic_event_cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/subscription_expression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subscription Expressions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_10" id="__nav_5_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Events
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events System
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#base-event-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base Event Class
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Base Event Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topic-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assistant-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assistant Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Assistant Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Node Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodeinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noderespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#noderespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodefailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodefailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tool Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflow-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workflow Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic-events_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Topic Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#topicevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TopicEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TopicEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#topicevent-base-fields-extended-from-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TopicEvent Base Fields (Extended from Event)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishtotopicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PublishToTopicEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PublishToTopicEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#publishtotopicevent-fields-extended-from-topicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PublishToTopicEvent Fields (Extended from TopicEvent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumefromtopicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConsumeFromTopicEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConsumeFromTopicEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#consumefromtopicevent-fields-extended-from-topicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConsumeFromTopicEvent Fields (Extended from TopicEvent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-usage-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Usage Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Usage Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization-and-deserialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization and Deserialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-context-and-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Context and Metadata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Context and Metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokecontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvokeContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-handling-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Handling Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topic-event-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Event Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-graphite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with Graphite
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integration with Graphite">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Coordination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-sourcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Sourcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../event_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_11" id="__nav_5_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Infrastructure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../builder-pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Builder Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../invoke-decorators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoke Decorators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../conventional-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventional Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#base-event-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base Event Class
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Base Event Class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#component-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topic-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assistant-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assistant Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Assistant Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assistantfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AssistantFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assistantfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssistantFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Node Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodeinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodeinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noderespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#noderespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodefailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NodeFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodefailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tool Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toolfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ToolFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ToolFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workflow-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workflow Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowinvokeevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowInvokeEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowInvokeEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowinvokeevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowInvokeEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowrespondevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowRespondEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowRespondEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowrespondevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowRespondEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflowfailedevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowFailedEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WorkflowFailedEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowfailedevent-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkflowFailedEvent Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#topic-events_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Topic Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#topicevent-base-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TopicEvent (Base Class)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TopicEvent (Base Class)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#topicevent-base-fields-extended-from-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TopicEvent Base Fields (Extended from Event)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishtotopicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PublishToTopicEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PublishToTopicEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#publishtotopicevent-fields-extended-from-topicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PublishToTopicEvent Fields (Extended from TopicEvent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumefromtopicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConsumeFromTopicEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConsumeFromTopicEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#consumefromtopicevent-fields-extended-from-topicevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConsumeFromTopicEvent Fields (Extended from TopicEvent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-usage-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Usage Patterns
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Usage Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization-and-deserialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization and Deserialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#event-context-and-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Context and Metadata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Event Context and Metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokecontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvokeContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-handling-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Handling Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#topic-event-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Topic Event Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-graphite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with Graphite
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integration with Graphite">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow Coordination
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-sourcing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Sourcing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="events-system">Events System</h1>
+<p>The Graphite events system provides a comprehensive event-driven architecture for tracking, monitoring, and coordinating activities across assistants, nodes, tools, workflows, and topics. This system enables observability, debugging, and loose coupling between components through a standardized event model.</p>
+<h2 id="overview">Overview</h2>
+<p>The events system is built around a hierarchical structure where:</p>
+<ul>
+<li><strong>Base Event</strong>: Provides common fields and functionality for all events</li>
+<li><strong>Category Events</strong>: Abstract base classes for different component types (Assistant, Node, Tool, Workflow, Topic)  </li>
+<li><strong>Specific Events</strong>: Concrete event implementations for specific actions (Invoke, Respond, Failed)</li>
+</ul>
+<h2 id="base-event-class">Base Event Class</h2>
+<p>All events inherit from the base <code>Event</code> class, which provides core functionality and common fields.</p>
+<h3 id="fields">Fields</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_id</code></td>
+<td><code>EventId</code></td>
+<td>Unique identifier for the event (automatically generated using <code>default_id</code>).</td>
+</tr>
+<tr>
+<td><code>event_version</code></td>
+<td><code>str</code></td>
+<td>Version identifier for the event schema (defaults to <code>"1.0"</code>).</td>
+</tr>
+<tr>
+<td><code>invoke_context</code></td>
+<td><code>InvokeContext</code></td>
+<td>Context information about the operation that triggered this event.</td>
+</tr>
+<tr>
+<td><code>event_type</code></td>
+<td><code>EventType</code></td>
+<td>Enumerated type indicating the specific kind of event.</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td><code>datetime</code></td>
+<td>UTC timestamp when the event was created (automatically generated).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="methods">Methods</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_dict</code></td>
+<td><code>() -&gt; Dict[str, Any]</code></td>
+<td>Returns base event data as a dictionary with flattened invoke_context.</td>
+</tr>
+<tr>
+<td><code>event_base</code></td>
+<td><code>classmethod (event_dict: dict) -&gt; Tuple[...]</code></td>
+<td>Extracts common event data from a dictionary.</td>
+</tr>
+<tr>
+<td><code>to_dict</code></td>
+<td><code>() -&gt; Dict[str, Any]</code></td>
+<td>Abstract method for converting event to dictionary (must be implemented).</td>
+</tr>
+<tr>
+<td><code>from_dict</code></td>
+<td><code>classmethod (data: Dict[str, Any]) -&gt; Event</code></td>
+<td>Abstract method for creating event from dictionary (must be implemented).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="event-types">Event Types</h3>
+<p>The <code>EventType</code> enumeration defines all supported event types:</p>
+<h4 id="component-events">Component Events</h4>
+<ul>
+<li><code>NODE_INVOKE</code>, <code>NODE_RESPOND</code>, <code>NODE_FAILED</code></li>
+<li><code>TOOL_INVOKE</code>, <code>TOOL_RESPOND</code>, <code>TOOL_FAILED</code>  </li>
+<li><code>WORKFLOW_INVOKE</code>, <code>WORKFLOW_RESPOND</code>, <code>WORKFLOW_FAILED</code></li>
+<li><code>ASSISTANT_INVOKE</code>, <code>ASSISTANT_RESPOND</code>, <code>ASSISTANT_FAILED</code></li>
+</ul>
+<h4 id="topic-events">Topic Events</h4>
+<ul>
+<li><code>TOPIC_EVENT</code>, <code>STREAM_TOPIC_EVENT</code></li>
+<li><code>PUBLISH_TO_TOPIC</code>, <code>CONSUME_FROM_TOPIC</code></li>
+<li><code>OUTPUT_TOPIC</code></li>
+</ul>
+<h2 id="assistant-events">Assistant Events</h2>
+<p>Assistant events track the lifecycle and operations of AI assistants within the system.</p>
+<h3 id="assistantevent-base-class">AssistantEvent (Base Class)</h3>
+<p>Base class for all assistant-related events.</p>
+<h4 id="assistantevent-fields">AssistantEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assistant_id</code></td>
+<td><code>str</code></td>
+<td>Unique identifier for the assistant instance.</td>
+</tr>
+<tr>
+<td><code>assistant_name</code></td>
+<td><code>str</code></td>
+<td>Human-readable name of the assistant.</td>
+</tr>
+<tr>
+<td><code>assistant_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the assistant.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="assistantinvokeevent">AssistantInvokeEvent</h3>
+<p>Emitted when an assistant is invoked with input data.</p>
+<h4 id="assistantinvokeevent-fields">AssistantInvokeEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td><code>Messages</code></td>
+<td>Input messages provided to the assistant.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="example-usage">Example Usage</h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.events.assistant_events.assistant_invoke_event</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssistantInvokeEvent</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.models.message</span><span class="w"> </span><span class="kn">import</span> <span class="n">Message</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">event</span> <span class="o">=</span> <span class="n">AssistantInvokeEvent</span><span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">invoke_context</span><span class="o">=</span><span class="n">context</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">assistant_name</span><span class="o">=</span><span class="s2">&quot;Chat Assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">assistant_type</span><span class="o">=</span><span class="s2">&quot;ConversationalAssistant&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">input_data</span><span class="o">=</span><span class="p">[</span><span class="n">Message</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="s2">&quot;Hello!&quot;</span><span class="p">)]</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Convert to dictionary for storage/transmission</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">event_dict</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># Reconstruct from dictionary</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">reconstructed_event</span> <span class="o">=</span> <span class="n">AssistantInvokeEvent</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">event_dict</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="assistantrespondevent">AssistantRespondEvent</h3>
+<p>Emitted when an assistant produces a response.</p>
+<h4 id="assistantrespondevent-fields">AssistantRespondEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td><code>Messages</code></td>
+<td>Original input messages provided to the assistant.</td>
+</tr>
+<tr>
+<td><code>output_data</code></td>
+<td><code>Messages</code></td>
+<td>Response messages generated by the assistant.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="assistantfailedevent">AssistantFailedEvent</h3>
+<p>Emitted when an assistant operation fails.</p>
+<h4 id="assistantfailedevent-fields">AssistantFailedEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_message</code></td>
+<td><code>str</code></td>
+<td>Description of the error that occurred.</td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the error.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="node-events">Node Events</h2>
+<p>Node events track the execution and status of individual nodes in workflows.</p>
+<h3 id="nodeevent-base-class">NodeEvent (Base Class)</h3>
+<p>Base class for all node-related events.</p>
+<h4 id="nodeevent-fields">NodeEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node_id</code></td>
+<td><code>str</code></td>
+<td>Unique identifier for the node instance.</td>
+</tr>
+<tr>
+<td><code>node_name</code></td>
+<td><code>str</code></td>
+<td>Human-readable name of the node.</td>
+</tr>
+<tr>
+<td><code>node_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the node.</td>
+</tr>
+<tr>
+<td><code>subscribed_topics</code></td>
+<td><code>List[str]</code></td>
+<td>Topics this node subscribes to.</td>
+</tr>
+<tr>
+<td><code>publish_to_topics</code></td>
+<td><code>List[str]</code></td>
+<td>Topics this node publishes to.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="nodeinvokeevent">NodeInvokeEvent</h3>
+<p>Emitted when a node begins processing.</p>
+<h4 id="nodeinvokeevent-fields">NodeInvokeEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td><code>Messages</code></td>
+<td>Input messages provided to the node.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="noderespondevent">NodeRespondEvent</h3>
+<p>Emitted when a node completes processing successfully.</p>
+<h4 id="noderespondevent-fields">NodeRespondEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_data</code></td>
+<td><code>Messages</code></td>
+<td>Output messages generated by the node.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="nodefailedevent">NodeFailedEvent</h3>
+<p>Emitted when a node operation fails.</p>
+<h4 id="nodefailedevent-fields">NodeFailedEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_message</code></td>
+<td><code>str</code></td>
+<td>Description of the error that occurred.</td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the error.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="tool-events">Tool Events</h2>
+<p>Tool events track the execution and status of tools within the system.</p>
+<h3 id="toolevent-base-class">ToolEvent (Base Class)</h3>
+<p>Base class for all tool-related events.</p>
+<h4 id="toolevent-fields">ToolEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tool_id</code></td>
+<td><code>str</code></td>
+<td>Unique identifier for the tool instance.</td>
+</tr>
+<tr>
+<td><code>tool_name</code></td>
+<td><code>str</code></td>
+<td>Human-readable name of the tool.</td>
+</tr>
+<tr>
+<td><code>tool_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the tool.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="toolinvokeevent">ToolInvokeEvent</h3>
+<p>Emitted when a tool is invoked.</p>
+<h4 id="toolinvokeevent-fields">ToolInvokeEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td><code>Messages</code></td>
+<td>Input messages provided to the tool.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="toolrespondevent">ToolRespondEvent</h3>
+<p>Emitted when a tool produces a response.</p>
+<h4 id="toolrespondevent-fields">ToolRespondEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_data</code></td>
+<td><code>Messages</code></td>
+<td>Response messages generated by the tool.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="toolfailedevent">ToolFailedEvent</h3>
+<p>Emitted when a tool operation fails.</p>
+<h4 id="toolfailedevent-fields">ToolFailedEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_message</code></td>
+<td><code>str</code></td>
+<td>Description of the error that occurred.</td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the error.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="workflow-events">Workflow Events</h2>
+<p>Workflow events track the execution and status of entire workflows.</p>
+<h3 id="workflowevent-base-class">WorkflowEvent (Base Class)</h3>
+<p>Base class for all workflow-related events.</p>
+<h4 id="workflowevent-fields">WorkflowEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>workflow_id</code></td>
+<td><code>str</code></td>
+<td>Unique identifier for the workflow instance.</td>
+</tr>
+<tr>
+<td><code>workflow_name</code></td>
+<td><code>str</code></td>
+<td>Human-readable name of the workflow.</td>
+</tr>
+<tr>
+<td><code>workflow_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the workflow.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workflowinvokeevent">WorkflowInvokeEvent</h3>
+<p>Emitted when a workflow begins execution.</p>
+<h4 id="workflowinvokeevent-fields">WorkflowInvokeEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_data</code></td>
+<td><code>Messages</code></td>
+<td>Input messages provided to the workflow.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workflowrespondevent">WorkflowRespondEvent</h3>
+<p>Emitted when a workflow completes successfully.</p>
+<h4 id="workflowrespondevent-fields">WorkflowRespondEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_data</code></td>
+<td><code>Messages</code></td>
+<td>Final output messages from the workflow.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workflowfailedevent">WorkflowFailedEvent</h3>
+<p>Emitted when a workflow execution fails.</p>
+<h4 id="workflowfailedevent-fields">WorkflowFailedEvent Fields</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error_message</code></td>
+<td><code>str</code></td>
+<td>Description of the error that occurred.</td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td><code>str</code></td>
+<td>Type/category of the error.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="topic-events_1">Topic Events</h2>
+<p>Topic events handle message passing and communication between components. These are the primary events used for component interaction in the current architecture.</p>
+<h3 id="topicevent-base-class">TopicEvent (Base Class)</h3>
+<p>Basic event for topic-related activities.</p>
+<h4 id="topicevent-base-fields-extended-from-event">TopicEvent Base Fields (Extended from Event)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>Name of the topic.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>TopicType</code></td>
+<td>Type of the topic.</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td><code>int</code></td>
+<td>Position/offset in the topic stream.</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>List[Message]</code></td>
+<td>Data associated with the topic event.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="publishtotopicevent">PublishToTopicEvent</h3>
+<p>The primary event used for publishing data to topics. This is the output format for nodes and the input format for workflows and assistants.</p>
+<h4 id="publishtotopicevent-fields-extended-from-topicevent">PublishToTopicEvent Fields (Extended from TopicEvent)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publisher_name</code></td>
+<td><code>str</code></td>
+<td>Name of the component publishing the data.</td>
+</tr>
+<tr>
+<td><code>publisher_type</code></td>
+<td><code>str</code></td>
+<td>Type of the component publishing the data.</td>
+</tr>
+<tr>
+<td><code>consumed_event_ids</code></td>
+<td><code>List[EventId]</code></td>
+<td>IDs of events consumed before publishing.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="consumefromtopicevent">ConsumeFromTopicEvent</h3>
+<p>The primary event used when consuming data from topics. This is the input format for nodes and the output format for workflows and assistants.</p>
+<h4 id="consumefromtopicevent-fields-extended-from-topicevent">ConsumeFromTopicEvent Fields  (Extended from TopicEvent)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumer_name</code></td>
+<td><code>str</code></td>
+<td>Name of the original publisher.</td>
+</tr>
+<tr>
+<td><code>consumer_type</code></td>
+<td><code>str</code></td>
+<td>Type of the original publisher.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="event-usage-patterns">Event Usage Patterns</h2>
+<h3 id="creating-events">Creating Events</h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.events.tool_events.tool_invoke_event</span><span class="w"> </span><span class="kn">import</span> <span class="n">ToolInvokeEvent</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.models.invoke_context</span><span class="w"> </span><span class="kn">import</span> <span class="n">InvokeContext</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.models.message</span><span class="w"> </span><span class="kn">import</span> <span class="n">Message</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Create invoke context</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">context</span> <span class="o">=</span> <span class="n">InvokeContext</span><span class="p">(</span><span class="n">assistant_request_id</span><span class="o">=</span><span class="s2">&quot;req_123&quot;</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># Create tool invoke event</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">event</span> <span class="o">=</span> <span class="n">ToolInvokeEvent</span><span class="p">(</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">invoke_context</span><span class="o">=</span><span class="n">context</span><span class="p">,</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">tool_name</span><span class="o">=</span><span class="s2">&quot;OpenAI Tool&quot;</span><span class="p">,</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">tool_type</span><span class="o">=</span><span class="s2">&quot;LLMTool&quot;</span><span class="p">,</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">input_data</span><span class="o">=</span><span class="p">[</span><span class="n">Message</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="s2">&quot;Hello&quot;</span><span class="p">)]</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="serialization-and-deserialization">Serialization and Deserialization</h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Convert event to dictionary for storage/transmission</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">event_dict</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Store or transmit event_dict...</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Reconstruct event from dictionary</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">reconstructed_event</span> <span class="o">=</span> <span class="n">ToolInvokeEvent</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">event_dict</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="event-context-and-metadata">Event Context and Metadata</h2>
+<h3 id="invokecontext">InvokeContext</h3>
+<p>All events carry an <code>InvokeContext</code> that provides:</p>
+<ul>
+<li><strong>Request Tracking</strong>: <code>assistant_request_id</code> for correlating related events</li>
+<li><strong>Workflow Context</strong>: Information about the current workflow execution  </li>
+<li><strong>Metadata</strong>: Additional context-specific information</li>
+</ul>
+<h3 id="event-context">Event Context</h3>
+<p>Each event type includes structured context information:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Assistant events include:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="p">{</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">&quot;assistant_id&quot;</span><span class="p">:</span> <span class="s2">&quot;asst_123&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;assistant_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Chat Assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">&quot;assistant_type&quot;</span><span class="p">:</span> <span class="s2">&quot;ConversationalAssistant&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="s2">&quot;invoke_context&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># Tool events include:</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">{</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="s2">&quot;tool_id&quot;</span><span class="p">:</span> <span class="s2">&quot;tool_456&quot;</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="s2">&quot;tool_name&quot;</span><span class="p">:</span> <span class="s2">&quot;OpenAI Tool&quot;</span><span class="p">,</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="s2">&quot;tool_type&quot;</span><span class="p">:</span> <span class="s2">&quot;LLMTool&quot;</span><span class="p">,</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="s2">&quot;invoke_context&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="p">}</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="c1"># Topic events include:</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="p">{</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="s2">&quot;consumed_event_ids&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;event_1&quot;</span><span class="p">,</span> <span class="s2">&quot;event_2&quot;</span><span class="p">],</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="s2">&quot;publisher_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Data Processor&quot;</span><span class="p">,</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="s2">&quot;publisher_type&quot;</span><span class="p">:</span> <span class="s2">&quot;ProcessingNode&quot;</span><span class="p">,</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;output_topic&quot;</span><span class="p">,</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;topic&quot;</span><span class="p">,</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="s2">&quot;offset&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    <span class="s2">&quot;invoke_context&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="event-design">Event Design</h3>
+<ol>
+<li><strong>Immutability</strong>: Events should be immutable once created</li>
+<li><strong>Complete Information</strong>: Include all relevant context for debugging and monitoring</li>
+<li><strong>Structured Data</strong>: Use typed fields rather than generic data blobs</li>
+<li><strong>Correlation</strong>: Ensure proper <code>invoke_context</code> for request correlation</li>
+</ol>
+<h3 id="event-handling-best-practices">Event Handling Best Practices</h3>
+<ol>
+<li><strong>Type Safety</strong>: Use <code>isinstance()</code> checks for type-specific handling</li>
+<li><strong>Error Handling</strong>: Always handle potential deserialization errors</li>
+<li><strong>Logging</strong>: Log important events for debugging and monitoring</li>
+<li><strong>Performance</strong>: Avoid expensive operations in event handlers</li>
+</ol>
+<h3 id="serialization">Serialization</h3>
+<ol>
+<li><strong>JSON Compatibility</strong>: Ensure all event data is JSON-serializable</li>
+<li><strong>Schema Versioning</strong>: Use <code>event_version</code> for backward compatibility</li>
+<li><strong>Validation</strong>: Validate events during deserialization</li>
+<li><strong>Error Recovery</strong>: Handle malformed event data gracefully</li>
+</ol>
+<h3 id="topic-event-best-practices">Topic Event Best Practices</h3>
+<ol>
+<li><strong>Event Correlation</strong>: Use <code>consumed_event_ids</code> to track event dependencies</li>
+<li><strong>Publisher Information</strong>: Always include <code>publisher_name</code> and <code>publisher_type</code> for traceability</li>
+<li><strong>Offset Management</strong>: Properly manage topic offsets for ordered processing</li>
+<li><strong>Async Handling</strong>: Use <code>OutputAsyncEvent</code> for non-blocking output operations</li>
+</ol>
+<h2 id="integration-with-graphite">Integration with Graphite</h2>
+<h3 id="observability">Observability</h3>
+<p>Events integrate with Graphite's observability system:</p>
+<ul>
+<li><strong>Tracing</strong>: Events can be correlated with OpenInference traces</li>
+<li><strong>Monitoring</strong>: Event streams provide real-time system monitoring</li>
+<li><strong>Debugging</strong>: Event history helps diagnose issues</li>
+</ul>
+<h3 id="workflow-coordination">Workflow Coordination</h3>
+<p>Events enable loose coupling between workflow components:</p>
+<ul>
+<li><strong>Asynchronous Processing</strong>: Components can react to events asynchronously</li>
+<li><strong>Topic-Based Communication</strong>: Events flow through topic-based messaging</li>
+<li><strong>State Management</strong>: Events provide a history of state changes</li>
+</ul>
+<h3 id="error-handling">Error Handling</h3>
+<p>Failed events provide structured error information:</p>
+<ul>
+<li><strong>Error Classification</strong>: <code>error_type</code> enables categorized error handling</li>
+<li><strong>Context Preservation</strong>: Failed events retain full context for debugging</li>
+<li><strong>Recovery Strategies</strong>: Error events can trigger recovery mechanisms</li>
+</ul>
+<h3 id="event-sourcing">Event Sourcing</h3>
+<p>The events system supports event sourcing patterns:</p>
+<ul>
+<li><strong>Event History</strong>: Complete history of system state changes</li>
+<li><strong>Replay Capability</strong>: Events can be replayed to reconstruct system state</li>
+<li><strong>Audit Trail</strong>: Events provide a complete audit trail of operations</li>
+</ul>
+<p>The events system forms the backbone of Graphite's event-driven architecture, enabling robust, observable, and loosely-coupled systems that can scale and adapt to complex workflow requirements.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 2, 2026 09:43:54 UTC">January 2, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.top", "navigation.sections", "content.code.annotate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

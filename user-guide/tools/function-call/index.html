@@ -1,0 +1,2923 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../function/">
+      
+      
+        <link rel="next" href="../../topics/topic_base/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../static/GRAPHITE_Favico_Dark.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Function Call Tools - Graphite Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CFira+Code:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"Fira Code"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/custom.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#functioncalltool" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Graphite Documentation" class="md-header__button md-logo" aria-label="Graphite Documentation" data-md-component="logo">
+      
+  <img src="../../../static/GRAPHITE_Logotype.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Graphite Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Function Call Tools
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/binome-dev/graphite" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    binome-dev/graphite
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Graphite Documentation" class="md-nav__button md-logo" aria-label="Graphite Documentation" data-md-component="logo">
+      
+  <img src="../../../static/GRAPHITE_Logotype.png" alt="logo">
+
+    </a>
+    Graphite Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/binome-dev/graphite" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    binome-dev/graphite
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/creating-a-simple-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simple Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/getting-started-with-assistants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Assistants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/configuring-event-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuring Event Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/connecting-to-an-mcp-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to an MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/configuring-integration-with-arize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration with Arize
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../event-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assistant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assistant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../event-driven-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Driven Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../workflow-components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../command/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_8" id="__nav_5_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tool/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tool Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../openai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenAI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ollama/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ollama
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../function/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Call Tools
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Function Call Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm-function-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Function Decorator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LLM Function Decorator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llm_function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @llm_function
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-and-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage and Customization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-simple-weather-mock-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example - Simple Weather Mock Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-tavily-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example - Tavily Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#additional-search-tool-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Search Tool Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional Search Tool Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#duckduckgo-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuckDuckGo Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#google-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-model-context-protocol-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP (Model Context Protocol) Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-calling-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Calling Tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synthetic-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Synthetic Tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#function-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function Design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tool-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_9" id="__nav_5_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Topics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/input_topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input Topics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/output_topics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Topics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/topic_event_cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../topics/subscription_expression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subscription Expressions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_10" id="__nav_5_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Events
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../events/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../events/event_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../events/event_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_11" id="__nav_5_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Infrastructure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../builder-pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Builder Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../invoke-decorators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoke Decorators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../conventional-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventional Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm-function-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Function Decorator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LLM Function Decorator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llm_function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        @llm_function
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-and-customization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage and Customization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-simple-weather-mock-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example - Simple Weather Mock Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-tavily-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example - Tavily Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#additional-search-tool-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional Search Tool Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional Search Tool Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#duckduckgo-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuckDuckGo Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#google-search-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Search Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-model-context-protocol-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP (Model Context Protocol) Tool
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-calling-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Calling Tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synthetic-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Synthetic Tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#function-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Function Design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tool-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="functioncalltool">FunctionCallTool</h1>
+<p><code>FunctionCallTool</code> is designed to allow Language Models (LLMs) to invoke specific Python functions directly through JSON-formatted calls. When a message from the LLM references a particular function name along with arguments, <code>FunctionCallTool</code> checks if it has a function matching that name and, if so, invokes it.</p>
+<p>This design greatly reduces the complexity of integrating advanced logic: the LLM simply issues a request to invoke a function, and the tool handles the invocation details behind the scenes.</p>
+<h2 id="fields">Fields</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Descriptive identifier (defaults to <code>"FunctionCallTool"</code>).</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type (defaults to <code>"FunctionCallTool"</code>).</td>
+</tr>
+<tr>
+<td><code>function_specs</code></td>
+<td>List of <code>FunctionSpec</code> objects describing registered functions and their parameters.</td>
+</tr>
+<tr>
+<td><code>functions</code></td>
+<td>Dictionary mapping function names to their callable implementations.</td>
+</tr>
+<tr>
+<td><code>oi_span_type</code></td>
+<td>Semantic tracing attribute (<code>TOOL</code>) for observability.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="methods">Methods</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>function</code> (Builder Class)</td>
+<td>Builder method to register a function. Automatically applies <code>@llm_function</code> if not already decorated.</td>
+</tr>
+<tr>
+<td><code>get_function_specs</code></td>
+<td>Retrieves detailed metadata about registered functions (including parameter info), enabling structured LLM-based function calls.</td>
+</tr>
+<tr>
+<td><code>invoke</code></td>
+<td>Asynchronous method that evaluates incoming messages for tool calls, matches them to registered functions, and executes with JSON arguments, allowing concurrency and awaiting coroutine functions.</td>
+</tr>
+<tr>
+<td><code>to_messages</code></td>
+<td>Converts invoke results into <code>Message</code> objects with proper <code>tool_call_id</code> linkage.</td>
+</tr>
+<tr>
+<td><code>to_dict</code></td>
+<td>Serializes the <code>FunctionCallTool</code> instance, listing function specifications for debugging or persistence.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="llm-function-decorator">LLM Function Decorator</h2>
+<h3 id="llm_function">@llm_function</h3>
+<p>The <code>@llm_function</code> decorator exposes methods to Language Learning Models by automatically generating function specifications.</p>
+<p><strong>Location</strong>: <code>grafi.common.decorators.llm_function</code></p>
+<p><strong>Purpose</strong>:</p>
+<ul>
+<li>Extracts function metadata (name, docstring, parameters, type hints)</li>
+<li>Constructs a <code>FunctionSpec</code> object with JSON Schema-compatible parameter descriptions</li>
+<li>Stores the specification as a <code>_function_spec</code> attribute on the decorated function</li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.decorators.llm_function</span><span class="w"> </span><span class="kn">import</span> <span class="n">llm_function</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nd">@llm_function</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">calculate_sum</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">precision</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="sd">    Calculate the sum of two numbers with optional precision.</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="sd">        x (int): The first number to add.</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="sd">        y (int): The second number to add.</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="sd">        precision (float, optional): Precision level. Defaults to 0.1.</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="sd">        float: The sum of x and y.</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Features</strong>:</p>
+<ul>
+<li>Automatically maps Python types to JSON Schema types</li>
+<li>Extracts parameter descriptions from docstrings</li>
+<li>Marks parameters without defaults as required</li>
+<li>Supports type hints for comprehensive schema generation</li>
+</ul>
+<p><strong>Type Mapping</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Python Type</th>
+<th>JSON Schema Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>str</code></td>
+<td><code>"string"</code></td>
+</tr>
+<tr>
+<td><code>int</code></td>
+<td><code>"integer"</code></td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td><code>"number"</code></td>
+</tr>
+<tr>
+<td><code>bool</code></td>
+<td><code>"boolean"</code></td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td><code>"array"</code></td>
+</tr>
+<tr>
+<td><code>dict</code></td>
+<td><code>"object"</code></td>
+</tr>
+<tr>
+<td>Other</td>
+<td><code>"string"</code> (default)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-it-works">How It Works</h2>
+<ol>
+<li>
+<p><strong>Function Registration</strong>: Functions are registered either via the builder pattern using <code>.function()</code> method or by inheriting from <code>FunctionCallTool</code> and decorating methods with <code>@llm_function</code>. This automatically generates <code>FunctionSpec</code> objects describing each function's metadata.</p>
+</li>
+<li>
+<p><strong>Automatic Discovery</strong>: When inheriting from <code>FunctionCallTool</code>, the <code>__init_subclass__</code> method automatically discovers all methods decorated with <code>@llm_function</code> and adds them to the <code>functions</code> dictionary and <code>function_specs</code> list.</p>
+</li>
+<li>
+<p><strong>Message Processing</strong>: When <code>invoke</code> receives messages, it examines the <code>tool_calls</code> field in the first message to find function calls that match registered function names.</p>
+</li>
+<li>
+<p><strong>Function Execution</strong>: For each matching tool call:</p>
+</li>
+<li>Arguments are parsed from JSON in the <code>tool_call.function.arguments</code> field</li>
+<li>The corresponding function is called with the parsed arguments</li>
+<li>
+<p>Results are converted to <code>Message</code> objects with the appropriate <code>tool_call_id</code></p>
+</li>
+<li>
+<p><strong>Response Handling</strong>: The <code>to_messages</code> method formats function results into proper <code>Message</code> objects, maintaining the link between function calls and responses through <code>tool_call_id</code>.</p>
+</li>
+</ol>
+<h2 id="usage-and-customization">Usage and Customization</h2>
+<ul>
+<li><strong>Builder Pattern</strong>: Use the builder's <code>.function(...)</code> method to assign the function you want to expose. This ensures your function is properly decorated if not already.</li>
+<li><strong>Flexible</strong>: By simply swapping out the underlying callable, you can quickly adapt to new or updated logic without modifying the rest of the workflow.</li>
+<li><strong>Observability</strong>: Because <code>FunctionCallTool</code> implements the <code>Tool</code> interface and integrates with the event-driven architecture, all invocations can be monitored and logged.</li>
+</ul>
+<p>With <code>FunctionCallTool</code>, you can integrate specialized Python functions into an LLM-driven workflow with minimal extra overhead. As your system grows and evolves, it provides a clean way to add or modify functionality while retaining a uniform interaction pattern with the LLM.</p>
+<h2 id="implementation-examples">Implementation Examples</h2>
+<h3 id="example-simple-weather-mock-tool">Example - Simple Weather Mock Tool</h3>
+<p>A straightforward implementation that inherits from <code>FunctionCallTool</code>. This class provides a simple way to use <code>FunctionCallTool</code> by just instantiating and calling the method:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.common.decorators.llm_function</span><span class="w"> </span><span class="kn">import</span> <span class="n">llm_function</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">grafi.tools.function_calls.function_call_tool</span><span class="w"> </span><span class="kn">import</span> <span class="n">FunctionCallTool</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">WeatherMock</span><span class="p">(</span><span class="n">FunctionCallTool</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="nd">@llm_function</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_weather_mock</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">postcode</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="sd">        Function to get weather information for a given postcode.</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sd">        Args:</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="sd">            postcode (str): The postcode for which to retrieve weather information.</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="sd">        Returns:</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="sd">            str: A string containing a weather report for the given postcode.</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;The weather of </span><span class="si">{</span><span class="n">postcode</span><span class="si">}</span><span class="s2"> is bad now.&quot;</span>
+</span></code></pre></div>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li>Uses <code>@llm_function</code> decorator for automatic function registration</li>
+<li>Simple implementation for basic use cases</li>
+<li>Inherits all FunctionCallTool capabilities</li>
+</ul>
+<h3 id="example-tavily-search-tool">Example - Tavily Search Tool</h3>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/tavily_tool.py">TavilyTool</a> extends FunctionCallTool to provide web search capabilities through the Tavily API. This example demonstrates more complex configuration and a builder pattern for reusable tools.</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>Configurable Search Depth</strong>: Supports both "basic" and "advanced" search modes</li>
+<li><strong>Token Management</strong>: Limits response size to prevent overly large outputs</li>
+<li><strong>Builder Pattern</strong>: Provides fluent configuration interface</li>
+</ul>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Descriptive identifier for the tool (default: <code>"TavilyTool"</code>).</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type indicator (default: <code>"TavilyTool"</code>).</td>
+</tr>
+<tr>
+<td><code>client</code></td>
+<td>Instance of the <code>TavilyClient</code> used for performing search queries.</td>
+</tr>
+<tr>
+<td><code>search_depth</code></td>
+<td>Defines the search mode (either <code>"basic"</code> or <code>"advanced"</code>) for Tavily.</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>Limits the total size (in tokens) of the returned JSON string, preventing overly large responses.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Usage Example</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">tavily_tool</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">TavilyTool</span><span class="o">.</span><span class="n">builder</span><span class="p">()</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="o">.</span><span class="n">api_key</span><span class="p">(</span><span class="s2">&quot;YOUR_API_KEY&quot;</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="o">.</span><span class="n">search_depth</span><span class="p">(</span><span class="s2">&quot;advanced&quot;</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">.</span><span class="n">max_tokens</span><span class="p">(</span><span class="mi">6000</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The <code>@llm_function</code> decorated <code>web_search_using_tavily</code> method accepts a query and optional max_results parameter, returning JSON-formatted search results with token management.</p>
+<h3 id="additional-search-tool-examples">Additional Search Tool Examples</h3>
+<h4 id="duckduckgo-search-tool">DuckDuckGo Search Tool</h4>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/duckduckgo_tool.py">DuckDuckGoTool</a> provides web search functionality using the DuckDuckGo Search API, offering a privacy-focused alternative to other search engines.</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>Privacy-focused Search</strong>: Uses DuckDuckGo's API for searches without tracking</li>
+<li><strong>Configurable Parameters</strong>: Supports custom headers, proxy settings, and timeout configurations</li>
+<li><strong>Flexible Result Limits</strong>: Allows both fixed and dynamic result count settings</li>
+</ul>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Tool identifier (default: <code>"DuckDuckGoTool"</code>).</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type (default: <code>"DuckDuckGoTool"</code>).</td>
+</tr>
+<tr>
+<td><code>fixed_max_results</code></td>
+<td>Optional fixed maximum number of results to return.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>Optional custom headers for requests.</td>
+</tr>
+<tr>
+<td><code>proxy</code></td>
+<td>Optional proxy server configuration.</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>Request timeout in seconds (default: 10).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Usage Example</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">duckduckgo_tool</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">DuckDuckGoTool</span><span class="o">.</span><span class="n">builder</span><span class="p">()</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="o">.</span><span class="n">fixed_max_results</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="mi">15</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="google-search-tool">Google Search Tool</h4>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/google_search_tool.py">GoogleSearchTool</a> extends FunctionCallTool to provide web search functionality using the Google Search API with advanced configuration options.</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>Language Support</strong>: Configurable language settings for international searches</li>
+<li><strong>Result Customization</strong>: Fixed or dynamic result count limits</li>
+<li><strong>Advanced Configuration</strong>: Support for custom headers, proxy, and timeout settings</li>
+</ul>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Tool identifier (default: <code>"GoogleSearchTool"</code>).</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type (default: <code>"GoogleSearchTool"</code>).</td>
+</tr>
+<tr>
+<td><code>fixed_max_results</code></td>
+<td>Optional fixed maximum number of results.</td>
+</tr>
+<tr>
+<td><code>fixed_language</code></td>
+<td>Optional fixed language code for searches.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>Optional custom headers for requests.</td>
+</tr>
+<tr>
+<td><code>proxy</code></td>
+<td>Optional proxy server configuration.</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>Request timeout in seconds (default: 10).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Usage Example</strong>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">google_tool</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">GoogleSearchTool</span><span class="o">.</span><span class="n">builder</span><span class="p">()</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="o">.</span><span class="n">fixed_max_results</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="o">.</span><span class="n">fixed_language</span><span class="p">(</span><span class="s2">&quot;en&quot;</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="o">.</span><span class="n">build</span><span class="p">()</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="mcp-model-context-protocol-tool">MCP (Model Context Protocol) Tool</h4>
+<p><a href="https://github.com/binome-dev/graphite/blob/main/grafi/tools/function_calls/impl/mcp_tool.py">MCPTool</a> provides integration with Model Context Protocol servers, enabling access to external tools, resources, and prompts.</p>
+<p><strong>Key Features</strong>:</p>
+<ul>
+<li><strong>Dynamic Function Discovery</strong>: Automatically discovers and registers functions from MCP servers</li>
+<li><strong>Resource Access</strong>: Provides access to MCP server resources and prompts</li>
+<li><strong>Extensible Configuration</strong>: Supports custom MCP server configurations</li>
+</ul>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Tool identifier (default: <code>"MCPTool"</code>).</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type (default: <code>"MCPTool"</code>).</td>
+</tr>
+<tr>
+<td><code>mcp_config</code></td>
+<td>Configuration dictionary for MCP server connections.</td>
+</tr>
+<tr>
+<td><code>resources</code></td>
+<td>List of available MCP resources.</td>
+</tr>
+<tr>
+<td><code>prompts</code></td>
+<td>List of available MCP prompts.</td>
+</tr>
+</tbody>
+</table>
+<p>This tool automatically discovers available functions from connected MCP servers and makes them available for LLM function calling.</p>
+<h2 id="agent-calling-tool">Agent Calling Tool</h2>
+<p><code>AgentCallingTool</code> extends the <code>FunctionCallTool</code> concept to enable multi-agent systems, allowing an LLM to call another agent by name, pass relevant arguments (as a message prompt), and return the agent's response as part of the workflow.</p>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Descriptive identifier, defaults to <code>"AgentCallingTool"</code>.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type indicator, defaults to <code>"AgentCallingTool"</code>.</td>
+</tr>
+<tr>
+<td><code>agent_name</code></td>
+<td>Name of the agent to call; also used as the tool's name.</td>
+</tr>
+<tr>
+<td><code>agent_description</code></td>
+<td>High-level explanation of what the agent does, used to generate function specs.</td>
+</tr>
+<tr>
+<td><code>argument_description</code></td>
+<td>Describes the argument required (e.g., <code>prompt</code>) for the agent call.</td>
+</tr>
+<tr>
+<td><code>agent_call</code></td>
+<td>A callable that takes <code>(invoke_context, Message)</code> and returns a dictionary (e.g., <code>{"content": ...}</code>).</td>
+</tr>
+<tr>
+<td><code>oi_span_type</code></td>
+<td>OpenInference semantic attribute (<code>TOOL</code>), enabling observability and traceability.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_function_specs</code></td>
+<td>Returns the function specification (name, description, parameters) for the agent call.</td>
+</tr>
+<tr>
+<td><code>invoke</code></td>
+<td>Asynchronous method that processes incoming tool calls matching <code>agent_name</code>, passing the <code>prompt</code> to the <code>agent_call</code> callable; yields messages in an async generator for real-time or concurrent agent calls.</td>
+</tr>
+<tr>
+<td><code>to_messages</code></td>
+<td>Creates a <code>Message</code> object from the agent's response, linking the output to <code>tool_call_id</code>.</td>
+</tr>
+<tr>
+<td><code>to_dict</code></td>
+<td>Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Workflow Example</strong>:</p>
+<ol>
+<li><strong>Tool Registration</strong>: An <code>AgentCallingTool</code> is constructed with details about the agent (<code>agent_name</code>, <code>agent_description</code>, etc.) and the callable (<code>agent_call</code>).</li>
+<li><strong>Agent Invocation</strong>: When an LLM includes a tool call referencing this agent's name, <code>invoke</code> receives the <code>prompt</code> and calls the agent.</li>
+<li><strong>Response Conversion</strong>: The agent's return value is formed into a new <code>Message</code>, which the workflow can then process or forward.</li>
+</ol>
+<p><strong>Usage and Customization</strong>:</p>
+<ul>
+<li><strong>Multi-Agent Systems</strong>: By configuring multiple <code>AgentCallingTool</code> instances, you can facilitate dynamic exchanges among multiple agents, each specializing in a different task.</li>
+<li><strong>Runtime Flexibility</strong>: Changing or updating the underlying <code>agent_call</code> logic requires no changes to the rest of the workflow.</li>
+<li><strong>Parameter Schemas</strong>: <code>argument_description</code> ensures the LLM knows which arguments are required and how they should be formatted.</li>
+</ul>
+<p>By integrating <code>AgentCallingTool</code> into your event-driven workflow, you can build sophisticated multi-agent systems where each agent can be invoked seamlessly via structured function calls. This approach maintains a clear separation between the LLM's orchestration and the agents' invoke details.</p>
+<h2 id="synthetic-tool">Synthetic Tool</h2>
+<p><code>SyntheticTool</code> extends the <code>FunctionCallTool</code> that enables LLMs to generate synthetic or modeled data by leveraging another LLM as a data generator. Unlike traditional function call tools that execute predefined logic, <code>SyntheticTool</code> uses an LLM to produce plausible, schema-compliant, outputs based on input specifications—perfect for testing, prototyping, or generating realistic mock data.</p>
+<p><strong>Fields</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Descriptive identifier, defaults to <code>"SyntheticTool"</code>.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>Tool type indicator, defaults to <code>"SyntheticTool"</code>.</td>
+</tr>
+<tr>
+<td><code>tool_name</code></td>
+<td>Name used for function registration and LLM tool calls.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Explanation of what synthetic data this tool generates.</td>
+</tr>
+<tr>
+<td><code>input_model</code></td>
+<td>Pydantic <code>BaseModel</code> class or JSON schema dict defining expected input structure.</td>
+</tr>
+<tr>
+<td><code>output_model</code></td>
+<td>Pydantic <code>BaseModel</code> class or JSON schema dict defining generated output structure.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>OpenAI model to use for data generation (e.g., <code>"gpt-4o-mini"</code>).</td>
+</tr>
+<tr>
+<td><code>openai_api_key</code></td>
+<td>API key for OpenAI authentication.</td>
+</tr>
+<tr>
+<td><code>oi_span_type</code></td>
+<td>OpenInference semantic attribute (<code>TOOL</code>), enabling observability and traceability.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_function_specs</code></td>
+<td>Returns the function specification (name, description, input schema) for the synthetic. tool</td>
+</tr>
+<tr>
+<td><code>invoke</code></td>
+<td>Processes tool calls, generates synthetic data via LLM, returns schema-compliant JSON responses.</td>
+</tr>
+<tr>
+<td><code>ensure_strict_schema</code></td>
+<td>Static method that recursively adds <code>additionalProperties: false</code> to JSON schemas for OpenAI strict mode compatibility.</td>
+</tr>
+<tr>
+<td><code>to_dict</code></td>
+<td>Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Workflow Example</strong>:</p>
+<ol>
+<li><strong>Schema Definition</strong>: Define input and output schemas using either Pydantic models (type-safe Python) or JSON Schema dicts (flexible).</li>
+<li><strong>Function Registration</strong>: The tool automatically generates the <code>FunctionSpec</code>, enabling LLMs to discover and call the tool.</li>
+<li><strong>Tool Invocation</strong>: When an LLM invokes the tool with arguments:<ul>
+<li>Arguments are validated against <code>input_model</code> schema</li>
+<li>A prompt is constructed with input/output schema specifications</li>
+<li>LLM generates synthetic data conforming to <code>output_model</code></li>
+</ul>
+</li>
+<li><strong>Structured Output</strong>:<ul>
+<li><strong>Pydantic Mode</strong>: Uses OpenAI's <code>beta.chat.completions.parse()</code> with type safety</li>
+<li><strong>JSON Schema Mode</strong>: Uses <code>chat.completions.create()</code> with <code>strict: True</code> for schema validation</li>
+</ul>
+</li>
+<li><strong>Response Handling</strong>: Generated data is returned as a <code>Message</code> object linked to the original <code>tool_call_id</code>.</li>
+</ol>
+<p><strong>Usage and Customization</strong>:</p>
+<ul>
+<li><strong>Flexible Schema Definition</strong>: By supporting both Pydantic models and JSON schemas, you can choose type-safe Python development or dynamic schema-based configuration without changing the rest of your workflow.</li>
+<li><strong>Runtime Model Selection</strong>: Easily swap between OpenAI models (e.g., <code>gpt-5-mini</code> for cost, <code>gpt-5</code> for quality) to balance generation quality and API costs without modifying tool logic.</li>
+<li><strong>Schema-Driven Generation</strong>: Input and output schemas guide the LLM's data generation, ensuring consistent, validated outputs that conform to your exact specifications.</li>
+<li><strong>Composable Data Pipelines</strong>: Chain multiple <code>SyntheticTool</code> instances where one tool's output becomes another's input, creating sophisticated data generation workflows.</li>
+</ul>
+<p>With SyntheticTool, you can rapidly prototype data-driven workflows without building actual data sources, while maintaining full schema compliance and
+type safety through Pydantic or JSON Schema validation.</p>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="function-design">Function Design</h3>
+<ol>
+<li>
+<p><strong>Clear Documentation</strong>: Always provide comprehensive docstrings for functions decorated with <code>@llm_function</code>. The LLM uses these descriptions to understand when and how to call your functions.</p>
+</li>
+<li>
+<p><strong>Type Hints</strong>: Use proper type hints for all parameters. These are used to generate accurate JSON schemas for function specifications.</p>
+</li>
+<li>
+<p><strong>Error Handling</strong>: Implement proper error handling in your functions, as exceptions will be propagated back through the tool invoke chain.</p>
+</li>
+</ol>
+<h3 id="tool-configuration">Tool Configuration</h3>
+<ol>
+<li>
+<p><strong>Builder Pattern</strong>: Use the builder pattern for complex tools that require multiple configuration options.</p>
+</li>
+<li>
+<p><strong>Resource Management</strong>: For tools that use external APIs or resources, implement proper resource management and cleanup.</p>
+</li>
+<li>
+<p><strong>Token Management</strong>: For tools that return large amounts of data, implement token or size limits to prevent overwhelming downstream components.</p>
+</li>
+</ol>
+<h3 id="integration">Integration</h3>
+<ol>
+<li>
+<p><strong>Command Registration</strong>: Tools that extend <code>FunctionCallTool</code> automatically use the <code>FunctionCallCommand</code> through the <code>@use_command</code> decorator.</p>
+</li>
+<li>
+<p><strong>Observability</strong>: Leverage the built-in observability features by ensuring proper tool naming and type identification.</p>
+</li>
+<li>
+<p><strong>Testing</strong>: Write comprehensive tests for your function implementations, as they will be called dynamically by LLMs.</p>
+</li>
+</ol>
+<p>With these patterns and examples, you can create robust, reusable function call tools that integrate seamlessly into Graphite's event-driven architecture while maintaining clean separation of concerns and excellent observability.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 2, 2026 09:43:54 UTC">January 2, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.top", "navigation.sections", "content.code.annotate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
