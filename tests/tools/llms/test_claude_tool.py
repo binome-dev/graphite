@@ -33,7 +33,7 @@ def claude_instance() -> ClaudeTool:
         system_message="dummy system message",
         name="ClaudeTool",
         api_key="test_api_key",
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5-20251001",
         max_tokens=2048,
     )
 
@@ -43,7 +43,7 @@ def claude_instance() -> ClaudeTool:
 # --------------------------------------------------------------------------- #
 def test_init(claude_instance):
     assert claude_instance.api_key == "test_api_key"
-    assert claude_instance.model == "claude-3-5-haiku-20241022"
+    assert claude_instance.model == "claude-haiku-4-5-20251001"
     assert claude_instance.system_message == "dummy system message"
     assert claude_instance.max_tokens == 2048
 
@@ -93,7 +93,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
 
     # verify create() called with right kwargs
     kwargs = mock_client.messages.create.call_args[1]
-    assert kwargs["model"] == "claude-3-5-haiku-20241022"
+    assert kwargs["model"] == "claude-haiku-4-5-20251001"
     assert kwargs["max_tokens"] == 2048
     assert kwargs["messages"][0] == {
         "role": "system",
@@ -214,7 +214,7 @@ def test_to_dict(claude_instance):
     assert d["name"] == "ClaudeTool"
     assert d["type"] == "ClaudeTool"
     assert d["api_key"] == "****************"
-    assert d["model"] == "claude-3-5-haiku-20241022"
+    assert d["model"] == "claude-haiku-4-5-20251001"
 
 
 # --------------------------------------------------------------------------- #
@@ -230,7 +230,7 @@ async def test_from_dict():
         "type": "ClaudeTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "max_tokens": 2048,
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
@@ -241,7 +241,7 @@ async def test_from_dict():
 
     assert isinstance(tool, ClaudeTool)
     assert tool.name == "TestClaude"
-    assert tool.model == "claude-3-5-haiku-20241022"
+    assert tool.model == "claude-haiku-4-5-20251001"
     assert tool.max_tokens == 2048
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
