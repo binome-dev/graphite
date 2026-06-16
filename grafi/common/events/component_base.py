@@ -131,14 +131,20 @@ class FailedEvent(ComponentEvent, Generic[T_Input], ABC):
 
     input_data: T_Input
     error: Any
+    error_details: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        data: Dict[str, Any] = {
+            "input_data": self._serialize_input(self.input_data),
+            "error": str(self.error),
+        }
+        # Additive, backward-compatible: only present when structured details
+        # were captured, so existing stored events and tests keep a stable shape.
+        if self.error_details is not None:
+            data["error_details"] = self.error_details
         return {
             **self.to_dict_base(),
-            "data": {
-                "input_data": self._serialize_input(self.input_data),
-                "error": str(self.error),
-            },
+            "data": data,
         }
 
     @abstractmethod
@@ -311,6 +317,7 @@ def create_component_events(
                 type=event_context["type"],
                 input_data=cls._deserialize_input(data["data"]["input_data"]),
                 error=data["data"]["error"],
+                error_details=data["data"].get("error_details"),
                 **{
                     k: v
                     for k, v in event_context.items()

@@ -2,6 +2,7 @@
 
 import functools
 import json
+import os
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
@@ -12,6 +13,9 @@ from typing import Type
 from typing import TypeVar
 from typing import Union
 
+from loguru import logger
+from opentelemetry.trace import Status
+from opentelemetry.trace import StatusCode
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic_core import to_jsonable_python
@@ -23,6 +27,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions.serialization import error_message
+from grafi.common.exceptions.serialization import error_to_dict
+from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -32,6 +39,10 @@ from grafi.workflows.workflow import Workflow
 
 
 T = TypeVar("T")
+
+# Attribute used to mark an exception whose full traceback has already been
+# logged, so the same root failure is not dumped at every decorator layer.
+_TRACEBACK_LOGGED_ATTR = "_grafi_traceback_logged"
 
 
 class EventContext(BaseModel):
@@ -57,6 +68,117 @@ class ComponentConfig:
     ]  # Extracts component-specific metadata
     process_async_result: Callable[[List], Any]
     span_name_suffix: str = "invoke"  # Suffix for span name
+
+
+def _include_traceback() -> bool:
+    """Whether to capture tracebacks into structured error details.
+
+    Enabled by default. Set ``GRAFI_ERROR_INCLUDE_TRACEBACK`` to a falsy value
+    (``0``/``false``/``no``/``off``) to omit tracebacks from persisted events,
+    e.g. in production where they may carry sensitive paths or large payloads.
+    """
+    value = os.getenv("GRAFI_ERROR_INCLUDE_TRACEBACK")
+    if value is None:
+        return True
+    return value.strip().lower() not in ("0", "false", "no", "off", "")
+
+
+def _build_error_details(exc: Exception, metadata: EventContext) -> Dict[str, Any]:
+    """Build the structured ``error_details`` payload for a failed component."""
+    details = error_to_dict(exc, include_traceback=_include_traceback())
+    # Identify which component failed (the "where"), alongside the exception's
+    # own type/module/cause chain (the "why").
+    details["component_id"] = metadata.id
+    details["component_name"] = metadata.name
+    details["component_type"] = metadata.type
+    return details
+
+
+def _record_span_error(
+    span: Any, exc: Exception, error_details: Dict[str, Any]
+) -> None:
+    """Attach structured error information to the active span."""
+    span.set_attribute("error", str(exc))
+    span.set_attribute("error.type", error_details["error_type"])
+    span.set_attribute("error.message", error_details["message"])
+    traceback_str = error_details.get("traceback")
+    if traceback_str:
+        span.set_attribute("error.stack", traceback_str)
+    try:
+        span.set_attribute(
+            "error.details", json.dumps(error_details, default=to_jsonable_python)
+        )
+    except (TypeError, ValueError):
+        pass
+    try:
+        span.record_exception(exc)
+        span.set_status(Status(StatusCode.ERROR, error_details["message"]))
+    except Exception:  # pragma: no cover - defensive; span impls vary
+        pass
+
+
+def _traceback_already_logged(exc: Exception) -> bool:
+    """True if any exception in the cause chain has had its traceback logged."""
+    # Scan generously: each decorator layer marks the exception it sees (below),
+    # so the flag is normally within a few links, but a large bound keeps the
+    # invariant robust for deeply nested agent-calling chains. The cycle guard in
+    # iter_cause_chain prevents runaway traversal.
+    return any(
+        getattr(link, _TRACEBACK_LOGGED_ATTR, False)
+        for link in iter_cause_chain(exc, max_depth=1000)
+    )
+
+
+def _log_component_exception(
+    exc: Exception,
+    metadata: EventContext,
+    invoke_context: InvokeContext,
+    error_details: Dict[str, Any],
+) -> None:
+    """Log a failed component, with a full traceback only once.
+
+    The same root failure propagates through the tool -> node -> workflow ->
+    assistant decorators (and is re-wrapped along the way). Logging the full
+    traceback at every layer would print the same stack four-plus times, so the
+    full traceback is emitted once at the layer closest to the failure (the first
+    decorator to catch it); outer layers log a one-line summary instead.
+
+    The traceback is taken from ``error_details`` -- a plain, stdlib-formatted
+    string that does NOT include local-variable values (unlike Loguru's
+    ``opt(exception=...)`` with ``diagnose=True``). This keeps secrets/PII out of
+    logs and honors GRAFI_ERROR_INCLUDE_TRACEBACK (the key is absent when the
+    switch disables traceback capture), without forcing global Loguru config.
+    """
+    bound = logger.bind(
+        component_id=metadata.id,
+        component_name=metadata.name,
+        component_type=metadata.type,
+        conversation_id=getattr(invoke_context, "conversation_id", None),
+        invoke_id=getattr(invoke_context, "invoke_id", None),
+        assistant_request_id=getattr(invoke_context, "assistant_request_id", None),
+    )
+    component_label = metadata.type or "component"
+    summary = (
+        f"{component_label} '{metadata.name}' failed: "
+        f"{type(exc).__name__}: {error_message(exc)}"
+    )
+
+    already_logged = _traceback_already_logged(exc)
+    # Mark this exception (including re-wrapped outer ones) so the next decorator
+    # layer finds the flag within one link of the chain regardless of nesting
+    # depth, keeping the full traceback to a single emission.
+    try:
+        setattr(exc, _TRACEBACK_LOGGED_ATTR, True)
+    except Exception:  # pragma: no cover - builtins generally allow attributes
+        pass
+
+    traceback_str = error_details.get("traceback")
+    # Pass values as arguments so any braces in them are not re-interpreted as
+    # Loguru format placeholders.
+    if already_logged or not traceback_str:
+        bound.error("{}", summary)
+    else:
+        bound.error("{}\n{}", summary, traceback_str)
 
 
 def create_async_decorator(config: ComponentConfig) -> Callable:
@@ -136,10 +258,20 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     )
 
             except Exception as e:
-                # Record failed event
-                if "span" in locals():
-                    span.set_attribute("error", str(e))
+                # Build structured details once, while the traceback is still
+                # attached to the exception.
+                error_details = _build_error_details(e, metadata)
 
+                # Enrich the active span with structured error information.
+                if "span" in locals():
+                    _record_span_error(span, e, error_details)
+
+                # Log a full traceback once at the layer closest to the failure;
+                # outer layers log a concise summary (see _log_component_exception).
+                _log_component_exception(e, metadata, invoke_context, error_details)
+
+                # Record failed event with both the human-readable string (kept
+                # for backward compatibility) and the structured details.
                 failed_event = config.event_types["failed"](
                     id=metadata.id,
                     name=metadata.name,
@@ -147,6 +279,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     input_data=input_data,
                     invoke_context=invoke_context,
                     error=str(e),
+                    error_details=error_details,
                 )
                 await container.event_store.record_event(failed_event)
                 raise

@@ -79,9 +79,46 @@ def tool_failed_event_dict():
     }
 
 
+@pytest.fixture
+def tool_failed_event_with_details(tool_failed_event) -> Any:
+    return tool_failed_event.model_copy(
+        update={
+            "error_details": {
+                "error_type": "FunctionCallException",
+                "error_module": "grafi.common.exceptions.tool_exceptions",
+                "message": "function call blew up",
+                "tool_name": "test_tool",
+                "cause": {"error_type": "ValueError", "message": "root boom"},
+                "traceback": "Traceback (most recent call last): ...",
+            }
+        }
+    )
+
+
 def test_tool_failed_event_to_dict(tool_failed_event, tool_failed_event_dict):
     assert tool_failed_event.to_dict() == tool_failed_event_dict
 
 
 def test_tool_failed_event_from_dict(tool_failed_event_dict, tool_failed_event):
     assert ToolFailedEvent.from_dict(tool_failed_event_dict) == tool_failed_event
+
+
+def test_tool_failed_event_omits_error_details_when_absent(tool_failed_event):
+    # Backward compatibility: with no structured details, the key is absent and
+    # the serialized shape is unchanged.
+    assert "error_details" not in tool_failed_event.to_dict()["data"]
+
+
+def test_tool_failed_event_to_dict_includes_error_details(
+    tool_failed_event_with_details,
+):
+    data = tool_failed_event_with_details.to_dict()["data"]
+    assert data["error"] == "error"  # human-readable string preserved
+    assert data["error_details"]["error_type"] == "FunctionCallException"
+    assert data["error_details"]["cause"]["error_type"] == "ValueError"
+
+
+def test_tool_failed_event_error_details_round_trip(tool_failed_event_with_details):
+    restored = ToolFailedEvent.from_dict(tool_failed_event_with_details.to_dict())
+    assert restored == tool_failed_event_with_details
+    assert restored.error_details["cause"]["message"] == "root boom"
