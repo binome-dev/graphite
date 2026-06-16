@@ -50,7 +50,7 @@ class ClaudeTool(LLM):
         default_factory=lambda: os.getenv("ANTHROPIC_API_KEY")
     )
     max_tokens: int = Field(default=4096)
-    model: str = Field(default="claude-3-5-haiku-20241022")  # or haiku, opus…
+    model: str = Field(default="claude-haiku-4-5-20251001")  # or haiku, opus…
 
     @classmethod
     def builder(cls) -> "ClaudeToolBuilder":
@@ -203,7 +203,7 @@ class ClaudeTool(LLM):
             .is_streaming(data.get("is_streaming", False))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("ANTHROPIC_API_KEY"))
-            .model(data.get("model", "claude-3-5-haiku-20241022"))
+            .model(data.get("model", "claude-haiku-4-5-20251001"))
             .max_tokens(data.get("max_tokens", 4096))
             .build()
         )

@@ -1,7 +1,43 @@
 """Tests for the unified record decorators."""
 
+import json
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+from pydantic_core import to_jsonable_python
+
+from grafi.common.containers.container import container
+from grafi.common.decorators.record_base import _TRACEBACK_LOGGED_ATTR
 from grafi.common.decorators.record_base import EventContext
+from grafi.common.decorators.record_base import _traceback_already_logged
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.event_stores import EventStoreInMemory
+from grafi.common.events.component_events import ToolFailedEvent
+from grafi.common.exceptions.tool_exceptions import FunctionCallException
+from grafi.common.exceptions.workflow_exceptions import NodeExecutionError
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
+
+
+@pytest.fixture
+def isolated_container():
+    """Register an isolated in-memory store and a no-op tracer, then restore.
+
+    Using a mock tracer avoids the live ``setup_tracing`` path (a socket probe to
+    localhost:4317 and possible global instrumentation side effects). The previous
+    container state is restored so the global singleton does not leak across tests.
+    """
+    prev_store = container._event_store
+    prev_tracer = container._tracer
+    store = EventStoreInMemory()
+    container.register_event_store(store)
+    container.register_tracer(MagicMock())
+    try:
+        yield store
+    finally:
+        container._event_store = prev_store
+        container._tracer = prev_tracer
 
 
 class TestEventContext:
@@ -83,3 +119,93 @@ class TestDecoratorBehavior:
         assert decorated_async_func is not original_async_func
         assert callable(decorated_async_func)
         # Don't make assumptions about whether it preserves async nature
+
+
+class _ExplodingTool:
+    """Minimal tool-shaped object whose decorated invoke always raises."""
+
+    tool_id = "exploding-tool-id"
+    name = "ExplodingTool"
+    type = "FunctionCallTool"
+    oi_span_type = SimpleNamespace(value="TOOL")
+
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        raise FunctionCallException(
+            tool_name="ExplodingTool",
+            function_name="detonate",
+            message="function call blew up",
+            invoke_context=invoke_context,
+            cause=ValueError("root boom"),
+        )
+        yield  # pragma: no cover - makes this an async generator
+
+
+class TestFailedEventErrorDetails:
+    """The decorator records structured error details and re-raises."""
+
+    @pytest.mark.asyncio
+    async def test_failed_event_carries_error_details(self, isolated_container):
+        event_store = isolated_container
+
+        tool = _ExplodingTool()
+        invoke_context = InvokeContext(
+            conversation_id="conversation_id",
+            invoke_id="invoke_id",
+            assistant_request_id="assistant_request_id",
+        )
+        messages = [Message(role="user", content="hi")]
+
+        # The original exception still propagates unchanged.
+        with pytest.raises(FunctionCallException) as exc_info:
+            async for _ in tool.invoke(invoke_context, messages):
+                pass
+        assert exc_info.value.function_name == "detonate"
+
+        events = await event_store.get_events()
+        failed = [e for e in events if isinstance(e, ToolFailedEvent)]
+        assert len(failed) == 1
+
+        details = failed[0].error_details
+        assert details is not None
+        assert details["error_type"] == "FunctionCallException"
+        assert details["message"] == "function call blew up"
+        assert details["component_name"] == "ExplodingTool"
+        assert details["component_type"] == "FunctionCallTool"
+        assert details["tool_name"] == "ExplodingTool"
+        assert details["function_name"] == "detonate"
+        assert details["cause"]["error_type"] == "ValueError"
+
+        # A real traceback was captured pointing at the failure site.
+        assert details["traceback"]
+        assert "detonate" in details["traceback"] or "invoke" in details["traceback"]
+
+        # The persisted payload must be JSON-serializable (JSONB storage).
+        json.dumps(details, default=to_jsonable_python)
+
+        # Human-readable string still recorded for backward compatibility.
+        assert failed[0].error
+
+
+class TestTracebackDedup:
+    """The full traceback is logged once even after the error is re-wrapped."""
+
+    def test_flag_survives_rewrapping(self):
+        inner = ValueError("root boom")
+        # The innermost decorator marks the exception it caught.
+        setattr(inner, _TRACEBACK_LOGGED_ATTR, True)
+
+        # The workflow re-wraps it into a new exception with cause=inner.
+        outer = NodeExecutionError(
+            node_name="SearchNode", message="node failed", cause=inner
+        )
+
+        # An outer decorator must still see that the traceback was already logged.
+        assert _traceback_already_logged(outer) is True
+
+    def test_fresh_chain_not_yet_logged(self):
+        inner = ValueError("root boom")
+        outer = NodeExecutionError(
+            node_name="SearchNode", message="node failed", cause=inner
+        )
+        assert _traceback_already_logged(outer) is False

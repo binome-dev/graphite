@@ -53,7 +53,7 @@ async def test_tool_factory_claude_tool():
         "type": "ClaudeTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "max_tokens": 4096,
         "chat_params": {},
         "is_streaming": False,
@@ -64,7 +64,7 @@ async def test_tool_factory_claude_tool():
 
     assert isinstance(tool, ClaudeTool)
     assert tool.name == "ClaudeTool"
-    assert tool.model == "claude-3-5-haiku-20241022"
+    assert tool.model == "claude-haiku-4-5-20251001"
     assert tool.max_tokens == 4096
 
 
@@ -273,7 +273,7 @@ async def test_tool_factory_roundtrip_claude():
     original = (
         ClaudeTool.builder()
         .name("test_claude")
-        .model("claude-3-5-haiku-20241022")
+        .model("claude-haiku-4-5-20251001")
         .max_tokens(2048)
         .system_message("You are helpful")
         .build()
