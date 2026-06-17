@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from textwrap import indent
 
-
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:

@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-
 JsonSchema = Dict[str, Any]
 
 
@@ -22,7 +21,7 @@ class ParameterSchema(BaseModel):
       and preserved when dumped to dict.
     """
 
-    # type: Optional[object] = None , can also be anyOf
+    # the "type" field: Optional[object] = None, can also be anyOf
     description: Optional[str] = ""
 
     model_config = ConfigDict(extra="allow")

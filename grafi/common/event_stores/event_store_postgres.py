@@ -8,7 +8,6 @@ from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
 from grafi.common.exceptions import EventPersistenceError
 
-
 try:
     from sqlalchemy import Column
     from sqlalchemy import DateTime

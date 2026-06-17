@@ -6,7 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:

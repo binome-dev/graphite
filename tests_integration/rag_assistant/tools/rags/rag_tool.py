@@ -14,7 +14,6 @@ from tests_integration.rag_assistant.tools.rags.rag_response_command import (
     RagResponseCommand,
 )
 
-
 try:
     from llama_index.core.base.response.schema import RESPONSE_TYPE
     from llama_index.core.base.response.schema import PydanticResponse

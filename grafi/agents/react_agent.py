@@ -24,7 +24,6 @@ from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
-
 AGENT_SYSTEM_MESSAGE = """
 You are a helpful and knowledgeable agent. To achieve your goal of answering complex questions
 correctly, you have access to the search tool.

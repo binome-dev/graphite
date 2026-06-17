@@ -13,7 +13,6 @@ from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
 from grafi.topics.topic_base import TopicType
 from grafi.topics.topic_impl.output_topic import OutputTopic
 
-
 agent_output_topic = OutputTopic(name="agent_output_topic")
 
 

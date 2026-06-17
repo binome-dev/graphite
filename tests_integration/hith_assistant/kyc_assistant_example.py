@@ -11,7 +11,6 @@ from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.kyc_assistant import KycAssistant
 
-
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 

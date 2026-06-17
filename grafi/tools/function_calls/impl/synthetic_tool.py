@@ -19,7 +19,6 @@ from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
-
 try:
     from openai import AsyncOpenAI
 except ImportError:

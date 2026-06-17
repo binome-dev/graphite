@@ -25,7 +25,6 @@ from grafi.common.models.function_spec import JsonSchema
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 
-
 P = ParamSpec("P")
 R = TypeVar("R")
 

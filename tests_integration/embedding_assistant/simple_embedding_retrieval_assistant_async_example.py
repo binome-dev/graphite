@@ -19,7 +19,6 @@ from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant 
     SimpleEmbeddingRetrievalAssistant,
 )
 
-
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store

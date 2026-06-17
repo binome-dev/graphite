@@ -13,7 +13,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.input_output_topics.mimo_llm_assistant import MIMOLLMAssistant
 
-
 container.register_tracer(setup_tracing(tracing_options=TracingOptions.IN_MEMORY))
 event_store = container.event_store
 

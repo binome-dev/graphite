@@ -12,7 +12,6 @@ from tests_integration.function_call_assistant.simple_function_call_assistant im
     SimpleFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

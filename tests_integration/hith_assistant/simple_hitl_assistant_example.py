@@ -12,7 +12,6 @@ from grafi.common.models.message import Message
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.simple_hitl_assistant import SimpleHITLAssistant
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

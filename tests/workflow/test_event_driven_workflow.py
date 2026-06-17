@@ -170,7 +170,6 @@ class TestEventDrivenWorkflowEventHandling:
 
 class TestEventDrivenWorkflowOutputEvents:
     @pytest.fixture
-    @pytest.mark.asyncio
     async def workflow_with_output_topics(self):
         """Create a workflow with various output topics."""
         input_topic = InputTopic(name="test_input")

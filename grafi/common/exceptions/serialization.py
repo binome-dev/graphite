@@ -17,7 +17,6 @@ from pydantic_core import to_jsonable_python
 
 from grafi.common.exceptions.base import GrafiError
 
-
 # Domain-specific attributes set by Grafi exception subclasses that help pinpoint
 # which component failed. Captured only when present on the exception instance.
 _DOMAIN_FIELDS = (

@@ -8,7 +8,6 @@ from typing import Optional
 import httpx
 from typing_extensions import TypedDict
 
-
 EncodingErrorHandler = Literal["strict", "ignore", "replace"]
 
 

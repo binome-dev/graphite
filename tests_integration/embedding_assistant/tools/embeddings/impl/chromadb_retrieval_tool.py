@@ -13,7 +13,6 @@ from tests_integration.embedding_assistant.tools.embeddings.retrieval_tool impor
     RetrievalTool,
 )
 
-
 try:
     from chromadb import Collection
     from chromadb import QueryResult

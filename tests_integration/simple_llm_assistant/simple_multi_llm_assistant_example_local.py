@@ -14,7 +14,6 @@ from tests_integration.simple_llm_assistant.simple_multi_llm_assistant import (
     SimpleMultiLLMAssistant,
 )
 
-
 event_store = container.event_store
 
 

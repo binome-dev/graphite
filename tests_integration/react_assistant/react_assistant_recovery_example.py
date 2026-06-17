@@ -12,7 +12,6 @@ from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

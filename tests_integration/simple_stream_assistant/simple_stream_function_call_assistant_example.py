@@ -12,7 +12,6 @@ from tests_integration.simple_stream_assistant.simple_stream_function_call_assis
     SimpleStreamFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

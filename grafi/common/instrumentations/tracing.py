@@ -1,11 +1,14 @@
 """
 OpenTelemetry tracing configuration for Grafi framework.
 
-This module provides flexible tracing setup with support for multiple backends:
-- Arize: Production monitoring and observability
-- Phoenix: Local/development tracing
-- Auto: Automatic detection of available endpoints
+This module provides flexible tracing setup using a generic OpenTelemetry
+(OTLP) endpoint:
+- OTLP: Export spans to any OpenTelemetry-compatible collector
+- Auto: Automatic detection of an available OTLP endpoint
 - In-Memory: Testing without external dependencies
+
+OpenInference is used to automatically instrument OpenAI calls, regardless of
+which OTLP collector the spans are exported to.
 """
 
 import os
@@ -14,11 +17,10 @@ from enum import Enum
 from typing import Optional
 from typing import Tuple
 
-import arize.otel
-import phoenix.otel
 from loguru import logger
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -30,15 +32,14 @@ from opentelemetry.trace import set_tracer_provider
 class TracingOptions(Enum):
     """Available tracing backend options."""
 
-    ARIZE = "arize"  # Production monitoring with Arize
-    PHOENIX = "phoenix"  # Phoenix tracing (local or remote)
-    AUTO = "auto"  # Auto-detect available endpoints
+    OTLP = "otlp"  # Export to a generic OpenTelemetry (OTLP) collector
+    AUTO = "auto"  # Auto-detect an available OTLP endpoint
     IN_MEMORY = "in_memory"  # In-memory tracing for testing
 
 
 def is_local_endpoint_available(host: str, port: int) -> bool:
     """
-    Check if a local OTLP endpoint is reachable.
+    Check if an OTLP endpoint is reachable.
 
     Args:
         host: The hostname or IP address
@@ -55,23 +56,9 @@ def is_local_endpoint_available(host: str, port: int) -> bool:
         return False
 
 
-def _get_arize_config() -> Tuple[str, str, str]:
+def _get_otlp_config(default_endpoint: str, default_port: int) -> Tuple[str, int]:
     """
-    Retrieve Arize configuration from environment variables.
-
-    Returns:
-        Tuple of (api_key, space_id, project_name)
-    """
-    return (
-        os.getenv("ARIZE_API_KEY", ""),
-        os.getenv("ARIZE_SPACE_ID", ""),
-        os.getenv("ARIZE_PROJECT_NAME", ""),
-    )
-
-
-def _get_phoenix_config(default_endpoint: str, default_port: int) -> Tuple[str, int]:
-    """
-    Retrieve Phoenix configuration from environment or use defaults.
+    Retrieve OTLP collector configuration from environment or use defaults.
 
     Args:
         default_endpoint: Default endpoint if not in environment
@@ -81,47 +68,24 @@ def _get_phoenix_config(default_endpoint: str, default_port: int) -> Tuple[str, 
         Tuple of (endpoint, port)
     """
     return (
-        os.getenv("PHOENIX_ENDPOINT", default_endpoint),
-        int(os.getenv("PHOENIX_PORT", str(default_port))),
+        os.getenv("OTEL_COLLECTOR_ENDPOINT", default_endpoint),
+        int(os.getenv("OTEL_COLLECTOR_PORT", str(default_port))),
     )
 
 
-def _setup_arize_tracing(collector_endpoint: str) -> None:
-    """
-    Configure Arize tracing backend.
-
-    Args:
-        collector_endpoint: The Arize collector endpoint
-    """
-    api_key, space_id, project_name = _get_arize_config()
-
-    # Register with Arize
-    arize.otel.register(
-        endpoint=collector_endpoint,
-        space_id=space_id,
-        api_key=api_key,
-        project_name=project_name,
-    )
-
-    logger.info(f"Arize tracing configured with endpoint: {collector_endpoint}")
-
-    # Instrument OpenAI calls
-    OpenAIInstrumentor().instrument()
-
-
-def _setup_phoenix_tracing(
+def _setup_otlp_tracing(
     endpoint: str,
     port: int,
     project_name: str,
     require_available: bool = True,
 ) -> Optional[TracerProvider]:
     """
-    Configure Phoenix tracing backend.
+    Configure tracing against a generic OTLP collector.
 
     Args:
-        endpoint: The Phoenix collector endpoint hostname
-        port: The Phoenix collector port
-        project_name: The project name for tracing
+        endpoint: The OTLP collector endpoint hostname
+        port: The OTLP collector port
+        project_name: The project (service) name for tracing
         require_available: If True, raise error when endpoint is unavailable
 
     Returns:
@@ -135,24 +99,22 @@ def _setup_phoenix_tracing(
     # Check endpoint availability if required
     if require_available and not is_local_endpoint_available(endpoint, port):
         raise ValueError(
-            f"Phoenix endpoint {endpoint_url} is not available. "
+            f"OTLP endpoint {endpoint_url} is not available. "
             "Please ensure the collector is running or check the endpoint configuration."
         )
 
-    # Register Phoenix tracer
-    tracer_provider = phoenix.otel.register(
-        endpoint=endpoint_url,
-        project_name=project_name,
-    )
+    # Build a tracer provider tagged with the project/service name
+    resource = Resource.create({"service.name": project_name})
+    tracer_provider = TracerProvider(resource=resource)
 
     # Configure OTLP exporter
     span_exporter = OTLPSpanExporter(endpoint=endpoint_url, insecure=True)
     span_processor = BatchSpanProcessor(span_exporter)
     tracer_provider.add_span_processor(span_processor)
 
-    logger.info(f"Phoenix tracing configured with endpoint: {endpoint_url}")
+    logger.info(f"OTLP tracing configured with endpoint: {endpoint_url}")
 
-    # Instrument OpenAI and set global tracer
+    # Instrument OpenAI (via OpenInference) and set global tracer
     OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
     set_tracer_provider(tracer_provider)
 
@@ -165,12 +127,11 @@ def _setup_auto_tracing(
     project_name: str,
 ) -> Optional[TracerProvider]:
     """
-    Automatically detect and configure the best available tracing backend.
+    Automatically detect and configure tracing against an OTLP collector.
 
     Priority order:
-    1. Default collector endpoint (if available)
-    2. Phoenix endpoint from environment (if available)
-    3. In-memory tracing (fallback)
+    1. OTLP endpoint (if available)
+    2. In-memory tracing (fallback)
 
     Args:
         collector_endpoint: Default collector endpoint
@@ -180,24 +141,14 @@ def _setup_auto_tracing(
     Returns:
         TracerProvider if configured, None for in-memory fallback
     """
-    # Try default collector first
-    logger.info(f"Trying default collector at {collector_endpoint}:{collector_port}")
+    endpoint, port = _get_otlp_config(collector_endpoint, collector_port)
 
-    if is_local_endpoint_available(collector_endpoint, collector_port):
-        return _setup_phoenix_tracing(
-            collector_endpoint, collector_port, project_name, require_available=False
+    logger.info(f"Trying OTLP collector at {endpoint}:{port}")
+
+    if is_local_endpoint_available(endpoint, port):
+        return _setup_otlp_tracing(
+            endpoint, port, project_name, require_available=False
         )
-
-    # Try Phoenix from environment
-    phoenix_endpoint, phoenix_port = _get_phoenix_config(
-        collector_endpoint, collector_port
-    )
-
-    if phoenix_endpoint and phoenix_port and phoenix_endpoint != collector_endpoint:
-        if is_local_endpoint_available(phoenix_endpoint, phoenix_port):
-            return _setup_phoenix_tracing(
-                phoenix_endpoint, phoenix_port, project_name, require_available=False
-            )
 
     # Fallback to in-memory
     _setup_in_memory_tracing()
@@ -221,9 +172,8 @@ def setup_tracing(
     Set up distributed tracing with the specified backend.
 
     This function configures OpenTelemetry tracing based on the selected option:
-    - ARIZE: Uses Arize for production monitoring
-    - PHOENIX: Uses Phoenix collector (requires running instance)
-    - AUTO: Auto-detects available endpoints
+    - OTLP: Exports to a generic OTLP collector (requires running instance)
+    - AUTO: Auto-detects an available OTLP endpoint
     - IN_MEMORY: Uses in-memory storage (for testing)
 
     Args:
@@ -242,9 +192,9 @@ def setup_tracing(
         >>> # Auto-detect available tracing backend
         >>> tracer = setup_tracing()
 
-        >>> # Use Phoenix with custom endpoint
+        >>> # Use a generic OTLP collector with a custom endpoint
         >>> tracer = setup_tracing(
-        ...     TracingOptions.PHOENIX,
+        ...     TracingOptions.OTLP,
         ...     collector_endpoint="tracing.example.com",
         ...     collector_port=4317
         ... )
@@ -252,18 +202,10 @@ def setup_tracing(
         >>> # Use in-memory tracing for tests
         >>> tracer = setup_tracing(TracingOptions.IN_MEMORY)
     """
-    if tracing_options == TracingOptions.ARIZE:
-        logger.info(f"Trying Arize tracing at {collector_endpoint}")
-        _setup_arize_tracing(collector_endpoint)
-
-    elif tracing_options == TracingOptions.PHOENIX:
-        logger.info(f"Trying Phoenix tracing at {collector_endpoint}:{collector_port}")
-        phoenix_endpoint, phoenix_port = _get_phoenix_config(
-            collector_endpoint, collector_port
-        )
-        _setup_phoenix_tracing(
-            phoenix_endpoint, phoenix_port, project_name, require_available=True
-        )
+    if tracing_options == TracingOptions.OTLP:
+        logger.info(f"Trying OTLP tracing at {collector_endpoint}:{collector_port}")
+        endpoint, port = _get_otlp_config(collector_endpoint, collector_port)
+        _setup_otlp_tracing(endpoint, port, project_name, require_available=True)
 
     elif tracing_options == TracingOptions.AUTO:
         logger.info(
@@ -278,7 +220,7 @@ def setup_tracing(
     else:
         raise ValueError(
             f"Invalid tracing option: {tracing_options}. "
-            "Choose from: ARIZE, PHOENIX, AUTO, or IN_MEMORY."
+            "Choose from: OTLP, AUTO, or IN_MEMORY."
         )
 
     return get_tracer(__name__)

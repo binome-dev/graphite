@@ -14,7 +14,6 @@ from grafi.common.models.message import Messages
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.functions.function_tool import FunctionToolBuilder
 
-
 try:
     from fastmcp import Client
 except (ImportError, ModuleNotFoundError):

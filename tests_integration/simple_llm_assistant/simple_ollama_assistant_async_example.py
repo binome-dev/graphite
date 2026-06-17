@@ -11,7 +11,6 @@ from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
     SimpleOllamaAssistant,
 )
 
-
 event_store = container.event_store
 
 

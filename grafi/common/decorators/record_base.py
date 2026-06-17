@@ -37,7 +37,6 @@ from grafi.nodes.node_base import NodeBase
 from grafi.tools.tool import Tool
 from grafi.workflows.workflow import Workflow
 
-
 T = TypeVar("T")
 
 # Attribute used to mark an exception whose full traceback has already been

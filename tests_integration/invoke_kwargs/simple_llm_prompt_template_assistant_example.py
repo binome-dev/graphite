@@ -15,7 +15,6 @@ from tests_integration.invoke_kwargs.simple_llm_prompt_template_assistant import
     SimpleLLMPromptTemplateAssistant,
 )
 
-
 container.register_tracer(setup_tracing(tracing_options=TracingOptions.IN_MEMORY))
 event_store = container.event_store
 

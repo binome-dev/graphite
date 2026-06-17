@@ -12,7 +12,6 @@ from tests_integration.function_call_assistant.simple_function_call_assistant im
     SimpleFunctionCallAssistant,
 )
 
-
 # Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
 
 event_store = container.event_store

@@ -11,7 +11,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from tests_integration.rag_assistant.simple_rag_assistant import SimpleRagAssistant
 
-
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 event_store = container.event_store

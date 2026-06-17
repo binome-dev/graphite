@@ -7,44 +7,43 @@ license = {text = "Mozilla Public License Version 2.0"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic>=2.12.5",
-    "openai>=2.14.0",
-    "docstring-parser>=0.16",
-    "openinference-instrumentation-openai>=0.1.41",
-    "arize-otel>=0.11.0",
+    "pydantic>=2.13.4",
+    "openai>=2.42.0",
+    "docstring-parser>=0.18.0",
+    "openinference-instrumentation-openai>=0.1.52",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.42.1",
     "loguru>=0.7.3",
-    "arize-phoenix-otel>=0.14.0",
-    "anyio>=4.9.0",
-    "cloudpickle>=3.1.1",
+    "anyio>=4.14.0",
+    "cloudpickle>=3.1.2",
 ]
 
 [dependency-groups]
 dev = [
-    "anthropic>=0.75.0",
-    "arize-phoenix>=12.25.1",
-    "black>=25.12.0",
-    "chromadb>=1.3.7",
+    "anthropic>=0.109.2",
+    "black>=26.5.1",
+    "chromadb>=1.5.9",
     "duckduckgo-search>=8.1.1",
-    "fastmcp>=2.14.1",
-    "google-genai>=1.43.0",
+    "fastmcp>=3.4.2",
+    "google-genai>=2.8.0",
     "googlesearch-python>=1.3.0",
     "h11>=0.16.0",
-    "llama-index-core>=0.14.10",
-    "llama-index-embeddings-openai>=0.5.1",
-    "llama-index-llms-openai>=0.6.12",
-    "markdown>=3.8.2",
-    "mcp>=1.25.0",
-    "mypy>=1.18.2",
-    "ollama>=0.6.0",
-    "pre-commit>=4.2.0",
-    "psycopg2-binary>=2.9.10",
-    "asyncpg>=0.29.0",
-    "pycountry>=24.6.1",
-    "pytest>=8.4.1",
-    "pytest-asyncio>=1.0.0",
-    "ruff>=0.12.2",
-    "sqlalchemy>=2.0.41",
-    "tavily-python>=0.7.17",
+    "llama-index-core>=0.14.22",
+    "llama-index-embeddings-openai>=0.6.0",
+    "llama-index-llms-openai>=0.7.9",
+    "markdown>=3.10.2",
+    "mcp>=1.28.0",
+    "mypy>=2.1.0",
+    "ollama>=0.6.2",
+    "pre-commit>=4.6.0",
+    "psycopg2-binary>=2.9.12",
+    "asyncpg>=0.31.0",
+    "pycountry>=26.2.16",
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.17",
+    "sqlalchemy>=2.0.51",
+    "tavily-python>=0.7.26",
 ]
 docs = [
     "mkdoc>=0.1",
@@ -76,10 +75,6 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 allow_redefinition = true
 disable_error_code = "typeddict-item, return-value, override, has-type"
-
-[[tool.mypy.overrides]]
-module = "arize.*"
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "tavily.*"
@@ -140,6 +135,9 @@ exclude = [
     ".venv"
 ]
 
+[tool.black]
+target-version = ["py311"]
+
 [tool.isort]
 multi_line_output = 3
 include_trailing_comma = true
@@ -147,7 +145,6 @@ force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
 line_length = 88
-lines_after_imports = 2
 force_single_line = true
 
 

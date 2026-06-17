@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from grafi.common.exceptions.workflow_exceptions import WorkflowError
 
-
 if TYPE_CHECKING:
     from grafi.nodes.node_base import NodeBase
 

@@ -1,13 +1,13 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         name: Strip trailing whitespace
         args: ['--markdown-linebreak-ext=md']
 
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 26.5.1
     hooks:
       - id: black
         name: Format grafi package
@@ -25,7 +25,7 @@ repos:
         args: ['--config=pyproject.toml']
 
   - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         name: Lint grafi package with flake8
@@ -50,7 +50,7 @@ repos:
 
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 8.0.1
     hooks:
       - id: isort
         name: Sort imports grafi package

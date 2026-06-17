@@ -20,7 +20,6 @@ from pydantic import Field
 
 from grafi.common.models.default_id import default_id
 
-
 # Message class is based on the ChatCompletionMessage from OpenAI, extended to include all the different type of input
 
 

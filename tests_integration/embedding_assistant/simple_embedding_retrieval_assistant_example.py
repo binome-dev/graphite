@@ -20,7 +20,6 @@ from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant 
     SimpleEmbeddingRetrievalAssistant,
 )
 
-
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 CURRENT_DIR = Path(__file__).parent

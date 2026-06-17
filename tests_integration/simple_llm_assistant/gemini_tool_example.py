@@ -13,7 +13,6 @@ from grafi.tools.llms.impl.gemini_tool import GeminiTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
-
 event_store = container.event_store
 api_key = os.getenv("GEMINI_API_KEY", "")  # set your Google AI Studio key here
 

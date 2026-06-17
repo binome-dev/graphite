@@ -30,7 +30,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.message import Message
 
-
 # ============================================================================
 # ASSISTANT DECORATORS
 # ============================================================================

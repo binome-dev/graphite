@@ -13,7 +13,6 @@ from tests_integration.function_call_assistant.simple_gemini_function_call_assis
     SimpleGeminiFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("GEMINI_API_KEY", "")

@@ -2,7 +2,6 @@ import asyncio
 
 from grafi.agents.react_agent import create_react_agent
 
-
 react_agent = create_react_agent()
 
 
