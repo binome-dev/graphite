@@ -11,7 +11,6 @@ from grafi.common.decorators.llm_function import llm_function
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
-
 try:
     from googlesearch import SearchResult
     from googlesearch import search

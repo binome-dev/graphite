@@ -13,7 +13,6 @@ from tests_integration.function_call_assistant.simple_openrouter_function_call_a
     SimpleOpenRouterFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENROUTER_API_KEY", "")

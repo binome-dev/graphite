@@ -3,12 +3,19 @@ import json
 import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from grafi.assistants.assistant import Assistant
 from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+
+# Load API keys (e.g. OPENAI_API_KEY) from .env before the assistant is
+# deserialized; OpenAITool.from_dict() reads the key from the environment since
+# the manifest stores it masked.
+load_dotenv()
 
 
 def get_invoke_context() -> InvokeContext:

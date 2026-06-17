@@ -13,7 +13,6 @@ from grafi.tools.llms.impl.claude_tool import ClaudeTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
-
 # --------------------------------------------------------------------------- #
 #  Shared helpers / fixtures                                                  #
 # --------------------------------------------------------------------------- #

@@ -19,7 +19,6 @@ from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
-
 Json = Dict[str, Any]
 
 

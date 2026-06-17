@@ -12,7 +12,6 @@ from tests_integration.function_call_assistant.simple_deepseek_function_call_ass
     SimpleDeepseekFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("DEEPSEEK_API_KEY", "")

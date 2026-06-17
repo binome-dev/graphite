@@ -15,7 +15,6 @@ from tests_integration.simple_llm_assistant.simple_llm_assistant import (
     SimpleLLMAssistant,
 )
 
-
 container.register_tracer(setup_tracing(tracing_options=TracingOptions.IN_MEMORY))
 event_store = container.event_store
 

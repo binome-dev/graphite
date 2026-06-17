@@ -19,7 +19,6 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 
-
 # ============================================================================
 # SERIALIZATION HELPERS
 # ============================================================================

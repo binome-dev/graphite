@@ -13,7 +13,6 @@ from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
 
-
 event_store = container.event_store
 
 # DeepSeek key comes from the same environment style you used for OpenAI

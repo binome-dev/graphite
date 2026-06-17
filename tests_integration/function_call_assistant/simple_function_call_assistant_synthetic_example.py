@@ -17,7 +17,6 @@ from tests_integration.function_call_assistant.simple_function_call_assistant im
     SimpleFunctionCallAssistant,
 )
 
-
 load_dotenv()
 
 

@@ -22,7 +22,6 @@ from grafi.common.events.event import EventType
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 
-
 # ============================================================================
 # COMPONENT EVENT BASE
 # ============================================================================

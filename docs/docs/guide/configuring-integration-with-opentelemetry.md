@@ -1,6 +1,7 @@
-# Arize & Phoenix Integration Guide
+# OpenTelemetry Tracing Guide
 
-This document provides comprehensive guidance on integrating Graphite with Arize and Phoenix for distributed tracing and observability.
+This document provides guidance on integrating Graphite with any OpenTelemetry
+(OTLP) compatible backend for distributed tracing and observability.
 
 ## Table of Contents
 
@@ -14,14 +15,20 @@ This document provides comprehensive guidance on integrating Graphite with Arize
 
 ## Overview
 
-Graphite integrates with OpenTelemetry to provide distributed tracing through multiple backends:
+Graphite emits traces through OpenTelemetry and exports them to a generic OTLP
+collector. This works with any OpenTelemetry-compatible backend (e.g. the
+OpenTelemetry Collector, Jaeger, Tempo, or any vendor that accepts OTLP).
 
-- **Arize**: Production-grade monitoring and observability platform for AI applications
-- **Phoenix**: Local/remote tracing solution ideal for development and debugging
-- **Auto**: Automatic detection of available tracing endpoints
+Graphite supports the following modes:
+
+- **OTLP**: Export spans to an OTLP collector (gRPC)
+- **Auto**: Automatic detection of an available OTLP endpoint
 - **In-Memory**: Testing mode without external dependencies
 
-The integration is built on top of OpenTelemetry and automatically instruments:
+[OpenInference](https://github.com/Arize-ai/openinference) is used to
+automatically instrument LLM calls, regardless of which OTLP collector the
+spans are exported to. The integration automatically captures:
+
 - OpenAI API calls
 - LLM interactions
 - Tool executions
@@ -36,9 +43,9 @@ Grafi includes the following observability dependencies by default:
 
 ```toml
 dependencies = [
-    "openinference-instrumentation-openai>=0.1.30",
-    "arize-otel>=0.10.0",
-    "arize-phoenix-otel>=0.13.1",
+    "openinference-instrumentation-openai>=0.1.41",
+    "opentelemetry-sdk>=1.39.1",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.39.1",
 ]
 ```
 
@@ -48,64 +55,43 @@ These are automatically installed when you install Grafi:
 # Using pip
 pip install grafi
 
-# Using poetry
-poetry add grafi
-
 # Using uv
 uv pip install grafi
-```
-
-### Optional Development Dependencies
-
-For local Phoenix tracing during development:
-
-```bash
-pip install arize-phoenix
 ```
 
 ## Configuration
 
 ### Docker Compose
 
-To run Phoenix you can run it on your local machine via docker compose
+You can run a local OpenTelemetry Collector (or any OTLP-compatible backend)
+via docker compose. For example, using an OTLP collector that exposes the
+default gRPC port `4317`:
 
 ```yaml
-
 version: '3.8'
 
 services:
-
-  phoenix:
-    image: arizephoenix/phoenix:latest
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "6006:6006"
-      - "4317:4317"
+      - "4317:4317" # OTLP gRPC
 ```
-
-
 
 ### Environment Variables
 
-#### Arize Configuration
-
-Set these environment variables when using Arize:
-
-```bash
-# Required for Arize
-export ARIZE_API_KEY="your-arize-api-key"
-export ARIZE_SPACE_ID="your-space-id"
-export ARIZE_PROJECT_NAME="your-project-name"
-```
-
-#### Phoenix Configuration
-
-Set these environment variables to override default Phoenix settings:
+Set these environment variables to override the default OTLP collector settings:
 
 ```bash
 # Optional - defaults to localhost:4317
-export PHOENIX_ENDPOINT="localhost" # if using docker compose and ports are forwarded
-export PHOENIX_PORT="4317" # This will override port settings in setup_tracing()
+export OTEL_COLLECTOR_ENDPOINT="localhost" # collector hostname
+export OTEL_COLLECTOR_PORT="4317"          # collector gRPC port
 ```
+
+These are also read by the default `Container` tracer, so simply setting them is
+enough for the auto-configured tracer to find your collector.
 
 ### Setup Function Parameters
 
@@ -120,60 +106,39 @@ def setup_tracing(
 ) -> Tracer:
 ```
 
-- **tracing_options**: Backend to use (ARIZE, PHOENIX, AUTO, IN_MEMORY)
+- **tracing_options**: Backend to use (OTLP, AUTO, IN_MEMORY)
 - **collector_endpoint**: Hostname of the collector (default: "localhost")
 - **collector_port**: Port number of the collector (default: 4317)
-- **project_name**: Name for the tracing project (default: "grafi-trace")
-
+- **project_name**: Name for the tracing project; exported as the `service.name`
+  resource attribute (default: "grafi-trace")
 
 ## Tracing Options
 
-Grafi provides four tracing backend options through the `TracingOptions` enum:
+Grafi provides three tracing modes through the `TracingOptions` enum:
 
-### 1. ARIZE - Production Monitoring
+### 1. OTLP - Generic OpenTelemetry Collector
 
-Use Arize for production environments with enterprise-grade observability:
-
-```python
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-tracing = setup_tracing(
-    tracing_options=TracingOptions.ARIZE,
-    collector_endpoint="https://otlp.arize.com/v1",
-    project_name="my-dev-project",
-)
-```
-
-**When to use:**
-- Production deployments
-- Need for team collaboration and sharing
-- Require advanced analytics and monitoring
-- Enterprise compliance requirements
-
-### 2. PHOENIX - Local/Remote Development
-
-Use Phoenix for development and debugging:
+Export spans to any OTLP-compatible collector:
 
 ```python
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
 tracer = setup_tracing(
-    tracing_options=TracingOptions.PHOENIX,
+    tracing_options=TracingOptions.OTLP,
     collector_endpoint="localhost",
     collector_port=4317,
-    project_name="my-dev-project"
+    project_name="my-project",
 )
 ```
 
 **When to use:**
-- Local development and debugging
-- Quick iteration and testing
-- Learning and experimentation
-- Running Phoenix locally or on a remote server
+- Production and development deployments
+- Any backend that accepts OTLP (OpenTelemetry Collector, Jaeger, Tempo, etc.)
+- A running collector instance is required
 
-### 3. AUTO - Automatic Detection
+### 2. AUTO - Automatic Detection
 
-Let Grafi automatically detect available tracing endpoints:
+Let Grafi automatically detect an available OTLP endpoint:
 
 ```python
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
@@ -181,21 +146,20 @@ from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 tracer = setup_tracing(
     tracing_options=TracingOptions.AUTO,
     collector_endpoint="localhost",
-    collector_port=4317
+    collector_port=4317,
 )
 ```
 
 **Detection priority:**
-1. Default collector endpoint (if available)
-2. Phoenix endpoint from environment variables
-3. Falls back to in-memory tracing
+1. OTLP endpoint (from arguments or `OTEL_COLLECTOR_*` env vars), if available
+2. Falls back to in-memory tracing
 
 **When to use:**
-- Development environments with optional Phoenix
+- Development environments with an optional collector
 - CI/CD pipelines
 - Flexible deployment scenarios
 
-### 4. IN_MEMORY - Testing
+### 3. IN_MEMORY - Testing
 
 Use in-memory tracing for tests and offline work:
 
@@ -208,7 +172,6 @@ tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
 - CI/CD without external dependencies
 - Offline development
 - Minimal overhead scenarios
-
 
 ## Usage Examples
 
@@ -225,57 +188,24 @@ container.register_tracer(tracer)
 # Your assistant code here
 ```
 
-### Example 2: Production Setup with Arize
-
-```python
-from grafi.common.containers.container import container
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-# Ensure environment variables are set
-# ARIZE_API_KEY, ARIZE_SPACE_ID, ARIZE_PROJECT_NAME
-
-tracer = setup_tracing(
-    tracing_options=TracingOptions.ARIZE,
-    collector_endpoint="https://otlp.arize.com/v1",
-    project_name="production-assistant"
-)
-container.register_tracer(tracer)
-
-# Your assistant code here
-```
-
-### Example 3: Development with Local Phoenix
-
-First, start Phoenix locally:
-
-```bash
-# Install Phoenix if not already installed
-pip install arize-phoenix
-
-# Start Phoenix server
-docker compose up
-```
-
-Then in your code:
+### Example 2: Export to an OTLP Collector
 
 ```python
 from grafi.common.containers.container import container
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
 tracer = setup_tracing(
-    tracing_options=TracingOptions.PHOENIX,
+    tracing_options=TracingOptions.OTLP,
     collector_endpoint="localhost",
     collector_port=4317,
-    project_name="my-dev-assistant"
+    project_name="my-assistant",
 )
 container.register_tracer(tracer)
 
 # Your assistant code here
 ```
 
-Visit `http://localhost:6006` to view the Phoenix UI.
-
-### Example 4: Testing with In-Memory Tracing
+### Example 3: Testing with In-Memory Tracing
 
 ```python
 from grafi.common.containers.container import container
@@ -288,21 +218,7 @@ container.register_tracer(tracer)
 # Your test code here
 ```
 
-### Example 5: Remote Phoenix Instance
-
-```python
-from grafi.common.containers.container import container
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-tracer = setup_tracing(
-    # If you've set up the ENV Variables then some arguments can be skipped
-    tracing_options=TracingOptions.PHOENIX,
-    project_name="shared-dev-project"
-)
-container.register_tracer(tracer)
-```
-
-### Example 6: Complete Assistant with Tracing
+### Example 4: Complete Assistant with Tracing
 
 ```python
 import os
@@ -359,7 +275,7 @@ asyncio.run(main())
 
 ### 1. Environment-Specific Configuration
 
-Use different tracing backends for different environments:
+Use different tracing modes for different environments:
 
 ```python
 import os
@@ -367,12 +283,9 @@ from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
 env = os.getenv("ENVIRONMENT", "development")
 
-if env == "production":
-    tracing_option = TracingOptions.ARIZE
-    endpoint = "https://otlp.arize.com/v1"
-elif env == "staging":
-    tracing_option = TracingOptions.PHOENIX
-    endpoint = "staging-phoenix.example.com"
+if env in ("production", "staging"):
+    tracing_option = TracingOptions.OTLP
+    endpoint = os.getenv("OTEL_COLLECTOR_ENDPOINT", "localhost")
 elif env == "development":
     tracing_option = TracingOptions.AUTO
     endpoint = "localhost"
@@ -383,7 +296,7 @@ else:  # testing
 tracer = setup_tracing(
     tracing_options=tracing_option,
     collector_endpoint=endpoint,
-    project_name=f"{env}-assistant"
+    project_name=f"{env}-assistant",
 )
 ```
 
@@ -402,39 +315,26 @@ assistant = MyAssistant.builder().build()
 
 ### 3. Project Naming Conventions
 
-Use descriptive project names to organize traces:
+Use descriptive project names to organize traces. The project name is exported
+as the `service.name` resource attribute:
 
 ```python
 tracer = setup_tracing(
-    tracing_options=TracingOptions.PHOENIX,
-    project_name=f"{app_name}-{environment}-{version}"
+    tracing_options=TracingOptions.OTLP,
+    project_name=f"{app_name}-{environment}-{version}",
 )
 ```
 
-### 4. Secure Credential Management
+### 4. Graceful Degradation with AUTO Mode
 
-Never hardcode API keys. Use environment variables or secret management:
-
-```python
-import os
-
-# Good: Use environment variables
-os.environ["ARIZE_API_KEY"] = os.getenv("ARIZE_API_KEY")
-
-# Bad: Never hardcode
-# os.environ["ARIZE_API_KEY"] = "hardcoded-key"
-```
-
-### 5. Graceful Degradation with AUTO Mode
-
-Use AUTO mode to gracefully degrade when tracing endpoints are unavailable:
+Use AUTO mode to gracefully degrade when the collector is unavailable:
 
 ```python
 # Will automatically fall back to in-memory if no endpoint available
 tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
 ```
 
-### 6. Testing Isolation
+### 5. Testing Isolation
 
 Use IN_MEMORY mode in tests to avoid external dependencies:
 
@@ -452,63 +352,35 @@ def setup_test_tracing():
 
 ## Troubleshooting
 
-### Issue: "Phoenix endpoint is not available"
+### Issue: "OTLP endpoint is not available"
 
-**Symptom**: ValueError when using PHOENIX tracing option
+**Symptom**: ValueError when using the OTLP tracing option
 
 **Solution**:
-1. Ensure Phoenix is running:
+
+1. Ensure your collector is running:
    ```bash
    ➜ docker compose up
     nc -zv localhost 4317
 
     Connection to localhost (::1) 4317 port [tcp/*] succeeded!
-
-    nc -zv localhost 6006
-
-    Connection to localhost (::1) 6006 port [tcp/x11-6] succeeded!
    ```
 
 2. Check the endpoint and port are correct:
-
    ```python
    tracer = setup_tracing(
-       tracing_options=TracingOptions.PHOENIX,
+       tracing_options=TracingOptions.OTLP,
        collector_endpoint="localhost",
-       collector_port=4317
+       collector_port=4317,
    )
    ```
 
 3. Use AUTO mode for graceful fallback:
-
    ```python
    tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
    ```
 
-### Issue: Arize traces not appearing
-
-**Symptom**: No traces visible in Arize dashboard
-
-**Solution**:
-1. Verify environment variables are set:
-   ```python
-   import os
-   print(os.getenv("ARIZE_API_KEY"))
-   print(os.getenv("ARIZE_SPACE_ID"))
-   print(os.getenv("ARIZE_PROJECT_NAME"))
-   ```
-
-2. Check the collector endpoint:
-   ```python
-   tracer = setup_tracing(
-       tracing_options=TracingOptions.ARIZE,
-       collector_endpoint="https://otlp.arize.com/v1"
-   )
-   ```
-
-3. Verify API key has proper permissions
-
-### Issue: Connection timeout with Phoenix
+### Issue: Connection timeout with the collector
 
 **Symptom**: Slow startup or timeout errors
 
@@ -518,8 +390,7 @@ def setup_test_tracing():
    ```python
    tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
    ```
-
-3. For PHOENIX mode, ensure the endpoint is reachable:
+3. For OTLP mode, ensure the endpoint is reachable:
    ```bash
    nc -zv localhost 4317
    ```
@@ -529,22 +400,22 @@ def setup_test_tracing():
 **Symptom**: OpenAI calls not showing in traces
 
 **Solution**:
-1. Ensure OpenAI is instrumented (done automatically by setup_tracing)
-2. Verify tracer is registered before creating assistants:
+1. Ensure OpenAI is instrumented (done automatically by `setup_tracing`)
+2. Verify the tracer is registered before creating assistants:
    ```python
    container.register_tracer(tracer)  # Must be before assistant creation
    ```
 
 ### Issue: Traces showing in wrong project
 
-**Symptom**: Traces appear in unexpected project
+**Symptom**: Traces appear in an unexpected project / service name
 
 **Solution**:
-Specify project name explicitly:
+Specify the project name explicitly:
 ```python
 tracer = setup_tracing(
-    tracing_options=TracingOptions.PHOENIX,
-    project_name="my-specific-project"
+    tracing_options=TracingOptions.OTLP,
+    project_name="my-specific-project",
 )
 ```
 
@@ -565,14 +436,12 @@ tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
 
 ## Additional Resources
 
-### Arize Resources
-- [Arize Platform Documentation](https://docs.arize.com/)
-- [Arize OpenTelemetry Integration](https://arize.com/docs/ax/integrations/opentelemetry/opentelemetry-arize-otel)
-- [Arize Python SDK](https://arize-client-python.readthedocs.io/en/latest/)
+### OpenTelemetry Resources
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
+- [OpenTelemetry Python SDK](https://opentelemetry-python.readthedocs.io/)
 
-### Phoenix Resources
-- [Phoenix Documentation](https://docs.arize.com/phoenix)
-- [Phoenix GitHub Repository](https://github.com/Arize-ai/phoenix)
+### OpenInference Resources
 - [OpenInference Specification](https://github.com/Arize-ai/openinference)
 
 ### Grafi Resources
@@ -585,7 +454,4 @@ tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
 For issues related to:
 
 - **Graphite tracing integration**: Open an issue on the Grafi repository
-- **Arize platform**: Contact Arize support or consult their documentation
-- **Phoenix**: Check the Phoenix GitHub issues or documentation
-
-
+- **OpenTelemetry**: Consult the OpenTelemetry documentation

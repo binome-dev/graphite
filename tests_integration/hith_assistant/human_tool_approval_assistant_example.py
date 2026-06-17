@@ -13,7 +13,6 @@ from tests_integration.hith_assistant.human_tool_approval_assistant import (
     HumanApprovalAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

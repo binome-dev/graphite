@@ -39,7 +39,7 @@ This documentation will guide you through:
 2. **Core Concepts** - Understand the architecture: Assistants, Workflows, Nodes, and Tools
 3. **Building Workflows** - Create event-driven AI pipelines
 4. **Tool Integration** - Add LLMs, function calls, and MCP servers
-5. **Observability** - Configure tracing with Arize and Phoenix
+5. **Observability** - Configure tracing with OpenTelemetry (OTLP)
 6. **Advanced Topics** - Event stores, workflow recovery, and custom tools
 
 Ready to dive in? Start with our [Quick Start Guide](./getting-started/quickstart.md) to build your first AI agent, or explore the [Architecture](./user-guide/architecture.md) to understand how Graphite components work together.

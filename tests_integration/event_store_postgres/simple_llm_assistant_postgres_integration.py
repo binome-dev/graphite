@@ -14,7 +14,6 @@ from tests_integration.event_store_postgres.simple_llm_assistant import (
     SimpleLLMAssistant,
 )
 
-
 """ docker compose yaml
 
 version: '3.8'

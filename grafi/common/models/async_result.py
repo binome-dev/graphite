@@ -7,7 +7,6 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 
-
 _SENTINEL = object()
 
 

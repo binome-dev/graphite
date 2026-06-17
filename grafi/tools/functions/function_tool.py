@@ -23,7 +23,6 @@ from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
-
 OutputType = Union[BaseModel, List[BaseModel]]
 
 

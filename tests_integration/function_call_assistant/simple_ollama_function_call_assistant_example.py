@@ -13,7 +13,6 @@ from tests_integration.function_call_assistant.simple_ollama_function_call_assis
     SimpleOllamaFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 

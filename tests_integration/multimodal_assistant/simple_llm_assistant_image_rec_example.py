@@ -15,7 +15,6 @@ from tests_integration.multimodal_assistant.simple_llm_assistant import (
     SimpleLLMAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")

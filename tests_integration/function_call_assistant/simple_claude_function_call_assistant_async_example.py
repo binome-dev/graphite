@@ -12,7 +12,6 @@ from tests_integration.function_call_assistant.simple_claude_function_call_assis
     SimpleClaudeFunctionCallAssistant,
 )
 
-
 event_store = container.event_store
 
 api_key = os.getenv("ANTHROPIC_API_KEY", "")

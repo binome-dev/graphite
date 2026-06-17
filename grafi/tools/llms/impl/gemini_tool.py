@@ -27,7 +27,6 @@ from grafi.common.models.message import MsgsAGen
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
-
 try:
     from google import genai
     from google.genai.types import Content
@@ -209,9 +208,9 @@ class GeminiTool(LLM):
         # Process tool calls if they exist
         if response.function_calls and len(response.function_calls) > 0:
             if content == "No content provided":
-                message_args[
-                    "content"
-                ] = ""  # Clear content when function call is included
+                message_args["content"] = (
+                    ""  # Clear content when function call is included
+                )
             tool_calls = []
             for raw_function_call in response.function_calls:
                 # Include the function call if provided
