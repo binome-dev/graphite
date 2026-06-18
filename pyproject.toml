@@ -101,7 +101,19 @@ module = "tests.*"
 ignore_errors = true
 
 [tool.coverage.run]
-omit = ["tests/*"]
+source = ["grafi"]
+branch = true
+omit = ["tests/*", "tests_integration/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]
 
 [tool.pytest-watcher]
 now = true

@@ -31,7 +31,7 @@ Key benefits include:
 - Effortless workflow customization for AI agents
 - Clear visibility into agent behavior via event sourcing
 - Reliable fault recovery and state restoration
-- Scalable, stateless architecture
+- Horizontally scalable: state lives in the event store, so use one workflow instance per in-flight request (see [Configuration & operations](#configuration--operations))
 - End-to-end auditability with persistent event tracking
 - Enables both online and offline data processing by capturing all events in an event store — users can build memory, knowledge bases, analytics, or fine-tuning pipelines on top of it
 
@@ -108,6 +108,43 @@ You might ask why we created another agent framework. The short answer is: we se
 For a typical business problem (e.g., purchasing a property), there’s usually a well-defined procedure — or a workflow — guided by domain expertise. This process might include know your client, searching online, analyzing data, or summarizing findings, all of which can be orchestrated in a controlled manner.
 
 Graphite simplifies constructing these AI powered workflows, much like building with LEGO bricks. It offers businesses a straightforward way to automate complex tasks while integrating seamlessly into existing software development life cycles.
+
+## Configuration & operations
+
+### Concurrency model
+
+An `EventDrivenWorkflow` instance holds per-invocation run state (topic queues, the
+ready-queue, and the quiescence tracker) and resets it at the start of each
+`invoke()`. **Use one workflow/assistant instance per in-flight request** (construct
+it, or deserialize it from the event store, per request). Do not share a single
+instance across concurrent `invoke()` calls. The durable state lives in the
+`EventStore`, so horizontal scaling is achieved by running many stateless
+processes that share one event store (e.g. `EventStorePostgres`).
+
+### Security: deserializing workflows
+
+Topic conditions and user functions are serialized with `cloudpickle`. Loading
+them executes embedded code, so deserialization of workflow/topic/tool manifests
+is **disabled by default**. Enable it only for data from a trusted source:
+
+```bash
+export GRAFI_ALLOW_PICKLE_DESERIALIZATION=true   # or call
+# grafi.common.pickle_guard.set_pickle_deserialization_allowed(True)
+```
+
+### Observability & data-handling controls
+
+| Environment variable | Default | Effect |
+| --- | --- | --- |
+| `OTEL_COLLECTOR_ENDPOINT` / `OTEL_COLLECTOR_PORT` | `localhost` / `4317` | OTLP collector for traces. Without a reachable collector, tracing falls back to in-memory mode and spans are **discarded** (a warning is logged). |
+| `GRAFI_SPAN_DISABLE_PAYLOADS` | `false` | When truthy, omit input/output payloads (prompts, tool args, message content) from spans. |
+| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | `10000` | Max characters of a serialized payload attached to a span (`0` = unbounded). |
+| `GRAFI_ERROR_INCLUDE_TRACEBACK` | `true` | When falsy, omit tracebacks from persisted failed-event details. |
+
+> Tracing and event payloads can contain prompts, tool arguments, and message
+> content. Use the controls above (and review your collector/database access) when
+> handling sensitive data. The `EventStorePostgres` `db_url` should use TLS
+> (`?sslmode=require`) in production.
 
 ## Contributing
 

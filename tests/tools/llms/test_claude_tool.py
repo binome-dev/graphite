@@ -95,12 +95,11 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     kwargs = mock_client.messages.create.call_args[1]
     assert kwargs["model"] == "claude-haiku-4-5-20251001"
     assert kwargs["max_tokens"] == 2048
-    assert kwargs["messages"][0] == {
-        "role": "system",
-        "content": "dummy system message",
-    }
-    assert kwargs["messages"][1]["role"] == "user"
-    assert kwargs["messages"][1]["content"] == "Say hello"
+    # system prompt must be the top-level `system=` param, NOT a message role
+    assert kwargs["system"] == "dummy system message"
+    assert all(msg["role"] != "system" for msg in kwargs["messages"])
+    assert kwargs["messages"][0]["role"] == "user"
+    assert kwargs["messages"][0]["content"] == "Say hello"
     # no tools in this call
     assert kwargs["tools"] == NOT_GIVEN
 
@@ -198,12 +197,53 @@ def test_prepare_api_input(claude_instance):
         Message(role="user", content="Hello!"),
         Message(role="assistant", content="Hi."),
     ]
-    api_messages, api_tools = claude_instance.prepare_api_input(msgs)
+    system, api_messages, api_tools = claude_instance.prepare_api_input(msgs)
 
-    # first element must be dummy system instruction from instance
-    assert api_messages[0]["content"] == "dummy system message"
+    # System prompt is returned separately (instance message + system-role msg),
+    # never injected into the messages array.
+    assert system == "dummy system message\n\nYou are helpful."
+    assert all(m["role"] in ("user", "assistant") for m in api_messages)
+    assert api_messages[0]["role"] == "user"
+    assert api_messages[0]["content"] == "Hello!"
     assert api_messages[-1]["role"] == "assistant"
     assert api_tools == NOT_GIVEN
+
+
+def test_prepare_api_input_tool_call_linkage(claude_instance):
+    """Assistant tool_calls and tool results map to tool_use/tool_result blocks."""
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    tool_call = ChatCompletionMessageToolCall(
+        id="call_123",
+        type="function",
+        function=Function(name="get_weather", arguments='{"location": "Paris"}'),
+    )
+    msgs = [
+        Message(role="user", content="Weather in Paris?"),
+        Message(role="assistant", content="", tool_calls=[tool_call]),
+        Message(role="tool", tool_call_id="call_123", content="20C and sunny"),
+    ]
+    _system, api_messages, _tools = claude_instance.prepare_api_input(msgs)
+
+    # assistant turn carries a tool_use block
+    assistant_turn = api_messages[1]
+    assert assistant_turn["role"] == "assistant"
+    use_block = assistant_turn["content"][0]
+    assert use_block["type"] == "tool_use"
+    assert use_block["id"] == "call_123"
+    assert use_block["name"] == "get_weather"
+    assert use_block["input"] == {"location": "Paris"}
+
+    # tool result becomes a user turn carrying a tool_result block
+    tool_turn = api_messages[2]
+    assert tool_turn["role"] == "user"
+    result_block = tool_turn["content"][0]
+    assert result_block["type"] == "tool_result"
+    assert result_block["tool_use_id"] == "call_123"
+    assert result_block["content"] == "20C and sunny"
 
 
 # --------------------------------------------------------------------------- #

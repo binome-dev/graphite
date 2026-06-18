@@ -22,6 +22,7 @@ from pydantic_core import to_jsonable_python
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
+from grafi.common.env import env_bool
 from grafi.common.events.component_base import ComponentEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -69,6 +70,51 @@ class ComponentConfig:
     span_name_suffix: str = "invoke"  # Suffix for span name
 
 
+_DEFAULT_SPAN_MAX_PAYLOAD_CHARS = 10_000
+
+
+def _span_payloads_disabled() -> bool:
+    """Whether input/output payloads should be omitted from spans entirely.
+
+    Set ``GRAFI_SPAN_DISABLE_PAYLOADS`` to a truthy value in environments where
+    prompts / tool args / message content must never reach the tracing backend.
+    """
+    return env_bool("GRAFI_SPAN_DISABLE_PAYLOADS", default=False)
+
+
+def _span_max_payload_chars() -> int:
+    """Max characters of a serialized payload to attach to a span (0 = unbounded).
+
+    Defaults to 10k characters so a single large prompt/response cannot bloat a
+    span unbounded. Override with ``GRAFI_SPAN_MAX_PAYLOAD_CHARS``.
+    """
+    raw = os.getenv("GRAFI_SPAN_MAX_PAYLOAD_CHARS")
+    if raw is None:
+        return _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
+
+
+def _span_payload(value: Any) -> Union[str, None]:
+    """Serialize a value for a span attribute, size-bounded and opt-out-able.
+
+    Returns ``None`` when payloads are disabled, so the caller can skip setting
+    the attribute altogether.
+    """
+    if _span_payloads_disabled():
+        return None
+    try:
+        text = json.dumps(value, default=to_jsonable_python)
+    except (TypeError, ValueError):
+        text = repr(value)
+    max_chars = _span_max_payload_chars()
+    if max_chars and len(text) > max_chars:
+        return f"{text[:max_chars]}...[truncated {len(text) - max_chars} chars]"
+    return text
+
+
 def _include_traceback() -> bool:
     """Whether to capture tracebacks into structured error details.
 
@@ -76,10 +122,7 @@ def _include_traceback() -> bool:
     (``0``/``false``/``no``/``off``) to omit tracebacks from persisted events,
     e.g. in production where they may carry sensitive paths or large payloads.
     """
-    value = os.getenv("GRAFI_ERROR_INCLUDE_TRACEBACK")
-    if value is None:
-        return True
-    return value.strip().lower() not in ("0", "false", "no", "off", "")
+    return env_bool("GRAFI_ERROR_INCLUDE_TRACEBACK", default=True)
 
 
 def _build_error_details(exc: Exception, metadata: EventContext) -> Dict[str, Any]:
@@ -224,7 +267,6 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
             await container.event_store.record_event(invoke_event)
 
             # Execute with tracing
-            result_list = []
             output_data = None
 
             try:
@@ -238,10 +280,10 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
 
                     span.set_attributes(invoke_context.model_dump())
 
-                    # Set input
-                    span.set_attribute(
-                        "input", json.dumps(input_data, default=to_jsonable_python)
-                    )
+                    # Set input (size-bounded; omitted if payloads are disabled)
+                    input_payload = _span_payload(input_data)
+                    if input_payload is not None:
+                        span.set_attribute("input", input_payload)
 
                     # Handle streaming
                     result_list: List = []
@@ -252,9 +294,9 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
 
                     output_data = config.process_async_result(result_list)
 
-                    span.set_attribute(
-                        "output", json.dumps(output_data, default=to_jsonable_python)
-                    )
+                    output_payload = _span_payload(output_data)
+                    if output_payload is not None:
+                        span.set_attribute("output", output_payload)
 
             except Exception as e:
                 # Build structured details once, while the traceback is still

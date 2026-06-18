@@ -4,8 +4,44 @@ Tests for LLM base class utility functions.
 
 from pydantic import BaseModel
 
+from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.function_spec import ParametersSchema
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import add_additional_properties
+
+
+def _spec(name: str) -> FunctionSpec:
+    return FunctionSpec(
+        name=name,
+        description=f"{name} description",
+        parameters=ParametersSchema(type="object", properties={}),
+    )
+
+
+class TestAddFunctionSpecs:
+    """add_function_specs must be idempotent (deduped by name)."""
+
+    def test_specs_deduped_across_calls(self):
+        llm = LLM()
+        llm.add_function_specs([_spec("get_weather")])
+        # Re-linking the same spec (as model_post_init does on every round-trip)
+        # must not duplicate it.
+        llm.add_function_specs([_spec("get_weather")])
+        names = [s.name for s in llm.get_function_specs()]
+        assert names == ["get_weather"]
+
+    def test_specs_deduped_within_a_call(self):
+        llm = LLM()
+        llm.add_function_specs([_spec("a"), _spec("b"), _spec("a")])
+        names = sorted(s.name for s in llm.get_function_specs())
+        assert names == ["a", "b"]
+
+    def test_distinct_specs_all_added(self):
+        llm = LLM()
+        llm.add_function_specs([_spec("a")])
+        llm.add_function_specs([_spec("b")])
+        names = sorted(s.name for s in llm.get_function_specs())
+        assert names == ["a", "b"]
 
 
 class SampleModel(BaseModel):

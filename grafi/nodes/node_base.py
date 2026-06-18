@@ -46,8 +46,12 @@ class NodeBase(BaseModel):
     _command: Optional[Command] = PrivateAttr(default=None)
 
     @property
-    def command(self) -> Command:
-        """Access the internal command (for backward compatibility)."""
+    def command(self) -> Optional[Command]:
+        """Access the internal command (for backward compatibility).
+
+        Returns ``None`` for a node without a tool (no command is created), so
+        callers must null-check before invoking it.
+        """
         return self._command
 
     @command.setter
@@ -159,6 +163,22 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
             Self for method chaining.
         """
         self.kwargs["oi_span_type"] = oi_span_type
+        return self
+
+    def node_id(self, node_id: str) -> Self:
+        """Set the node's stable identifier.
+
+        Used when reconstructing a node from a serialized representation so the
+        restored node keeps its original id (preserving event<->node correlation
+        across a restore) instead of getting a fresh uuid.
+
+        Args:
+            node_id: The node's unique identifier.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.kwargs["node_id"] = node_id
         return self
 
     def name(self, name: str) -> Self:

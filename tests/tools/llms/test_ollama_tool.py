@@ -189,3 +189,28 @@ async def test_from_dict_roundtrip():
     assert restored.model == original.model
     assert restored.api_url == original.api_url
     assert restored.system_message == original.system_message
+
+
+def test_prepare_api_input_forwards_tool_calls():
+    """Assistant tool_calls must be forwarded to Ollama (not silently dropped)."""
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    tool = OllamaTool(name="OllamaTool", model="qwen3", api_url="http://localhost")
+    tool_call = ChatCompletionMessageToolCall(
+        id="call_1",
+        type="function",
+        function=Function(name="get_weather", arguments='{"location": "Paris"}'),
+    )
+    msgs = [Message(role="assistant", content="", tool_calls=[tool_call])]
+
+    api_messages, _ = tool.prepare_api_input(msgs)
+
+    assistant_msg = api_messages[-1]
+    assert "tool_calls" in assistant_msg
+    assert assistant_msg["tool_calls"][0]["function"]["name"] == "get_weather"
+    assert assistant_msg["tool_calls"][0]["function"]["arguments"] == {
+        "location": "Paris"
+    }

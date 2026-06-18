@@ -18,6 +18,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.command import Command
 from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
@@ -124,7 +125,10 @@ class FunctionTool(Tool):
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .role(data.get("role", "assistant"))
             .function(
-                cloudpickle.loads(base64.b64decode(data["function"].encode("utf-8")))
+                safe_b64_pickle_loads(
+                    data["function"],
+                    context=f"function tool '{data.get('name', '')}' function",
+                )
             )
             .build()
         )

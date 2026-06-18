@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from pydantic import field_validator
 
 from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
@@ -261,10 +262,23 @@ class SyntheticTool(FunctionCallTool):
                 return parsed_response.model_dump_json()
 
         except OpenAIError as exc:
-            return json.dumps({"error": f"OpenAI API error: {str(exc)}"})
+            # Surface the failure instead of returning a JSON "error" string as a
+            # normal result: a swallowed error produces no ToolFailedEvent and
+            # hides the failure from the audit trail and from retry logic.
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"SyntheticTool OpenAI API error: {exc}",
+                cause=exc,
+            ) from exc
 
         except Exception as e:
-            return json.dumps({"error": f"LLM call failed: {str(e)}"})
+            raise LLMToolException(
+                tool_name=self.name,
+                model=self.model,
+                message=f"SyntheticTool LLM call failed: {e}",
+                cause=e,
+            ) from e
 
     def to_dict(self) -> Dict[str, Any]:
         """

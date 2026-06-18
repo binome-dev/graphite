@@ -9,6 +9,11 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.pickle_guard import set_pickle_deserialization_allowed
+
+# This example deserializes a manifest we created ourselves (a trusted source),
+# so enable pickle-based deserialization, which is fail-closed by default.
+set_pickle_deserialization_allowed(True)
 
 
 def get_invoke_context() -> InvokeContext:

@@ -1,9 +1,7 @@
-import base64
 from typing import Any
 from typing import TypeVar
 
-import cloudpickle
-
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_base import TopicBaseBuilder
 
@@ -48,8 +46,8 @@ class Topic(TopicBase):
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=cloudpickle.loads(
-                base64.b64decode(encoded_condition.encode("utf-8"))
+            condition=safe_b64_pickle_loads(
+                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
             ),
         )
 

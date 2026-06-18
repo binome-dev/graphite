@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List
 from typing import Optional
+from typing import Sequence
 
 from loguru import logger
 
@@ -17,6 +18,7 @@ try:
     from sqlalchemy import delete
     from sqlalchemy import select
     from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -113,7 +115,7 @@ class EventStorePostgres(EventStore):
         async with self.AsyncSession() as session:
             try:
                 result = await session.execute(
-                    select(EventModel).order_by(EventModel.timestamp)
+                    select(EventModel).order_by(EventModel.timestamp, EventModel.id)
                 )
                 rows = result.scalars().all()
 
@@ -128,32 +130,36 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to get events: {e}")
                 raise
 
+    @staticmethod
+    def _event_values(event: Event) -> dict:
+        """Flatten an :class:`Event` into a column-value dict for insertion."""
+        event_dict = event.to_dict()
+        # The invoke_context is nested inside event_context.
+        event_context = event_dict.get("event_context", {})
+        invoke_context = event_context.get("invoke_context", {})
+        conversation_id = invoke_context.get("conversation_id", "")
+        return {
+            "event_id": event_dict["event_id"],
+            "conversation_id": conversation_id,
+            "assistant_request_id": event_dict["assistant_request_id"],
+            "event_type": event_dict["event_type"],
+            "event_version": event_dict.get("event_version", "1.0"),
+            "event_data": event_dict,
+            "timestamp": datetime.fromisoformat(event_dict["timestamp"]).replace(
+                tzinfo=None
+            ),
+        }
+
     async def record_event(self, event: Event) -> None:
-        """Record a single event into the database asynchronously."""
+        """Record a single event idempotently (no-op on duplicate event_id)."""
         async with self.AsyncSession() as session:
             try:
-                # Convert Event object to dict
-                event_dict = event.to_dict()
-
-                # Extract conversation_id from invoke_context
-                # The invoke_context is nested inside event_context
-                event_context = event_dict.get("event_context", {})
-                invoke_context = event_context.get("invoke_context", {})
-                conversation_id = invoke_context.get("conversation_id", "")
-
-                # Create SQLAlchemy model instance
-                model = EventModel(
-                    event_id=event_dict["event_id"],
-                    conversation_id=conversation_id,
-                    assistant_request_id=event_dict["assistant_request_id"],
-                    event_type=event_dict["event_type"],
-                    event_version=event_dict.get("event_version", "1.0"),
-                    event_data=event_dict,
-                    timestamp=datetime.fromisoformat(event_dict["timestamp"]).replace(
-                        tzinfo=None
-                    ),
+                stmt = (
+                    pg_insert(EventModel)
+                    .values(**self._event_values(event))
+                    .on_conflict_do_nothing(index_elements=["event_id"])
                 )
-                session.add(model)
+                await session.execute(stmt)
                 await session.commit()
             except Exception as e:
                 await session.rollback()
@@ -163,33 +169,23 @@ class EventStorePostgres(EventStore):
                     cause=e,
                 ) from e
 
-    async def record_events(self, events: List[Event]) -> None:
-        """Record multiple events into the database asynchronously."""
+    async def record_events(self, events: Sequence[Event]) -> None:
+        """Record multiple events idempotently.
+
+        Duplicate ``event_id`` rows are skipped via ``ON CONFLICT DO NOTHING``
+        rather than aborting the whole batch, so replay/retry stays idempotent.
+        """
+        if not events:
+            return
         async with self.AsyncSession() as session:
             try:
-                models = []
-                for event in events:
-                    event_dict = event.to_dict()
-
-                    # Extract conversation_id from invoke_context
-                    event_context = event_dict.get("event_context", {})
-                    invoke_context = event_context.get("invoke_context", {})
-                    conversation_id = invoke_context.get("conversation_id", "")
-
-                    models.append(
-                        EventModel(
-                            event_id=event_dict["event_id"],
-                            conversation_id=conversation_id,
-                            assistant_request_id=event_dict["assistant_request_id"],
-                            event_type=event_dict["event_type"],
-                            event_version=event_dict.get("event_version", "1.0"),
-                            event_data=event_dict,
-                            timestamp=datetime.fromisoformat(
-                                event_dict["timestamp"]
-                            ).replace(tzinfo=None),
-                        )
-                    )
-                session.add_all(models)
+                values = [self._event_values(event) for event in events]
+                stmt = (
+                    pg_insert(EventModel)
+                    .values(values)
+                    .on_conflict_do_nothing(index_elements=["event_id"])
+                )
+                await session.execute(stmt)
                 await session.commit()
             except Exception as e:
                 await session.rollback()
@@ -223,7 +219,7 @@ class EventStorePostgres(EventStore):
                 result = await session.execute(
                     select(EventModel)
                     .where(EventModel.assistant_request_id == assistant_request_id)
-                    .order_by(EventModel.timestamp)
+                    .order_by(EventModel.timestamp, EventModel.id)
                 )
                 rows = result.scalars().all()
 
@@ -248,7 +244,7 @@ class EventStorePostgres(EventStore):
                 result = await session.execute(
                     select(EventModel)
                     .where(EventModel.conversation_id == conversation_id)
-                    .order_by(EventModel.timestamp)
+                    .order_by(EventModel.timestamp, EventModel.id)
                 )
                 rows = result.scalars().all()
 
@@ -281,21 +277,24 @@ class EventStorePostgres(EventStore):
                     select(EventModel).where(
                         # Filter by event type
                         EventModel.event_type.in_(["PublishToTopic", "TopicEvent"]),
-                        # Use JSONB -> operator to navigate to event_context -> name
-                        EventModel.event_data.op("->")('"event_context"').op("->>")(
-                            '"name"'
+                        # JSONB navigation: event_data -> 'event_context' ->> 'name'.
+                        # Keys are passed unquoted; quoting them ('"name"') makes the
+                        # operator look up a key that literally includes quotes and
+                        # therefore matches nothing.
+                        EventModel.event_data.op("->")("event_context").op("->>")(
+                            "name"
                         )
                         == name,
-                        # Use JSONB -> operator to navigate to event_context -> offset
-                        EventModel.event_data.op("->")('"event_context"')
-                        .op("->")('"offset"')
+                        # event_data -> 'event_context' -> 'offset' (cast to int)
+                        EventModel.event_data.op("->")("event_context")
+                        .op("->")("offset")
                         .astext.cast(Integer)
                         .in_(offsets),
                     )
                     # Order by offset for consistent results
                     .order_by(
-                        EventModel.event_data.op("->")('"event_context"')
-                        .op("->")('"offset"')
+                        EventModel.event_data.op("->")("event_context")
+                        .op("->")("offset")
                         .astext.cast(Integer)
                     )
                 )

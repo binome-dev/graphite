@@ -217,6 +217,32 @@ async def test_tool_factory_tavily_tool():
 
 
 @pytest.mark.asyncio
+async def test_tool_factory_lazy_registration_without_explicit_register():
+    """Built-in LLM tools deserialize via lazy import, no manual register needed."""
+    # Ensure it is NOT pre-registered so we exercise the lazy-import path.
+    if ToolFactory.is_registered("GeminiTool"):
+        ToolFactory.unregister_tool_class("GeminiTool")
+
+    data = {
+        "class": "GeminiTool",
+        "tool_id": "test-id",
+        "name": "GeminiTool",
+        "type": "GeminiTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "gemini-2.5-flash-lite",
+        "chat_params": {},
+        "is_streaming": False,
+        "structured_output": False,
+    }
+
+    tool = await ToolFactory.from_dict(data)
+    assert isinstance(tool, GeminiTool)
+    # Lazy resolution should have populated the eager registry.
+    assert "GeminiTool" in ToolFactory.get_registered_classes()
+
+
+@pytest.mark.asyncio
 async def test_tool_factory_missing_class():
     """Test factory raises KeyError when class is missing."""
     data = {

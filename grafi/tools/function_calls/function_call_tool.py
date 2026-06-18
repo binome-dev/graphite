@@ -22,6 +22,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.command import use_command
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.tool import Tool
@@ -210,7 +211,9 @@ class FunctionCallTool(Tool):
         )
 
         for func_name, func_serialized in data.get("functions", {}).items():
-            func = cloudpickle.loads(base64.b64decode(func_serialized.encode("utf-8")))
+            func = safe_b64_pickle_loads(
+                func_serialized, context=f"function '{func_name}'"
+            )
             function_call_tool_builder.function(func)
 
         return function_call_tool_builder.build()

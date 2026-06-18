@@ -156,10 +156,20 @@ def _setup_auto_tracing(
 
 
 def _setup_in_memory_tracing() -> None:
-    """Configure in-memory tracing for testing or offline use."""
+    """Configure in-memory tracing for testing or offline use.
+
+    The in-memory exporter is shut down immediately, so spans are effectively
+    discarded -- the "Observability" pillar is inert in this mode. Warn so this
+    is not mistaken for working tracing (e.g. when an OTLP collector was expected
+    under AUTO but none was reachable).
+    """
     span_exporter = InMemorySpanExporter()
     span_exporter.shutdown()
-    logger.debug("Using in-memory tracing (no external endpoint available)")
+    logger.warning(
+        "Tracing is running in in-memory mode: spans are discarded and NOT "
+        "exported. Configure an OTLP collector (OTEL_COLLECTOR_ENDPOINT/PORT) "
+        "for real observability."
+    )
 
 
 def setup_tracing(

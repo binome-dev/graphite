@@ -8,6 +8,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
@@ -47,8 +48,14 @@ class Node(NodeBase):
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent],
     ) -> AsyncGenerator[PublishToTopicEvent, None]:
+        if self._command is None:
+            raise NodeExecutionError(
+                node_name=self.name,
+                message="Cannot invoke a node without a tool/command.",
+                invoke_context=invoke_context,
+            )
         # Use the LLM's invoke method to get the response generator
-        async for messages in self.command.invoke(
+        async for messages in self._command.invoke(
             invoke_context,
             input_data=node_input,
         ):
@@ -84,6 +91,10 @@ class Node(NodeBase):
             )
             .tool(tool)
         )
+
+        # Preserve the original node_id across the round-trip when present.
+        if node_dict.get("node_id"):
+            node_builder.node_id(node_dict["node_id"])
 
         # Deserialize subscribed expressions
         for expr_dict in node_dict["subscribed_expressions"]:

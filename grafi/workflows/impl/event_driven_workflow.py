@@ -241,6 +241,27 @@ class EventDrivenWorkflow(Workflow):
                 len(topic_events), source=f"commit:{consumer_name}"
             )
 
+    async def _count_pending_consumable(self) -> int:
+        """Count messages still awaiting consumption across all topics.
+
+        For each topic this sums the unconsumed messages per consumer: subscriber
+        nodes for any topic, plus the workflow itself for output topics (which the
+        output listener drains under ``self.name``). The total equals the number
+        of commit operations the resumed run must perform to drain the restored
+        state, which is exactly what the quiescence tracker needs seeded.
+        """
+        total = 0
+        for topic_name, topic in self._topics.items():
+            consumer_names = list(self._topic_nodes.get(topic_name, []))
+            if topic.type in (
+                TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+                TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE,
+            ):
+                consumer_names.append(self.name)
+            for consumer_name in consumer_names:
+                total += await topic.unconsumed_count(consumer_name)
+        return total
+
     async def _add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
 
@@ -412,7 +433,9 @@ class EventDrivenWorkflow(Workflow):
 
             # process events after stopping
             if consumed_output_events:
-                await container.event_store.record_events(get_async_output_events(consumed_output_events))  # type: ignore[arg-type]
+                await container.event_store.record_events(
+                    get_async_output_events(consumed_output_events)
+                )
 
             # Wait for all node tasks to complete with proper error handling
             for t in node_processing_task:
@@ -538,8 +561,10 @@ class EventDrivenWorkflow(Workflow):
                     await self._commit_events(
                         consumer_name=node.name, topic_events=consumed_events
                     )
-                    await container.event_store.record_events(consumed_events)  # type: ignore[arg-type]
-                    await container.event_store.record_events(get_async_output_events(node_output_events))  # type: ignore[arg-type]
+                    await container.event_store.record_events(consumed_events)
+                    await container.event_store.record_events(
+                        get_async_output_events(node_output_events)
+                    )
 
                 except Exception as node_error:
                     logger.error(f"Error processing node {node.name}: {node_error}")
@@ -674,6 +699,19 @@ class EventDrivenWorkflow(Workflow):
                 await self._topics[topic_event.name].restore_topic(topic_event)
                 if is_sequential and isinstance(topic_event, PublishToTopicEvent):
                     await self._add_to_invoke_queue(topic_event)
+
+            # Parallel execution terminates on tracker quiescence, which is
+            # (no active nodes) AND (uncommitted_messages == 0). After restoring
+            # topics the tracker counter is still zero, so without re-seeding it
+            # the resumed run would be declared quiescent immediately and yield
+            # nothing. Seed it with the messages that are still pending
+            # consumption so the workflow drains the restored work.
+            if not is_sequential:
+                pending = await self._count_pending_consumable()
+                if pending:
+                    await self._tracker.on_messages_published(
+                        pending, source="recovery_restore"
+                    )
 
             # Process in-workflow topics
             in_workflow_output_topic_names: Set[str] = set()

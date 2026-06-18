@@ -1,9 +1,8 @@
-import base64
 from typing import Any
 
-import cloudpickle
 from pydantic import Field
 
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_types import TopicType
 
@@ -50,7 +49,7 @@ class InputTopic(Topic):
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=cloudpickle.loads(
-                base64.b64decode(encoded_condition.encode("utf-8"))
+            condition=safe_b64_pickle_loads(
+                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
             ),
         )

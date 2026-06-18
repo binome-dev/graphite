@@ -168,6 +168,13 @@ class TestGetAsyncOutputEvents:
         assert result[0].data[0].content == "Part1Part2"
         assert result[0].data[0].is_streaming is False
 
+        # The aggregated event must be a NEW object: the source events (already
+        # yielded/recorded) must not be mutated in place.
+        assert result[0] is not event1
+        assert event1.data[0].content == "Part1"
+        assert event1.data[0].is_streaming is True
+        assert event2.data[0].content == "Part2"
+
     def test_output_event_aggregation(self):
         invoke_context = InvokeContext(
             conversation_id="test-conversation",

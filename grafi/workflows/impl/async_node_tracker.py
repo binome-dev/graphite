@@ -236,6 +236,9 @@ class AsyncNodeTracker:
         1. Setting _force_stopped to True is atomic for the stop signal
         2. asyncio.Event.set() is thread-safe
         3. Readers will see the updated state on their next lock acquisition
+
+        Termination waiters block on ``_quiescence_event`` (set here), not on
+        ``self._cond``, so setting the event is sufficient to wake them.
         """
         logger.info("Tracker: force stop requested (sync)")
         self._force_stopped = True

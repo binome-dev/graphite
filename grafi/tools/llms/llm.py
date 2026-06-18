@@ -1,4 +1,5 @@
 import inspect
+import json
 from copy import deepcopy
 from typing import Any
 from typing import Dict
@@ -143,14 +144,39 @@ class LLM(Tool):
     _function_specs: FunctionSpecs = PrivateAttr(default_factory=list)
 
     def add_function_specs(self, function_spec: FunctionSpecs) -> None:
-        """Add function specifications to the LLM."""
+        """Add function specifications to the LLM, deduplicated by name.
+
+        This is idempotent: the workflow links function specs into LLM tools in
+        ``model_post_init`` (which Pydantic re-runs on every reconstruction /
+        ``from_dict`` round-trip), so without dedup the same specs would
+        accumulate, bloating prompts and confusing the model.
+        """
         if not function_spec:
             return
-        self._function_specs.extend(function_spec)
+        existing = {spec.name for spec in self._function_specs}
+        for spec in function_spec:
+            if spec.name not in existing:
+                self._function_specs.append(spec)
+                existing.add(spec.name)
 
     def get_function_specs(self) -> FunctionSpecs:
         """Return the function specifications for this LLM."""
         return self._function_specs.copy()
+
+    @staticmethod
+    def parse_tool_arguments(arguments: Optional[str]) -> Dict[str, Any]:
+        """Parse a tool call's JSON ``arguments`` string into a dict.
+
+        Returns ``{}`` for empty/None input or malformed JSON, so a single bad
+        tool-call argument string never crashes request preparation. Shared by
+        provider tools to keep tool-argument handling uniform.
+        """
+        if not arguments:
+            return {}
+        try:
+            return json.loads(arguments)
+        except (ValueError, TypeError):
+            return {}
 
     def prepare_api_input(self, input_data: Messages) -> Any:
         """Prepare input data for API consumption."""

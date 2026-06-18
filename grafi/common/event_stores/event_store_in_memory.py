@@ -2,6 +2,8 @@
 
 from typing import List
 from typing import Optional
+from typing import Sequence
+from typing import Set
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
@@ -9,25 +11,39 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 
 
 class EventStoreInMemory(EventStore):
-    """Stores and manages events in memory by default."""
+    """Stores and manages events in memory by default.
 
-    events: List[Event] = []
+    Recording is idempotent on ``event_id``: re-recording an event that has
+    already been stored (e.g. on a retry or workflow replay) is a no-op, matching
+    the Postgres store's ``ON CONFLICT DO NOTHING`` semantics. Events are returned
+    in insertion order, which is the stable, causal order recovery relies on.
+    """
+
+    # Instance state is created in __init__; no mutable class-level default.
+    events: List[Event]
+    _event_ids: Set[str]
 
     def __init__(self) -> None:
         """Initialize the event store."""
         self.events = []
+        self._event_ids = set()
 
     async def record_event(self, event: Event) -> None:
-        """Record an event to the store."""
-        self.events.append(event)
+        """Record an event to the store (idempotent on event_id)."""
+        await self.record_events([event])
 
-    async def record_events(self, events: List[Event]) -> None:
-        """Record events to the store."""
-        self.events.extend(events)
+    async def record_events(self, events: Sequence[Event]) -> None:
+        """Record events to the store (idempotent on event_id)."""
+        for event in events:
+            if event.event_id in self._event_ids:
+                continue
+            self._event_ids.add(event.event_id)
+            self.events.append(event)
 
     async def clear_events(self) -> None:
         """Clear all events."""
         self.events.clear()
+        self._event_ids.clear()
 
     async def get_events(self) -> List[Event]:
         """Get all events."""
