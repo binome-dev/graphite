@@ -80,3 +80,20 @@ class TopicEventQueue(ABC):
             True if there are unconsumed events, False otherwise
         """
         pass
+
+    @abstractmethod
+    async def unconsumed_count(self, consumer_id: str) -> int:
+        """
+        Exact number of events the consumer has not yet fetched.
+
+        This must be an exact count: it is summed to seed the workflow quiescence
+        tracker on recovery, so a 0/1 approximation would under-count pending work
+        and cause a resumed run to terminate early. Backends must implement it.
+
+        Args:
+            consumer_id: Unique identifier for the consumer
+
+        Returns:
+            Count of unconsumed events (>= 0).
+        """
+        ...

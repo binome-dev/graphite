@@ -6,6 +6,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Sequence
 from typing import Type
 
 from loguru import logger
@@ -36,7 +37,7 @@ class EventStore(ABC):
     async def record_event(self, event: Event) -> None: ...
 
     @abstractmethod
-    async def record_events(self, events: List[Event]) -> None: ...
+    async def record_events(self, events: Sequence[Event]) -> None: ...
 
     @abstractmethod
     async def clear_events(self) -> None: ...
@@ -57,20 +58,36 @@ class EventStore(ABC):
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]: ...
 
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
-        """Create an event object from a dictionary."""
+        """Create an event object from a dictionary.
+
+        Returns ``None`` (with a logged warning) instead of raising when a single
+        stored event is malformed or of an unknown type. Retrieval methods skip
+        ``None`` results, so one corrupt row cannot abort an entire
+        ``get_agent_events`` / ``get_events`` call — which would otherwise make a
+        whole conversation (and any recovery that depends on it) unreadable.
+        """
+        event_id = event_dict.get("event_id", "<unknown>")
         event_type: Any = event_dict.get("event_type")
         if not isinstance(event_type, str):
-            raise ValueError("Event type not found in event dict.")
+            logger.warning(
+                "Skipping event {} with missing/invalid event_type", event_id
+            )
+            return None
 
         event_class = self._get_event_class(event_type)
         if event_class is None:
-            raise ValueError(f"Event class not found for event type: {event_type}")
+            logger.warning(
+                "Skipping event {} with unknown event type: {}", event_id, event_type
+            )
+            return None
 
         try:
             return event_class.from_dict(data=event_dict)
         except Exception as e:
-            logger.error(f"Failed to create event from dict: {e}")
-            raise ValueError(f"Failed to create event from dict: {e}")
+            logger.error(
+                "Skipping event {} that failed to deserialize: {}", event_id, e
+            )
+            return None
 
     def _get_event_class(self, event_type: str) -> Optional[Type[Event]]:
         """Get the event class based on the event type string."""

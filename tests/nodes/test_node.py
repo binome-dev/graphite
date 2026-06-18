@@ -275,7 +275,11 @@ class TestNode:
         # Node without tool should not have a command
         assert basic_node._command is None
 
-        with pytest.raises(AttributeError):
+        # A node without a tool raises a clear NodeExecutionError rather than an
+        # opaque AttributeError from calling .invoke() on None.
+        from grafi.common.exceptions import NodeExecutionError
+
+        with pytest.raises(NodeExecutionError, match="without a tool"):
             async for _ in basic_node.invoke(invoke_context, sample_consumed_events):
                 pass
 
@@ -518,3 +522,27 @@ class TestNode:
 
         assert node.tool is mock_tool
         assert node._command.tool is mock_tool
+
+
+class TestNodeIdRoundTrip:
+    """node_id must survive a builder set and a to_dict/from_dict round-trip."""
+
+    def test_builder_sets_node_id(self):
+        node = Node.builder().node_id("fixed-id").name("n").type("Node").build()
+        assert node.node_id == "fixed-id"
+
+    @pytest.mark.asyncio
+    async def test_from_dict_preserves_node_id(self):
+        from grafi.tools.llms.impl.openai_tool import OpenAITool
+
+        original = Node(
+            name="n",
+            type="Node",
+            tool=OpenAITool.builder().name("llm").model("gpt-4o-mini").build(),
+        )
+        data = original.to_dict()
+        assert data["node_id"] == original.node_id
+
+        restored = await Node.from_dict(data, {})
+        # Recovered node keeps its identity instead of getting a fresh uuid.
+        assert restored.node_id == original.node_id

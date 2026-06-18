@@ -17,6 +17,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
@@ -154,7 +155,10 @@ class AgentCallingTool(FunctionCallTool):
             .agent_description(data.get("agent_description", ""))
             .argument_description(data.get("argument_description", ""))
             .agent_call(
-                cloudpickle.loads(base64.b64decode(data["agent_call"].encode("utf-8")))
+                safe_b64_pickle_loads(
+                    data["agent_call"],
+                    context=f"agent_call for '{data.get('agent_name', '')}'",
+                )
             )
             .build()
         )

@@ -4,9 +4,15 @@
 import argparse
 import importlib.util
 import io
+import os
 import sys
 from pathlib import Path
 from textwrap import indent
+
+# The integration examples deserialize manifests we created ourselves (a trusted
+# source). Pickle-based deserialization is fail-closed by default for safety, so
+# enable it for the whole suite; example scripts inherit this via subprocess.
+os.environ.setdefault("GRAFI_ALLOW_PICKLE_DESERIALIZATION", "true")
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")

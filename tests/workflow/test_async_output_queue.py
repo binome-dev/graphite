@@ -503,3 +503,35 @@ class TestAsyncOutputQueue:
 
         # Should have received the queued events before terminating
         assert len(events) == 2
+
+
+class TestOutputListenerErrorSurfacing:
+    """A fatal listener error must surface to the consumer, not be swallowed."""
+
+    class ExplodingTopic(OutputTopic):
+        def __init__(self, name: str):
+            super().__init__(name=name)
+            self.type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
+
+        async def consume(self, consumer_name: str, timeout=None):
+            raise RuntimeError("boom in listener")
+
+        async def can_consume(self, consumer_name: str) -> bool:
+            return False
+
+    @pytest.mark.asyncio
+    async def test_listener_error_propagates_through_iteration(self):
+        tracker = AsyncNodeTracker()
+        # Seed pending work so the tracker is not immediately quiescent (as
+        # init_workflow does), giving the listener a chance to run and fail.
+        await tracker.on_messages_published(1)
+        queue = AsyncOutputQueue([self.ExplodingTopic("bad")], "test_consumer", tracker)
+        await queue.start_listeners()
+        try:
+            with pytest.raises(RuntimeError, match="boom in listener"):
+                async for _ in queue:
+                    pass
+        finally:
+            await queue.stop_listeners()
+
+        assert isinstance(queue._listener_error, RuntimeError)

@@ -39,8 +39,12 @@ class InMemTopicEventQueue(TopicEventQueue):
     # ------------------------------ asynchronous methods ------------------------------
     async def put(self, event: TopicEvent) -> TopicEvent:
         """
-        Append a message to the log. Returns the offset of the appended message.
-        Implements backpressure when cache is full.
+        Append a message to the log and return the event with its offset set.
+
+        Note: this log is unbounded and retained for the life of the instance
+        (events are never evicted, to support replay/recovery). There is no
+        backpressure; memory grows with the number of published events, so
+        long-lived in-memory workflows should be periodically reset.
         """
         async with self._cond:
             offset = len(self._records)
@@ -121,3 +125,8 @@ class InMemTopicEventQueue(TopicEventQueue):
         """
         async with self._cond:
             return self._can_consume_unlocked(consumer_id)
+
+    async def unconsumed_count(self, consumer_id: str) -> int:
+        """Number of records this consumer has not yet fetched."""
+        async with self._cond:
+            return max(0, len(self._records) - self._consumed[consumer_id])

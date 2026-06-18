@@ -27,6 +27,8 @@ try:
     from anthropic import NOT_GIVEN
     from anthropic import AsyncAnthropic
     from anthropic import NotGiven
+    from anthropic import Omit
+    from anthropic import omit
     from anthropic.types import Message as AnthropicMessage
     from anthropic.types import MessageParam
     from anthropic.types import ToolParam
@@ -59,23 +61,71 @@ class ClaudeTool(LLM):
         """
         return ClaudeToolBuilder(cls)
 
-    def prepare_api_input(
-        self, input_data: Messages
-    ) -> tuple[List[MessageParam], Union[List[ToolParam], NotGiven]]:
-        """grafi → Anthropic message list (& optional tools)."""
+    def prepare_api_input(self, input_data: Messages) -> tuple[
+        Union[str, Omit],
+        List[MessageParam],
+        Union[List[ToolParam], NotGiven],
+    ]:
+        """grafi → Anthropic (system, message list, optional tools).
+
+        The Anthropic Messages API only accepts ``user``/``assistant`` roles in
+        the ``messages`` array; the system prompt is a top-level ``system``
+        parameter. Tool calls and tool results are expressed as ``tool_use`` /
+        ``tool_result`` content blocks rather than separate roles.
+        """
+        # System prompt: instance system_message plus any system-role messages,
+        # all folded into the top-level `system` parameter.
+        system_parts: List[str] = []
+        if self.system_message:
+            system_parts.append(self.system_message)
+
         messages: List[MessageParam] = []
 
-        if self.system_message:
-            messages.append({"role": "system", "content": self.system_message})
-
         for m in input_data:
-            if m.content is not None and isinstance(m.content, str) and m.content != "":
+            if m.role == "system":
+                if isinstance(m.content, str) and m.content:
+                    system_parts.append(m.content)
+                continue
+
+            if m.role == "tool":
+                # A tool result becomes a user turn carrying a tool_result block.
                 messages.append(
                     {
-                        "role": "user" if m.role == "tool" else m.role,
-                        "content": m.content or "",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": m.tool_call_id or "",
+                                "content": self._content_to_text(m.content),
+                            }
+                        ],
                     }
                 )
+                continue
+
+            if m.role == "assistant" and m.tool_calls:
+                # Assistant tool calls become tool_use content blocks, preserving
+                # any accompanying text so the conversation stays linked.
+                blocks: List[Dict[str, Any]] = []
+                if isinstance(m.content, str) and m.content:
+                    blocks.append({"type": "text", "text": m.content})
+                for tc in m.tool_calls:
+                    blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.id,
+                            "name": tc.function.name,
+                            "input": self.parse_tool_arguments(tc.function.arguments),
+                        }
+                    )
+                messages.append({"role": "assistant", "content": blocks})
+                continue
+
+            # Plain text user/assistant message.
+            if isinstance(m.content, str) and m.content:
+                messages.append({"role": m.role, "content": m.content})
+
+        system: Union[str, Omit] = "\n\n".join(system_parts) if system_parts else omit
 
         tools: List[ToolParam] = []
         for function in self.get_function_specs():
@@ -87,7 +137,16 @@ class ClaudeTool(LLM):
                 }
             )
 
-        return messages, tools or NOT_GIVEN
+        return system, messages, tools or NOT_GIVEN
+
+    @staticmethod
+    def _content_to_text(content: Any) -> str:
+        """Coerce a tool-result message's content to text for Anthropic."""
+        if isinstance(content, str):
+            return content
+        if content is None:
+            return ""
+        return json.dumps(content, default=str)
 
     # ------------------------------------------------------------------ #
     # Async call                                                         #
@@ -98,7 +157,7 @@ class ClaudeTool(LLM):
         invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:
-        messages, tools = self.prepare_api_input(input_data)
+        system, messages, tools = self.prepare_api_input(input_data)
 
         try:
             async with AsyncAnthropic(api_key=self.api_key) as client:
@@ -106,6 +165,7 @@ class ClaudeTool(LLM):
                     async with client.messages.stream(
                         max_tokens=self.max_tokens,
                         model=self.model,
+                        system=system,
                         messages=messages,
                         tools=tools,
                         **self.chat_params,
@@ -117,6 +177,7 @@ class ClaudeTool(LLM):
                     resp: AnthropicMessage = await client.messages.create(
                         max_tokens=self.max_tokens,
                         model=self.model,
+                        system=system,
                         messages=messages,
                         tools=tools,
                         **self.chat_params,

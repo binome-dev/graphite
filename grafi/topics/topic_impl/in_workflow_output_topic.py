@@ -1,11 +1,10 @@
-import base64
 from typing import Any
 from typing import List
 from typing import Self
 
-import cloudpickle
 from pydantic import Field
 
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_impl.topic import TopicBuilder
 from grafi.topics.topic_types import TopicType
@@ -80,8 +79,8 @@ class InWorkflowOutputTopic(Topic):
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=cloudpickle.loads(
-                base64.b64decode(encoded_condition.encode("utf-8"))
+            condition=safe_b64_pickle_loads(
+                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
             ),
             paired_in_workflow_input_topic_names=data.get(
                 "paired_in_workflow_input_topic_names", []

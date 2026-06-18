@@ -4,6 +4,7 @@ Grafi exception hierarchy for comprehensive error handling.
 
 from grafi.common.exceptions.base import (
     GrafiError,
+    UnsafeDeserializationError,
     ValidationError,
 )
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
@@ -30,6 +31,7 @@ __all__ = [
     # Base errors
     "GrafiError",
     "ValidationError",
+    "UnsafeDeserializationError",
     # Tool errors
     "ToolInvocationError",
     "LLMToolException",

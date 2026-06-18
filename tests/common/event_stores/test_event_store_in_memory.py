@@ -147,6 +147,42 @@ class TestEventStoreInMemory:
             assert event.event_id == f"test-event-{i}"
 
     @pytest.mark.asyncio
+    async def test_record_event_is_idempotent(
+        self, event_store: EventStore, sample_event
+    ):
+        """Re-recording the same event_id is a no-op (replay/retry safe)."""
+        await event_store.record_event(sample_event)
+        await event_store.record_event(sample_event)
+
+        events = await event_store.get_events()
+        assert len(events) == 1
+
+    @pytest.mark.asyncio
+    async def test_record_events_dedups_within_and_across_calls(
+        self, event_store: EventStore, multiple_events
+    ):
+        """Duplicate event_ids are skipped, not appended, across batches."""
+        await event_store.record_events(multiple_events)
+        # Replay the same batch (e.g. recovery) plus a duplicate within the batch.
+        await event_store.record_events(multiple_events + [multiple_events[0]])
+
+        events = await event_store.get_events()
+        assert len(events) == len(multiple_events)
+        assert len({e.event_id for e in events}) == len(multiple_events)
+
+    @pytest.mark.asyncio
+    async def test_clear_resets_idempotency_index(
+        self, event_store: EventStore, sample_event
+    ):
+        """After clearing, an event with a previously-seen id can be re-recorded."""
+        await event_store.record_event(sample_event)
+        await event_store.clear_events()
+        await event_store.record_event(sample_event)
+
+        events = await event_store.get_events()
+        assert len(events) == 1
+
+    @pytest.mark.asyncio
     async def test_get_event_by_id(self, event_store: EventStore, sample_event):
         """Test getting an event by ID."""
         await event_store.record_event(sample_event)
@@ -333,3 +369,28 @@ class TestEventStoreInMemory:
         # Should be able to retrieve topic events
         topic_0_events = await event_store.get_topic_events("topic-0", [0, 2])
         assert len(topic_0_events) == 2
+
+
+class TestEventDeserializationQuarantine:
+    """Malformed stored events are skipped (None), not raised, on retrieval."""
+
+    def test_missing_event_type_returns_none(self):
+        store = EventStoreInMemory()
+        assert store._create_event_from_dict({"event_id": "x"}) is None
+
+    def test_unknown_event_type_returns_none(self):
+        store = EventStoreInMemory()
+        assert (
+            store._create_event_from_dict(
+                {"event_id": "x", "event_type": "NotARealType"}
+            )
+            is None
+        )
+
+    def test_corrupt_payload_returns_none(self):
+        store = EventStoreInMemory()
+        # Valid type but missing all the fields from_dict needs -> skipped, not raised.
+        result = store._create_event_from_dict(
+            {"event_id": "x", "event_type": "NodeInvoke"}
+        )
+        assert result is None

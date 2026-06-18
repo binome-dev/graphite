@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -65,7 +66,22 @@ class OllamaTool(LLM):
                 "role": "tool" if message.role == "function" else message.role,
                 "content": message.content or "",
             }
-            if message.function_call:
+            if message.tool_calls:
+                # grafi stores assistant tool calls in `tool_calls`; forward them
+                # so multi-turn function calling survives (the deprecated
+                # `function_call` field is handled below for backward compat).
+                api_message["tool_calls"] = [
+                    {
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": self.parse_tool_arguments(
+                                tc.function.arguments
+                            ),
+                        }
+                    }
+                    for tc in message.tool_calls
+                ]
+            elif message.function_call:
                 api_message["tool_calls"] = [
                     {
                         "function": {
@@ -115,6 +131,10 @@ class OllamaTool(LLM):
                 )
                 # Return the raw response as a Message object
                 yield self.to_messages(response)
+        except asyncio.CancelledError:
+            # Preserve cooperative cancellation instead of re-wrapping it as a
+            # tool error (matches the other LLM tools' cancellation contract).
+            raise
         except Exception as e:
             logger.error("Ollama API error: %s", e)
             raise LLMToolException(

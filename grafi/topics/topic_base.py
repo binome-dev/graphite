@@ -20,6 +20,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.message import Messages
+from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
@@ -51,8 +52,7 @@ def serialize_condition(fn: Callable) -> str:
         return src
     except Exception:
         raise ValueError(
-            f"Cannot serialize callable {fn}. "
-            "Define it in a module, not dynamically."
+            f"Cannot serialize callable {fn}. Define it in a module, not dynamically."
         )
 
 
@@ -75,18 +75,29 @@ class TopicBase(BaseModel):
 
     async def publish_data(
         self, publish_event: PublishToTopicEvent
-    ) -> PublishToTopicEvent:
+    ) -> Optional[PublishToTopicEvent]:
         """
         Publish data to the topic if it meets the condition.
+
+        Returns the published event, or ``None`` when the topic's condition is
+        not met (callers must null-check).
         """
         try:
             condition_met = self.condition(publish_event)
+        except (IndexError, KeyError) as e:
+            # Expected "not met" signal for conditions that index into data that
+            # may legitimately be empty/absent.
+            logger.debug(f"[{self.name}] Condition not met ({type(e).__name__}: {e}).")
+            condition_met = False
         except Exception as e:
-            # Condition evaluation failed (e.g., IndexError on empty data)
-            # Treat as condition not met
-            logger.debug(
-                f"[{self.name}] Condition evaluation failed: {e}. "
-                "Treating as condition not met."
+            # An unexpected error in a user condition is almost certainly a bug.
+            # Surface it at WARNING (a silent drop here looks identical to a normal
+            # routing decision) but still treat as not-met so one faulty condition
+            # cannot halt the whole workflow.
+            logger.warning(
+                f"[{self.name}] Condition raised an unexpected "
+                f"{type(e).__name__}: {e}. Treating as not published; "
+                "check the topic condition."
             )
             condition_met = False
 
@@ -110,6 +121,10 @@ class TopicBase(BaseModel):
         already consumed).
         """
         return await self.event_queue.can_consume(consumer_name)
+
+    async def unconsumed_count(self, consumer_name: str) -> int:
+        """Number of messages this consumer has not yet consumed from the topic."""
+        return await self.event_queue.unconsumed_count(consumer_name)
 
     async def consume(
         self, consumer_name: str, timeout: Optional[float] = None
@@ -143,13 +158,17 @@ class TopicBase(BaseModel):
                 topic_event.consumer_name, topic_event.offset
             )
 
-    async def add_event(self, event: TopicEvent) -> TopicEvent:
+    async def add_event(self, event: TopicEvent) -> Optional[TopicEvent]:
         """
         Asynchronously add an event to the topic cache and update total_published.
         This method should be used by subclasses when publishing events.
+
+        Returns ``None`` for non-publish events (only PublishToTopicEvents are
+        appended to the queue).
         """
         if isinstance(event, PublishToTopicEvent):
             return await self.event_queue.put(event)
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         """
@@ -202,8 +221,8 @@ class TopicBase(BaseModel):
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=cloudpickle.loads(
-                base64.b64decode(encoded_condition.encode("utf-8"))
+            condition=safe_b64_pickle_loads(
+                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
             ),
         )
 

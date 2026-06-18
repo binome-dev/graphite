@@ -1,5 +1,6 @@
 import asyncio
 from typing import List
+from typing import Optional
 
 from loguru import logger
 
@@ -27,6 +28,10 @@ class AsyncOutputQueue:
         self.queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
         self._listener_tasks: List[asyncio.Task] = []
         self._stopped = False
+        # First fatal error raised by a listener, surfaced to the consumer via
+        # __anext__ (otherwise stop_listeners' gather(return_exceptions=True)
+        # would silently swallow it and the workflow would appear to end cleanly).
+        self._listener_error: Optional[BaseException] = None
 
     async def start_listeners(self) -> None:
         """Start listener tasks for all output topics."""
@@ -76,7 +81,12 @@ class AsyncOutputQueue:
                 break
             except Exception as e:
                 logger.error(f"Output listener error for {topic.name}: {e}")
-                raise e
+                # Record the error and force termination so __anext__ wakes and
+                # re-raises it to the consumer instead of it being swallowed.
+                if self._listener_error is None:
+                    self._listener_error = e
+                await self.tracker.force_stop()
+                break
 
     def __aiter__(self) -> "AsyncOutputQueue":
         return self
@@ -93,6 +103,11 @@ class AsyncOutputQueue:
         check_count = 0
         while True:
             check_count += 1
+
+            # Drain any pending items before surfacing a listener failure, so the
+            # caller still receives output produced before the error.
+            if self._listener_error is not None and self.queue.empty():
+                raise self._listener_error
 
             # Fast path: queue has items
             if not self.queue.empty():
@@ -143,4 +158,8 @@ class AsyncOutputQueue:
                 try:
                     return self.queue.get_nowait()
                 except asyncio.QueueEmpty:
+                    # A listener failure (which also forces termination) must
+                    # surface as that error, not a clean end-of-iteration.
+                    if self._listener_error is not None:
+                        raise self._listener_error
                     raise StopAsyncIteration

@@ -1,5 +1,6 @@
 from typing import Dict
 from typing import List
+from typing import Sequence
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -11,7 +12,7 @@ from grafi.nodes.node_base import NodeBase
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
 
-def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
+def get_async_output_events(events: Sequence[TopicEvent]) -> List[TopicEvent]:
     """
     Process a list of TopicEvents, grouping by name and aggregating streaming messages.
 
@@ -65,8 +66,15 @@ def get_async_output_events(events: List[TopicEvent]) -> List[TopicEvent]:
                 is_streaming=False,
             )
 
-            aggregated_event = base_event
-            aggregated_event.data = [aggregated_message]
+            # Build a NEW event for the aggregated output. Mutating base_event in
+            # place would rewrite an event that has already been yielded to the
+            # caller and recorded in the event store, corrupting the audit log.
+            # A shallow copy suffices: `update` replaces `data` with a fresh list
+            # and the other (unmutated) fields can be shared, avoiding an O(payload)
+            # deep clone of the original streaming messages on the hot path.
+            aggregated_event = base_event.model_copy(
+                update={"data": [aggregated_message]}
+            )
             output_events.append(aggregated_event)
 
     return output_events
