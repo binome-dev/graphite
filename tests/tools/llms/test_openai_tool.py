@@ -47,7 +47,6 @@ def test_init(openai_instance):
 
 @pytest.mark.asyncio
 async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_context):
-    import grafi.tools.llms.impl.openai_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -75,7 +74,7 @@ async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_conte
     # Mock the AsyncClient constructor to return our context manager
     mock_async_client_cls = MagicMock(return_value=mock_context_manager)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.openai_tool, "AsyncClient", mock_async_client_cls
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient", mock_async_client_cls
     )
 
     input_data = [Message(role="user", content="Say hello")]
@@ -97,7 +96,6 @@ async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_conte
 
 @pytest.mark.asyncio
 async def test_invoke_function_call(monkeypatch, openai_instance, invoke_context):
-    import grafi.tools.llms.impl.openai_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -140,7 +138,7 @@ async def test_invoke_function_call(monkeypatch, openai_instance, invoke_context
     # Mock the AsyncClient constructor to return our context manager
     mock_async_client_cls = MagicMock(return_value=mock_context_manager)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.openai_tool, "AsyncClient", mock_async_client_cls
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient", mock_async_client_cls
     )
 
     input_data = [Message(role="user", content="What's the weather in London?")]

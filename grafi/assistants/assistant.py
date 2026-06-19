@@ -69,6 +69,8 @@ class Assistant(AssistantBase):
         with open(output_path, "w") as f:
             f.write(json.dumps(manifest_dict, indent=4))
 
+        return output_path
+
     @classmethod
     async def from_dict(cls, data: dict[str, Any]) -> "Assistant":
         """

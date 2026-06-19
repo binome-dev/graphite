@@ -19,8 +19,8 @@ from grafi.common.models.event_id import EventId
 class EventGraphNode(BaseModel):
     event_id: EventId
     event: TopicEvent
-    upstream_events: List[EventId] = Field(default=[])
-    downstream_events: List[EventId] = Field(default=[])
+    upstream_events: List[EventId] = Field(default_factory=list)
+    downstream_events: List[EventId] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,8 +41,8 @@ class EventGraphNode(BaseModel):
 
 
 class EventGraph(BaseModel):
-    nodes: Dict[EventId, EventGraphNode] = Field(default={})
-    root_nodes: List[EventGraphNode] = Field(default=[])
+    nodes: Dict[EventId, EventGraphNode] = Field(default_factory=dict)
+    root_nodes: List[EventGraphNode] = Field(default_factory=list)
 
     def _add_event(self, event: TopicEvent) -> EventGraphNode:
         """Add a new node to the graph if it doesn't exist"""
