@@ -4,7 +4,7 @@ from typing import Self
 
 from pydantic import Field
 
-from grafi.common.pickle_guard import safe_b64_pickle_loads
+from grafi.topics.topic_base import deserialize_condition
 from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_impl.topic import TopicBuilder
 from grafi.topics.topic_types import TopicType
@@ -70,18 +70,10 @@ class InWorkflowOutputTopic(Topic):
         Returns:
             InWorkflowOutputTopic: A Topic instance created from the dictionary.
         """
-        condition_data = data["condition"]
-        if isinstance(condition_data, dict):
-            encoded_condition = condition_data["base64"]
-        else:
-            encoded_condition = condition_data
-
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=safe_b64_pickle_loads(
-                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
-            ),
+            condition=deserialize_condition(data),
             paired_in_workflow_input_topic_names=data.get(
                 "paired_in_workflow_input_topic_names", []
             ),

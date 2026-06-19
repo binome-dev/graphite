@@ -6,12 +6,12 @@ serialized dictionary data. It automatically determines the correct tool type
 and instantiates the appropriate class.
 """
 
-import importlib
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Type
 
+from grafi.common.import_ref import resolve_import_ref
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -79,9 +79,7 @@ class ToolFactory:
         target = cls._LAZY_TOOL_IMPORTS.get(class_name)
         if target is None:
             return None
-        module_path, _, attr = target.partition(":")
-        module = importlib.import_module(module_path)
-        tool_class: Type[Tool] = getattr(module, attr)
+        tool_class: Type[Tool] = resolve_import_ref(target)
         cls._TOOL_REGISTRY[class_name] = tool_class
         return tool_class
 

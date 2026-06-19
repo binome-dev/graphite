@@ -139,6 +139,11 @@ class MCPFunctionTool(FunctionTool):
 
         yield response_str
 
+    def _serialize_function(self) -> None:
+        # The MCP callable is reconstructed from mcp_config + function_name on
+        # load, so it is not serialized into the manifest.
+        return None
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             **super().to_dict(),

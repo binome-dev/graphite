@@ -1,7 +1,5 @@
-from typing import Any
 from typing import TypeVar
 
-from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_base import TopicBaseBuilder
 
@@ -9,6 +7,9 @@ from grafi.topics.topic_base import TopicBaseBuilder
 class Topic(TopicBase):
     """
     Represents a topic in a message queue system.
+
+    Serialization (``to_dict``/``from_dict``) is inherited from
+    :class:`~grafi.topics.topic_base.TopicBase`.
     """
 
     @classmethod
@@ -17,39 +18,6 @@ class Topic(TopicBase):
         Returns a builder for Topic.
         """
         return TopicBuilder(cls)
-
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the topic to a dictionary.
-        """
-        return {
-            **super().to_dict(),
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "Topic":
-        """
-        Create a Topic instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the Topic.
-
-        Returns:
-            Topic: A Topic instance created from the dictionary.
-        """
-        condition_data = data["condition"]
-        if isinstance(condition_data, dict):
-            encoded_condition = condition_data["base64"]
-        else:
-            encoded_condition = condition_data
-
-        return cls(
-            name=data["name"],
-            type=data["type"],
-            condition=safe_b64_pickle_loads(
-                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
-            ),
-        )
 
 
 T_T = TypeVar("T_T", bound=Topic)

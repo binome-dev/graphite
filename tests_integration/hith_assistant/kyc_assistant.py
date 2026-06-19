@@ -7,6 +7,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -17,6 +18,31 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+def _is_tool_call(event: PublishToTopicEvent) -> bool:
+    return (
+        event is not None
+        and len(event.data) > 0
+        and event.data[-1].tool_calls is not None
+        and len(event.data[-1].tool_calls) > 0
+    )
+
+
+def needs_human_review(event: PublishToTopicEvent) -> bool:
+    """A pending tool call other than ``register_client`` needs human review."""
+    return (
+        _is_tool_call(event)
+        and event.data[-1].tool_calls[0].function.name != "register_client"
+    )
+
+
+def is_register_client(event: PublishToTopicEvent) -> bool:
+    """The pending tool call is the ``register_client`` action."""
+    return (
+        _is_tool_call(event)
+        and event.data[-1].tool_calls[0].function.name == "register_client"
+    )
 
 
 class KycAssistant(Assistant):
@@ -76,20 +102,12 @@ class KycAssistant(Assistant):
 
         hitl_call_topic = Topic(
             name="hitl_call_topic",
-            condition=lambda event: event is not None
-            and len(event.data) > 0
-            and event.data[-1].tool_calls is not None
-            and len(event.data[-1].tool_calls) > 0
-            and event.data[-1].tool_calls[0].function.name != "register_client",
+            condition=needs_human_review,
         )
 
         register_user_topic = Topic(
             name="register_user_topic",
-            condition=lambda event: event is not None
-            and len(event.data) > 0
-            and event.data[-1].tool_calls is not None
-            and len(event.data[-1].tool_calls) > 0
-            and event.data[-1].tool_calls[0].function.name == "register_client",
+            condition=is_register_client,
         )
 
         action_node = (

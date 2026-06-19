@@ -9,11 +9,15 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.pickle_guard import set_pickle_deserialization_allowed
+from grafi.tools.tool_factory import ToolFactory
+from tests_integration.function_call_assistant.simple_function_call_assistant_multi_functions_example import (  # noqa: E501
+    LocalInfoMock,
+)
 
-# This example deserializes a manifest we created ourselves (a trusted source),
-# so enable pickle-based deserialization, which is fail-closed by default.
-set_pickle_deserialization_allowed(True)
+# The custom FunctionCallTool subclass must be registered so the manifest's
+# "LocalInfoMock" tool reconstructs with its @llm_function methods (they are
+# defined by the class, not serialized).
+ToolFactory.register_tool_class("LocalInfoMock", LocalInfoMock)
 
 
 def get_invoke_context() -> InvokeContext:
@@ -59,9 +63,9 @@ async def test_deserialized_assistant() -> None:
     assert "12345" in str(output[-1].data[0].content)
     assert "bad" in str(output[-1].data[0].content)
     print(len(await event_store.get_events()))
-    # The event store is idempotent on event_id: a duplicate publish that was
-    # previously double-counted (26) is now stored once (25).
-    assert len(await event_store.get_events()) == 25
+    # Same workflow as the freshly-built assistant, so the same event count
+    # (see simple_function_call_assistant_multi_functions_example.py).
+    assert len(await event_store.get_events()) == 24
 
     # Test restore from finished requests
 
@@ -80,11 +84,13 @@ async def test_deserialized_assistant() -> None:
 
     print(output[-1].data[0].content)
     assert output is not None
-    assert "12345" in str(output[-1].data[0].content)
-    assert "200,000" in str(output[-1].data[0].content)
+    content = str(output[-1].data[0].content)
+    assert "12345" in content
+    # The mock returns "200000"; the summary LLM may or may not add a comma.
+    assert "200,000" in content or "200000" in content
     print(len(await event_store.get_events()))
-    # Two identical runs, 25 unique events each (deduped on event_id).
-    assert len(await event_store.get_events()) == 50
+    # Two identical runs, 24 unique events each (deduped on event_id).
+    assert len(await event_store.get_events()) == 48
 
 
 if __name__ == "__main__":

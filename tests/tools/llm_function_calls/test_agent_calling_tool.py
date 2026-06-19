@@ -8,12 +8,30 @@ from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.agent_calling_tool import AgentCallingTool
 
 
+async def sample_agent_call(*args, **kwargs):
+    """Module-level agent call -> serializes as an import reference (no pickle)."""
+    return {"content": "sample response"}
+
+
 @pytest.fixture
 def mock_agent_call():
     async def async_mock_agent_call(*args, **kwargs):
         return {"content": "mocked response"}
 
     return Mock(side_effect=async_mock_agent_call)
+
+
+@pytest.fixture
+def serializable_agent_tool() -> AgentCallingTool:
+    """An AgentCallingTool whose agent_call is a referenceable module function."""
+    return (
+        AgentCallingTool.builder()
+        .agent_name("test_agent")
+        .agent_description("Test agent description")
+        .argument_description("Test argument description")
+        .agent_call(sample_agent_call)
+        .build()
+    )
 
 
 @pytest.fixture
@@ -128,26 +146,18 @@ def test_to_messages(agent_calling_tool):
     assert result[0].tool_call_id == "test_id"
 
 
-def test_to_dict(agent_calling_tool: AgentCallingTool):
-    result = agent_calling_tool.to_dict()
+def test_to_dict(serializable_agent_tool: AgentCallingTool):
+    result = serializable_agent_tool.to_dict()
     assert isinstance(result, dict)
     assert result["name"] == "test_agent"
     assert result["agent_description"] == "Test agent description"
+    # agent_call serializes as an import reference, no pickle blob.
+    assert result["agent_call"] == {"ref": f"{__name__}:sample_agent_call"}
 
 
 @pytest.mark.asyncio
 async def test_from_dict():
-    """Test deserialization from dictionary."""
-    import base64
-
-    import cloudpickle
-
-    async def test_agent_call(*args, **kwargs):
-        return "test response"
-
-    # Encode the function
-    encoded_func = base64.b64encode(cloudpickle.dumps(test_agent_call)).decode("utf-8")
-
+    """Test deserialization from a dictionary with an agent_call reference."""
     data = {
         "class": "AgentCallingTool",
         "tool_id": "test-id",
@@ -157,7 +167,7 @@ async def test_from_dict():
         "agent_name": "test_agent",
         "agent_description": "Test description",
         "argument_description": "Test args",
-        "agent_call": encoded_func,
+        "agent_call": {"ref": f"{__name__}:sample_agent_call"},
     }
 
     tool = await AgentCallingTool.from_dict(data)
@@ -167,21 +177,21 @@ async def test_from_dict():
     assert tool.agent_name == "test_agent"
     assert tool.agent_description == "Test description"
     assert tool.argument_description == "Test args"
-    assert tool.agent_call is not None
+    assert tool.agent_call is sample_agent_call
 
 
 @pytest.mark.asyncio
-async def test_from_dict_roundtrip(agent_calling_tool):
+async def test_from_dict_roundtrip(serializable_agent_tool):
     """Test that serialization and deserialization are consistent."""
     # Serialize to dict
-    data = agent_calling_tool.to_dict()
+    data = serializable_agent_tool.to_dict()
 
     # Deserialize back
     restored = await AgentCallingTool.from_dict(data)
 
     # Verify key properties match
-    assert restored.name == agent_calling_tool.name
-    assert restored.agent_name == agent_calling_tool.agent_name
-    assert restored.agent_description == agent_calling_tool.agent_description
-    assert restored.argument_description == agent_calling_tool.argument_description
-    assert restored.agent_call is not None
+    assert restored.name == serializable_agent_tool.name
+    assert restored.agent_name == serializable_agent_tool.agent_name
+    assert restored.agent_description == serializable_agent_tool.agent_description
+    assert restored.argument_description == serializable_agent_tool.argument_description
+    assert restored.agent_call is sample_agent_call

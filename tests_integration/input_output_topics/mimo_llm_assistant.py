@@ -7,6 +7,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.callable_component import CallableComponent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
@@ -14,6 +16,21 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+class ContainsKeyword(CallableComponent):
+    """Route when the last message's content contains *keyword* (case-insensitive).
+
+    A parameterized, serializable condition demonstrating the CallableComponent
+    pattern: the manifest stores
+    ``{"component": "...:ContainsKeyword", "config": {"keyword": "hello"}}`` --
+    config data, no embedded code.
+    """
+
+    keyword: str
+
+    def __call__(self, event: PublishToTopicEvent) -> bool:
+        return self.keyword in str(event.data[-1].content).lower()
 
 
 class MIMOLLMAssistant(Assistant):
@@ -61,11 +78,11 @@ class MIMOLLMAssistant(Assistant):
     def _construct_workflow(self) -> "MIMOLLMAssistant":
         agent_input_greeting_topic = InputTopic(
             name="agent_input_greeting_topic",
-            condition=lambda event: "hello" in str(event.data[-1].content).lower(),
+            condition=ContainsKeyword(keyword="hello"),
         )
         agent_input_question_topic = InputTopic(
             name="agent_input_question_topic",
-            condition=lambda event: "question" in str(event.data[-1].content).lower(),
+            condition=ContainsKeyword(keyword="question"),
         )
         agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")
         agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")

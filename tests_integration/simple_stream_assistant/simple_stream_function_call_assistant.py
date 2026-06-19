@@ -10,6 +10,8 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_no_tool_call
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -50,14 +52,12 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda event: event.data[-1].tool_calls
-            is not None,  # only when the last message is a function call
+            condition=has_tool_call,
         )
 
         summary_topic = Topic(
             name="summary_topic",
-            condition=lambda event: event.data[-1].tool_calls
-            is None,  # only when the last message is a function call
+            condition=has_no_tool_call,
         )
 
         llm_input_node = (

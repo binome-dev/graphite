@@ -9,7 +9,6 @@ All tests use FunctionTool to deterministically mock LLM responses,
 enabling reliable unit testing without real API calls.
 """
 
-import base64
 import inspect
 import uuid
 from typing import Any
@@ -18,7 +17,6 @@ from typing import List
 from typing import Union
 from unittest.mock import patch
 
-import cloudpickle
 import pytest
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
@@ -46,6 +44,11 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+def _mock_passthrough(messages: Messages) -> Messages:
+    """Identity stand-in re-attached when an LLMMockTool is deserialized."""
+    return messages
 
 
 @use_command(Command)
@@ -94,13 +97,13 @@ class LLMMockTool(Tool):
         Returns:
             Dict[str, Any]: A dictionary representation of the tool.
         """
+        # from_dict re-attaches a fixed identity function, so the mock's real
+        # (closure) function is not serialized -- store a reference placeholder.
         return {
             **super().to_dict(),
             "role": self.role,
             "base_class": "FunctionTool",
-            "function": base64.b64encode(cloudpickle.dumps(self.function)).decode(
-                "utf-8"
-            ),
+            "function": {"ref": f"{__name__}:_mock_passthrough"},
         }
 
     @classmethod
@@ -124,7 +127,7 @@ class LLMMockTool(Tool):
             name=data.get("name", "LLMMockTool"),
             type=data.get("type", "LLMMockTool"),
             role=data.get("role", "assistant"),
-            function=lambda messages: messages,
+            function=_mock_passthrough,
             oi_span_type=OpenInferenceSpanKindValues.TOOL,
         )
 

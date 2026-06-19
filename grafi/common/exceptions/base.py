@@ -61,14 +61,3 @@ class ValidationError(GrafiError):
     """Raised when input validation fails."""
 
     pass
-
-
-class UnsafeDeserializationError(GrafiError):
-    """Raised when pickle-based deserialization is attempted without explicit trust.
-
-    Deserializing pickle/cloudpickle payloads can execute arbitrary code, so it is
-    refused by default. See :mod:`grafi.common.pickle_guard` for how to opt in for
-    data from a trusted source.
-    """
-
-    pass

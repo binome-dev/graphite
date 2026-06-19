@@ -7,23 +7,16 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_text_response
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-
-
-def agent_output_condition(event: PublishToTopicEvent) -> bool:
-    return (
-        event.data[-1].content is not None
-        and isinstance(event.data[-1].content, str)
-        and event.data[-1].content.strip() != ""
-    )
 
 
 class SimpleFunctionCallAssistant(Assistant):
@@ -61,12 +54,11 @@ class SimpleFunctionCallAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleFunctionCallAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(
-            name="agent_output_topic", condition=agent_output_condition
+            name="agent_output_topic", condition=has_text_response
         )
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda event: event.data[-1].tool_calls
-            is not None,  # only when the last message is a function call
+            condition=has_tool_call,
         )
 
         llm_input_node = (

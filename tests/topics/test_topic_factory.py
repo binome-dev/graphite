@@ -2,9 +2,6 @@
 Tests for TopicFactory - Factory class for deserializing topics.
 """
 
-import base64
-
-import cloudpickle
 import pytest
 
 from grafi.topics.topic_factory import TopicFactory
@@ -19,11 +16,10 @@ from grafi.topics.topic_types import TopicType
 @pytest.mark.asyncio
 async def test_topic_factory_default_topic():
     """Test factory creates default Topic correctly."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": "Topic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -36,11 +32,10 @@ async def test_topic_factory_default_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_input_topic():
     """Test factory creates InputTopic correctly."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "input_topic",
         "type": "AgentInputTopic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -53,11 +48,10 @@ async def test_topic_factory_input_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_output_topic():
     """Test factory creates OutputTopic correctly."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "output_topic",
         "type": "AgentOutputTopic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -70,11 +64,10 @@ async def test_topic_factory_output_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_in_workflow_input_topic():
     """Test factory creates InWorkflowInputTopic correctly."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "in_workflow_input",
         "type": "InWorkflowInputTopic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -87,11 +80,10 @@ async def test_topic_factory_in_workflow_input_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_in_workflow_output_topic():
     """Test factory creates InWorkflowOutputTopic correctly."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "in_workflow_output",
         "type": "InWorkflowOutputTopic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
         "paired_in_workflow_input_topic_names": ["approval", "rejection"],
     }
 
@@ -106,11 +98,10 @@ async def test_topic_factory_in_workflow_output_topic():
 @pytest.mark.asyncio
 async def test_topic_factory_with_topic_type_enum():
     """Test factory works with TopicType enum values."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": TopicType.DEFAULT_TOPIC_TYPE,
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -122,11 +113,10 @@ async def test_topic_factory_with_topic_type_enum():
 @pytest.mark.asyncio
 async def test_topic_factory_unknown_type_string():
     """Test factory raises ValueError for unknown type string."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": "UnknownTopicType",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(ValueError, match="Unknown topic type string"):
@@ -136,10 +126,9 @@ async def test_topic_factory_unknown_type_string():
 @pytest.mark.asyncio
 async def test_topic_factory_missing_type():
     """Test factory raises KeyError when type is missing."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(KeyError, match="Missing required key 'type'"):
@@ -149,11 +138,10 @@ async def test_topic_factory_missing_type():
 @pytest.mark.asyncio
 async def test_topic_factory_invalid_type():
     """Test factory raises ValueError for invalid type format."""
-    condition = lambda x: True  # noqa: E731
     data = {
         "name": "test_topic",
         "type": 12345,  # Invalid type
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(ValueError, match="Invalid topic type"):

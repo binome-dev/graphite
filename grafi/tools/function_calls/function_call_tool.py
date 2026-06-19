@@ -1,4 +1,3 @@
-import base64
 import inspect
 import json
 from typing import Any
@@ -8,11 +7,12 @@ from typing import Optional
 from typing import Self
 from typing import TypeVar
 
-import cloudpickle
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
+from grafi.common.callable_ref import deserialize_callable
+from grafi.common.callable_ref import serialize_callable
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionCallException
@@ -22,7 +22,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.command import use_command
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.tool import Tool
@@ -168,14 +167,21 @@ class FunctionCallTool(Tool):
             Dict[str, Any]: A dictionary representation of the tool.
         """
 
+        # Functions discovered from @llm_function-decorated methods are intrinsic
+        # to the class and re-registered automatically on from_dict (see
+        # __init_subclass__), so they are NOT serialized. Only standalone
+        # functions added via the builder are serialized (as references).
+        serialized_functions = {
+            name: serialize_callable(func)
+            for name, func in self.functions.items()
+            if getattr(type(self), name, None) is not func
+        }
+
         return {
             **super().to_dict(),
             "base_class": "FunctionCallTool",
             "function_specs": [spec.model_dump() for spec in self.function_specs],
-            "functions": {
-                name: base64.b64encode(cloudpickle.dumps(func)).decode("utf-8")
-                for name, func in self.functions.items()
-            },
+            "functions": serialized_functions,
         }
 
     @classmethod
@@ -190,19 +196,10 @@ class FunctionCallTool(Tool):
             FunctionCallTool: A FunctionCallTool instance created from the dictionary.
 
         Note:
-            Functions are reconstructed from cloudpickle serialized data.
-
-        Warning:
-            SECURITY: This method deserializes pickled code using cloudpickle.
-            Pickle deserialization can execute arbitrary code. Only use this
-            method with data from trusted sources. For production use with
-            external/untrusted data, consider using a safer serialization format.
+            Each function is reconstructed (without pickle) from its import
+            reference or CallableComponent config. See
+            :mod:`grafi.common.callable_ref`.
         """
-        logger.debug(
-            "Deserializing function call tool from pickle data. "
-            "Ensure data source is trusted."
-        )
-
         function_call_tool_builder = (
             cls.builder()
             .name(data.get("name", "FunctionCallTool"))
@@ -211,7 +208,7 @@ class FunctionCallTool(Tool):
         )
 
         for func_name, func_serialized in data.get("functions", {}).items():
-            func = safe_b64_pickle_loads(
+            func = deserialize_callable(
                 func_serialized, context=f"function '{func_name}'"
             )
             function_call_tool_builder.function(func)
