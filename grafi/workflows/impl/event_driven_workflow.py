@@ -26,7 +26,6 @@ from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
-from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
@@ -73,6 +72,9 @@ class EventDrivenWorkflow(Workflow):
     # mapping lets ``stop`` reach the in-flight runs.
     _active_runs: Dict[int, "EventDrivenWorkflow"] = PrivateAttr(default_factory=dict)
 
+    # Memoized consumer lists per topic name (static topology); see _topic_consumers.
+    _topic_consumers_cache: Dict[str, List[str]] = PrivateAttr(default_factory=dict)
+
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
 
@@ -102,15 +104,21 @@ class EventDrivenWorkflow(Workflow):
         topics. The definition instance's runtime state is never used for
         execution, so two concurrent invocations of the same workflow are fully
         isolated.
+
+        Note: ``tool``/``command`` objects are shared with the definition (not
+        deep-copied), so tools must hold no per-invocation mutable state.
         """
         run = self.model_copy()
         run._stop_requested = False
         run._tracker = AsyncNodeTracker()
         run._invoke_queue = deque()
         run._active_runs = {}
+        run._topic_consumers_cache = {}
         run._topic_nodes = self._topic_nodes  # name-based topology, safe to share
+        # Fresh queue of the same backend type per topic, so a topic configured
+        # with a non-default queue keeps its kind (just emptied) for this run.
         fresh_topics = {
-            name: topic.model_copy(update={"event_queue": InMemTopicEventQueue()})
+            name: topic.model_copy(update={"event_queue": type(topic.event_queue)()})
             for name, topic in self._topics.items()
         }
         run._topics = fresh_topics
@@ -289,6 +297,9 @@ class EventDrivenWorkflow(Workflow):
         consumer. Deduplicated, since a node consumes a topic once regardless of
         how many of its subscription expressions reference it.
         """
+        cached = self._topic_consumers_cache.get(topic_name)
+        if cached is not None:
+            return cached
         consumers = list(dict.fromkeys(self._topic_nodes.get(topic_name, [])))
         topic = self._topics.get(topic_name)
         if topic is not None and topic.type in (
@@ -296,6 +307,8 @@ class EventDrivenWorkflow(Workflow):
             TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE,
         ):
             consumers.append(self.name)
+        # Memoized: topology is static and this is read once per published event.
+        self._topic_consumers_cache[topic_name] = consumers
         return consumers
 
     async def _count_pending_consumable(self) -> int:
@@ -311,6 +324,27 @@ class EventDrivenWorkflow(Workflow):
             for consumer_name in self._topic_consumers(topic_name):
                 total += await topic.unconsumed_count(consumer_name)
         return total
+
+    async def _progress_possible(self) -> bool:
+        """Whether the parallel run can still make progress.
+
+        True while any node is actively processing, any event is still awaiting
+        consumption, or any node could be invoked with currently available
+        events. When this is False but the tracker is non-quiescent, the
+        outstanding deliveries are parked -- e.g. a node with an ``A AND B``
+        subscription that consumed ``A`` but whose ``B`` will never arrive -- so
+        the output queue ends iteration instead of hanging on a commit that will
+        never come. (Per-consumer delivery accounting prevents premature
+        termination; this only catches the genuinely stuck case.)
+        """
+        if not await self._tracker.is_idle():
+            return True
+        if await self._count_pending_consumable() > 0:
+            return True
+        for node in self.nodes.values():
+            if await node.can_invoke():
+                return True
+        return False
 
     async def _add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
@@ -424,7 +458,12 @@ class EventDrivenWorkflow(Workflow):
         ]
 
         # Create AsyncOutputQueue with output topics and tracker
-        output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+        output_queue = AsyncOutputQueue(
+            output_topics,
+            self.name,
+            self._tracker,
+            progress_possible=self._progress_possible,
+        )
         await output_queue.start_listeners()
 
         consumed_output_events: List[ConsumeFromTopicEvent] = []
@@ -680,9 +719,10 @@ class EventDrivenWorkflow(Workflow):
         """Execute one invocation on this (per-run) instance's own state."""
         invoke_context = input_data.invoke_context
         try:
-            # Reset stop flag at the beginning of new execution
-            self.reset_stop_flag()
-
+            # The clone is born fresh (stop flag clear, new tracker), so there is
+            # no flag to reset here. Crucially, NOT resetting means a stop()
+            # forwarded to this run between its registration and this point (see
+            # EventDrivenWorkflow.stop) is preserved rather than cleared.
             await self.init_workflow(input_data, is_sequential)
 
             if is_sequential:
@@ -709,7 +749,11 @@ class EventDrivenWorkflow(Workflow):
         logger.debug(
             f"init_workflow: is_sequential={is_sequential}, tracker_id={id(self._tracker)}"
         )
-        if not is_sequential:
+        # Reset the tracker for a fresh parallel run, but never when a stop has
+        # already been requested -- resetting would clear a forwarded force-stop
+        # and let a stopped run proceed. (On a per-invocation clone the tracker
+        # is already fresh, so this reset only matters for direct callers.)
+        if not is_sequential and not self._stop_requested:
             self._tracker.reset()
 
         for topic in self._topics.values():

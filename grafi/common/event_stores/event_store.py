@@ -17,8 +17,10 @@ class EventStore(ABC):
     """Stores and manages events."""
 
     # Decoder for stored event dicts. Persistence backends delegate decoding to
-    # the codec instead of knowing concrete event classes; override per instance
-    # to register additional event types without editing this class.
+    # the codec instead of knowing concrete event classes. This is a shared,
+    # process-wide default registry: calling ``.register(...)`` on it affects all
+    # stores. For an isolated registry, assign a fresh ``EventCodec`` to the
+    # instance (``self._codec = EventCodec({...})``) in a subclass constructor.
     _codec: EventCodec = default_event_codec
 
     @abstractmethod

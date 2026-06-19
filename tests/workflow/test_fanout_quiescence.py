@@ -109,3 +109,56 @@ async def test_parallel_fanout_yields_every_subscriber_output():
 
     assert "resp-a" in contents
     assert "resp-b" in contents
+
+
+@pytest.mark.asyncio
+async def test_parallel_does_not_hang_on_unsatisfied_and_subscription():
+    """A topic feeding a firing node AND a node whose AND-subscription can never
+    be satisfied must still terminate (the parked delivery must not hang the
+    run). Regression for the per-consumer accounting over-count."""
+    import asyncio
+
+    from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+    from grafi.topics.topic_impl.topic import Topic
+
+    input_topic = InputTopic(name="agent_input")
+    gate = Topic(name="gate_topic")  # nothing ever publishes here
+    output_topic = OutputTopic(name="agent_output")
+
+    firing = Node(
+        name="firing",
+        type="Node",
+        tool=LabelTool(label="ok"),
+        subscribed_expressions=[TopicExpr(topic=input_topic)],
+        publish_to=[output_topic],
+    )
+    # Subscribes to (agent_input AND gate_topic); gate_topic never fires.
+    stuck = Node(
+        name="stuck",
+        type="Node",
+        tool=LabelTool(label="never"),
+        subscribed_expressions=[
+            SubscriptionBuilder()
+            .subscribed_to(input_topic)
+            .and_()
+            .subscribed_to(gate)
+            .build()
+        ],
+        publish_to=[output_topic],
+    )
+    workflow = EventDrivenWorkflow.builder().node(firing).node(stuck).build()
+
+    fake_container = Mock()
+    fake_container.event_store = EventStoreInMemory()
+
+    with patch("grafi.workflows.impl.event_driven_workflow.container", fake_container):
+        contents = []
+        async with asyncio.timeout(10):  # fails loudly if it hangs
+            async for event in workflow.invoke(
+                _input_event("and-sub"), is_sequential=False
+            ):
+                contents.extend(msg.content for msg in event.data)
+
+    # The firing node's output is produced; the stuck AND-node never fires.
+    assert "resp-ok" in contents
+    assert "resp-never" not in contents

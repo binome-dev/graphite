@@ -30,6 +30,10 @@ class OpenRouterTool(OpenAICompatibleTool):
     extra_headers: Dict[str, str] = Field(default_factory=dict)
 
     _provider_label: ClassVar[str] = "OpenRouter"
+    # OpenRouter emulates the chat-completions API but not OpenAI's beta
+    # parsed-completions endpoint; structured output goes through response_format
+    # on the standard create call.
+    _supports_beta_parse: ClassVar[bool] = False
 
     def _extra_create_kwargs(self) -> Dict[str, Any]:
         # OpenRouter accepts optional attribution headers on each request.
@@ -41,9 +45,9 @@ class OpenRouterTool(OpenAICompatibleTool):
         return OpenRouterToolBuilder(cls)
 
     def to_dict(self) -> Dict[str, Any]:
+        # base_url is serialized by OpenAICompatibleTool.to_dict.
         return {
             **super().to_dict(),
-            "base_url": self.base_url,
             "extra_headers": self.extra_headers,
         }
 
@@ -61,6 +65,7 @@ class OpenRouterTool(OpenAICompatibleTool):
             .is_streaming(data.get("is_streaming", False))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("OPENROUTER_API_KEY"))
+            .model(data.get("model", "openrouter/auto"))
             .base_url(data.get("base_url", "https://openrouter.ai/api/v1"))
             .extra_headers(data.get("extra_headers", {}))
             .build()

@@ -38,11 +38,7 @@ class DeepseekTool(OpenAICompatibleTool):
         """Return a builder for DeepseekTool."""
         return DeepseekToolBuilder(cls)
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "base_url": self.base_url,
-        }
+    # to_dict (with base_url) is inherited from OpenAICompatibleTool.
 
     @classmethod
     async def from_dict(cls, data: Dict[str, Any]) -> "DeepseekTool":

@@ -46,6 +46,12 @@ class OpenAICompatibleTool(LLM):
     # Human-readable provider name used in error messages.
     _provider_label: ClassVar[str] = "OpenAI-compatible"
 
+    # Whether structured-output requests may use the OpenAI-specific
+    # ``beta.chat.completions.parse`` endpoint. Providers that only emulate the
+    # standard chat-completions API (e.g. OpenRouter) set this False and rely on
+    # ``response_format`` in ``chat_params`` via the normal ``create`` call.
+    _supports_beta_parse: ClassVar[bool] = True
+
     # Optional endpoint override (``None`` uses the SDK's default OpenAI base).
     base_url: Optional[str] = Field(default=None)
 
@@ -116,28 +122,34 @@ class OpenAICompatibleTool(LLM):
         # but fall back to the provider label so the error always has a name.
         tool_name = self.name or self._provider_label
 
+        # Merge provider/base kwargs with user chat_params into one dict so a
+        # caller-supplied key (e.g. extra_headers, response_format) overrides
+        # rather than collides with a duplicate keyword argument.
+        call_kwargs = {**request_kwargs, **self.chat_params}
+
         try:
             async with AsyncClient(**client_kwargs) as client:
                 if self.is_streaming:
-                    # ``**self.chat_params`` (Any) defeats overload resolution on
+                    # ``**call_kwargs`` (Any) defeats overload resolution on
                     # ``stream=True``, so cast the result to the streaming type.
                     stream = cast(
                         AsyncStream[ChatCompletionChunk],
                         await client.chat.completions.create(
-                            stream=True, **request_kwargs, **self.chat_params
+                            stream=True, **call_kwargs
                         ),
                     )
                     async for chunk in stream:
                         yield self.to_stream_messages(chunk)
                 else:
+                    use_parse = self.structured_output and self._supports_beta_parse
                     req_func = (
-                        client.chat.completions.create
-                        if not self.structured_output
-                        else client.beta.chat.completions.parse
+                        client.beta.chat.completions.parse
+                        if use_parse
+                        else client.chat.completions.create
                     )
                     response = cast(
                         ChatCompletion,
-                        await req_func(**request_kwargs, **self.chat_params),
+                        await req_func(**call_kwargs),
                     )
                     yield self.to_messages(response)
         except asyncio.CancelledError:
@@ -171,6 +183,18 @@ class OpenAICompatibleTool(LLM):
     def to_messages(self, response: ChatCompletion) -> Messages:
         """Convert a non-streaming response into Grafi messages."""
         return [Message.model_validate(response.choices[0].message.model_dump())]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the tool, including base_url when a provider sets one.
+
+        OpenAI (no base_url) omits the key, matching its prior manifest shape;
+        DeepSeek/OpenRouter inherit base_url serialization here instead of
+        repeating it.
+        """
+        data = super().to_dict()
+        if self.base_url:
+            data["base_url"] = self.base_url
+        return data
 
 
 T_OAC = TypeVar("T_OAC", bound=OpenAICompatibleTool)

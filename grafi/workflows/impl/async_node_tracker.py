@@ -133,8 +133,10 @@ class AsyncNodeTracker:
         each published event), and deliveries are registered before an event
         becomes consumable, so a commit can never outpace its registration. A
         genuine underflow therefore signals a real accounting bug (e.g. a
-        double-commit) rather than the benign publish/commit race the old
-        ``max(0, ...)`` clamp silently absorbed -- so we surface it.
+        double-commit). We log it loudly (rather than silently absorbing it as
+        the old ``max(0, ...)`` clamp did) and then clamp to 0 to keep the
+        counter valid; the parallel run is additionally backstopped by the output
+        queue's no-progress detection, so a miscount cannot hang the workflow.
 
         Call sites: _commit_events() in EventDrivenWorkflow, the output listener,
         and publish_events() (releasing an unpublished, condition-filtered event).
