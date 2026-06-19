@@ -21,7 +21,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic_core import to_jsonable_python
 
-from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
 from grafi.common.env import env_bool
 from grafi.common.events.component_base import ComponentEvent
@@ -35,9 +34,6 @@ from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.node_base import NodeBase
-from grafi.tools.tool import Tool
-from grafi.workflows.workflow import Workflow
 
 T = TypeVar("T")
 
@@ -64,9 +60,10 @@ class ComponentConfig:
     event_types: Dict[
         str, Type[ComponentEvent]
     ]  # Maps 'invoke', 'respond', 'failed' to event classes
-    extract_metadata: Callable[
-        [Union[AssistantBase, Workflow, NodeBase, Tool]], EventContext
-    ]  # Extracts component-specific metadata
+    # Extracts component-specific metadata. Typed as ``Any`` so this common-layer
+    # module does not import the higher-layer component classes (Assistant /
+    # Workflow / Node / Tool) just for an annotation.
+    extract_metadata: Callable[[Any], EventContext]
     process_async_result: Callable[[List], Any]
     span_name_suffix: str = "invoke"  # Suffix for span name
 
@@ -238,7 +235,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(
-            self: Union[AssistantBase, Workflow, NodeBase, Tool],
+            self: Any,
             *args: Any,
             **kwargs: Any,
         ) -> AsyncGenerator[Union[PublishToTopicEvent, List[Message]], None]:

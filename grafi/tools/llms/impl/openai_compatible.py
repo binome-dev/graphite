@@ -35,6 +35,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.llms.impl.openai_adapter import to_openai_tool
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -87,8 +88,7 @@ class OpenAICompatibleTool(LLM):
             )
 
         api_tools = [
-            function_spec.to_openai_tool()
-            for function_spec in self.get_function_specs()
+            to_openai_tool(function_spec) for function_spec in self.get_function_specs()
         ] or omit
 
         return api_messages, api_tools

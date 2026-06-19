@@ -12,6 +12,7 @@ from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.tools.llms.impl.openai_adapter import to_openai_tool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 
 
@@ -242,14 +243,16 @@ def test_prepare_api_input(openai_instance):
             role="user",
             content="What's the weather like?",
             tools=[
-                FunctionSpec(
-                    name="get_weather",
-                    description="Get weather",
-                    parameters=ParametersSchema(
-                        type="object",
-                        properties={"location": ParameterSchema(type="string")},
-                    ),
-                ).to_openai_tool()
+                to_openai_tool(
+                    FunctionSpec(
+                        name="get_weather",
+                        description="Get weather",
+                        parameters=ParametersSchema(
+                            type="object",
+                            properties={"location": ParameterSchema(type="string")},
+                        ),
+                    )
+                )
             ],
         ),
     ]

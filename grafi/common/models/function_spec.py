@@ -3,8 +3,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
-from openai.types.shared_params.function_definition import FunctionDefinition
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -65,16 +63,9 @@ class FunctionSpec(BaseModel):
     description: Optional[str]
     parameters: ParametersSchema
     output_schema: Optional[JsonSchema] = None
-
-    def to_openai_tool(self) -> ChatCompletionToolParam:
-        return ChatCompletionToolParam(
-            type="function",
-            function=FunctionDefinition(
-                name=self.name,
-                description=self.description,
-                parameters=self.parameters.model_dump(),
-            ),
-        )
+    # Provider conversion (e.g. to OpenAI tool params) lives in provider
+    # adapters such as grafi.tools.llms.impl.openai_adapter, keeping this core
+    # model free of any vendor SDK.
 
 
 FunctionSpecs = List[FunctionSpec]

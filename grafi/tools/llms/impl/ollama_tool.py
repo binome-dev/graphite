@@ -19,6 +19,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.tools.llms.impl.openai_adapter import to_openai_tool
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -94,8 +95,7 @@ class OllamaTool(LLM):
 
         # Extract function specifications from self.get_function_specs()
         api_functions = [
-            function_spec.to_openai_tool()
-            for function_spec in self.get_function_specs()
+            to_openai_tool(function_spec) for function_spec in self.get_function_specs()
         ] or None
 
         return api_messages, api_functions
