@@ -35,6 +35,11 @@ class AsyncOutputQueue:
         # whose other branch never arrived) and iteration ends rather than hangs.
         self._progress_possible = progress_possible
         self._stuck_polls = 0
+        # Tracker activity count at the last idle poll. Any change means a node
+        # processed between polls (real progress), which resets the stuck count
+        # even if no output-queue item appeared -- so termination never depends
+        # on the transient consume->enter window being unobservable.
+        self._last_activity = -1
         self.queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
         self._listener_tasks: List[asyncio.Task] = []
         self._stopped = False
@@ -181,11 +186,18 @@ class AsyncOutputQueue:
             # Not quiescent and no queue item after the wait. If the workflow
             # reports no further progress is possible, the outstanding tracker
             # count is parked work that will never commit, so end iteration
-            # instead of looping forever. Require two consecutive idle polls so a
-            # node momentarily between consuming its inputs and marking itself
-            # active is not mistaken for stuck.
+            # instead of looping forever. Terminate only after consecutive idle
+            # polls during which (a) no progress is possible AND (b) the tracker's
+            # activity count did not change -- i.e. no node processed in between.
+            # The activity-count guard means a node caught in the transient
+            # consume->enter window at one poll is detected as progress at the
+            # next (it will have entered), so a busy run is never mistaken for
+            # stuck regardless of scheduling.
             if self._progress_possible is not None and self.queue.empty():
-                if await self._progress_possible():
+                activity = await self.tracker.get_activity_count()
+                progressed = activity != self._last_activity
+                self._last_activity = activity
+                if progressed or await self._progress_possible():
                     self._stuck_polls = 0
                 else:
                     self._stuck_polls += 1

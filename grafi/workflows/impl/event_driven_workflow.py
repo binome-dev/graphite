@@ -26,6 +26,7 @@ from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
+from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
@@ -115,10 +116,12 @@ class EventDrivenWorkflow(Workflow):
         run._active_runs = {}
         run._topic_consumers_cache = {}
         run._topic_nodes = self._topic_nodes  # name-based topology, safe to share
-        # Fresh queue of the same backend type per topic, so a topic configured
-        # with a non-default queue keeps its kind (just emptied) for this run.
+        # Each run gets a fresh in-process queue per topic. A topic's event queue
+        # is a transient run buffer between publish and consume; durability and
+        # recovery come from the EventStore, not this queue -- so a per-run
+        # in-memory queue is correct regardless of any topic configuration.
         fresh_topics = {
-            name: topic.model_copy(update={"event_queue": type(topic.event_queue)()})
+            name: topic.model_copy(update={"event_queue": InMemTopicEventQueue()})
             for name, topic in self._topics.items()
         }
         run._topics = fresh_topics
