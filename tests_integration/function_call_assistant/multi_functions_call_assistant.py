@@ -12,6 +12,8 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_text_response
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -67,15 +69,10 @@ class MultiFunctionsCallAssistant(Assistant):
 
         function_call_topic = Topic(
             name="function_call_topic",
-            condition=lambda event: event.data[-1].tool_calls
-            is not None,  # only when the last message is a function call
+            condition=has_tool_call,
         )
 
-        agent_output_topic.condition = (
-            lambda event: event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != ""
-        )
+        agent_output_topic.condition = has_text_response
 
         # Create an input LLM node
         llm_input_node = (
@@ -100,10 +97,7 @@ class MultiFunctionsCallAssistant(Assistant):
 
         function_result_topic = Topic(
             name="function_result_topic",
-            condition=lambda event: len(event.data) > 0
-            and event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != "",
+            condition=has_text_response,
         )
 
         # Create function call node

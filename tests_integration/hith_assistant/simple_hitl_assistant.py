@@ -10,6 +10,8 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_no_tool_call
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -54,7 +56,7 @@ class SimpleHITLAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleHITLAssistant":
         hitl_call_topic = Topic(
             name="hitl_call_topic",
-            condition=lambda event: event.data[-1].tool_calls is not None,
+            condition=has_tool_call,
         )
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
@@ -66,7 +68,7 @@ class SimpleHITLAssistant(Assistant):
 
         register_user_topic = Topic(
             name="register_user_topic",
-            condition=lambda event: event.data[-1].tool_calls is None,
+            condition=has_no_tool_call,
         )
 
         llm_input_node = (

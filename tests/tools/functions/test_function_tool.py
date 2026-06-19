@@ -163,25 +163,14 @@ def test_to_dict(function_tool):
     assert d["type"] == "FunctionTool"
     assert d["role"] == "assistant"
     assert d["base_class"] == "FunctionTool"
-    # Function is now serialized as base64-encoded cloudpickle
+    # A module-level function serializes as an import reference, not a pickle blob.
     assert "function" in d
-    assert isinstance(d["function"], str)
-    assert len(d["function"]) > 0
+    assert d["function"] == {"ref": f"{dummy_function.__module__}:dummy_function"}
 
 
 @pytest.mark.asyncio
 async def test_from_dict():
-    """Test deserialization from dictionary."""
-    import base64
-
-    import cloudpickle
-
-    def test_function(messages):
-        return DummyOutput(value=100)
-
-    # Encode the function
-    encoded_func = base64.b64encode(cloudpickle.dumps(test_function)).decode("utf-8")
-
+    """Test deserialization from a dictionary with a function reference."""
     data = {
         "class": "FunctionTool",
         "tool_id": "test-id",
@@ -189,7 +178,7 @@ async def test_from_dict():
         "type": "FunctionTool",
         "oi_span_type": "TOOL",
         "role": "tool",
-        "function": encoded_func,
+        "function": {"ref": f"{__name__}:dummy_function"},
     }
 
     tool = await FunctionTool.from_dict(data)
@@ -197,7 +186,7 @@ async def test_from_dict():
     assert isinstance(tool, FunctionTool)
     assert tool.name == "TestFunction"
     assert tool.role == "tool"
-    assert tool.function is not None
+    assert tool.function is dummy_function
 
 
 @pytest.mark.asyncio

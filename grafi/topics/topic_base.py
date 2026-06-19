@@ -1,18 +1,18 @@
-import base64
-import inspect
 from typing import Any
 from typing import Callable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Self
 from typing import TypeVar
 
-import cloudpickle
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from grafi.common.callable_ref import deserialize_callable
+from grafi.common.callable_ref import serialize_callable
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -20,40 +20,36 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.message import Messages
-from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
 
 
-def serialize_condition(fn: Callable) -> str:
-    try:
-        # TODO: improve serialization to handle more cases
-        src = inspect.getsource(fn).strip()
+def always_true(_: PublishToTopicEvent) -> bool:
+    """Default topic condition: publish every event.
 
-        # Case A: Field(default=lambda ...)
-        if "Field(" in src and "default=" in src and "lambda" in src:
-            s = src[src.index("lambda") :].strip()
-            # remove trailing junk from Field(...), e.g. "lambda _: True)"
-            s = s.rstrip().rstrip("),")
-            return s
+    A named module-level function (rather than an inline ``lambda``) so it
+    serializes as a tiny import reference instead of inline code.
+    """
+    return True
 
-        # Case B: assignment to lambda
-        if "=" in src and "lambda" in src:
-            rhs = src.split("=", 1)[1].strip()
-            if rhs.startswith("lambda"):
-                return rhs.rstrip().rstrip("),")
 
-        # Case C: lambda literal already
-        if src.startswith("lambda"):
-            return src.rstrip().rstrip("),")
+def deserialize_condition(
+    data: Dict[str, Any],
+) -> Callable[[PublishToTopicEvent], bool]:
+    """Reconstruct a topic's ``condition`` from its serialized form.
 
-        # Case D: def function
-        return src
-    except Exception:
-        raise ValueError(
-            f"Cannot serialize callable {fn}. Define it in a module, not dynamically."
-        )
+    Centralizes the decoding shared by every topic ``from_dict``. A missing or
+    empty condition falls back to :func:`always_true`. Otherwise the value is
+    resolved by :func:`~grafi.common.callable_ref.deserialize_callable`, which
+    handles references and components (no pickle).
+    """
+    raw = data.get("condition")
+    if raw is None or raw == "":
+        return always_true
+    return deserialize_callable(
+        raw, context=f"topic '{data.get('name', '')}' condition"
+    )
 
 
 class TopicBase(BaseModel):
@@ -68,7 +64,7 @@ class TopicBase(BaseModel):
 
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
-    condition: Callable[[PublishToTopicEvent], bool] = Field(default=lambda _: True)
+    condition: Callable[[PublishToTopicEvent], bool] = Field(default=always_true)
     event_queue: TopicEventQueue = Field(default_factory=InMemTopicEventQueue)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -174,20 +170,10 @@ class TopicBase(BaseModel):
         """
         Convert the topic to a dictionary representation.
         """
-        try:
-            code = serialize_condition(self.condition)
-        except (OSError, TypeError):
-            code = ""
-
         return {
             "name": self.name,
             "type": self.type.value,
-            "condition": {
-                "base64": base64.b64encode(cloudpickle.dumps(self.condition)).decode(
-                    "utf-8"
-                ),
-                "code": code,
-            },
+            "condition": serialize_callable(self.condition),
         }
 
     @classmethod
@@ -201,29 +187,15 @@ class TopicBase(BaseModel):
         Returns:
             TopicBase: A TopicBase instance created from the dictionary.
 
-        Warning:
-            SECURITY: This method deserializes pickled code using cloudpickle.
-            Pickle deserialization can execute arbitrary code. Only use this
-            method with data from trusted sources. For production use with
-            external/untrusted data, consider using a safer serialization format.
+        Note:
+            The condition is reconstructed (without pickle) from its import
+            reference or CallableComponent config. See
+            :mod:`grafi.common.callable_ref`.
         """
-        condition_data = data["condition"]
-        if isinstance(condition_data, dict):
-            encoded_condition = condition_data["base64"]
-        else:
-            encoded_condition = condition_data
-
-        logger.debug(
-            "Deserializing topic condition from pickle data. "
-            "Ensure data source is trusted."
-        )
-
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=safe_b64_pickle_loads(
-                encoded_condition, context=f"topic '{data.get('name', '')}' condition"
-            ),
+            condition=deserialize_condition(data),
         )
 
 

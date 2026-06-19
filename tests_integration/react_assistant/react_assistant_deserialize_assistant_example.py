@@ -7,13 +7,8 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.pickle_guard import set_pickle_deserialization_allowed
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.tool_factory import ToolFactory
-
-# This example deserializes a manifest we created ourselves (a trusted source),
-# so enable pickle-based deserialization, which is fail-closed by default.
-set_pickle_deserialization_allowed(True)
 
 
 def get_invoke_context() -> InvokeContext:

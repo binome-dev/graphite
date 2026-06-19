@@ -178,16 +178,11 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
 @pytest.mark.asyncio
 async def test_from_dict():
-    """Test deserialization from dictionary."""
-    import base64
-
-    import cloudpickle
-
-    condition = lambda x: True  # noqa: E731
+    """Test deserialization from a dictionary with a reference condition."""
     data = {
         "name": "test_input_topic",
         "type": "AgentInputTopic",
-        "condition": base64.b64encode(cloudpickle.dumps(condition)).decode("utf-8"),
+        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await InputTopic.from_dict(data)
@@ -196,6 +191,7 @@ async def test_from_dict():
     assert topic.name == "test_input_topic"
     assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
     assert topic.condition is not None
+    assert topic.condition("anything") is True
 
 
 @pytest.mark.asyncio

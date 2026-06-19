@@ -1,24 +1,24 @@
-import base64
 import inspect
 import json
 from typing import Any
 from typing import Callable
 from typing import List
+from typing import Optional
 from typing import Self
 from typing import TypeVar
 from typing import Union
 
-import cloudpickle
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
+from grafi.common.callable_ref import deserialize_callable
+from grafi.common.callable_ref import serialize_callable
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.command import Command
 from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
@@ -91,14 +91,24 @@ class FunctionTool(Tool):
         Returns:
             Dict[str, Any]: A dictionary representation of the tool.
         """
-        return {
+        data: dict[str, Any] = {
             **super().to_dict(),
             "role": self.role,
             "base_class": "FunctionTool",
-            "function": base64.b64encode(cloudpickle.dumps(self.function)).decode(
-                "utf-8"
-            ),
         }
+        function = self._serialize_function()
+        if function is not None:
+            data["function"] = function
+        return data
+
+    def _serialize_function(self) -> Optional[dict[str, Any]]:
+        """Serialize ``self.function`` for the manifest.
+
+        Returns ``None`` to omit the function entirely -- subclasses whose
+        callable is reconstructed from other config (e.g. ``MCPFunctionTool``
+        from its ``mcp_config``) override this instead of skipping a base class.
+        """
+        return serialize_callable(self.function)
 
     @classmethod
     async def from_dict(cls, data: dict[str, Any]) -> "FunctionTool":
@@ -112,26 +122,30 @@ class FunctionTool(Tool):
             FunctionTool: A FunctionTool instance created from the dictionary.
 
         Note:
-            Functions cannot be fully reconstructed from serialized data as they
-            contain executable code. This method creates an instance with a
-            placeholder function that needs to be re-registered after deserialization.
+            The function is reconstructed (without pickle) from its import
+            reference or CallableComponent config. See
+            :mod:`grafi.common.callable_ref`.
         """
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-        return (
+        builder = (
             cls.builder()
             .name(data.get("name", "FunctionTool"))
             .type(data.get("type", "FunctionTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .role(data.get("role", "assistant"))
-            .function(
-                safe_b64_pickle_loads(
+        )
+        # ``function`` is optional: a subclass whose callable is reconstructed
+        # from other config omits it (see _serialize_function). When present it is
+        # rebuilt without pickle from its reference / expression / component.
+        if "function" in data:
+            builder = builder.function(
+                deserialize_callable(
                     data["function"],
                     context=f"function tool '{data.get('name', '')}' function",
                 )
             )
-            .build()
-        )
+        return builder.build()
 
 
 T_FT = TypeVar("T_FT", bound=FunctionTool)

@@ -16,6 +16,8 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_text_response
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -78,13 +80,11 @@ class ReActAssistant(Assistant):
 
         action_result_search_topic = Topic(
             name="action_search_result",
-            condition=lambda event: event.data[-1].tool_calls is not None,
+            condition=has_tool_call,
         )
         action_result_finish_topic = Topic(
             name="action_finish_result",
-            condition=lambda event: event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != "",
+            condition=has_text_response,
         )
 
         action_node = (

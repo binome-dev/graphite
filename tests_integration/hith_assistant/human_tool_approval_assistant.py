@@ -7,9 +7,12 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.topics.conditions import has_no_tool_call
+from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -17,6 +20,17 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+
+def is_approval(event: PublishToTopicEvent) -> bool:
+    """Human approved the pending tool call."""
+    return event.data[-1].content == "YES"
+
+
+def is_disapproval(event: PublishToTopicEvent) -> bool:
+    """Human rejected the pending tool call (reply starts with 'NO')."""
+    content = event.data[-1].content
+    return isinstance(content, str) and content.startswith("NO")
 
 
 class HumanApprovalAssistant(Assistant):
@@ -54,15 +68,15 @@ class HumanApprovalAssistant(Assistant):
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(
             name="agent_output_topic",
-            condition=lambda event: event.data[-1].tool_calls is None,
+            condition=has_no_tool_call,
         )
         in_workflow_input_approval_topic = InWorkflowInputTopic(
             name="human_approval_topic",
-            condition=lambda event: event.data[-1].content == "YES",
+            condition=is_approval,
         )
         in_workflow_input_disapproval_topic = InWorkflowInputTopic(
             name="human_disapproval_topic",
-            condition=lambda event: event.data[-1].content.startswith("NO"),  # type: ignore
+            condition=is_disapproval,
         )
         in_workflow_output_topic = InWorkflowOutputTopic(
             name="human_tool_call_request_topic",
@@ -70,7 +84,7 @@ class HumanApprovalAssistant(Assistant):
                 in_workflow_input_approval_topic.name,
                 in_workflow_input_disapproval_topic.name,
             ],
-            condition=lambda event: event.data[-1].tool_calls is not None,
+            condition=has_tool_call,
         )
 
         function_output_topic = Topic(name="human_tool_call_response_topic")

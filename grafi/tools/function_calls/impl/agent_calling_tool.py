@@ -1,14 +1,14 @@
-import base64
 import inspect
 import json
 from typing import Any
 from typing import Callable
 from typing import Self
 
-import cloudpickle
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
+from grafi.common.callable_ref import deserialize_callable
+from grafi.common.callable_ref import serialize_callable
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
@@ -17,7 +17,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
-from grafi.common.pickle_guard import safe_b64_pickle_loads
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
@@ -122,9 +121,7 @@ class AgentCallingTool(FunctionCallTool):
             "agent_name": self.agent_name,
             "agent_description": self.agent_description,
             "argument_description": self.argument_description,
-            "agent_call": base64.b64encode(cloudpickle.dumps(self.agent_call)).decode(
-                "utf-8"
-            ),
+            "agent_call": serialize_callable(self.agent_call),
             "oi_span_type": self.oi_span_type.value,
         }
 
@@ -140,9 +137,9 @@ class AgentCallingTool(FunctionCallTool):
             AgentCallingTool: An AgentCallingTool instance created from the dictionary.
 
         Note:
-            The agent_call function cannot be fully reconstructed from serialized data.
-            This method creates an instance with the metadata but without the actual
-            callable function, which would need to be re-registered after deserialization.
+            ``agent_call`` is reconstructed (without pickle) from its import
+            reference or CallableComponent config. See
+            :mod:`grafi.common.callable_ref`.
         """
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -155,7 +152,7 @@ class AgentCallingTool(FunctionCallTool):
             .agent_description(data.get("agent_description", ""))
             .argument_description(data.get("argument_description", ""))
             .agent_call(
-                safe_b64_pickle_loads(
+                deserialize_callable(
                     data["agent_call"],
                     context=f"agent_call for '{data.get('agent_name', '')}'",
                 )
