@@ -1,16 +1,15 @@
 import asyncio
+from typing import Any
 from typing import AsyncGenerator
+from typing import Generator
 from typing import Optional
-from typing import TypeVar
+from typing import cast
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 
 _SENTINEL = object()
-
-
-T = TypeVar("T")
 
 
 class AsyncResult:
@@ -37,7 +36,8 @@ class AsyncResult:
     def __init__(self, source: AsyncGenerator[ConsumeFromTopicEvent, None]):
         self._source = source
 
-        self._queue: asyncio.Queue[ConsumeFromTopicEvent] = asyncio.Queue()
+        # Holds stream items plus the end-of-stream sentinel, hence ``object``.
+        self._queue: asyncio.Queue[object] = asyncio.Queue()
         self._items: list[ConsumeFromTopicEvent] = []
         self._done = asyncio.Event()
         self._started = False
@@ -63,22 +63,22 @@ class AsyncResult:
             await self._queue.put(_SENTINEL)
 
     # --- async iteration support ---
-    def __aiter__(self):
+    def __aiter__(self) -> "AsyncResult":
         self._ensure_started()
         return self
 
-    async def __anext__(self) -> T:
+    async def __anext__(self) -> ConsumeFromTopicEvent:
         self._ensure_started()
         item = await self._queue.get()
         if item is _SENTINEL:
             if self._exc:
                 raise self._exc
             raise StopAsyncIteration
-        return item
+        return cast(ConsumeFromTopicEvent, item)
 
     # --- awaitable support ---
-    def __await__(self):
-        async def _await_impl():
+    def __await__(self) -> Generator[Any, None, list[ConsumeFromTopicEvent]]:
+        async def _await_impl() -> list[ConsumeFromTopicEvent]:
             self._ensure_started()
             await self._done.wait()
             if self._exc:
@@ -111,7 +111,9 @@ class AsyncResult:
             pass
 
 
-def async_func_wrapper(return_value) -> AsyncResult:
+def async_func_wrapper(
+    return_value: AsyncGenerator[ConsumeFromTopicEvent, None],
+) -> AsyncResult:
     """
     Normalize a function's *return value* into an AsyncResult.
 

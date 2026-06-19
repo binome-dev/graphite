@@ -1,3 +1,4 @@
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Sequence
@@ -47,11 +48,13 @@ def get_async_output_events(events: Sequence[TopicEvent]) -> List[TopicEvent]:
 
         if streaming_events:
             base_event = streaming_events[0]
-            aggregated_content_parts = []
+            aggregated_content_parts: List[str] = []
             for event in streaming_events:
                 messages = event.data if isinstance(event.data, list) else [event.data]
                 for message in messages:
-                    if message.content:
+                    # Streaming text chunks carry str content; ignore non-str
+                    # content (which ``str.join`` could not concatenate anyway).
+                    if isinstance(message.content, str) and message.content:
                         aggregated_content_parts.append(message.content)
             aggregated_content = "".join(aggregated_content_parts)
 
@@ -84,25 +87,36 @@ async def publish_events(
     node: NodeBase,
     publish_event: PublishToTopicEvent,
     tracker: AsyncNodeTracker,
+    consumers_of: Callable[[str], Sequence[str]],
 ) -> List[PublishToTopicEvent]:
     """
     Publish events to all topics the node publishes to.
 
-    CHANGE: Added optional tracker parameter.
-    When provided, notifies tracker of published messages.
+    The tracker counts outstanding *deliveries* -- one per consumer of each
+    published event -- not publications. ``consumers_of(topic_name)`` returns the
+    consumers the workflow topology will route a topic's events to (subscribing
+    nodes, plus the workflow itself for output topics). Each delivery is
+    registered *before* the event is enqueued, so a consumer can never commit a
+    delivery the tracker has not yet counted (which would strand the count and
+    prevent quiescence).
     """
     published_events: List[PublishToTopicEvent] = []
 
     for topic in node.publish_to:
+        delivery_count = len(consumers_of(topic.name))
+        if delivery_count:
+            await tracker.on_messages_published(
+                delivery_count, source=f"node:{node.name}->{topic.name}"
+            )
         event = await topic.publish_data(publish_event)
         if event:
             published_events.append(event)
-
-    # NEW: Notify tracker of published messages
-    if tracker and published_events:
-        await tracker.on_messages_published(
-            len(published_events), source=f"node:{node.name}"
-        )
+        elif delivery_count:
+            # Condition not met: the event was never enqueued, so no consumer
+            # will ever commit these deliveries. Release them immediately.
+            await tracker.on_messages_committed(
+                delivery_count, source=f"discard:{topic.name}"
+            )
 
     return published_events
 

@@ -149,7 +149,7 @@ def _type_to_schema(tp: Any) -> JsonSchema:
             f_schema = _type_to_schema(f_type)
             if f.default is not dataclasses.MISSING:
                 f_schema.setdefault("default", f.default)
-            elif f.default_factory is not dataclasses.MISSING:  # type: ignore[attr-defined]
+            elif f.default_factory is not dataclasses.MISSING:
                 # we can't serialize the factory, just mark as optional
                 pass
             else:
@@ -164,7 +164,7 @@ def _type_to_schema(tp: Any) -> JsonSchema:
     import enum
 
     if isinstance(tp, type) and issubclass(tp, enum.Enum):
-        values = [m.value for m in tp]  # type: ignore[arg-type]
+        values = [m.value for m in tp]
         # derive base type from first value
         base = _type_to_schema(type(values[0])) if values else {}
         base["enum"] = values
@@ -242,11 +242,11 @@ class ParsedFunction:
 
         # Unwrap callable classes: use __call__
         if not inspect.isroutine(fn) and hasattr(fn, "__call__"):
-            fn = fn.__call__  # type: ignore[assignment]
+            fn = fn.__call__
 
         # Unwrap staticmethod
         if isinstance(fn, staticmethod):
-            fn = fn.__func__  # type: ignore[assignment]
+            fn = fn.__func__
 
         sig = inspect.signature(fn)
         type_hints = get_type_hints(fn, include_extras=True)
@@ -301,7 +301,7 @@ class ParsedFunction:
         return_schema: Optional[JsonSchema] = None
         return_ann = type_hints.get("return", sig.return_annotation)
 
-        if return_ann not in (inspect._empty, None, Any, ...):  # type: ignore[attr-defined]
+        if return_ann not in (inspect._empty, None, Any, ...):
             # Convert return type to schema
             return_schema = _type_to_schema(return_ann)
 

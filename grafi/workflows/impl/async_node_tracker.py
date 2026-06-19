@@ -126,14 +126,32 @@ class AsyncNodeTracker:
 
     async def on_messages_committed(self, count: int = 1, source: str = "") -> None:
         """
-        Called when messages are committed (consumed and acknowledged).
+        Called when deliveries are committed (consumed and acknowledged) or
+        released (a publication whose condition was not met).
 
-        Call site: _commit_events() in EventDrivenWorkflow
+        The pending counter tracks outstanding *deliveries* (one per consumer of
+        each published event), and deliveries are registered before an event
+        becomes consumable, so a commit can never outpace its registration. A
+        genuine underflow therefore signals a real accounting bug (e.g. a
+        double-commit) rather than the benign publish/commit race the old
+        ``max(0, ...)`` clamp silently absorbed -- so we surface it.
+
+        Call sites: _commit_events() in EventDrivenWorkflow, the output listener,
+        and publish_events() (releasing an unpublished, condition-filtered event).
         """
         if count <= 0:
             return
         async with self._cond:
-            self._uncommitted_messages = max(0, self._uncommitted_messages - count)
+            if count > self._uncommitted_messages:
+                logger.error(
+                    f"Tracker: delivery underflow committing {count} from "
+                    f"{source} (pending={self._uncommitted_messages}); "
+                    "clamping to 0 -- this indicates a double-commit or "
+                    "accounting bug."
+                )
+                self._uncommitted_messages = 0
+            else:
+                self._uncommitted_messages -= count
             self._check_quiescence_unlocked()
 
             logger.debug(f"Tracker: {count} messages committed from {source}")

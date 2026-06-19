@@ -13,8 +13,10 @@ from typing import Union
 from typing import cast
 
 from openai import AsyncClient
-from openai import NotGiven
+from openai import AsyncStream
+from openai import Omit
 from openai import OpenAIError
+from openai import omit
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -65,7 +67,7 @@ class OpenRouterTool(LLM):
     def prepare_api_input(
         self, input_data: Messages
     ) -> tuple[
-        List[ChatCompletionMessageParam], Union[List[ChatCompletionToolParam], NotGiven]
+        List[ChatCompletionMessageParam], Union[List[ChatCompletionToolParam], Omit]
     ]:
         api_messages: List[ChatCompletionMessageParam] = (
             [
@@ -96,7 +98,7 @@ class OpenRouterTool(LLM):
         api_tools = [
             function_spec.to_openai_tool()
             for function_spec in self.get_function_specs()
-        ] or None
+        ] or omit
 
         return api_messages, api_tools
 
@@ -115,14 +117,20 @@ class OpenRouterTool(LLM):
             client = AsyncClient(api_key=self.api_key, base_url=self.base_url)
 
             if self.is_streaming:
-                async for chunk in await client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                    stream=True,
-                    extra_headers=self.extra_headers or None,
-                    **self.chat_params,
-                ):
+                # ``**self.chat_params`` (Any) defeats overload resolution on
+                # ``stream=True``, so cast the result to the streaming type.
+                stream = cast(
+                    AsyncStream[ChatCompletionChunk],
+                    await client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        tools=tools,
+                        stream=True,
+                        extra_headers=self.extra_headers or None,
+                        **self.chat_params,
+                    ),
+                )
+                async for chunk in stream:
                     yield self.to_stream_messages(chunk)
             else:
                 resp: ChatCompletion = await client.chat.completions.create(

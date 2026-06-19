@@ -136,8 +136,9 @@ class ToolFactory:
         if tool_class is None:
             tool_class = cls._resolve_lazy(class_name)
 
-        if tool_class is None and data.get("base_class") is not None:
-            tool_class = cls._TOOL_REGISTRY.get(data.get("base_class"))
+        base_class = data.get("base_class")
+        if tool_class is None and base_class is not None:
+            tool_class = cls._TOOL_REGISTRY.get(base_class)
 
         if tool_class is None:
             raise ValueError(

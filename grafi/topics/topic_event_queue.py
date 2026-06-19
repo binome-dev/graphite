@@ -61,6 +61,27 @@ class TopicEventQueue(ABC):
         pass
 
     @abstractmethod
+    async def restore_consumer(self, consumer_id: str, committed_offset: int) -> None:
+        """
+        Restore a consumer's cursors during recovery, without consuming events.
+
+        Marks the consumer as having consumed and committed every offset up to
+        and including ``committed_offset``. The next event delivered to this
+        consumer is ``committed_offset + 1``: nothing at or before
+        ``committed_offset`` is re-delivered, and nothing after it is skipped.
+
+        Unlike :meth:`fetch`, this never blocks and never returns events. It is a
+        pure cursor restore used only by replay-based recovery, so its meaning is
+        unambiguous (``fetch`` over-advances the consumed cursor by one when
+        misused for restore).
+
+        Args:
+            consumer_id: Unique identifier for the consumer
+            committed_offset: Highest offset the consumer had committed
+        """
+        ...
+
+    @abstractmethod
     async def reset(self) -> None:
         """
         Reset the queue to its initial state.

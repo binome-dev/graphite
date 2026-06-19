@@ -241,24 +241,36 @@ class EventDrivenWorkflow(Workflow):
                 len(topic_events), source=f"commit:{consumer_name}"
             )
 
-    async def _count_pending_consumable(self) -> int:
-        """Count messages still awaiting consumption across all topics.
+    def _topic_consumers(self, topic_name: str) -> List[str]:
+        """Consumers that will commit each event published to ``topic_name``.
 
-        For each topic this sums the unconsumed messages per consumer: subscriber
-        nodes for any topic, plus the workflow itself for output topics (which the
-        output listener drains under ``self.name``). The total equals the number
-        of commit operations the resumed run must perform to drain the restored
-        state, which is exactly what the quiescence tracker needs seeded.
+        These are the subscribing nodes, plus the workflow itself for output
+        topics (the output listener / ``_get_output_events`` drains them under
+        ``self.name``). This is the single source of truth for fan-out: one event
+        published here yields one delivery -- and one eventual commit -- per
+        consumer. Deduplicated, since a node consumes a topic once regardless of
+        how many of its subscription expressions reference it.
+        """
+        consumers = list(dict.fromkeys(self._topic_nodes.get(topic_name, [])))
+        topic = self._topics.get(topic_name)
+        if topic is not None and topic.type in (
+            TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE,
+        ):
+            consumers.append(self.name)
+        return consumers
+
+    async def _count_pending_consumable(self) -> int:
+        """Count deliveries still awaiting consumption across all topics.
+
+        For each topic this sums the unconsumed events per consumer. The total
+        equals the number of commit operations the resumed run must perform to
+        drain the restored state, which is exactly what the quiescence tracker
+        needs seeded on recovery.
         """
         total = 0
         for topic_name, topic in self._topics.items():
-            consumer_names = list(self._topic_nodes.get(topic_name, []))
-            if topic.type in (
-                TopicType.AGENT_OUTPUT_TOPIC_TYPE,
-                TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE,
-            ):
-                consumer_names.append(self.name)
-            for consumer_name in consumer_names:
+            for consumer_name in self._topic_consumers(topic_name):
                 total += await topic.unconsumed_count(consumer_name)
         return total
 
@@ -313,7 +325,12 @@ class EventDrivenWorkflow(Workflow):
                             invoke_context, node_consumed_events
                         ):
                             published_events.extend(
-                                await publish_events(node, result, self._tracker)
+                                await publish_events(
+                                    node,
+                                    result,
+                                    self._tracker,
+                                    self._topic_consumers,
+                                )
                             )
 
                         for event in published_events:
@@ -555,6 +572,7 @@ class EventDrivenWorkflow(Workflow):
                                     node=node,
                                     publish_event=event,
                                     tracker=self._tracker,
+                                    consumers_of=self._topic_consumers,
                                 )
                             )
 
@@ -662,6 +680,11 @@ class EventDrivenWorkflow(Workflow):
             ]
 
             events_to_record: List[Event] = []
+            # One delivery per consumer of each seeded input topic (not one per
+            # topic), so a fan-out input feeding several nodes is not declared
+            # quiescent after only the first node commits. Accumulated here while
+            # ``event`` is narrowed to PublishToTopicEvent.
+            seeded_delivery_count = 0
             for input_topic in input_topics:
                 event = await input_topic.publish_data(
                     input_data.model_copy(
@@ -674,6 +697,7 @@ class EventDrivenWorkflow(Workflow):
                 )
                 if event:
                     events_to_record.append(event)
+                    seeded_delivery_count += len(self._topic_consumers(event.name))
                     if is_sequential:
                         await self._add_to_invoke_queue(event)
 
@@ -681,16 +705,13 @@ class EventDrivenWorkflow(Workflow):
                 f"init_workflow: events_to_record={len(events_to_record)}, input_topics={len(input_topics)}"
             )
             if events_to_record:
-                # Track initial input messages for quiescence detection
-                if not is_sequential:
+                # Track initial input messages for quiescence detection.
+                if not is_sequential and seeded_delivery_count:
                     logger.debug(
-                        f"init_workflow: calling on_messages_published({len(events_to_record)})"
+                        f"init_workflow: on_messages_published({seeded_delivery_count})"
                     )
                     await self._tracker.on_messages_published(
-                        len(events_to_record), source="init_workflow"
-                    )
-                    logger.debug(
-                        f"init_workflow: tracker after publish: {await self._tracker.get_metrics()}"
+                        seeded_delivery_count, source="init_workflow"
                     )
                 await container.event_store.record_events(events_to_record)
         else:
@@ -756,11 +777,19 @@ class EventDrivenWorkflow(Workflow):
                                 )
                             )
                             if paired_event:
-                                # Track the published message for quiescence detection
+                                # Track one delivery per consumer of the paired
+                                # input topic for quiescence detection.
                                 if not is_sequential:
-                                    await self._tracker.on_messages_published(
-                                        1, source="restore_paired_input"
+                                    delivery_count = len(
+                                        self._topic_consumers(
+                                            paired_in_workflow_input_topic_name
+                                        )
                                     )
+                                    if delivery_count:
+                                        await self._tracker.on_messages_published(
+                                            delivery_count,
+                                            source="restore_paired_input",
+                                        )
                                 if is_sequential:
                                     await self._add_to_invoke_queue(paired_event)
                                 await container.event_store.record_event(paired_event)

@@ -41,7 +41,7 @@ class SyntheticTool(FunctionCallTool):
 
     @field_validator("input_model", "output_model")
     @classmethod
-    def validate_pydantic_model_or_schema(cls, v: Any, info) -> Any:
+    def validate_pydantic_model_or_schema(cls, v: Any, info: Any) -> Any:
         """
         Validate that input_model and output_model are either:
         - A Pydantic BaseModel class (not instance) - for type-safe Python usage
@@ -231,8 +231,10 @@ class SyntheticTool(FunctionCallTool):
                     },
                 }
 
-                # Use standard chat completion (not parse)
-                completion = await client.chat.completions.create(
+                # Use standard chat completion (not parse). The plain message and
+                # response_format dicts are valid at runtime but do not match the
+                # SDK's TypedDict overloads, which require literal-keyed construction.
+                completion = await client.chat.completions.create(  # type: ignore[call-overload]
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
                     response_format=response_format,

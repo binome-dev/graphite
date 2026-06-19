@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from openai import omit
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
@@ -223,7 +224,7 @@ def test_prepare_api_input(openrouter_instance):
     ]
 
     api_messages, api_tools = openrouter_instance.prepare_api_input(input_data)
-    assert api_tools is None
+    assert api_tools is omit
     assert api_messages[0]["content"] == "dummy system message"
     assert api_messages[-1]["role"] == "assistant"
     assert api_messages[-1]["content"] == "Hi there."

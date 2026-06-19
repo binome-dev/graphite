@@ -59,7 +59,7 @@ def add_additional_properties(
     SCHEMA_KEYS_ARRAY = ("allOf", "anyOf", "oneOf")
 
     # keys that can hold a schema or array of schemas
-    def _recurse(node: Any):
+    def _recurse(node: Any) -> None:
         if isinstance(node, dict):
             # Dive into $defs/definitions first (Pydantic v2 uses $defs)
             for defs_key in ("$defs", "definitions"):
@@ -188,7 +188,7 @@ class LLM(Tool):
 
         Converts Pydantic v2 model instances and classes to their dict representation.
         """
-        serialized_params = {}
+        serialized_params: Dict[str, Any] = {}
         for key, value in params.items():
             if isinstance(value, BaseModel):
                 # Use model_dump() for Pydantic v2 model instances

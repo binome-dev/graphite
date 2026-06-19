@@ -212,6 +212,87 @@ class TestTopicEventQueue:
         await cache.commit_to("consumer1", 5)
         assert cache._committed["consumer1"] == 5
 
+    async def _put_n(self, cache: TopicEventQueue, n: int) -> list:
+        """Append ``n`` events (offsets 0..n-1) and return them."""
+        events = []
+        for i in range(n):
+            invoke_context = InvokeContext(
+                conversation_id="test-conversation",
+                invoke_id=f"test-invoke-{i}",
+                assistant_request_id="test-request",
+            )
+            event = PublishToTopicEvent(
+                event_id=f"event-{i}",
+                name="test_topic",
+                offset=i,
+                publisher_name="test_publisher",
+                publisher_type="test_type",
+                consumed_event_ids=[],
+                invoke_context=invoke_context,
+                data=[Message(role="user", content=f"message {i}")],
+                timestamp=datetime.now(),
+            )
+            events.append(event)
+            await cache.put(event)
+        return events
+
+    @pytest.mark.asyncio
+    async def test_restore_consumer_does_not_skip_next_offset(
+        self, cache: TopicEventQueue
+    ):
+        """Regression for the recovery off-by-one: restoring a consume at offset
+        0 must leave offsets 1..N available, not advance past offset 1."""
+        events = await self._put_n(cache, 3)
+
+        await cache.restore_consumer("consumer1", committed_offset=0)
+
+        # Cursor sits exactly one past the committed offset.
+        assert cache._committed["consumer1"] == 0
+        assert cache._consumed["consumer1"] == 1
+
+        # The very next offset (1) is still delivered, not skipped.
+        result = await cache.fetch("consumer1", timeout=0.1)
+        assert result == events[1:]
+        assert [e.offset for e in result] == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_restore_consumer_is_idempotent_and_never_rewinds(
+        self, cache: TopicEventQueue
+    ):
+        """Replaying the same or an earlier commit only advances cursors."""
+        await self._put_n(cache, 3)
+
+        await cache.restore_consumer("consumer1", committed_offset=1)
+        assert cache._consumed["consumer1"] == 2
+        assert cache._committed["consumer1"] == 1
+
+        # Same offset again: no change.
+        await cache.restore_consumer("consumer1", committed_offset=1)
+        assert cache._consumed["consumer1"] == 2
+        assert cache._committed["consumer1"] == 1
+
+        # An earlier offset (out-of-order replay) must not rewind the cursor.
+        await cache.restore_consumer("consumer1", committed_offset=0)
+        assert cache._consumed["consumer1"] == 2
+        assert cache._committed["consumer1"] == 1
+
+    @pytest.mark.asyncio
+    async def test_restore_consumer_is_independent_per_consumer(
+        self, cache: TopicEventQueue
+    ):
+        """Restoring one consumer's cursor does not affect another's."""
+        events = await self._put_n(cache, 3)
+
+        await cache.restore_consumer("consumer1", committed_offset=1)
+
+        # consumer2 was never restored: it still sees every event.
+        result2 = await cache.fetch("consumer2", timeout=0.1)
+        assert result2 == events
+
+        # consumer1 resumes from offset 2 only.
+        result1 = await cache.fetch("consumer1", timeout=0.1)
+        assert [e.offset for e in result1] == [2]
+
     @pytest.mark.asyncio
     async def test_concurrent_producers(self, cache: TopicEventQueue):
         # Multiple producers adding events concurrently

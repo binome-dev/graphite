@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from openai import omit
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
@@ -102,7 +103,7 @@ async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_con
             "tool_call_id": None,
         },
     ]
-    assert call_args["tools"] is None
+    assert call_args["tools"] is omit
 
 
 # --------------------------------------------------------------------------- #

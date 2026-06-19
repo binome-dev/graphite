@@ -3,6 +3,7 @@ import os
 from typing import Any
 from typing import Dict
 from typing import Literal
+from typing import Optional
 from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
@@ -114,7 +115,7 @@ class TavilyTool(FunctionCallTool):
 class TavilyToolBuilder(FunctionCallToolBuilder[TavilyTool]):
     """Builder for TavilyTool instances."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: Optional[str]) -> Self:
         from tavily import TavilyClient
 
         self.kwargs["client"] = TavilyClient(api_key)
