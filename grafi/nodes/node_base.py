@@ -64,23 +64,6 @@ class NodeBase(BaseModel):
         """Return a list of subscribed topics."""
         return list(self._subscribed_topics.values())
 
-    def rebind_topics(self, topics: Dict[str, TopicBase]) -> "NodeBase":
-        """Return a copy of this node whose published/subscribed topic
-        references point at the given topic instances (matched by name).
-
-        Each workflow invocation runs on its own topic instances (fresh queues);
-        rebinding lets a per-invocation node operate on those queues without
-        mutating the shared node definition. ``subscribed_expressions`` are left
-        as-is since they are evaluated by topic name, not identity.
-        """
-        clone = self.model_copy(
-            update={"publish_to": [topics[topic.name] for topic in self.publish_to]}
-        )
-        clone._subscribed_topics = {
-            name: topics[name] for name in self._subscribed_topics
-        }
-        return clone
-
     async def invoke(
         self,
         invoke_context: InvokeContext,

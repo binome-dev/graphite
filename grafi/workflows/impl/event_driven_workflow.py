@@ -26,7 +26,6 @@ from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
-from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
@@ -67,12 +66,6 @@ class EventDrivenWorkflow(Workflow):
 
     _tracker: AsyncNodeTracker = PrivateAttr(default_factory=AsyncNodeTracker)
 
-    # Live per-invocation runs spawned from this definition, keyed by id() since
-    # Pydantic models are not hashable. ``invoke`` runs on an isolated clone (see
-    # ``_spawn_run``) so concurrent invocations cannot corrupt one another; this
-    # mapping lets ``stop`` reach the in-flight runs.
-    _active_runs: Dict[int, "EventDrivenWorkflow"] = PrivateAttr(default_factory=dict)
-
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
 
@@ -83,48 +76,10 @@ class EventDrivenWorkflow(Workflow):
     def stop(self) -> None:
         """
         Stop the workflow execution.
-
-        Overrides the base class to also force-stop the tracker, and forwards the
-        stop to every in-flight invocation (each runs on its own clone with its
-        own tracker/stop flag).
+        Overrides base class to also trigger force stop on the tracker.
         """
         super().stop()
         self._tracker.force_stop_sync()
-        for run in list(self._active_runs.values()):
-            run._stop_requested = True
-            run._tracker.force_stop_sync()
-
-    def _spawn_run(self) -> "EventDrivenWorkflow":
-        """Create an isolated per-invocation copy of this workflow.
-
-        The clone gets a fresh tracker, invoke queue, stop flag, and topic
-        instances with fresh queues, and its nodes are rebound to those per-run
-        topics. The definition instance's runtime state is never used for
-        execution, so two concurrent invocations of the same workflow are fully
-        isolated.
-
-        Note: ``tool``/``command`` objects are shared with the definition (not
-        deep-copied), so tools must hold no per-invocation mutable state.
-        """
-        run = self.model_copy()
-        run._stop_requested = False
-        run._tracker = AsyncNodeTracker()
-        run._invoke_queue = deque()
-        run._active_runs = {}
-        run._topic_nodes = self._topic_nodes  # name-based topology, safe to share
-        # Each run gets a fresh in-process queue per topic. A topic's event queue
-        # is a transient run buffer between publish and consume; durability and
-        # recovery come from the EventStore, not this queue -- so a per-run
-        # in-memory queue is correct regardless of any topic configuration.
-        fresh_topics = {
-            name: topic.model_copy(update={"event_queue": InMemTopicEventQueue()})
-            for name, topic in self._topics.items()
-        }
-        run._topics = fresh_topics
-        run.nodes = {
-            name: node.rebind_topics(fresh_topics) for name, node in self.nodes.items()
-        }
-        return run
 
     @classmethod
     def builder(cls) -> WorkflowBuilder:
@@ -693,28 +648,12 @@ class EventDrivenWorkflow(Workflow):
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """
         Run the workflow with streaming output.
-
-        Each call executes on an isolated per-invocation clone, so concurrent
-        invocations of the same workflow instance do not share runtime state.
         """
-        run = self._spawn_run()
-        self._active_runs[id(run)] = run
-        try:
-            async for event in run._invoke_impl(input_data, is_sequential):
-                yield event
-        finally:
-            self._active_runs.pop(id(run), None)
-
-    async def _invoke_impl(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Execute one invocation on this (per-run) instance's own state."""
         invoke_context = input_data.invoke_context
         try:
-            # The clone is born fresh (stop flag clear, new tracker), so there is
-            # no flag to reset here. Crucially, NOT resetting means a stop()
-            # forwarded to this run between its registration and this point (see
-            # EventDrivenWorkflow.stop) is preserved rather than cleared.
+            # Reset stop flag at the beginning of new execution
+            self.reset_stop_flag()
+
             await self.init_workflow(input_data, is_sequential)
 
             if is_sequential:
@@ -741,11 +680,7 @@ class EventDrivenWorkflow(Workflow):
         logger.debug(
             f"init_workflow: is_sequential={is_sequential}, tracker_id={id(self._tracker)}"
         )
-        # Reset the tracker for a fresh parallel run, but never when a stop has
-        # already been requested -- resetting would clear a forwarded force-stop
-        # and let a stopped run proceed. (On a per-invocation clone the tracker
-        # is already fresh, so this reset only matters for direct callers.)
-        if not is_sequential and not self._stop_requested:
+        if not is_sequential:
             self._tracker.reset()
 
         for topic in self._topics.values():
