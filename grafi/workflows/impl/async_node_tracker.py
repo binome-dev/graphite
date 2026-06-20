@@ -145,15 +145,15 @@ class AsyncNodeTracker:
             return
         async with self._cond:
             if count > self._uncommitted_messages:
+                # Tripwire: with deliveries registered before publication this
+                # should be unreachable; log loudly rather than silently absorb.
                 logger.error(
                     f"Tracker: delivery underflow committing {count} from "
                     f"{source} (pending={self._uncommitted_messages}); "
                     "clamping to 0 -- this indicates a double-commit or "
                     "accounting bug."
                 )
-                self._uncommitted_messages = 0
-            else:
-                self._uncommitted_messages -= count
+            self._uncommitted_messages = max(0, self._uncommitted_messages - count)
             self._check_quiescence_unlocked()
 
             logger.debug(f"Tracker: {count} messages committed from {source}")

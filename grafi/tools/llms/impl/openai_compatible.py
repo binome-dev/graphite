@@ -111,21 +111,20 @@ class OpenAICompatibleTool(LLM):
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
 
-        request_kwargs: Dict[str, Any] = {
-            "model": self.model,
-            "messages": api_messages,
-            "tools": api_tools,
-            **self._extra_create_kwargs(),
-        }
-
         # ``name`` is Optional on the base Tool; concrete providers always set it,
         # but fall back to the provider label so the error always has a name.
         tool_name = self.name or self._provider_label
 
-        # Merge provider/base kwargs with user chat_params into one dict so a
-        # caller-supplied key (e.g. extra_headers, response_format) overrides
-        # rather than collides with a duplicate keyword argument.
-        call_kwargs = {**request_kwargs, **self.chat_params}
+        # Base/provider kwargs merged with user chat_params (chat_params last, so
+        # a caller-supplied key overrides rather than collides with a duplicate
+        # keyword argument).
+        call_kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": api_messages,
+            "tools": api_tools,
+            **self._extra_create_kwargs(),
+            **self.chat_params,
+        }
 
         try:
             async with AsyncClient(**client_kwargs) as client:

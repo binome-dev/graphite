@@ -73,9 +73,6 @@ class EventDrivenWorkflow(Workflow):
     # mapping lets ``stop`` reach the in-flight runs.
     _active_runs: Dict[int, "EventDrivenWorkflow"] = PrivateAttr(default_factory=dict)
 
-    # Memoized consumer lists per topic name (static topology); see _topic_consumers.
-    _topic_consumers_cache: Dict[str, List[str]] = PrivateAttr(default_factory=dict)
-
     # Optional callback that handles output events
     # Including agent output event, stream event and hil event
 
@@ -114,7 +111,6 @@ class EventDrivenWorkflow(Workflow):
         run._tracker = AsyncNodeTracker()
         run._invoke_queue = deque()
         run._active_runs = {}
-        run._topic_consumers_cache = {}
         run._topic_nodes = self._topic_nodes  # name-based topology, safe to share
         # Each run gets a fresh in-process queue per topic. A topic's event queue
         # is a transient run buffer between publish and consume; durability and
@@ -300,9 +296,6 @@ class EventDrivenWorkflow(Workflow):
         consumer. Deduplicated, since a node consumes a topic once regardless of
         how many of its subscription expressions reference it.
         """
-        cached = self._topic_consumers_cache.get(topic_name)
-        if cached is not None:
-            return cached
         consumers = list(dict.fromkeys(self._topic_nodes.get(topic_name, [])))
         topic = self._topics.get(topic_name)
         if topic is not None and topic.type in (
@@ -310,8 +303,6 @@ class EventDrivenWorkflow(Workflow):
             TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE,
         ):
             consumers.append(self.name)
-        # Memoized: topology is static and this is read once per published event.
-        self._topic_consumers_cache[topic_name] = consumers
         return consumers
 
     async def _count_pending_consumable(self) -> int:
@@ -331,23 +322,21 @@ class EventDrivenWorkflow(Workflow):
     async def _progress_possible(self) -> bool:
         """Whether the parallel run can still make progress.
 
-        True while any node is actively processing, any event is still awaiting
-        consumption, or any node could be invoked with currently available
-        events. When this is False but the tracker is non-quiescent, the
-        outstanding deliveries are parked -- e.g. a node with an ``A AND B``
-        subscription that consumed ``A`` but whose ``B`` will never arrive -- so
-        the output queue ends iteration instead of hanging on a commit that will
-        never come. (Per-consumer delivery accounting prevents premature
-        termination; this only catches the genuinely stuck case.)
+        True while any node is actively processing or any event is still awaiting
+        consumption. A node can only be invoked when one of its subscribed topics
+        has an unconsumed event, so a zero pending-consumable count already
+        implies no node can invoke -- no separate can_invoke() sweep is needed.
+
+        When this is False but the tracker is non-quiescent, the outstanding
+        deliveries are parked -- e.g. a node with an ``A AND B`` subscription that
+        consumed ``A`` but whose ``B`` will never arrive -- so the output queue
+        ends iteration instead of hanging on a commit that will never come.
+        (Per-consumer delivery accounting prevents premature termination; this
+        only catches the genuinely stuck case.)
         """
         if not await self._tracker.is_idle():
             return True
-        if await self._count_pending_consumable() > 0:
-            return True
-        for node in self.nodes.values():
-            if await node.can_invoke():
-                return True
-        return False
+        return await self._count_pending_consumable() > 0
 
     async def _add_to_invoke_queue(self, event: TopicEvent) -> None:
         topic_name = event.name
