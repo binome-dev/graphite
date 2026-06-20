@@ -39,7 +39,7 @@ The tool automatically handles different response types in its `to_messages` met
 - **`BaseModel` instances**: Serialized to JSON using `model_dump_json()`
 - **Lists of `BaseModel` objects**: Converted to JSON arrays using `model_dump()` for each item
 - **String responses**: Used directly as message content
-- **Other types**: Encoded using `jsonpickle` for complex object serialization
+- **Other types**: Encoded with `json.dumps(..., default=str)` (no pickle)
 
 ### Async Support
 

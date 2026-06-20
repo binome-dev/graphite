@@ -3,6 +3,8 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import Callable
 from typing import Dict
+from typing import Optional
+from typing import cast
 
 from loguru import logger
 from pydantic import Field
@@ -40,11 +42,17 @@ class MCPFunctionTool(FunctionTool):
 
     mcp_config: Dict[str, Any] = Field(default_factory=dict)
 
-    function: Callable[[Messages], AsyncGenerator[Messages, None]] = Field(default=None)
+    # MCP yields str chunks that FunctionTool.to_messages wraps. This return
+    # type intentionally differs from the base FunctionTool.function contract
+    # (Callable[..., OutputType]); reconciling the two is tracked for the tools
+    # refactor, so only the base-override mismatch is suppressed below.
+    function: Optional[Callable[[Messages], AsyncGenerator[str, None]]] = Field(  # type: ignore[assignment]
+        default=None
+    )
 
     function_name: str = Field(default="")
 
-    _function_spec: FunctionSpec = PrivateAttr(default=None)
+    _function_spec: Optional[FunctionSpec] = PrivateAttr(default=None)
 
     @classmethod
     async def initialize(cls, **kwargs: Any) -> "MCPFunctionTool":
@@ -98,7 +106,7 @@ class MCPFunctionTool(FunctionTool):
     async def invoke_mcp_function(
         self,
         input_data: Messages,
-    ) -> AsyncGenerator[Messages, None]:
+    ) -> AsyncGenerator[str, None]:
         """
         Invoke the MCPFunctionTool with the provided input data.
 
@@ -112,7 +120,8 @@ class MCPFunctionTool(FunctionTool):
         """
         input_message = input_data[-1]
 
-        kwargs = json.loads(input_message.content)
+        # The last message's content is the JSON-encoded tool-call arguments.
+        kwargs = json.loads(cast(str, input_message.content))
 
         response_str = ""
 

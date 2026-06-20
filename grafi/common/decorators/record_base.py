@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 from typing import Callable
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Type
 from typing import TypeVar
 from typing import Union
@@ -20,7 +21,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic_core import to_jsonable_python
 
-from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.containers.container import container
 from grafi.common.env import env_bool
 from grafi.common.events.component_base import ComponentEvent
@@ -34,9 +34,6 @@ from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.node_base import NodeBase
-from grafi.tools.tool import Tool
-from grafi.workflows.workflow import Workflow
 
 T = TypeVar("T")
 
@@ -63,9 +60,10 @@ class ComponentConfig:
     event_types: Dict[
         str, Type[ComponentEvent]
     ]  # Maps 'invoke', 'respond', 'failed' to event classes
-    extract_metadata: Callable[
-        [Union[AssistantBase, Workflow, NodeBase, Tool]], EventContext
-    ]  # Extracts component-specific metadata
+    # Extracts component-specific metadata. Typed as ``Any`` so this common-layer
+    # module does not import the higher-layer component classes (Assistant /
+    # Workflow / Node / Tool) just for an annotation.
+    extract_metadata: Callable[[Any], EventContext]
     process_async_result: Callable[[List], Any]
     span_name_suffix: str = "invoke"  # Suffix for span name
 
@@ -237,27 +235,33 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(
-            self: Union[AssistantBase, Workflow, NodeBase, Tool],
-            *args,
-            **kwargs,
+            self: Any,
+            *args: Any,
+            **kwargs: Any,
         ) -> AsyncGenerator[Union[PublishToTopicEvent, List[Message]], None]:
             # Extract metadata using component-specific logic
             metadata = config.extract_metadata(self)
 
-            input_data: Union[
-                List[ConsumeFromTopicEvent], List[Message], PublishToTopicEvent
+            input_data: Optional[
+                Union[List[ConsumeFromTopicEvent], List[Message], PublishToTopicEvent]
             ] = None
 
             if isinstance(args[0], InvokeContext):
                 invoke_context: InvokeContext = args[0]
                 input_data = args[1]
             else:
-                # Assistant and workflow
+                # Assistant and workflow: args[0] is the input event (Any), which
+                # carries invoke_context. Read it off args[0] directly so mypy
+                # does not widen to the input_data union (which has no such attr).
                 input_data = args[0]
-                invoke_context = input_data.invoke_context
+                invoke_context = args[0].invoke_context
 
-            # Create invoke event
-            invoke_event = config.event_types["invoke"](
+            # Create invoke event. The factory maps each string key to the
+            # matching InvokeEvent/RespondEvent/FailedEvent subclass, so these
+            # per-event kwargs (input_data/output_data/error/...) are correct at
+            # runtime but unprovable to mypy through the Dict value's
+            # ComponentEvent base type -- hence the targeted call-arg ignores.
+            invoke_event = config.event_types["invoke"](  # type: ignore[call-arg]
                 id=metadata.id,
                 name=metadata.name,
                 type=metadata.type,
@@ -268,44 +272,52 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
 
             # Execute with tracing
             output_data = None
+            error_details: Optional[Dict[str, Any]] = None
 
             try:
                 with container.tracer.start_as_current_span(
                     f"{metadata.name}.{config.span_name_suffix}"
                 ) as span:
-                    # Set span attributes
-                    for key, value in metadata.model_dump().items():
-                        if value is not None:
-                            span.set_attribute(key, value)
+                    try:
+                        # Set span attributes
+                        for key, value in metadata.model_dump().items():
+                            if value is not None:
+                                span.set_attribute(key, value)
 
-                    span.set_attributes(invoke_context.model_dump())
+                        span.set_attributes(invoke_context.model_dump())
 
-                    # Set input (size-bounded; omitted if payloads are disabled)
-                    input_payload = _span_payload(input_data)
-                    if input_payload is not None:
-                        span.set_attribute("input", input_payload)
+                        # Set input (size-bounded; omitted if payloads are disabled)
+                        input_payload = _span_payload(input_data)
+                        if input_payload is not None:
+                            span.set_attribute("input", input_payload)
 
-                    # Handle streaming
-                    result_list: List = []
+                        # Handle streaming
+                        result_list: List = []
 
-                    async for result in func(self, *args, **kwargs):
-                        yield result
-                        result_list.append(result)
+                        async for result in func(self, *args, **kwargs):
+                            yield result
+                            result_list.append(result)
 
-                    output_data = config.process_async_result(result_list)
+                        output_data = config.process_async_result(result_list)
 
-                    output_payload = _span_payload(output_data)
-                    if output_payload is not None:
-                        span.set_attribute("output", output_payload)
+                        output_payload = _span_payload(output_data)
+                        if output_payload is not None:
+                            span.set_attribute("output", output_payload)
+                    except Exception as e:
+                        # Build structured details once, while the traceback is
+                        # still attached to the exception, and enrich the span
+                        # WHILE it is still recording. Attributes set after the
+                        # span context manager exits are dropped by the backend.
+                        error_details = _build_error_details(e, metadata)
+                        _record_span_error(span, e, error_details)
+                        raise
 
             except Exception as e:
-                # Build structured details once, while the traceback is still
-                # attached to the exception.
-                error_details = _build_error_details(e, metadata)
-
-                # Enrich the active span with structured error information.
-                if "span" in locals():
-                    _record_span_error(span, e, error_details)
+                # error_details is normally built above, inside the live span.
+                # Rebuild defensively only if the failure happened before the
+                # inner try (e.g. span creation itself).
+                if error_details is None:
+                    error_details = _build_error_details(e, metadata)
 
                 # Log a full traceback once at the layer closest to the failure;
                 # outer layers log a concise summary (see _log_component_exception).
@@ -313,7 +325,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
 
                 # Record failed event with both the human-readable string (kept
                 # for backward compatibility) and the structured details.
-                failed_event = config.event_types["failed"](
+                failed_event = config.event_types["failed"](  # type: ignore[call-arg]
                     id=metadata.id,
                     name=metadata.name,
                     type=metadata.type,
@@ -326,7 +338,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 raise
             else:
                 # Record respond event
-                respond_event = config.event_types["respond"](
+                respond_event = config.event_types["respond"](  # type: ignore[call-arg]
                     id=metadata.id,
                     name=metadata.name,
                     type=metadata.type,

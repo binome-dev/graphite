@@ -244,11 +244,9 @@ class TestAssistant:
 
         result_path = mock_assistant.generate_manifest(output_dir)
 
-        # Verify the method returns correct path
+        # Verify the method returns the path to the generated manifest.
         expected_path = os.path.join(output_dir, "test_assistant_manifest.json")
-        assert (
-            result_path is None
-        )  # Method doesn't return path, but we can check file exists
+        assert result_path == expected_path
 
         # Verify file was created and contains correct data
         assert os.path.exists(expected_path)

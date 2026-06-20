@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from openai import omit
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
@@ -58,8 +59,6 @@ def test_init(deepseek_instance):
 async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_context):
     from unittest.mock import AsyncMock
 
-    import grafi.tools.llms.impl.deepseek_tool
-
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
         Mock(message=ChatCompletionMessage(role="assistant", content="Hello, world!"))
@@ -67,11 +66,13 @@ async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_con
 
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
 
     # Patch the OpenAI.Client constructor the tool uses
     mock_openai_cls = MagicMock(return_value=mock_client)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.deepseek_tool, "AsyncClient", mock_openai_cls
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient", mock_openai_cls
     )
 
     input_data = [Message(role="user", content="Say hello")]
@@ -102,7 +103,7 @@ async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_con
             "tool_call_id": None,
         },
     ]
-    assert call_args["tools"] is None
+    assert call_args["tools"] is omit
 
 
 # --------------------------------------------------------------------------- #
@@ -111,8 +112,6 @@ async def test_invoke_simple_response(monkeypatch, deepseek_instance, invoke_con
 @pytest.mark.asyncio
 async def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_context):
     from unittest.mock import AsyncMock
-
-    import grafi.tools.llms.impl.deepseek_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -136,9 +135,10 @@ async def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_conte
 
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.deepseek_tool,
-        "AsyncClient",
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient",
         MagicMock(return_value=mock_client),
     )
 
@@ -188,13 +188,12 @@ async def test_invoke_function_call(monkeypatch, deepseek_instance, invoke_conte
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
 async def test_invoke_api_error(monkeypatch, deepseek_instance, invoke_context):
-    import grafi.tools.llms.impl.deepseek_tool
 
     # Force constructor to raise – simulates any client error
     def _raise(*_a, **_kw):  # noqa: D401
         raise Exception("Error code")
 
-    monkeypatch.setattr(grafi.tools.llms.impl.deepseek_tool, "AsyncClient", _raise)
+    monkeypatch.setattr("grafi.tools.llms.impl.openai_compatible.AsyncClient", _raise)
 
     from grafi.common.exceptions import LLMToolException
 

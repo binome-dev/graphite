@@ -102,6 +102,23 @@ class InMemTopicEventQueue(TopicEventQueue):
 
             return self._committed[consumer_id]
 
+    async def restore_consumer(self, consumer_id: str, committed_offset: int) -> None:
+        """Restore a consumer's cursors from a recorded commit point.
+
+        See :meth:`TopicEventQueue.restore_consumer`. Idempotent and
+        order-independent: replaying the same or an earlier commit can only
+        advance a cursor, never rewind it, so events restored out of order still
+        reconstruct the correct position.
+        """
+        async with self._cond:
+            # The next offset to read is one past the last committed offset.
+            self._consumed[consumer_id] = max(
+                self._consumed[consumer_id], committed_offset + 1
+            )
+            self._committed[consumer_id] = max(
+                self._committed[consumer_id], committed_offset
+            )
+
     async def reset(self) -> None:
         """
         Reset the queue to its initial state asynchronously.

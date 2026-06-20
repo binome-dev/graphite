@@ -1,4 +1,6 @@
 import asyncio
+from typing import Awaitable
+from typing import Callable
 from typing import List
 from typing import Optional
 
@@ -21,10 +23,23 @@ class AsyncOutputQueue:
         output_topics: List[TopicBase],
         consumer_name: str,
         tracker: AsyncNodeTracker,
+        progress_possible: Optional[Callable[[], Awaitable[bool]]] = None,
     ):
         self.output_topics = output_topics
         self.consumer_name = consumer_name
         self.tracker = tracker
+        # Optional workflow callback: True while progress is still possible
+        # (a node is active, an event is still consumable, or some node can
+        # invoke). When this stays False while the tracker is non-quiescent, the
+        # outstanding deliveries are parked (e.g. an unsatisfied AND-subscription
+        # whose other branch never arrived) and iteration ends rather than hangs.
+        self._progress_possible = progress_possible
+        self._stuck_polls = 0
+        # Tracker activity count at the last idle poll. Any change means a node
+        # processed between polls (real progress), which resets the stuck count
+        # even if no output-queue item appeared -- so termination never depends
+        # on the transient consume->enter window being unobservable.
+        self._last_activity = -1
         self.queue: asyncio.Queue[TopicEvent] = asyncio.Queue()
         self._listener_tasks: List[asyncio.Task] = []
         self._stopped = False
@@ -112,7 +127,9 @@ class AsyncOutputQueue:
             # Fast path: queue has items
             if not self.queue.empty():
                 try:
-                    return self.queue.get_nowait()
+                    item = self.queue.get_nowait()
+                    self._stuck_polls = 0  # progress made
+                    return item
                 except asyncio.QueueEmpty:
                     pass
 
@@ -146,7 +163,9 @@ class AsyncOutputQueue:
             # Got queue item
             if queue_task in done and not queue_task.cancelled():
                 try:
-                    return queue_task.result()
+                    item = queue_task.result()
+                    self._stuck_polls = 0  # progress made
+                    return item
                 except asyncio.QueueEmpty:
                     # Task was cancelled as part of normal cleanup; ignore.
                     continue
@@ -163,3 +182,28 @@ class AsyncOutputQueue:
                     if self._listener_error is not None:
                         raise self._listener_error
                     raise StopAsyncIteration
+
+            # Not quiescent and no queue item after the wait. If the workflow
+            # reports no further progress is possible, the outstanding tracker
+            # count is parked work that will never commit, so end iteration
+            # instead of looping forever. Terminate only after consecutive idle
+            # polls during which (a) no progress is possible AND (b) the tracker's
+            # activity count did not change -- i.e. no node processed in between.
+            # The activity-count guard means a node caught in the transient
+            # consume->enter window at one poll is detected as progress at the
+            # next (it will have entered), so a busy run is never mistaken for
+            # stuck regardless of scheduling.
+            if self._progress_possible is not None and self.queue.empty():
+                activity = await self.tracker.get_activity_count()
+                progressed = activity != self._last_activity
+                self._last_activity = activity
+                if progressed or await self._progress_possible():
+                    self._stuck_polls = 0
+                else:
+                    self._stuck_polls += 1
+                    if self._stuck_polls >= 2:
+                        logger.debug(
+                            "Output queue: no progress possible; ending iteration "
+                            "(parked deliveries)."
+                        )
+                        raise StopAsyncIteration

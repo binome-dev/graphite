@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
+from unittest.mock import call
 
 import pytest
 
@@ -234,8 +235,16 @@ class TestPublishEvents:
         )
         mock_event2 = None  # Test case where topic doesn't publish
 
+        mock_topic1.name = "topic1"
+        mock_topic2.name = "topic2"
         mock_topic1.publish_data.return_value = mock_event1
         mock_topic2.publish_data.return_value = mock_event2
+
+        # topic1 fans out to two consumers; topic2 to one.
+        consumers = {"topic1": ["A", "B"], "topic2": ["C"]}
+
+        def consumers_of(topic_name: str):
+            return consumers.get(topic_name, [])
 
         publish_to_event = PublishToTopicEvent(
             invoke_context=invoke_context,
@@ -245,15 +254,24 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
-        published_events = await publish_events(node, publish_to_event, tracker)
+        published_events = await publish_events(
+            node, publish_to_event, tracker, consumers_of
+        )
 
         assert len(published_events) == 1
         assert published_events[0] == mock_event1
 
         # Verify topics were called correctly
         mock_topic1.publish_data.assert_called_once_with(publish_to_event)
-        tracker.on_messages_published.assert_awaited_once_with(
-            1, source="node:test_node"
+
+        # One delivery registered per consumer, per topic, before publishing.
+        assert tracker.on_messages_published.await_args_list == [
+            call(2, source="node:test_node->topic1"),
+            call(1, source="node:test_node->topic2"),
+        ]
+        # topic2's condition filtered the event out, so its delivery is released.
+        tracker.on_messages_committed.assert_awaited_once_with(
+            1, source="discard:topic2"
         )
 
 

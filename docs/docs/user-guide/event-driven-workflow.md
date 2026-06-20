@@ -100,14 +100,14 @@ The asynchronous execution model provides sophisticated event-driven processing 
 1. **Workflow Initialization**: Sets up initial state with `init_workflow`
 2. **Concurrent Node Processing**: Spawns individual tasks for each node using `_invoke_node`  
 3. **Output Listening**: Creates listeners for each output topic to capture results
-4. **Event Streaming**: Uses `MergeIdleQueue` to stream events as they become available
+4. **Event Streaming**: Uses `AsyncOutputQueue` to stream output events as they become available
 5. **Proper Termination**: Coordinates workflow completion using `AsyncNodeTracker`
 
 #### Key Components
 
-- **AsyncNodeTracker**: Manages active node state and idle detection
+- **AsyncNodeTracker**: Manages active node state and quiescence detection
 - **Output Listeners**: Monitor output topics for new events
-- **MergeIdleQueue**: Coordinates between event availability and workflow idle state
+- **AsyncOutputQueue**: Streams output-topic events and coordinates with workflow quiescence
 - **Offset Management**: Commits events immediately to prevent duplicates
 
 ### Event-Driven Node Triggering
@@ -185,7 +185,9 @@ async for event in output_queue:
 The async workflow implements proper offset management to prevent duplicate data:
 
 ```python
-async for event in MergeIdleQueue(queue, self._tracker):
+output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
+await output_queue.start_listeners()
+async for event in output_queue:
     consumed_output_event = ConsumeFromTopicEvent(...)
 
     # Commit BEFORE yielding to prevent duplicate data

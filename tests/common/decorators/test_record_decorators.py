@@ -187,6 +187,92 @@ class TestFailedEventErrorDetails:
         assert failed[0].error
 
 
+class _RecordingSpan:
+    """Fake span that remembers whether it had already ended when each
+    operation was performed, so a test can prove enrichment happened while the
+    span was still recording."""
+
+    def __init__(self) -> None:
+        self.ended = False
+        self.attr_set_after_end: dict = {}  # attribute key -> ended-state at set
+        self.exception_recorded_after_end: list = []
+        self.status_set_after_end: list = []
+
+    def set_attribute(self, key, value):
+        self.attr_set_after_end[key] = self.ended
+
+    def set_attributes(self, mapping):
+        for key in mapping:
+            self.attr_set_after_end[key] = self.ended
+
+    def record_exception(self, exc):
+        self.exception_recorded_after_end.append(self.ended)
+
+    def set_status(self, status):
+        self.status_set_after_end.append(self.ended)
+
+
+class _RecordingSpanCM:
+    def __init__(self, span: _RecordingSpan) -> None:
+        self.span = span
+
+    def __enter__(self) -> _RecordingSpan:
+        return self.span
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        # Ending the span (as OTel's context manager does) must happen AFTER
+        # error enrichment, never before.
+        self.span.ended = True
+        return False  # do not suppress the exception
+
+
+class _RecordingTracer:
+    def __init__(self) -> None:
+        self.span = _RecordingSpan()
+
+    def start_as_current_span(self, _name):
+        return _RecordingSpanCM(self.span)
+
+
+class TestSpanErrorEnrichment:
+    """Defect #4: failed-span error attributes must be set before span end."""
+
+    @pytest.mark.asyncio
+    async def test_error_attributes_recorded_before_span_ends(self):
+        prev_store = container._event_store
+        prev_tracer = container._tracer
+        tracer = _RecordingTracer()
+        container.register_event_store(EventStoreInMemory())
+        container.register_tracer(tracer)
+        try:
+            tool = _ExplodingTool()
+            invoke_context = InvokeContext(
+                conversation_id="c",
+                invoke_id="i",
+                assistant_request_id="r",
+            )
+            with pytest.raises(FunctionCallException):
+                async for _ in tool.invoke(
+                    invoke_context, [Message(role="user", content="hi")]
+                ):
+                    pass
+        finally:
+            container._event_store = prev_store
+            container._tracer = prev_tracer
+
+        span = tracer.span
+        # The span was ended by the context manager exit.
+        assert span.ended is True
+        # Every error attribute was set while the span was still recording.
+        assert span.attr_set_after_end.get("error.type") is False
+        assert span.attr_set_after_end.get("error.message") is False
+        assert span.attr_set_after_end.get("error.stack") is False
+        assert span.attr_set_after_end.get("error.details") is False
+        # The exception and error status were also recorded before span end.
+        assert span.exception_recorded_after_end == [False]
+        assert span.status_set_after_end == [False]
+
+
 class TestTracebackDedup:
     """The full traceback is logged once even after the error is re-wrapped."""
 

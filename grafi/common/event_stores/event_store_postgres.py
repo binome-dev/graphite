@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import cast
 
 from loguru import logger
 
@@ -110,6 +113,15 @@ class EventStorePostgres(EventStore):
                 logger.error(f"Failed to clear events: {e}")
                 raise
 
+    def _row_to_event(self, row: "EventModel") -> Optional[Event]:
+        """Decode a single ``EventModel`` row into an :class:`Event`.
+
+        Centralizes the row-to-event conversion shared by every query method.
+        ``row.event_data`` is a JSONB column typed as ``Column[Any]`` at the
+        class level; at the instance level it holds the stored dict.
+        """
+        return self._create_event_from_dict(cast(Dict[str, Any], row.event_data))
+
     async def get_events(self) -> List[Event]:
         """Get all events from the database."""
         async with self.AsyncSession() as session:
@@ -121,7 +133,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event = self._create_event_from_dict(r.event_data)
+                    event = self._row_to_event(r)
                     if event:
                         events.append(event)
 
@@ -207,7 +219,7 @@ class EventStorePostgres(EventStore):
                 if not row:
                     return None
 
-                return self._create_event_from_dict(row.event_data)
+                return self._row_to_event(row)
             except Exception as e:
                 logger.error(f"Failed to get event {event_id}: {e}")
                 raise
@@ -228,7 +240,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event = self._create_event_from_dict(r.event_data)
+                    event = self._row_to_event(r)
                     if event:
                         events.append(event)
 
@@ -253,7 +265,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event = self._create_event_from_dict(r.event_data)
+                    event = self._row_to_event(r)
                     if event:
                         events.append(event)
 
@@ -304,7 +316,7 @@ class EventStorePostgres(EventStore):
 
                 events: List[Event] = []
                 for r in rows:
-                    event = self._create_event_from_dict(r.event_data)
+                    event = self._row_to_event(r)
                     if event:
                         events.append(event)
 

@@ -24,9 +24,7 @@ from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
 try:
-    from anthropic import NOT_GIVEN
     from anthropic import AsyncAnthropic
-    from anthropic import NotGiven
     from anthropic import Omit
     from anthropic import omit
     from anthropic.types import Message as AnthropicMessage
@@ -64,7 +62,7 @@ class ClaudeTool(LLM):
     def prepare_api_input(self, input_data: Messages) -> tuple[
         Union[str, Omit],
         List[MessageParam],
-        Union[List[ToolParam], NotGiven],
+        Union[List[ToolParam], Omit],
     ]:
         """grafi → Anthropic (system, message list, optional tools).
 
@@ -137,7 +135,7 @@ class ClaudeTool(LLM):
                 }
             )
 
-        return system, messages, tools or NOT_GIVEN
+        return system, messages, tools or omit
 
     @staticmethod
     def _content_to_text(content: Any) -> str:

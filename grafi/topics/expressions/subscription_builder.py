@@ -71,8 +71,16 @@ class SubscriptionBuilder(BaseModel):
 
     def build(self) -> SubExpr:
         """
-        Attach the final expression (root_expr) to the Node's subscribed_expressions,
-        then return the Node.Builder for further chaining.
+        Return the built subscription expression.
+
+        Raises:
+            ValueError: If no topic was subscribed (nothing to build), so the
+                ``-> SubExpr`` contract always holds rather than silently
+                returning ``None``.
         """
-        if self.root_expr:
-            return self.root_expr
+        if self.root_expr is None:
+            raise ValueError(
+                "Cannot build an empty subscription. "
+                "Call .subscribed_to(topic) before .build()."
+            )
+        return self.root_expr

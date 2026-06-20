@@ -1,5 +1,6 @@
 import json
 from typing import Any
+from typing import Optional
 from typing import Self
 
 from grafi.common.decorators.llm_function import llm_function
@@ -98,15 +99,15 @@ class DuckDuckGoTool(FunctionCallTool):
 class DuckDuckGoToolBuilder(FunctionCallToolBuilder[DuckDuckGoTool]):
     """Builder for DuckDuckGoTool instances."""
 
-    def fixed_max_results(self, fixed_max_results: int) -> Self:
+    def fixed_max_results(self, fixed_max_results: Optional[int]) -> Self:
         self.kwargs["fixed_max_results"] = fixed_max_results
         return self
 
-    def headers(self, headers: dict[str, str]) -> Self:
+    def headers(self, headers: Optional[dict[str, str]]) -> Self:
         self.kwargs["headers"] = headers
         return self
 
-    def proxy(self, proxy: str) -> Self:
+    def proxy(self, proxy: Optional[str]) -> Self:
         self.kwargs["proxy"] = proxy
         return self
 

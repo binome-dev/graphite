@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
-from anthropic import NOT_GIVEN
+from anthropic import omit
 from anthropic.types.text_block import TextBlock
 
 from grafi.common.models.function_spec import FunctionSpec
@@ -101,7 +101,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     assert kwargs["messages"][0]["role"] == "user"
     assert kwargs["messages"][0]["content"] == "Say hello"
     # no tools in this call
-    assert kwargs["tools"] == NOT_GIVEN
+    assert kwargs["tools"] is omit
 
 
 # --------------------------------------------------------------------------- #
@@ -206,7 +206,7 @@ def test_prepare_api_input(claude_instance):
     assert api_messages[0]["role"] == "user"
     assert api_messages[0]["content"] == "Hello!"
     assert api_messages[-1]["role"] == "assistant"
-    assert api_tools == NOT_GIVEN
+    assert api_tools is omit
 
 
 def test_prepare_api_input_tool_call_linkage(claude_instance):

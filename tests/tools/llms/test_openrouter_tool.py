@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from openai import omit
 from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionMessage
 
@@ -53,9 +54,6 @@ def test_init(openrouter_instance):
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
 async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool
-    import grafi.tools.llms.impl.openrouter_tool as or_module
-
     # Fake successful response
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -64,12 +62,13 @@ async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_c
 
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    # Patch the OpenAI class used inside the tool
+    # Patch the OpenAI class used inside the shared base tool
+    mock_async_client_cls = MagicMock(return_value=mock_client)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.openrouter_tool,
-        "AsyncClient",
-        MagicMock(return_value=mock_client),
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient", mock_async_client_cls
     )
 
     result_messages = []
@@ -84,7 +83,7 @@ async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_c
     assert result_messages[0].content == "Hello, world!"
 
     # AsyncClient ctor must receive correct kwargs
-    or_module.AsyncClient.assert_called_once_with(
+    mock_async_client_cls.assert_called_once_with(
         api_key="test_api_key", base_url="https://openrouter.ai/api/v1"
     )
 
@@ -103,7 +102,6 @@ async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_c
 async def test_invoke_with_extra_headers(
     monkeypatch, openrouter_instance, invoke_context
 ):
-    import grafi.tools.llms.impl.openrouter_tool
 
     openrouter_instance.extra_headers = {
         "HTTP-Referer": "https://my-app.example",
@@ -117,9 +115,10 @@ async def test_invoke_with_extra_headers(
 
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.openrouter_tool,
-        "AsyncClient",
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient",
         MagicMock(return_value=mock_client),
     )
 
@@ -139,7 +138,6 @@ async def test_invoke_with_extra_headers(
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
 async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool
 
     mock_response = Mock(spec=ChatCompletion)
     mock_response.choices = [
@@ -163,9 +161,10 @@ async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_con
 
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(
-        grafi.tools.llms.impl.openrouter_tool,
-        "AsyncClient",
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient",
         MagicMock(return_value=mock_client),
     )
 
@@ -196,12 +195,11 @@ async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_con
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
 async def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context):
-    import grafi.tools.llms.impl.openrouter_tool
 
     def _raise(*_a, **_kw):  # pragma: no cover
         raise Exception("Error code")
 
-    monkeypatch.setattr(grafi.tools.llms.impl.openrouter_tool, "AsyncClient", _raise)
+    monkeypatch.setattr("grafi.tools.llms.impl.openai_compatible.AsyncClient", _raise)
 
     from grafi.common.exceptions import LLMToolException
 
@@ -223,7 +221,7 @@ def test_prepare_api_input(openrouter_instance):
     ]
 
     api_messages, api_tools = openrouter_instance.prepare_api_input(input_data)
-    assert api_tools is None
+    assert api_tools is omit
     assert api_messages[0]["content"] == "dummy system message"
     assert api_messages[-1]["role"] == "assistant"
     assert api_messages[-1]["content"] == "Hi there."

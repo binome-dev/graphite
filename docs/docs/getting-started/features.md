@@ -39,7 +39,9 @@ Graphite adopts an event-driven architecture where topics function as logical me
 
 Consumption events are only recorded once the entire node processing completes successfully. Until that point, the system treats partial or failed node invokes as if they never happened, preventing duplicated outputs or broken states. Should a node encounter an error (e.g., an LLM connection failure, external API issue, or function exception), Graphite detects the unconsumed events upon restoration and places the associated node(s) back into the invoke queue. This design ensures the node can safely retry from the same input without creating conflicting or duplicated consumption records.
 
-By storing each event exactly once and withholding consumption records until success, Graphite guarantees idempotent behavior. Even if a node issues multiple invocations due to an error, the event logs and consumption rules still reconstruct a single, consistent path from invocation to response. This approach produces correct outcomes on retries while maintaining a complete, conflict-free audit trail.
+By recording each event idempotently and withholding consumption records until success, Graphite makes its **event persistence and replay** idempotent: the event logs and consumption rules reconstruct a single, consistent path from invocation to response, maintaining a complete, conflict-free audit trail.
+
+This is not the same as exactly-once execution of external side effects. Node and tool invocation is **at-least-once**: on retry, a node runs again from the same input, so any external action it performs (an LLM call, an outbound API request, a write) can happen more than once unless the tool itself is idempotent. Make tools with external side effects idempotent (e.g. via an idempotency key) if you need exactly-once *effects*.
 
 ## Auditability
 

@@ -37,9 +37,14 @@ class AgentCallingTool(FunctionCallTool):
                 description=self.agent_description,
                 parameters=ParametersSchema(
                     properties={
-                        "prompt": ParameterSchema(
-                            type="string",
-                            description=self.argument_description,
+                        # ``type`` is an extra JSON-Schema key (ParameterSchema
+                        # allows extras); validate from a dict so it is preserved
+                        # without tripping the typed constructor signature.
+                        "prompt": ParameterSchema.model_validate(
+                            {
+                                "type": "string",
+                                "description": self.argument_description,
+                            }
                         )
                     },
                     required=["prompt"],

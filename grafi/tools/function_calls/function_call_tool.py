@@ -46,8 +46,8 @@ class FunctionCallTool(Tool):
 
     name: str = "FunctionCallTool"
     type: str = "FunctionCallTool"
-    function_specs: FunctionSpecs = Field(default=[])
-    functions: Dict[str, Callable] = Field(default={})
+    function_specs: FunctionSpecs = Field(default_factory=list)
+    functions: Dict[str, Callable] = Field(default_factory=dict)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @classmethod

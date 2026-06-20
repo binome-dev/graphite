@@ -146,12 +146,12 @@ class TopicBase(BaseModel):
         if isinstance(topic_event, PublishToTopicEvent):
             await self.event_queue.put(topic_event)
         elif isinstance(topic_event, ConsumeFromTopicEvent):
-            # Fetch the events for the consumer and commit the offset
-            await self.event_queue.fetch(
-                consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
-            )
-            await self.event_queue.commit_to(
-                topic_event.consumer_name, topic_event.offset
+            # Restore the consumer's cursor to the recorded commit point. The
+            # next event delivered is topic_event.offset + 1, so the offset
+            # immediately after the committed one is not skipped.
+            await self.event_queue.restore_consumer(
+                consumer_id=topic_event.consumer_name,
+                committed_offset=topic_event.offset,
             )
 
     async def add_event(self, event: TopicEvent) -> Optional[TopicEvent]:

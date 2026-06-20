@@ -44,8 +44,12 @@ class AssistantBase(BaseModel):
         self._construct_workflow()
 
     def _construct_workflow(self) -> "AssistantBase":
-        """Construct the workflow for the assistant."""
-        pass
+        """Construct the workflow for the assistant.
+
+        Subclasses override this to build ``self.workflow`` and return ``self``.
+        The base is a no-op for a bare assistant with a default workflow.
+        """
+        return self
 
     async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
