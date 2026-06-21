@@ -36,13 +36,13 @@ def openai_instance():
         system_message="dummy system message",
         name="OpenAITool",
         api_key="test_api_key",
-        model="gpt-4o-mini",
+        model="gpt-4.1-nano",
     )
 
 
 def test_init(openai_instance):
     assert openai_instance.api_key == "test_api_key"
-    assert openai_instance.model == "gpt-4o-mini"
+    assert openai_instance.model == "gpt-4.1-nano"
     assert openai_instance.system_message == "dummy system message"
 
 
@@ -185,7 +185,7 @@ def test_to_dict(openai_instance):
     assert result["name"] == "OpenAITool"
     assert result["type"] == "OpenAITool"
     assert result["api_key"] == "****************"
-    assert result["model"] == "gpt-4o-mini"
+    assert result["model"] == "gpt-4.1-nano"
     assert result["system_message"] == "dummy system message"
     assert result["oi_span_type"] == "LLM"
 
@@ -200,7 +200,7 @@ async def test_from_dict():
         "type": "OpenAITool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "gpt-4o-mini",
+        "model": "gpt-4.1-nano",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
         "structured_output": False,
@@ -210,7 +210,7 @@ async def test_from_dict():
 
     assert isinstance(tool, OpenAITool)
     assert tool.name == "TestOpenAI"
-    assert tool.model == "gpt-4o-mini"
+    assert tool.model == "gpt-4.1-nano"
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
     assert tool.is_streaming is False
@@ -232,6 +232,39 @@ async def test_from_dict_roundtrip(openai_instance):
     assert restored.system_message == openai_instance.system_message
     assert restored.chat_params == openai_instance.chat_params
     assert restored.is_streaming == openai_instance.is_streaming
+
+
+# --------------------------------------------------------------------------- #
+#  reasoning_effort / verbosity request params                                 #
+# --------------------------------------------------------------------------- #
+def test_extra_create_kwargs_set():
+    tool = OpenAITool(api_key="k", reasoning_effort="high", verbosity="low")
+    assert tool._extra_create_kwargs() == {
+        "reasoning_effort": "high",
+        "verbosity": "low",
+    }
+
+
+def test_extra_create_kwargs_empty_by_default():
+    tool = OpenAITool(api_key="k")
+    assert tool._extra_create_kwargs() == {}
+
+
+@pytest.mark.asyncio
+async def test_reasoning_verbosity_roundtrip():
+    data = {
+        "name": "TestOpenAI",
+        "type": "OpenAITool",
+        "oi_span_type": "LLM",
+        "model": "gpt-5-mini",
+        "reasoning_effort": "medium",
+        "verbosity": "high",
+    }
+    tool = await OpenAITool.from_dict(data)
+    assert tool.reasoning_effort == "medium"
+    assert tool.verbosity == "high"
+    assert tool.to_dict()["reasoning_effort"] == "medium"
+    assert tool.to_dict()["verbosity"] == "high"
 
 
 def test_prepare_api_input(openai_instance):

@@ -31,7 +31,7 @@ def gemini_instance() -> GeminiTool:
         system_message="dummy system message",
         name="GeminiTool",
         api_key="test_api_key",
-        model="gemini-2.0-flash-lite",
+        model="gemini-2.5-flash-lite",
     )
 
 
@@ -40,7 +40,7 @@ def gemini_instance() -> GeminiTool:
 # --------------------------------------------------------------------------- #
 def test_init(gemini_instance):
     assert gemini_instance.api_key == "test_api_key"
-    assert gemini_instance.model == "gemini-2.0-flash-lite"
+    assert gemini_instance.model == "gemini-2.5-flash-lite"
     assert gemini_instance.system_message == "dummy system message"
 
 
@@ -77,11 +77,13 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
     # Ensure generate_content called with correct args
     mock_client.aio.models.generate_content.assert_called_once()
     call_kwargs = mock_client.aio.models.generate_content.call_args[1]
-    assert call_kwargs["model"] == "gemini-2.0-flash-lite"
+    assert call_kwargs["model"] == "gemini-2.5-flash-lite"
 
-    # Contents must include system message
+    # System prompt is delivered via config.system_instruction (SDK-native),
+    # not faked as a leading user turn; contents holds only the real turns.
+    assert call_kwargs["config"].system_instruction == "dummy system message"
     assert call_kwargs["contents"][0].role == "user"
-    assert call_kwargs["contents"][0].parts[0].text == "dummy system message"
+    assert call_kwargs["contents"][0].parts[0].text == "Say hello"
 
 
 # --------------------------------------------------------------------------- #
@@ -169,9 +171,13 @@ def test_prepare_api_input(gemini_instance):
         Message(role="assistant", content="Hi there."),
     ]
 
-    contents, tools = gemini_instance.prepare_api_input(msgs)
+    contents, tools, system_instruction = gemini_instance.prepare_api_input(msgs)
 
-    assert contents[0].role == "user"  # dummy system msg added later
+    # System text (instance message + system-role message) is hoisted out of
+    # contents into system_instruction; contents holds only user/model turns.
+    assert system_instruction == "dummy system message\n\nYou are helpful."
+    assert contents[0].role == "user"
+    assert contents[0].parts[0].text == "Hello!"
     assert contents[-1].role == "model"
     assert tools == [] or tools is None
 
@@ -184,7 +190,7 @@ def test_to_dict(gemini_instance):
     assert d["name"] == "GeminiTool"
     assert d["type"] == "GeminiTool"
     assert d["api_key"] == "****************"
-    assert d["model"] == "gemini-2.0-flash-lite"
+    assert d["model"] == "gemini-2.5-flash-lite"
 
 
 # --------------------------------------------------------------------------- #
@@ -200,7 +206,7 @@ async def test_from_dict():
         "type": "GeminiTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "gemini-2.0-flash-lite",
+        "model": "gemini-2.5-flash-lite",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
         "structured_output": False,
@@ -210,7 +216,7 @@ async def test_from_dict():
 
     assert isinstance(tool, GeminiTool)
     assert tool.name == "TestGemini"
-    assert tool.model == "gemini-2.0-flash-lite"
+    assert tool.model == "gemini-2.5-flash-lite"
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
 
@@ -228,3 +234,32 @@ async def test_from_dict_roundtrip(gemini_instance):
     assert restored.name == gemini_instance.name
     assert restored.model == gemini_instance.model
     assert restored.system_message == gemini_instance.system_message
+
+
+# --------------------------------------------------------------------------- #
+#  thinking_budget mapped into GenerateContentConfig                           #
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_invoke_thinking_budget(monkeypatch, invoke_context):
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    tool = GeminiTool(
+        api_key="test_api_key", model="gemini-2.5-flash-lite", thinking_budget=128
+    )
+
+    mock_response = Mock()
+    mock_response.text = "hi"
+    mock_response.function_calls = None
+
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+    monkeypatch.setattr(
+        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
+    )
+
+    async for _ in tool.invoke(invoke_context, [Message(role="user", content="hi")]):
+        pass
+
+    cfg = mock_client.aio.models.generate_content.call_args[1]["config"]
+    assert cfg.thinking_config is not None
+    assert cfg.thinking_config.thinking_budget == 128
