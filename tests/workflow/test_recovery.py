@@ -22,6 +22,7 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.impl.workflow_run import WorkflowRun
 
 
 class EchoTool(Tool):
@@ -73,12 +74,12 @@ async def test_count_pending_consumable_reflects_restored_work():
     request_id = "recovery-count"
     event = _pending_input_event(request_id)
 
-    # Restore the topic state as init_workflow would.
-    for topic in workflow._topics.values():
-        await topic.reset()
-    await workflow._topics["agent_input"].restore_topic(event)
+    # Per-run state: a fresh run starts with empty queues; restore into the run's
+    # own topic, as WorkflowRun.init would on recovery.
+    run = WorkflowRun(workflow, EventStoreInMemory())
+    await run.topics["agent_input"].restore_topic(event)
 
-    pending = await workflow._count_pending_consumable()
+    pending = await run._count_pending_consumable()
     assert pending == 1
 
 

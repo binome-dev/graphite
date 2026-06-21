@@ -254,8 +254,10 @@ class TestPublishEvents:
             consumed_event_ids=[event.event_id for event in consumed_events],
         )
 
+        # The run routes I/O through its own topic instances, keyed by name.
+        topics = {"topic1": mock_topic1, "topic2": mock_topic2}
         published_events = await publish_events(
-            node, publish_to_event, tracker, consumers_of
+            node, publish_to_event, tracker, consumers_of, topics
         )
 
         assert len(published_events) == 1
@@ -306,7 +308,8 @@ class TestGetNodeInput:
 
         mock_topic1.consume.return_value = [mock_event]
 
-        consumed_events = await get_node_input(node)
+        topics = {"topic1": mock_topic1, "topic2": mock_topic2}
+        consumed_events = await get_node_input(node, topics)
 
         assert len(consumed_events) == 1
         assert isinstance(consumed_events[0], ConsumeFromTopicEvent)
