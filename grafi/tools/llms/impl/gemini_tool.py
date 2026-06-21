@@ -57,7 +57,17 @@ class GeminiTool(LLM):
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
+    # Lowest-cost current Gemini tier; upgrade to "gemini-2.5-flash"/"gemini-2.5-pro"
+    # for harder tasks.
     model: str = Field(default="gemini-2.5-flash-lite")
+    thinking_budget: Optional[int] = Field(
+        default=None,
+        description=(
+            "Gemini 2.5 thinking budget in tokens. 0 disables thinking; -1 lets "
+            "the model decide dynamically. Mapped to types.ThinkingConfig and left "
+            "off when None (model default applies)."
+        ),
+    )
 
     @classmethod
     def builder(cls) -> "GeminiToolBuilder":
@@ -80,7 +90,7 @@ class GeminiTool(LLM):
 
     def prepare_api_input(
         self, input_data: Messages
-    ) -> tuple[ContentListUnion, Optional[Tool]]:
+    ) -> tuple[ContentListUnion, Optional[List[Tool]], Optional[str]]:
         """
         Map grafi ``Message`` objects -> Gemini *contents* list.
 
@@ -91,21 +101,24 @@ class GeminiTool(LLM):
                 {"role": "model", "parts": [{"text": "Hello!"}]},
             ]
 
-        Function/tool declarations are passed via GenerateContentConfig,
-        so we simply return them for the caller to insert.
+        The system prompt (the instance ``system_message`` plus any ``system``
+        role messages) is returned separately so the caller can pass it via the
+        config's ``system_instruction`` field — the SDK-native way to set a
+        system prompt — rather than faking it as a leading ``user`` turn.
+        Function/tool declarations are likewise returned for the caller to insert.
         """
         contents: List[Content] = []
 
-        # prepend system instruction in Gemini style if present
+        # Collect the system prompt; folded into config.system_instruction below.
+        system_parts: List[str] = []
         if self.system_message:
-            contents.append(
-                Content(
-                    role="user",
-                    parts=[Part(text=self.system_message)],
-                )
-            )
+            system_parts.append(self.system_message)
 
         for m in input_data:
+            if m.role == "system":
+                if isinstance(m.content, str) and m.content:
+                    system_parts.append(m.content)
+                continue
             # Gemini only needs role + parts; we ignore tool_call fields here
             if m.content is not None and isinstance(m.content, str) and m.content != "":
                 contents.append(
@@ -124,11 +137,14 @@ class GeminiTool(LLM):
             )
             function_declarations.append(function_declaration)
 
-        return contents, (
+        tools = (
             [Tool(function_declarations=function_declarations)]
             if function_declarations
             else None
         )
+        system_instruction = "\n\n".join(system_parts) if system_parts else None
+
+        return contents, tools, system_instruction
 
     # --------------------------------------------------------------------- #
     # Asynchronous (async/await) one‑shot call
@@ -139,15 +155,25 @@ class GeminiTool(LLM):
         invoke_context: InvokeContext,
         input_data: Messages,
     ) -> MsgsAGen:  # → async generator just like OpenAITool
-        contents, tools = self.prepare_api_input(input_data)
+        contents, tools, system_instruction = self.prepare_api_input(input_data)
 
         client = genai.Client(api_key=self.api_key)  # same lightweight client
 
-        cfg = (
-            types.GenerateContentConfig(tools=tools, **self.chat_params)  # type: ignore[arg-type]
-            if tools
-            else None
-        )
+        # Always build the config from chat_params (previously it was dropped
+        # entirely when no tools were present), then layer on tools, the system
+        # instruction, and the thinking budget when each is set.
+        config_kwargs: Dict[str, Any] = dict(self.chat_params)
+        if tools:
+            config_kwargs["tools"] = tools
+        if system_instruction:
+            config_kwargs.setdefault("system_instruction", system_instruction)
+        if self.thinking_budget is not None:
+            config_kwargs.setdefault(
+                "thinking_config",
+                types.ThinkingConfig(thinking_budget=self.thinking_budget),
+            )
+
+        cfg = types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
 
         try:
             if self.is_streaming:
@@ -238,6 +264,7 @@ class GeminiTool(LLM):
             "type": self.type,
             "api_key": "****************",
             "model": self.model,
+            "thinking_budget": self.thinking_budget,
         }
 
     @classmethod
@@ -263,7 +290,8 @@ class GeminiTool(LLM):
             .is_streaming(data.get("is_streaming", False))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("GEMINI_API_KEY"))
-            .model(data.get("model", "gemini-2.0-flash-lite"))
+            .model(data.get("model", "gemini-2.5-flash-lite"))
+            .thinking_budget(data.get("thinking_budget"))
             .build()
         )
 
@@ -275,4 +303,9 @@ class GeminiToolBuilder(LLMBuilder[GeminiTool]):
 
     def api_key(self, api_key: Optional[str]) -> Self:
         self.kwargs["api_key"] = api_key
+        return self
+
+    def thinking_budget(self, thinking_budget: Optional[int]) -> Self:
+        """Set the Gemini 2.5 thinking budget in tokens (0 off, -1 dynamic)."""
+        self.kwargs["thinking_budget"] = thinking_budget
         return self

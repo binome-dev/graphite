@@ -33,7 +33,7 @@ def claude_instance() -> ClaudeTool:
         system_message="dummy system message",
         name="ClaudeTool",
         api_key="test_api_key",
-        model="claude-haiku-4-5-20251001",
+        model="claude-haiku-4-5",
         max_tokens=2048,
     )
 
@@ -43,7 +43,7 @@ def claude_instance() -> ClaudeTool:
 # --------------------------------------------------------------------------- #
 def test_init(claude_instance):
     assert claude_instance.api_key == "test_api_key"
-    assert claude_instance.model == "claude-haiku-4-5-20251001"
+    assert claude_instance.model == "claude-haiku-4-5"
     assert claude_instance.system_message == "dummy system message"
     assert claude_instance.max_tokens == 2048
 
@@ -93,7 +93,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
 
     # verify create() called with right kwargs
     kwargs = mock_client.messages.create.call_args[1]
-    assert kwargs["model"] == "claude-haiku-4-5-20251001"
+    assert kwargs["model"] == "claude-haiku-4-5"
     assert kwargs["max_tokens"] == 2048
     # system prompt must be the top-level `system=` param, NOT a message role
     assert kwargs["system"] == "dummy system message"
@@ -254,7 +254,7 @@ def test_to_dict(claude_instance):
     assert d["name"] == "ClaudeTool"
     assert d["type"] == "ClaudeTool"
     assert d["api_key"] == "****************"
-    assert d["model"] == "claude-haiku-4-5-20251001"
+    assert d["model"] == "claude-haiku-4-5"
 
 
 # --------------------------------------------------------------------------- #
@@ -270,7 +270,7 @@ async def test_from_dict():
         "type": "ClaudeTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "claude-haiku-4-5-20251001",
+        "model": "claude-haiku-4-5",
         "max_tokens": 2048,
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
@@ -281,7 +281,7 @@ async def test_from_dict():
 
     assert isinstance(tool, ClaudeTool)
     assert tool.name == "TestClaude"
-    assert tool.model == "claude-haiku-4-5-20251001"
+    assert tool.model == "claude-haiku-4-5"
     assert tool.max_tokens == 2048
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
@@ -305,3 +305,46 @@ async def test_from_dict_roundtrip(claude_instance):
     assert restored.system_message == claude_instance.system_message
     assert restored.chat_params == claude_instance.chat_params
     assert restored.is_streaming == claude_instance.is_streaming
+
+
+# --------------------------------------------------------------------------- #
+#  thinking / effort request assembly                                          #
+# --------------------------------------------------------------------------- #
+def test_request_kwargs_thinking_and_effort():
+    tool = ClaudeTool(
+        api_key="k",
+        model="claude-haiku-4-5",
+        max_tokens=1000,
+        thinking={"type": "adaptive"},
+        effort="high",
+        chat_params={"output_config": {"foo": "bar"}, "service_tier": "auto"},
+    )
+    kwargs = tool._request_kwargs(omit, [], omit)
+
+    assert kwargs["thinking"] == {"type": "adaptive"}
+    # effort is folded into output_config, merged with the caller-supplied one.
+    assert kwargs["output_config"]["effort"] == "high"
+    assert kwargs["output_config"]["foo"] == "bar"
+    # other chat_params still pass through.
+    assert kwargs["service_tier"] == "auto"
+
+
+def test_request_kwargs_omits_unset_fields():
+    tool = ClaudeTool(api_key="k", model="claude-haiku-4-5", max_tokens=1000)
+    kwargs = tool._request_kwargs(omit, [], omit)
+    assert "thinking" not in kwargs
+    assert "output_config" not in kwargs
+
+
+# --------------------------------------------------------------------------- #
+#  refusal stop reason                                                         #
+# --------------------------------------------------------------------------- #
+def test_to_messages_refusal(claude_instance):
+    resp = Mock(
+        content=[],
+        stop_reason="refusal",
+        stop_details=Mock(explanation="declined for policy reasons"),
+    )
+    messages = claude_instance.to_messages(resp)
+    assert messages[0].refusal == "declined for policy reasons"
+    assert messages[0].content == ""

@@ -48,8 +48,32 @@ class ClaudeTool(LLM):
     api_key: Optional[str] = Field(
         default_factory=lambda: os.getenv("ANTHROPIC_API_KEY")
     )
-    max_tokens: int = Field(default=4096)
-    model: str = Field(default="claude-haiku-4-5-20251001")  # or haiku, opus…
+    # Anthropic recommends not lowballing max_tokens; this is an upper bound, not
+    # a cost floor (you pay for what is generated). Opus 4.x supports up to 128K
+    # when streaming — raise this if you stream long outputs.
+    max_tokens: int = Field(default=16384)
+    # Default to the lowest-cost tier (Haiku). Upgrade for harder tasks, e.g.
+    # "claude-sonnet-4-6" or "claude-opus-4-8".
+    # NOTE: if you switch to Opus 4.7/4.8 they reject temperature/top_p/top_k/
+    # budget_tokens — steer with `effort`/`thinking` instead of sampling params.
+    model: str = Field(default="claude-haiku-4-5")
+    thinking: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Extended/adaptive thinking config passed to the Messages API, e.g. "
+            "{'type': 'adaptive'} or {'type': 'adaptive', 'display': 'summarized'}. "
+            "Adaptive thinking is the supported mode on Claude 4.6+; "
+            "budget_tokens is rejected on Opus 4.7/4.8. Left off when None."
+        ),
+    )
+    effort: Optional[str] = Field(
+        default=None,
+        description=(
+            "Output/reasoning effort sent inside output_config: "
+            "'low' | 'medium' | 'high' | 'xhigh' | 'max'. Supported on Opus 4.5+ "
+            "and Sonnet 4.6. Left off when None (API default is 'high')."
+        ),
+    )
 
     @classmethod
     def builder(cls) -> "ClaudeToolBuilder":
@@ -146,6 +170,42 @@ class ClaudeTool(LLM):
             return ""
         return json.dumps(content, default=str)
 
+    def _request_kwargs(
+        self,
+        system: Union[str, Omit],
+        messages: List[MessageParam],
+        tools: Union[List[ToolParam], Omit],
+    ) -> Dict[str, Any]:
+        """Assemble keyword arguments shared by the streaming and non-streaming
+        calls.
+
+        ``thinking`` and ``effort`` are only included when set, so a tool that
+        doesn't use them keeps the API's defaults. ``effort`` is folded into
+        ``output_config`` (merged with any user-supplied ``output_config`` in
+        ``chat_params``). ``chat_params`` is applied last so an explicit caller
+        value always wins over the first-class fields.
+        """
+        kwargs: Dict[str, Any] = {
+            "max_tokens": self.max_tokens,
+            "model": self.model,
+            "system": system,
+            "messages": messages,
+            "tools": tools,
+        }
+
+        chat_params = dict(self.chat_params)
+
+        if self.thinking is not None:
+            kwargs["thinking"] = self.thinking
+
+        if self.effort is not None:
+            output_config = dict(chat_params.pop("output_config", {}) or {})
+            output_config.setdefault("effort", self.effort)
+            kwargs["output_config"] = output_config
+
+        kwargs.update(chat_params)
+        return kwargs
+
     # ------------------------------------------------------------------ #
     # Async call                                                         #
     # ------------------------------------------------------------------ #
@@ -156,29 +216,18 @@ class ClaudeTool(LLM):
         input_data: Messages,
     ) -> MsgsAGen:
         system, messages, tools = self.prepare_api_input(input_data)
+        request_kwargs = self._request_kwargs(system, messages, tools)
 
         try:
             async with AsyncAnthropic(api_key=self.api_key) as client:
                 if self.is_streaming:
-                    async with client.messages.stream(
-                        max_tokens=self.max_tokens,
-                        model=self.model,
-                        system=system,
-                        messages=messages,
-                        tools=tools,
-                        **self.chat_params,
-                    ) as stream:
+                    async with client.messages.stream(**request_kwargs) as stream:
                         async for event in stream:
                             if event.type == "text":
                                 yield self.to_stream_messages(event.text)
                 else:
                     resp: AnthropicMessage = await client.messages.create(
-                        max_tokens=self.max_tokens,
-                        model=self.model,
-                        system=system,
-                        messages=messages,
-                        tools=tools,
-                        **self.chat_params,
+                        **request_kwargs
                     )
                     yield self.to_messages(resp)
 
@@ -226,6 +275,16 @@ class ClaudeTool(LLM):
         if len(tool_calls) > 0:
             message_args["content"] = ""
 
+        # A refused response (HTTP 200, stop_reason="refusal") carries empty or
+        # partial content; surface the reason on the message so callers can react
+        # instead of treating the blank text as a normal answer.
+        if getattr(resp, "stop_reason", None) == "refusal":
+            details = getattr(resp, "stop_details", None)
+            explanation = getattr(details, "explanation", None) if details else None
+            message_args["refusal"] = (
+                explanation or "Request refused by the Anthropic safety system."
+            )
+
         return [Message.model_validate(message_args)]
 
     # ------------------------------------------------------------------ #
@@ -235,6 +294,8 @@ class ClaudeTool(LLM):
         return {
             **super().to_dict(),
             "max_tokens": self.max_tokens,
+            "thinking": self.thinking,
+            "effort": self.effort,
         }
 
     @classmethod
@@ -261,8 +322,10 @@ class ClaudeTool(LLM):
             .is_streaming(data.get("is_streaming", False))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("ANTHROPIC_API_KEY"))
-            .model(data.get("model", "claude-haiku-4-5-20251001"))
-            .max_tokens(data.get("max_tokens", 4096))
+            .model(data.get("model", "claude-haiku-4-5"))
+            .max_tokens(data.get("max_tokens", 16384))
+            .thinking(data.get("thinking"))
+            .effort(data.get("effort"))
             .build()
         )
 
@@ -279,4 +342,14 @@ class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
 
     def max_tokens(self, max_tokens: int) -> Self:
         self.kwargs["max_tokens"] = max_tokens
+        return self
+
+    def thinking(self, thinking: Optional[Dict[str, Any]]) -> Self:
+        """Set the extended/adaptive thinking config (e.g. {'type': 'adaptive'})."""
+        self.kwargs["thinking"] = thinking
+        return self
+
+    def effort(self, effort: Optional[str]) -> Self:
+        """Set output effort ('low' | 'medium' | 'high' | 'xhigh' | 'max')."""
+        self.kwargs["effort"] = effort
         return self
