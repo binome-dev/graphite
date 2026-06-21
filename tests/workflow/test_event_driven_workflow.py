@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
+from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
@@ -17,6 +18,7 @@ from grafi.topics.topic_base import TopicType
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.impl.workflow_run import WorkflowRun
 from grafi.workflows.workflow import WorkflowBuilder
 
 
@@ -284,12 +286,10 @@ class TestEventDrivenWorkflowAsyncInvoke:
     @pytest.mark.asyncio
     async def test_invoke_with_async_output_queue(self, async_workflow):
         """Test that invoke uses AsyncOutputQueue."""
-        # We can verify that the workflow has the necessary components
-        assert hasattr(async_workflow, "_tracker")
+        # The definition owns topology; runtime state (incl. the AsyncOutputQueue)
+        # is created per invocation in WorkflowRun.
         assert hasattr(async_workflow, "_topics")
-
-        # The AsyncOutputQueue should be created during invoke execution
-        # This is more of an integration test ensuring the components work together
+        assert callable(async_workflow.invoke)
 
 
 class TestEventDrivenWorkflowInitialWorkflow:
@@ -310,9 +310,10 @@ class TestEventDrivenWorkflowInitialWorkflow:
         return EventDrivenWorkflow(nodes={"test_node": node})
 
     def test_init_workflow_method_exists(self, workflow_for_initial_test):
-        """init_workflow should be available for restoring workflow state."""
-        assert hasattr(workflow_for_initial_test, "init_workflow")
-        assert callable(workflow_for_initial_test.init_workflow)
+        """A run's init() restores/seeds workflow state for an invocation."""
+        run = WorkflowRun(workflow_for_initial_test, EventStoreInMemory())
+        assert callable(run.init)
+        assert callable(run.run)
 
 
 class TestEventDrivenWorkflowToDict:
@@ -357,37 +358,32 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
         return EventDrivenWorkflow(nodes={"test_node": node})
 
     def test_workflow_has_tracker(self, workflow_with_tracker):
-        """Test that workflow has AsyncNodeTracker."""
-        assert hasattr(workflow_with_tracker, "_tracker")
+        """Each run owns an AsyncNodeTracker; runs have independent trackers."""
         from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
-        assert isinstance(workflow_with_tracker._tracker, AsyncNodeTracker)
+        run = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
+        assert isinstance(run.tracker, AsyncNodeTracker)
+
+        # Independent trackers per run are the basis of invocation isolation.
+        run2 = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
+        assert run.tracker is not run2.tracker
 
     @pytest.mark.asyncio
-    async def test_tracker_reset_on_init(self, workflow_with_tracker):
-        """Test that tracker is reset on workflow initialization."""
-        # Add some activity to tracker
-        await workflow_with_tracker._tracker.enter("test_node")
-        assert not await workflow_with_tracker._tracker.is_idle()
+    async def test_run_init_leaves_no_active_nodes(self, workflow_with_tracker):
+        """A fresh run starts idle, and init() seeds work without marking any
+        node active (nodes only become active once they enter processing)."""
+        run = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
+        assert await run.tracker.is_idle()
 
-        # Call init_workflow which should reset tracker
         invoke_context = InvokeContext(
             conversation_id="test", invoke_id="test", assistant_request_id="test"
         )
-        with patch(
-            "grafi.workflows.impl.event_driven_workflow.container"
-        ) as mock_container:
-            mock_event_store = Mock()
-            mock_event_store.get_agent_events = AsyncMock(return_value=[])
-            mock_event_store.record_events = AsyncMock()
-            mock_event_store.record_event = AsyncMock()
-            mock_container.event_store = mock_event_store
-            await workflow_with_tracker.init_workflow(
-                PublishToTopicEvent(invoke_context=invoke_context, data=[])
-            )
+        await run.init(
+            PublishToTopicEvent(invoke_context=invoke_context, data=[]),
+            is_sequential=False,
+        )
 
-        # Tracker should be reset
-        assert await workflow_with_tracker._tracker.is_idle()
+        assert await run.tracker.is_idle()
 
 
 class TestEventDrivenWorkflowStopFlag:

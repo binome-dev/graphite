@@ -10,6 +10,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
 from grafi.nodes.node_base import NodeBase
+from grafi.topics.topic_base import TopicBase
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
 
@@ -88,9 +89,15 @@ async def publish_events(
     publish_event: PublishToTopicEvent,
     tracker: AsyncNodeTracker,
     consumers_of: Callable[[str], Sequence[str]],
+    topics: Dict[str, TopicBase],
 ) -> List[PublishToTopicEvent]:
     """
     Publish events to all topics the node publishes to.
+
+    ``topics`` maps topic name to the *current run's* topic instance (with its
+    per-run queue); a node's ``publish_to`` only identifies which topics, by name,
+    it targets. Routing through the run's topics keeps concurrent invocations
+    isolated.
 
     The tracker counts outstanding *deliveries* -- one per consumer of each
     published event -- not publications. ``consumers_of(topic_name)`` returns the
@@ -103,12 +110,13 @@ async def publish_events(
     published_events: List[PublishToTopicEvent] = []
 
     for topic in node.publish_to:
+        run_topic = topics[topic.name]
         delivery_count = len(consumers_of(topic.name))
         if delivery_count:
             await tracker.on_messages_published(
                 delivery_count, source=f"node:{node.name}->{topic.name}"
             )
-        event = await topic.publish_data(publish_event)
+        event = await run_topic.publish_data(publish_event)
         if event:
             published_events.append(event)
         elif delivery_count:
@@ -121,17 +129,20 @@ async def publish_events(
     return published_events
 
 
-async def get_node_input(node: NodeBase) -> List[ConsumeFromTopicEvent]:
+async def get_node_input(
+    node: NodeBase, topics: Dict[str, TopicBase]
+) -> List[ConsumeFromTopicEvent]:
     """
     Get input events for a node from its subscribed topics.
 
-    NO CHANGES NEEDED - consumption tracking happens at commit time.
+    ``topics`` maps topic name to the current run's topic instance; the node's
+    subscriptions only identify which topics, by name, it reads. Consumption
+    tracking happens at commit time.
     """
     consumed_events: List[ConsumeFromTopicEvent] = []
 
-    node_subscribed_topics = node._subscribed_topics.values()
-
-    for subscribed_topic in node_subscribed_topics:
+    for topic_name in node._subscribed_topics:
+        subscribed_topic = topics[topic_name]
         if await subscribed_topic.can_consume(node.name):
             node_consumed_events = await subscribed_topic.consume(node.name)
             for event in node_consumed_events:

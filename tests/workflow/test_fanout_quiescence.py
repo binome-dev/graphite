@@ -23,6 +23,7 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.workflows.impl.workflow_run import WorkflowRun
 
 
 class LabelTool(Tool):
@@ -81,11 +82,12 @@ def test_topic_consumers_counts_every_subscriber():
     """The topology helper reports both subscribers of the fan-out input topic
     and the workflow itself as the consumer of the output topic."""
     workflow = _build_fanout_workflow()
+    run = WorkflowRun(workflow, EventStoreInMemory())
 
-    assert set(workflow._topic_consumers("agent_input")) == {"node_a", "node_b"}
-    assert workflow._topic_consumers("agent_output") == [workflow.name]
+    assert set(run._topic_consumers("agent_input")) == {"node_a", "node_b"}
+    assert run._topic_consumers("agent_output") == [workflow.name]
     # Unknown topic -> no consumers (cannot hang execution).
-    assert workflow._topic_consumers("does_not_exist") == []
+    assert run._topic_consumers("does_not_exist") == []
 
 
 @pytest.mark.asyncio
