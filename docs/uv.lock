@@ -2,6 +2,15 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 
+[manifest]
+constraints = [
+    { name = "idna", specifier = ">=3.15" },
+    { name = "markdown", specifier = ">=3.8.1" },
+    { name = "pygments", specifier = ">=2.20.0" },
+    { name = "requests", specifier = ">=2.33.0" },
+    { name = "urllib3", specifier = ">=2.7.0" },
+]
+
 [[package]]
 name = "babel"
 version = "2.18.0"
@@ -137,7 +146,7 @@ dependencies = [
 requires-dist = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
-    { name = "pymdown-extensions" },
+    { name = "pymdown-extensions", specifier = ">=10.21.3" },
 ]
 
 [[package]]

@@ -4,5 +4,16 @@ version = "0.1.0"
 dependencies = [
     "mkdocs",
     "mkdocs-material",
-    "pymdown-extensions"
+    "pymdown-extensions>=10.21.3", # GHSA-62q4-447f-wv8h, GHSA-r6h4-mm7h-8pmq
+]
+
+[tool.uv]
+# Security floors on transitive docs-tooling dependencies, pinned to the patched
+# version so a fresh resolve cannot regress below the fix. See Dependabot alerts.
+constraint-dependencies = [
+    "urllib3>=2.7.0",   # GHSA-qccp-gfcp-xxvc (+ 5 related urllib3 advisories)
+    "requests>=2.33.0", # GHSA-gc5v-m9x4-r6x2, GHSA-9hjg-9r4m-mvj7
+    "idna>=3.15",       # GHSA-65pc-fj4g-8rjx
+    "pygments>=2.20.0", # GHSA-5239-wwwm-4pmq
+    "markdown>=3.8.1",  # GHSA-5wmx-573v-2qwq
 ]
