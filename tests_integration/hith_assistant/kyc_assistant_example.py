@@ -8,6 +8,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime.execution_services import ExecutionServices
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.kyc_assistant import KycAssistant
 
@@ -138,4 +140,5 @@ async def test_kyc_assistant() -> None:
     print(output)
 
 
-asyncio.run(test_kyc_assistant())
+with bind_services(ExecutionServices()):
+    asyncio.run(test_kyc_assistant())

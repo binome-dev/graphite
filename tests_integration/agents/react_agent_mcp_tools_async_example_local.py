@@ -2,6 +2,8 @@ import asyncio
 
 from grafi.agents.react_agent import create_react_agent
 from grafi.common.models.mcp_connections import StdioConnection
+from grafi.runtime.execution_services import ExecutionServices
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 
@@ -26,4 +28,5 @@ async def run_agent() -> None:
         print(output.content)
 
 
-asyncio.run(run_agent())
+with bind_services(ExecutionServices()):
+    asyncio.run(run_agent())

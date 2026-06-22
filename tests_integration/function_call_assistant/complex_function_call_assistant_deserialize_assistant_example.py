@@ -4,11 +4,12 @@ import uuid
 from pathlib import Path
 
 from grafi.assistants.assistant import Assistant
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.tool_factory import ToolFactory
 from tests_integration.function_call_assistant.simple_function_call_assistant_complex_function_example import (  # noqa: E501
     LocalFileMock,
@@ -28,7 +29,8 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 
 async def test_deserialized_assistant() -> None:
@@ -70,4 +72,5 @@ async def test_deserialized_assistant() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(test_deserialized_assistant())
+    with bind_services(runtime.services):
+        asyncio.run(test_deserialized_assistant())

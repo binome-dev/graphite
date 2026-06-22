@@ -198,7 +198,7 @@ class GeminiTool(LLM):
             raise LLMToolException(
                 tool_name=self.name,
                 model=self.model,
-                message=f"Gemini async call failed: {exc}",
+                message="Gemini async call failed",
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc

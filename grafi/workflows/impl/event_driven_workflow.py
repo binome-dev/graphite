@@ -6,7 +6,6 @@ from typing import List
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
-from grafi.common.containers.container import container
 from grafi.common.decorators.record_decorators import record_workflow_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -182,7 +181,7 @@ class EventDrivenWorkflow(Workflow):
         instance carries no per-invocation state and concurrent invocations are
         isolated.
         """
-        run = WorkflowRun(self, container.event_store)
+        run = WorkflowRun(self)
         self._active_runs[id(run)] = run
         try:
             async for event in run.run(input_data, is_sequential):

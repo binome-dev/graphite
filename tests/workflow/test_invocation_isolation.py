@@ -11,12 +11,10 @@ drains/resets the first mid-flight (one run yields nothing, or the run hangs).
 """
 
 import asyncio
-from unittest.mock import Mock
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -81,17 +79,13 @@ async def _drain(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sequential", [False, True])
-async def test_concurrent_invokes_on_one_instance_are_isolated(sequential, monkeypatch):
-    """Two concurrent invokes on one workflow instance complete independently."""
-    workflow = _build_workflow()
+async def test_concurrent_invokes_on_one_instance_are_isolated(sequential):
+    """Two concurrent invokes on one workflow instance complete independently.
 
-    # A shared store is fine: events are partitioned by assistant_request_id.
-    store = EventStoreInMemory()
-    fake_container = Mock()
-    fake_container.event_store = store
-    monkeypatch.setattr(
-        "grafi.workflows.impl.event_driven_workflow.container", fake_container
-    )
+    They share the one store bound for the test (events are partitioned by
+    assistant_request_id); isolation is in the per-run state, not the store.
+    """
+    workflow = _build_workflow()
 
     results_a, results_b = await asyncio.wait_for(
         asyncio.gather(
@@ -107,19 +101,13 @@ async def test_concurrent_invokes_on_one_instance_are_isolated(sequential, monke
 
 
 @pytest.mark.asyncio
-async def test_stop_does_not_leak_across_concurrent_invokes(monkeypatch):
+async def test_stop_does_not_leak_across_concurrent_invokes():
     """Stopping is scoped: one run finishing/stopping must not halt another.
 
     Here both runs simply complete; the assertion is that running them
     concurrently does not strand either one (a shared stop flag / tracker would).
     """
     workflow = _build_workflow()
-    store = EventStoreInMemory()
-    fake_container = Mock()
-    fake_container.event_store = store
-    monkeypatch.setattr(
-        "grafi.workflows.impl.event_driven_workflow.container", fake_container
-    )
 
     batches = await asyncio.wait_for(
         asyncio.gather(*[_drain(workflow, _input(f"r{i}"), False) for i in range(4)]),

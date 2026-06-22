@@ -3,6 +3,7 @@
 import functools
 import json
 import os
+import uuid
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
@@ -14,32 +15,37 @@ from typing import Type
 from typing import TypeVar
 from typing import Union
 
-from loguru import logger
 from opentelemetry.trace import Status
 from opentelemetry.trace import StatusCode
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic_core import to_jsonable_python
 
-from grafi.common.containers.container import container
 from grafi.common.env import env_bool
 from grafi.common.events.component_base import ComponentEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import EventPersistenceError
 from grafi.common.exceptions.serialization import error_message
 from grafi.common.exceptions.serialization import error_to_dict
 from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime.execution_services import current_services
 
 T = TypeVar("T")
 
 # Attribute used to mark an exception whose full traceback has already been
 # logged, so the same root failure is not dumped at every decorator layer.
 _TRACEBACK_LOGGED_ATTR = "_grafi_traceback_logged"
+
+# Attribute carrying the correlation id shared by every layer of one failure, so
+# the wrapped/re-raised exception keeps a stable ``error_id`` across the
+# tool -> node -> workflow -> assistant decorators.
+_ERROR_ID_ATTR = "_grafi_error_id"
 
 
 class EventContext(BaseModel):
@@ -123,14 +129,58 @@ def _include_traceback() -> bool:
     return env_bool("GRAFI_ERROR_INCLUDE_TRACEBACK", default=True)
 
 
-def _build_error_details(exc: Exception, metadata: EventContext) -> Dict[str, Any]:
-    """Build the structured ``error_details`` payload for a failed component."""
+def _error_id_for(exc: Exception) -> str:
+    """Return the correlation id for ``exc``, creating one if the chain has none.
+
+    Scans the cause chain so a re-wrapped outer exception inherits the id minted
+    at the layer closest to the root failure; the id is stashed on the exception
+    so the next decorator layer reuses it.
+    """
+    for link in iter_cause_chain(exc, max_depth=1000):
+        existing = getattr(link, _ERROR_ID_ATTR, None)
+        if existing:
+            return str(existing)
+    error_id = uuid.uuid4().hex[:12]
+    try:
+        setattr(exc, _ERROR_ID_ATTR, error_id)
+    except Exception:  # pragma: no cover - builtins generally allow attributes
+        pass
+    return error_id
+
+
+def _root_cause(exc: Exception) -> BaseException:
+    """Return the innermost exception in the cause chain (the root failure)."""
+    root: BaseException = exc
+    for link in iter_cause_chain(exc, max_depth=1000):
+        root = link
+    return root
+
+
+def _build_error_details(
+    exc: Exception, metadata: EventContext, invoke_context: InvokeContext
+) -> Dict[str, Any]:
+    """Build the structured ``error_details`` payload for a failed component.
+
+    One correlated record: the failing component (the "where"), the exception's
+    own type/module/cause chain (the "why"), the request identifiers, the root
+    cause, and a stable ``error_id`` shared across the wrapper chain.
+    """
     details = error_to_dict(exc, include_traceback=_include_traceback())
-    # Identify which component failed (the "where"), alongside the exception's
-    # own type/module/cause chain (the "why").
+    details["error_id"] = _error_id_for(exc)
+    # Identify which component failed (the "where").
     details["component_id"] = metadata.id
     details["component_name"] = metadata.name
     details["component_type"] = metadata.type
+    # Correlate to the request.
+    details["conversation_id"] = getattr(invoke_context, "conversation_id", None)
+    details["invoke_id"] = getattr(invoke_context, "invoke_id", None)
+    details["assistant_request_id"] = getattr(
+        invoke_context, "assistant_request_id", None
+    )
+    # The original failure at the bottom of the chain (the "why, ultimately").
+    root = _root_cause(exc)
+    details["root_error_type"] = type(root).__name__
+    details["root_error_message"] = error_message(root)
     return details
 
 
@@ -169,56 +219,77 @@ def _traceback_already_logged(exc: Exception) -> bool:
     )
 
 
-def _log_component_exception(
+def _safe_report(message: str, *, level: str = "error") -> None:
+    """Emit a log line best-effort.
+
+    A misbehaving reporter (or an unbound runtime) must never replace the
+    execution failure it is describing, so any exception from resolving the
+    services or calling ``report`` is swallowed here.
+    """
+    try:
+        current_services().error_reporter.report(message, level=level)
+    except Exception:  # pragma: no cover - reporters must not raise
+        pass
+
+
+def _report_component_exception(
     exc: Exception,
     metadata: EventContext,
-    invoke_context: InvokeContext,
     error_details: Dict[str, Any],
 ) -> None:
-    """Log a failed component, with a full traceback only once.
+    """Log one concise, id-bearing line for a failure -- once.
 
-    The same root failure propagates through the tool -> node -> workflow ->
-    assistant decorators (and is re-wrapped along the way). Logging the full
-    traceback at every layer would print the same stack four-plus times, so the
-    full traceback is emitted once at the layer closest to the failure (the first
-    decorator to catch it); outer layers log a one-line summary instead.
-
-    The traceback is taken from ``error_details`` -- a plain, stdlib-formatted
-    string that does NOT include local-variable values (unlike Loguru's
-    ``opt(exception=...)`` with ``diagnose=True``). This keeps secrets/PII out of
-    logs and honors GRAFI_ERROR_INCLUDE_TRACEBACK (the key is absent when the
-    switch disables traceback capture), without forcing global Loguru config.
+    The same failure propagates through the tool -> node -> workflow -> assistant
+    decorators (re-wrapped along the way). Only the layer closest to the failure
+    (the first decorator to catch it) logs; outer layers add nothing. The line
+    carries the conversation/invoke/assistant_request/error ids so the full
+    structured record (cause chain, traceback, component fields) can be pulled
+    from the event store -- the log itself stays minimal and never dumps a
+    traceback.
     """
-    bound = logger.bind(
-        component_id=metadata.id,
-        component_name=metadata.name,
-        component_type=metadata.type,
-        conversation_id=getattr(invoke_context, "conversation_id", None),
-        invoke_id=getattr(invoke_context, "invoke_id", None),
-        assistant_request_id=getattr(invoke_context, "assistant_request_id", None),
-    )
-    component_label = metadata.type or "component"
-    summary = (
-        f"{component_label} '{metadata.name}' failed: "
-        f"{type(exc).__name__}: {error_message(exc)}"
-    )
-
     already_logged = _traceback_already_logged(exc)
     # Mark this exception (including re-wrapped outer ones) so the next decorator
     # layer finds the flag within one link of the chain regardless of nesting
-    # depth, keeping the full traceback to a single emission.
+    # depth, keeping emission to a single line.
     try:
         setattr(exc, _TRACEBACK_LOGGED_ATTR, True)
     except Exception:  # pragma: no cover - builtins generally allow attributes
         pass
+    if already_logged:
+        return
 
-    traceback_str = error_details.get("traceback")
-    # Pass values as arguments so any braces in them are not re-interpreted as
-    # Loguru format placeholders.
-    if already_logged or not traceback_str:
-        bound.error("{}", summary)
-    else:
-        bound.error("{}\n{}", summary, traceback_str)
+    component_label = metadata.type or "component"
+    _safe_report(
+        f"{component_label} '{metadata.name}' failed: "
+        f"{type(exc).__name__}: {error_message(exc)} "
+        f"[error_id={error_details.get('error_id')} "
+        f"conversation_id={error_details.get('conversation_id')} "
+        f"invoke_id={error_details.get('invoke_id')} "
+        f"assistant_request_id={error_details.get('assistant_request_id')}]"
+    )
+
+
+async def _record_lifecycle_event(
+    event: ComponentEvent, *, operation: str, invoke_context: InvokeContext
+) -> None:
+    """Persist a lifecycle event, translating a store failure into a contextual
+    :class:`EventPersistenceError`.
+
+    Used for invoke/respond events, where no execution error is active yet -- a
+    failure to persist them is itself the primary failure and must surface with
+    operation context rather than a raw backend exception.
+    """
+    try:
+        await current_services().event_store.record_event(event)
+    except Exception as persist_error:
+        err = EventPersistenceError(
+            message=f"Failed to persist {operation} event",
+            invoke_context=invoke_context,
+            cause=persist_error,
+        )
+        # Captured by serialization's _DOMAIN_FIELDS for a precise diagnostic.
+        err.operation = operation  # type: ignore[attr-defined]
+        raise err from persist_error
 
 
 def create_async_decorator(config: ComponentConfig) -> Callable:
@@ -268,14 +339,16 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 input_data=input_data,
                 invoke_context=invoke_context,
             )
-            await container.event_store.record_event(invoke_event)
+            await _record_lifecycle_event(
+                invoke_event, operation="invoke", invoke_context=invoke_context
+            )
 
             # Execute with tracing
             output_data = None
             error_details: Optional[Dict[str, Any]] = None
 
             try:
-                with container.tracer.start_as_current_span(
+                with current_services().tracer.start_as_current_span(
                     f"{metadata.name}.{config.span_name_suffix}"
                 ) as span:
                     try:
@@ -308,7 +381,9 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                         # still attached to the exception, and enrich the span
                         # WHILE it is still recording. Attributes set after the
                         # span context manager exits are dropped by the backend.
-                        error_details = _build_error_details(e, metadata)
+                        error_details = _build_error_details(
+                            e, metadata, invoke_context
+                        )
                         _record_span_error(span, e, error_details)
                         raise
 
@@ -317,11 +392,12 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 # Rebuild defensively only if the failure happened before the
                 # inner try (e.g. span creation itself).
                 if error_details is None:
-                    error_details = _build_error_details(e, metadata)
+                    error_details = _build_error_details(e, metadata, invoke_context)
 
-                # Log a full traceback once at the layer closest to the failure;
-                # outer layers log a concise summary (see _log_component_exception).
-                _log_component_exception(e, metadata, invoke_context, error_details)
+                # Emit one authoritative record (full traceback once, at the layer
+                # closest to the failure; outer layers emit a debug propagation
+                # record). See _report_component_exception.
+                _report_component_exception(e, metadata, error_details)
 
                 # Record failed event with both the human-readable string (kept
                 # for backward compatibility) and the structured details.
@@ -334,7 +410,28 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     error=str(e),
                     error_details=error_details,
                 )
-                await container.event_store.record_event(failed_event)
+                # A failure to persist the failed event must NOT replace the
+                # primary execution error. Report it as a secondary diagnostic
+                # (same error_id), annotate the primary, and re-raise the primary.
+                try:
+                    await current_services().event_store.record_event(failed_event)
+                except Exception as persist_error:
+                    error_id = error_details.get("error_id")
+                    arid = error_details.get("assistant_request_id")
+                    _safe_report(
+                        "Secondary failure: failed-event NOT persisted "
+                        f"(error_id={error_id} assistant_request_id={arid}); "
+                        "the failure will not be queryable from the event store: "
+                        f"{type(persist_error).__name__}: {persist_error}",
+                        level="warning",
+                    )
+                    try:
+                        e.add_note(  # Python 3.11+
+                            f"[grafi] failed to persist failed-event "
+                            f"(error_id={error_id}): {persist_error!r}"
+                        )
+                    except Exception:  # pragma: no cover - add_note always present
+                        pass
                 raise
             else:
                 # Record respond event
@@ -346,7 +443,9 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                     invoke_context=invoke_context,
                     output_data=output_data,
                 )
-                await container.event_store.record_event(respond_event)
+                await _record_lifecycle_event(
+                    respond_event, operation="respond", invoke_context=invoke_context
+                )
 
         return wrapper
 

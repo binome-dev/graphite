@@ -4,15 +4,17 @@ import shutil
 import uuid
 from pathlib import Path
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from tests_integration.rag_assistant.simple_rag_assistant import SimpleRagAssistant
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 try:
     from llama_index.core import SimpleDirectoryReader
@@ -81,4 +83,5 @@ async def test_rag_tool_async() -> None:
         print(f"Deleted {PERSIST_DIR} and all its contents")
 
 
-asyncio.run(test_rag_tool_async())
+with bind_services(runtime.services):
+    asyncio.run(test_rag_tool_async())

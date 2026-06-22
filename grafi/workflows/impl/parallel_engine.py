@@ -13,8 +13,6 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 
-from loguru import logger
-
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -74,16 +72,18 @@ async def invoke_parallel(
                             if i < len(run.nodes)
                             else f"node_{i}"
                         )
-                        logger.error(
-                            f"Node {node_name} failed during execution: {task_error}"
-                        )
                         for t in node_processing_task:
                             if not t.done():
                                 t.cancel()
                         run.stop()
+                        # The lifecycle decorator already reported this failure;
+                        # do not log again, and do not re-wrap an existing
+                        # NodeExecutionError for the same node.
+                        if isinstance(task_error, NodeExecutionError):
+                            raise task_error
                         raise NodeExecutionError(
                             node_name=node_name,
-                            message=f"Node {node_name} execution failed during workflow: {task_error}",
+                            message="Node execution failed",
                             invoke_context=invoke_context,
                             cause=task_error,
                         ) from task_error
@@ -125,13 +125,14 @@ async def invoke_parallel(
             if isinstance(result, Exception) and not isinstance(
                 result, asyncio.CancelledError
             ):
+                if isinstance(result, NodeExecutionError):
+                    raise result
                 node_name = (
                     list(run.nodes.keys())[i] if i < len(run.nodes) else f"node_{i}"
                 )
-                logger.error(f"Node {node_name} failed with exception: {result}")
                 raise NodeExecutionError(
                     node_name=node_name,
-                    message=f"Node {node_name} execution failed: {result}",
+                    message="Node execution failed",
                     invoke_context=invoke_context,
                     cause=result,
                 ) from result
@@ -223,11 +224,12 @@ async def _invoke_node(
                     get_async_output_events(node_output_events)
                 )
             except Exception as node_error:
-                logger.error(f"Error processing node {node.name}: {node_error}")
                 await run.tracker.force_stop()
+                if isinstance(node_error, NodeExecutionError):
+                    raise
                 raise NodeExecutionError(
                     node_name=node.name,
-                    message=f"Async node execution failed: {node_error}",
+                    message="Node execution failed",
                     invoke_context=invoke_context,
                     cause=node_error,
                 ) from node_error
@@ -235,18 +237,17 @@ async def _invoke_node(
                 await run.tracker.leave(node.name)
                 buffer.clear()
     except asyncio.CancelledError:
-        logger.info(f"Node {node.name} was cancelled")
+        # Cancellation is normal shutdown, not a failure -- do not log/report it.
         _cancel_all_active_tasks()
         raise
     except NodeExecutionError:
         _cancel_all_active_tasks()
         raise
     except Exception as e:
-        logger.error(f"Fatal error in node {node.name} execution: {e}")
         _cancel_all_active_tasks()
         raise NodeExecutionError(
             node_name=node.name,
-            message=f"Fatal error in node execution: {e}",
+            message="Node execution failed",
             invoke_context=invoke_context,
             cause=e,
         ) from e

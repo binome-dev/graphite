@@ -9,8 +9,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-from grafi.common.containers.container import container
-from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -55,6 +53,9 @@ class AssistantBase(BaseModel):
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Invoke the assistant's workflow with the provided input data asynchronously."""
+        # ``yield`` makes this an async generator (matching the concrete
+        # subclasses and Workflow.invoke), so callers can ``async for`` over it.
+        yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement 'invoke'.")
 
     def to_dict(self) -> dict[str, Any]:
@@ -135,16 +136,4 @@ class AssistantBaseBuilder(BaseBuilder[T_A]):
             Self for method chaining.
         """
         self.kwargs["type"] = type_name
-        return self
-
-    def event_store(self, event_store: EventStore) -> Self:
-        """Register an event store for persistence.
-
-        Args:
-            event_store: The event store implementation to use.
-
-        Returns:
-            Self for method chaining.
-        """
-        container.register_event_store(event_store)
         return self

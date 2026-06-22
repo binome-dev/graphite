@@ -2,7 +2,6 @@ from typing import List
 
 from loguru import logger
 
-from grafi.common.containers.container import container
 from grafi.common.events.component_events import AssistantRespondEvent
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
@@ -12,6 +11,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.runtime.execution_services import current_services
 from grafi.tools.command import Command
 
 
@@ -25,7 +25,8 @@ class LLMCommand(Command):
 
         # Get conversation history messages from the event store
 
-        conversation_events = await container.event_store.get_conversation_events(
+        event_store = current_services().event_store
+        conversation_events = await event_store.get_conversation_events(
             invoke_context.conversation_id
         )
 
@@ -47,7 +48,7 @@ class LLMCommand(Command):
                     all_messages.extend(output_event.data)
 
         # Retrieve agent events related to the current assistant request
-        agent_events = await container.event_store.get_agent_events(
+        agent_events = await event_store.get_agent_events(
             invoke_context.assistant_request_id
         )
         topic_events = {

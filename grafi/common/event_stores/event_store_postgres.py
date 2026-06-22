@@ -6,8 +6,6 @@ from typing import Optional
 from typing import Sequence
 from typing import cast
 
-from loguru import logger
-
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
 from grafi.common.exceptions import EventPersistenceError
@@ -102,6 +100,21 @@ class EventStorePostgres(EventStore):
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
 
+    @staticmethod
+    def _persistence_error(
+        message: str, operation: str, cause: Exception
+    ) -> EventPersistenceError:
+        """Build an :class:`EventPersistenceError` with stable message and the
+        operation (including any relevant identifier) as structured context.
+
+        Centralizes translation so every store method surfaces a consistent
+        domain error instead of a raw backend exception, and so the original
+        cause is always preserved (the lifecycle decorator emits the record)."""
+        err = EventPersistenceError(message=message, cause=cause)
+        # Captured by serialization's _DOMAIN_FIELDS for a precise diagnostic.
+        err.operation = operation  # type: ignore[attr-defined]
+        return err
+
     async def clear_events(self) -> None:
         """Clear all events from the database."""
         async with self.AsyncSession() as session:
@@ -110,8 +123,9 @@ class EventStorePostgres(EventStore):
                 await session.commit()
             except Exception as e:
                 await session.rollback()
-                logger.error(f"Failed to clear events: {e}")
-                raise
+                raise self._persistence_error(
+                    "Failed to clear events", "clear_events", e
+                ) from e
 
     def _row_to_event(self, row: "EventModel") -> Optional[Event]:
         """Decode a single ``EventModel`` row into an :class:`Event`.
@@ -139,8 +153,9 @@ class EventStorePostgres(EventStore):
 
                 return events
             except Exception as e:
-                logger.error(f"Failed to get events: {e}")
-                raise
+                raise self._persistence_error(
+                    "Failed to read events", "get_events", e
+                ) from e
 
     @staticmethod
     def _event_values(event: Event) -> dict:
@@ -175,10 +190,8 @@ class EventStorePostgres(EventStore):
                 await session.commit()
             except Exception as e:
                 await session.rollback()
-                logger.error(f"Failed to record event: {e}")
-                raise EventPersistenceError(
-                    message=f"Failed to record event: {e}",
-                    cause=e,
+                raise self._persistence_error(
+                    "Failed to record event", "record_event", e
                 ) from e
 
     async def record_events(self, events: Sequence[Event]) -> None:
@@ -201,10 +214,8 @@ class EventStorePostgres(EventStore):
                 await session.commit()
             except Exception as e:
                 await session.rollback()
-                logger.error(f"Failed to record events: {e}")
-                raise EventPersistenceError(
-                    message=f"Failed to record events: {e}",
-                    cause=e,
+                raise self._persistence_error(
+                    "Failed to record events", "record_events", e
                 ) from e
 
     async def get_event(self, event_id: str) -> Optional[Event]:
@@ -221,8 +232,9 @@ class EventStorePostgres(EventStore):
 
                 return self._row_to_event(row)
             except Exception as e:
-                logger.error(f"Failed to get event {event_id}: {e}")
-                raise
+                raise self._persistence_error(
+                    "Failed to read event", f"get_event:{event_id}", e
+                ) from e
 
     async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given assistant_request_id asynchronously."""
@@ -246,8 +258,11 @@ class EventStorePostgres(EventStore):
 
                 return events
             except Exception as e:
-                logger.error(f"Failed to get agent events {assistant_request_id}: {e}")
-                raise
+                raise self._persistence_error(
+                    "Failed to read agent events",
+                    f"get_agent_events:{assistant_request_id}",
+                    e,
+                ) from e
 
     async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID asynchronously."""
@@ -271,10 +286,11 @@ class EventStorePostgres(EventStore):
 
                 return events
             except Exception as e:
-                logger.error(
-                    f"Failed to get conversation events {conversation_id}: {e}"
-                )
-                raise
+                raise self._persistence_error(
+                    "Failed to read conversation events",
+                    f"get_conversation_events:{conversation_id}",
+                    e,
+                ) from e
 
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
         """Get all events for a given topic name and specific offsets asynchronously."""
@@ -322,8 +338,9 @@ class EventStorePostgres(EventStore):
 
                 return events
             except Exception as e:
-                logger.error(f"Failed to get topic events for {name}: {e}")
-                raise
+                raise self._persistence_error(
+                    "Failed to read topic events", f"get_topic_events:{name}", e
+                ) from e
 
     async def initialize(self) -> None:
         """Initialize the database tables asynchronously."""

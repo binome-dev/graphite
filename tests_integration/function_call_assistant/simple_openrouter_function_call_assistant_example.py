@@ -2,18 +2,20 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.function_call_assistant.simple_openrouter_function_call_assistant import (
     SimpleOpenRouterFunctionCallAssistant,
 )
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENROUTER_API_KEY", "")
 
@@ -87,4 +89,5 @@ async def test_simple_function_call_assistant() -> None:
     assert output == []
 
 
-asyncio.run(test_simple_function_call_assistant())
+with bind_services(runtime.services):
+    asyncio.run(test_simple_function_call_assistant())

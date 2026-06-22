@@ -5,16 +5,18 @@ import json
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from tests_integration.simple_llm_assistant.simple_multi_llm_assistant import (
     SimpleMultiLLMAssistant,
 )
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 
 def get_invoke_context() -> InvokeContext:
@@ -102,4 +104,5 @@ async def test_simple_multi_llm_assistant_async() -> None:
     assert len(await event_store.get_events()) == 57
 
 
-asyncio.run(test_simple_multi_llm_assistant_async())
+with bind_services(runtime.services):
+    asyncio.run(test_simple_multi_llm_assistant_async())

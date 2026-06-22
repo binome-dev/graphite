@@ -5,9 +5,6 @@ event store already has events for an assistant_request_id, the workflow restore
 topic state and resumes instead of starting fresh.
 """
 
-from unittest.mock import Mock
-from unittest.mock import patch
-
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -84,7 +81,7 @@ async def test_count_pending_consumable_reflects_restored_work():
 
 
 @pytest.mark.asyncio
-async def test_parallel_recovery_resumes_and_yields_output():
+async def test_parallel_recovery_resumes_and_yields_output(event_store):
     """A resumed parallel run must drain restored work, not quiesce immediately.
 
     Regression test: before seeding the tracker on recovery, the parallel path
@@ -93,18 +90,14 @@ async def test_parallel_recovery_resumes_and_yields_output():
     workflow, _input_topic, _node_name = _build_workflow()
     request_id = "recovery-parallel"
 
-    store = EventStoreInMemory()
-    await store.record_event(_pending_input_event(request_id))
+    # Pre-seed the bound store so the workflow recovers instead of starting fresh.
+    await event_store.record_event(_pending_input_event(request_id))
 
-    fake_container = Mock()
-    fake_container.event_store = store
-
-    with patch("grafi.workflows.impl.event_driven_workflow.container", fake_container):
-        outputs = []
-        async for event in workflow.invoke(
-            _pending_input_event(request_id), is_sequential=False
-        ):
-            outputs.append(event)
+    outputs = []
+    async for event in workflow.invoke(
+        _pending_input_event(request_id), is_sequential=False
+    ):
+        outputs.append(event)
 
     assert outputs, "resumed parallel workflow yielded no output (immediate quiescence)"
     assert any(
@@ -113,23 +106,18 @@ async def test_parallel_recovery_resumes_and_yields_output():
 
 
 @pytest.mark.asyncio
-async def test_sequential_recovery_resumes_and_yields_output():
+async def test_sequential_recovery_resumes_and_yields_output(event_store):
     """The sequential path also resumes restored work and yields output."""
     workflow, _input_topic, _node_name = _build_workflow()
     request_id = "recovery-sequential"
 
-    store = EventStoreInMemory()
-    await store.record_event(_pending_input_event(request_id))
+    await event_store.record_event(_pending_input_event(request_id))
 
-    fake_container = Mock()
-    fake_container.event_store = store
-
-    with patch("grafi.workflows.impl.event_driven_workflow.container", fake_container):
-        outputs = []
-        async for event in workflow.invoke(
-            _pending_input_event(request_id), is_sequential=True
-        ):
-            outputs.append(event)
+    outputs = []
+    async for event in workflow.invoke(
+        _pending_input_event(request_id), is_sequential=True
+    ):
+        outputs.append(event)
 
     assert outputs
     assert any(

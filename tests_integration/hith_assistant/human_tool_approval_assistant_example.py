@@ -2,18 +2,20 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.hith_assistant.human_tool_approval_assistant import (
     HumanApprovalAssistant,
 )
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -304,7 +306,9 @@ async def test_function_call_assistant_suggestion_mem() -> None:
     assert parsed_args["db_name"] == "staging.product_backup"
 
 
-asyncio.run(test_function_call_assistant())
-asyncio.run(test_function_call_assistant_disapproval())
+with bind_services(runtime.services):
+    asyncio.run(test_function_call_assistant())
+with bind_services(runtime.services):
+    asyncio.run(test_function_call_assistant_disapproval())
 # test_function_call_assistant_suggestion()
 # test_function_call_assistant_suggestion_mem()

@@ -95,9 +95,10 @@ class AsyncOutputQueue:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Output listener error for {topic.name}: {e}")
-                # Record the error and force termination so __anext__ wakes and
-                # re-raises it to the consumer instead of it being swallowed.
+                # Transport the error to the consumer via __anext__ (which
+                # re-raises it) and force termination so it is not swallowed. The
+                # lifecycle decorator emits the authoritative record when the
+                # re-raised error reaches the workflow layer, so do not log here.
                 if self._listener_error is None:
                     self._listener_error = e
                 await self.tracker.force_stop()
