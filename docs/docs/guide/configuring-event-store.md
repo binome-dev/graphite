@@ -110,19 +110,19 @@ Nothing fancy here, just initialization of context and setting up of variables.
 
 ### Event Store Initialization
 
-We create a PostgreSQL event store instance with the connection URL matching your Docker container configuration, we then register the event store with Graphite's dependency injection container to obtain a reference to the registered event store for later use.
+We create a PostgreSQL event store instance with the connection URL matching your Docker container configuration, then place it in an `ExecutionServices` bundle and build a `GrafiRuntime` from it. Invocations run through that runtime; we keep a reference to the store for reading events later.
 
 ```python
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
-from grafi.common.containers.container import container
+from grafi.runtime import GrafiRuntime, ExecutionServices
 
 postgres_event_store = EventStorePostgres(
     # must match what is in docker-compose.yaml
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
 
-container.register_event_store(postgres_event_store)
-event_store = container.event_store
+runtime = GrafiRuntime(ExecutionServices(event_store=postgres_event_store))
+event_store = runtime.services.event_store
 ```
 
 ## Running the agent and Retrieving Events
@@ -137,12 +137,13 @@ async def run_agent():
 
     react_agent = create_react_agent()
 
-    result = await react_agent.run(user_input, invoke_context)
+    # Run through the runtime so the agent uses the Postgres store.
+    result = await react_agent.run(user_input, invoke_context, runtime=runtime)
 
     print("Output from React Agent:", result)
 
 
-    events = event_store.get_conversation_events(conversation_id)
+    events = await event_store.get_conversation_events(conversation_id)
 
     print(f"Events for conversation {conversation_id}:")
 
@@ -170,19 +171,19 @@ import os
 import uuid
 
 from grafi.agents.react_agent import create_react_agent
-from grafi.common.containers.container import container
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime, ExecutionServices
 
 postgres_event_store = EventStorePostgres(
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
 
 
-container.register_event_store(postgres_event_store)
+runtime = GrafiRuntime(ExecutionServices(event_store=postgres_event_store))
 
-event_store = container.event_store
+event_store = runtime.services.event_store
 
 # Generate consistent IDs for the conversation
 conversation_id = uuid.uuid4().hex
@@ -211,12 +212,12 @@ async def run_agent():
 
     react_agent = create_react_agent()
 
-    result = await react_agent.run(user_input, invoke_context)
+    result = await react_agent.run(user_input, invoke_context, runtime=runtime)
 
     print("Output from React Agent:", result)
 
 
-    events = event_store.get_conversation_events(conversation_id)
+    events = await event_store.get_conversation_events(conversation_id)
 
     print(f"Events for conversation {conversation_id}:")
 

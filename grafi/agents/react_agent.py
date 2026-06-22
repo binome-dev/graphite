@@ -15,6 +15,7 @@ from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import GrafiRuntime
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -150,18 +151,31 @@ class ReActAgent(Assistant):
         )
 
     async def run(
-        self, question: str, invoke_context: Optional[InvokeContext] = None
+        self,
+        question: str,
+        invoke_context: Optional[InvokeContext] = None,
+        runtime: Optional[GrafiRuntime] = None,
     ) -> str:
+        # Run through the runtime, which binds the services scope. Pass a shared
+        # ``runtime`` to reuse a store/tracer across calls; otherwise a default
+        # in-process runtime is used for this call.
+        runtime = runtime or GrafiRuntime()
         output = await async_func_wrapper(
-            super().invoke(self.get_input(question, invoke_context))
+            runtime.invoke(self, self.get_input(question, invoke_context))
         )
 
         return output[0].data[0].content
 
     async def a_run(
-        self, question: str, invoke_context: Optional[InvokeContext] = None
+        self,
+        question: str,
+        invoke_context: Optional[InvokeContext] = None,
+        runtime: Optional[GrafiRuntime] = None,
     ) -> AsyncGenerator[Message, None]:
-        async for output in super().invoke(self.get_input(question, invoke_context)):
+        runtime = runtime or GrafiRuntime()
+        async for output in runtime.invoke(
+            self, self.get_input(question, invoke_context)
+        ):
             for message in output.data:
                 yield message
 

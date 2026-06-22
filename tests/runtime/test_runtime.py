@@ -71,3 +71,17 @@ class TestRuntimeInvokeBinding:
         assert a_direct is rt_a.services and a_task is rt_a.services
         assert b_direct is rt_b.services and b_task is rt_b.services
         assert rt_a.services is not rt_b.services
+
+    @pytest.mark.asyncio
+    async def test_binding_released_after_close(self, bound_services):
+        # A distinct runtime from the test's autouse-bound services.
+        rt = GrafiRuntime()
+        assert rt.services is not bound_services
+
+        agen = rt.invoke(_ProbeAssistant(), None)
+        direct, _ = await agen.__anext__()
+        # The runtime's services are bound while the stream is iterated...
+        assert direct is rt.services
+        # ...and the prior (outer) binding is restored once it is closed.
+        await agen.aclose()
+        assert current_services() is bound_services

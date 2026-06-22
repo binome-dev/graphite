@@ -230,13 +230,21 @@ This function is not part of the framework, but rather a helper function used to
 class FinanceAssistant(Assistant):
 
     ...
-    async def run(self, question: str, invoke_context: Optional[InvokeContext] = None) -> str:
+    async def run(
+        self,
+        question: str,
+        invoke_context: Optional[InvokeContext] = None,
+        runtime: Optional[GrafiRuntime] = None,  # from grafi.runtime import GrafiRuntime
+    ) -> str:
         """Run the assistant with a question and return the response."""
         # Call helper function get_input()
-        input_event= self.get_input(question, invoke_context)
-        # This is the line that invokes the workflow
+        input_event = self.get_input(question, invoke_context)
+        # Run through a runtime, which binds the services (event store / tracer /
+        # error reporter) for the invocation. Pass a shared `runtime` to reuse a
+        # store across calls; otherwise a default in-process runtime is used.
+        runtime = runtime or GrafiRuntime()
         response_str = ""
-        async for output in super().invoke(input_event):
+        async for output in runtime.invoke(self, input_event):
             # Handle different content types
             if output and len(output) > 0:
                 content = output.data[0].content

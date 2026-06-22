@@ -129,31 +129,34 @@ def _include_traceback() -> bool:
     return env_bool("GRAFI_ERROR_INCLUDE_TRACEBACK", default=True)
 
 
-def _error_id_for(exc: Exception) -> str:
-    """Return the correlation id for ``exc``, creating one if the chain has none.
+def _error_correlation(exc: Exception) -> tuple[str, BaseException]:
+    """Walk the cause chain once and return ``(error_id, root_cause)``.
 
-    Scans the cause chain so a re-wrapped outer exception inherits the id minted
-    at the layer closest to the root failure; the id is stashed on the exception
-    so the next decorator layer reuses it.
+    The error id is the one already stashed on any link of the chain (so a
+    re-wrapped outer exception inherits the id minted at the layer closest to the
+    root failure); if the chain has none, mint one and stash it on ``exc`` for
+    the next decorator layer. The root cause is the innermost link.
     """
-    for link in iter_cause_chain(exc, max_depth=1000):
-        existing = getattr(link, _ERROR_ID_ATTR, None)
-        if existing:
-            return str(existing)
-    error_id = uuid.uuid4().hex[:12]
-    try:
-        setattr(exc, _ERROR_ID_ATTR, error_id)
-    except Exception:  # pragma: no cover - builtins generally allow attributes
-        pass
-    return error_id
-
-
-def _root_cause(exc: Exception) -> BaseException:
-    """Return the innermost exception in the cause chain (the root failure)."""
+    error_id: Optional[str] = None
     root: BaseException = exc
     for link in iter_cause_chain(exc, max_depth=1000):
+        if error_id is None:
+            existing = getattr(link, _ERROR_ID_ATTR, None)
+            if existing:
+                error_id = str(existing)
         root = link
-    return root
+    if error_id is None:
+        error_id = uuid.uuid4().hex[:12]
+        try:
+            setattr(exc, _ERROR_ID_ATTR, error_id)
+        except Exception:  # pragma: no cover - builtins generally allow attributes
+            pass
+    return error_id, root
+
+
+def _error_id_for(exc: Exception) -> str:
+    """Return the correlation id for ``exc`` (minting one if the chain has none)."""
+    return _error_correlation(exc)[0]
 
 
 def _build_error_details(
@@ -166,7 +169,9 @@ def _build_error_details(
     cause, and a stable ``error_id`` shared across the wrapper chain.
     """
     details = error_to_dict(exc, include_traceback=_include_traceback())
-    details["error_id"] = _error_id_for(exc)
+    # One pass over the cause chain yields both the correlation id and the root.
+    error_id, root = _error_correlation(exc)
+    details["error_id"] = error_id
     # Identify which component failed (the "where").
     details["component_id"] = metadata.id
     details["component_name"] = metadata.name
@@ -178,7 +183,6 @@ def _build_error_details(
         invoke_context, "assistant_request_id", None
     )
     # The original failure at the bottom of the chain (the "why, ultimately").
-    root = _root_cause(exc)
     details["root_error_type"] = type(root).__name__
     details["root_error_message"] = error_message(root)
     return details
@@ -394,9 +398,9 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 if error_details is None:
                     error_details = _build_error_details(e, metadata, invoke_context)
 
-                # Emit one authoritative record (full traceback once, at the layer
-                # closest to the failure; outer layers emit a debug propagation
-                # record). See _report_component_exception.
+                # Log one concise line for this failure -- once, at the layer
+                # closest to it; outer layers add nothing. See
+                # _report_component_exception.
                 _report_component_exception(e, metadata, error_details)
 
                 # Record failed event with both the human-readable string (kept

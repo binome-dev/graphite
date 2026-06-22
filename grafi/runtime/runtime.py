@@ -47,8 +47,11 @@ class GrafiRuntime:
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
         """Bind this runtime's services and stream the assistant's output.
 
-        The binding is active for the whole iteration and reset on exit; child
-        ``asyncio`` tasks spawned during execution inherit it.
+        The binding is active while the result is iterated and is released when
+        iteration finishes or the generator is closed. ``asyncio`` tasks spawned
+        during execution inherit it. Fully draining the stream releases it
+        promptly; if you break early, the binding is released when the generator
+        is closed (``aclose``, or when it goes out of scope).
         """
         with bind_services(self._services):
             async for event in assistant.invoke(input_data, is_sequential):
