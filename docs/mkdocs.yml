@@ -72,7 +72,7 @@ nav:
       - Event Store: user-guide/events/event_store.md
       - Event Graph: user-guide/events/event_graph.md
     - Infrastructure:
-      - Containers: user-guide/containers.md
+      - Runtime & Dependency Injection: user-guide/runtime.md
       - Models: user-guide/models.md
       - Builder Pattern: user-guide/builder-pattern.md
       - Invoke Decorators: user-guide/invoke-decorators.md

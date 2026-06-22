@@ -136,11 +136,12 @@ class OllamaTool(LLM):
             # tool error (matches the other LLM tools' cancellation contract).
             raise
         except Exception as e:
-            logger.error("Ollama API error: %s", e)
+            # The lifecycle decorator emits the authoritative record; raise a
+            # domain error with a stable message and the original cause attached.
             raise LLMToolException(
                 tool_name=self.name,
                 model=self.model,
-                message=f"Ollama async call failed: {e}",
+                message="Ollama async call failed",
                 invoke_context=invoke_context,
                 cause=e,
             ) from e

@@ -83,9 +83,14 @@ ollama_tool = (
 # Create input messages
 messages = [Message(role="user", content="Hello, how are you?")]
 
+# Invoking a tool directly goes through the lifecycle decorator, which resolves
+# the runtime services -- so bind a scope first (ExecutionServices() = defaults).
+from grafi.runtime import bind_services, ExecutionServices
+
 # Asynchronous invocation
-async for response in ollama_tool.invoke(invoke_context, messages):
-    print(response[0].content)
+with bind_services(ExecutionServices()):
+    async for response in ollama_tool.invoke(invoke_context, messages):
+        print(response[0].content)
 ```
 
 ### Streaming Usage
@@ -103,10 +108,11 @@ ollama_tool = (
 # Asynchronous streaming
 async def stream_example():
     messages = [Message(role="user", content="Tell me a story")]
-    async for message_batch in ollama_tool.invoke(invoke_context, messages):
-        for message in message_batch:
-            if message.content:
-                print(message.content, end="", flush=True)
+    with bind_services(ExecutionServices()):
+        async for message_batch in ollama_tool.invoke(invoke_context, messages):
+            for message in message_batch:
+                if message.content:
+                    print(message.content, end="", flush=True)
 ```
 
 ### Function Calling

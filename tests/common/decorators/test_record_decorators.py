@@ -2,12 +2,10 @@
 
 import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import to_jsonable_python
 
-from grafi.common.containers.container import container
 from grafi.common.decorators.record_base import _TRACEBACK_LOGGED_ATTR
 from grafi.common.decorators.record_base import EventContext
 from grafi.common.decorators.record_base import _traceback_already_logged
@@ -18,26 +16,9 @@ from grafi.common.exceptions.tool_exceptions import FunctionCallException
 from grafi.common.exceptions.workflow_exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-
-
-@pytest.fixture
-def isolated_container():
-    """Register an isolated in-memory store and a no-op tracer, then restore.
-
-    Using a mock tracer avoids the live ``setup_tracing`` path (a socket probe to
-    localhost:4317 and possible global instrumentation side effects). The previous
-    container state is restored so the global singleton does not leak across tests.
-    """
-    prev_store = container._event_store
-    prev_tracer = container._tracer
-    store = EventStoreInMemory()
-    container.register_event_store(store)
-    container.register_tracer(MagicMock())
-    try:
-        yield store
-    finally:
-        container._event_store = prev_store
-        container._tracer = prev_tracer
+from grafi.runtime.execution_services import ErrorReporter
+from grafi.runtime.execution_services import ExecutionServices
+from grafi.runtime.execution_services import bind_services
 
 
 class TestEventContext:
@@ -145,9 +126,7 @@ class TestFailedEventErrorDetails:
     """The decorator records structured error details and re-raises."""
 
     @pytest.mark.asyncio
-    async def test_failed_event_carries_error_details(self, isolated_container):
-        event_store = isolated_container
-
+    async def test_failed_event_carries_error_details(self, event_store):
         tool = _ExplodingTool()
         invoke_context = InvokeContext(
             conversation_id="conversation_id",
@@ -239,12 +218,13 @@ class TestSpanErrorEnrichment:
 
     @pytest.mark.asyncio
     async def test_error_attributes_recorded_before_span_ends(self):
-        prev_store = container._event_store
-        prev_tracer = container._tracer
         tracer = _RecordingTracer()
-        container.register_event_store(EventStoreInMemory())
-        container.register_tracer(tracer)
-        try:
+        services = ExecutionServices(
+            event_store=EventStoreInMemory(),
+            tracer=tracer,
+            error_reporter=ErrorReporter(),
+        )
+        with bind_services(services):
             tool = _ExplodingTool()
             invoke_context = InvokeContext(
                 conversation_id="c",
@@ -256,9 +236,6 @@ class TestSpanErrorEnrichment:
                     invoke_context, [Message(role="user", content="hi")]
                 ):
                     pass
-        finally:
-            container._event_store = prev_store
-            container._tracer = prev_tracer
 
         span = tracer.span
         # The span was ended by the context manager exit.

@@ -4,17 +4,16 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.instrumentations.tracing import TracingOptions
-from grafi.common.instrumentations.tracing import setup_tracing
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from tests_integration.input_output_topics.mimo_llm_assistant import MIMOLLMAssistant
 
-container.register_tracer(setup_tracing(tracing_options=TracingOptions.IN_MEMORY))
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -111,4 +110,5 @@ async def test_mimo_llm_assistant() -> None:
     assert len(await event_store.get_events()) == 65
 
 
-asyncio.run(test_mimo_llm_assistant())
+with bind_services(runtime.services):
+    asyncio.run(test_mimo_llm_assistant())

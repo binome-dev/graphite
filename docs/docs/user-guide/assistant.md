@@ -129,7 +129,6 @@ The `AssistantBaseBuilder` provides a fluent interface for constructing assistan
 
 ```python
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.common.event_stores.in_memory_event_store import InMemoryEventStore
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 builder = AssistantBaseBuilder(MyAssistant)
@@ -137,6 +136,9 @@ assistant = (builder
     .name("Customer Support Assistant")
     .type("support")
     .oi_span_type(OpenInferenceSpanKindValues.AGENT)
-    .event_store(InMemoryEventStore())
     .build())
+
+# The event store / tracer are supplied at runtime, not on the assistant:
+#   runtime = GrafiRuntime(ExecutionServices(event_store=...))
+#   async for event in runtime.invoke(assistant, input_data): ...
 ```

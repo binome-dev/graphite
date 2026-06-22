@@ -237,7 +237,7 @@ class ClaudeTool(LLM):
             raise LLMToolException(
                 tool_name=self.name,
                 model=self.model,
-                message=f"Anthropic async call failed: {exc}",
+                message="Anthropic async call failed",
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc

@@ -178,20 +178,20 @@ tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
 ### Example 1: Basic Setup with AUTO Detection
 
 ```python
-from grafi.common.containers.container import container
+from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
-# Register the tracer with auto-detection
+# Build a runtime that uses the auto-detected tracer
 tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-container.register_tracer(tracer)
+runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
 
-# Your assistant code here
+# Invoke assistants through `runtime`
 ```
 
 ### Example 2: Export to an OTLP Collector
 
 ```python
-from grafi.common.containers.container import container
+from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
 tracer = setup_tracing(
@@ -200,22 +200,22 @@ tracer = setup_tracing(
     collector_port=4317,
     project_name="my-assistant",
 )
-container.register_tracer(tracer)
+runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
 
-# Your assistant code here
+# Invoke assistants through `runtime`
 ```
 
 ### Example 3: Testing with In-Memory Tracing
 
 ```python
-from grafi.common.containers.container import container
+from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 
 # Use in-memory tracing for tests
 tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
-container.register_tracer(tracer)
+runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
 
-# Your test code here
+# Invoke assistants through `runtime` in your test
 ```
 
 ### Example 4: Complete Assistant with Tracing
@@ -224,7 +224,7 @@ container.register_tracer(tracer)
 import os
 import uuid
 import asyncio
-from grafi.common.containers.container import container
+from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
 from grafi.common.models.async_result import async_func_wrapper
@@ -232,12 +232,12 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.assistants.assistant_base import AssistantBase
 
-# Setup tracing
+# Setup tracing and build a runtime that uses it
 tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-container.register_tracer(tracer)
+runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
 
-# Get event store
-event_store = container.event_store
+# Reference the event store (the default in-memory store here)
+event_store = runtime.services.event_store
 
 # Create your assistant
 async def main():
@@ -264,7 +264,7 @@ async def main():
     )
 
     output = await async_func_wrapper(
-        assistant.invoke(input_data, is_sequential=True)
+        runtime.invoke(assistant, input_data, is_sequential=True)
     )
     print(output)
 
@@ -305,11 +305,11 @@ tracer = setup_tracing(
 Set up tracing early in your application lifecycle, before creating assistants:
 
 ```python
-# Good: Setup tracing first
+# Good: Setup tracing first, build the runtime from it
 tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-container.register_tracer(tracer)
+runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
 
-# Then create assistants
+# Then create assistants and invoke them through `runtime`
 assistant = MyAssistant.builder().build()
 ```
 
@@ -341,13 +341,14 @@ Use IN_MEMORY mode in tests to avoid external dependencies:
 ```python
 import pytest
 from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
+from grafi.runtime import bind_services, ExecutionServices
 
 @pytest.fixture(autouse=True)
 def setup_test_tracing():
     tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
-    container.register_tracer(tracer)
-    yield
-    # Cleanup if needed
+    # Bind a scope for the test so component invocations resolve these services.
+    with bind_services(ExecutionServices(tracer=tracer)):
+        yield
 ```
 
 ## Troubleshooting
@@ -401,9 +402,9 @@ def setup_test_tracing():
 
 **Solution**:
 1. Ensure OpenAI is instrumented (done automatically by `setup_tracing`)
-2. Verify the tracer is registered before creating assistants:
+2. Build the runtime with your tracer and invoke through it:
    ```python
-   container.register_tracer(tracer)  # Must be before assistant creation
+   runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
    ```
 
 ### Issue: Traces showing in wrong project

@@ -36,6 +36,7 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.exceptions import WorkflowError
 from grafi.nodes.node_base import NodeBase
+from grafi.runtime.execution_services import current_services
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
@@ -47,13 +48,19 @@ from grafi.workflows.impl.sequential_engine import invoke_sequential
 class WorkflowRun:
     """Mutable runtime state for a single workflow invocation."""
 
-    def __init__(self, definition: Any, event_store: Any) -> None:
+    def __init__(self, definition: Any, event_store: Any = None) -> None:
         # Read-only references into the shared definition.
         self.name: str = definition.name
         self.type: str = definition.type
         self.nodes: Dict[str, NodeBase] = definition.nodes
         self.topic_nodes: Dict[str, List[str]] = definition._topic_nodes
-        self.event_store = event_store
+        # The event store is resolved from the runtime services bound for this
+        # invocation. ``event_store`` may be passed explicitly (tests / advanced
+        # callers); production code constructs ``WorkflowRun(self)`` inside a
+        # ``GrafiRuntime.invoke`` scope and lets it resolve from there.
+        self.event_store = (
+            event_store if event_store is not None else current_services().event_store
+        )
 
         # Per-run topic instances: same config, fresh queue.
         self.topics: Dict[str, TopicBase] = {
@@ -204,7 +211,7 @@ class WorkflowRun:
             raise
         except Exception as e:
             raise WorkflowError(
-                message=f"Workflow {self.name} async execution failed: {e}",
+                message=f"Workflow {self.name} execution failed",
                 invoke_context=invoke_context,
                 cause=e,
             ) from e

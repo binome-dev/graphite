@@ -64,10 +64,13 @@ async def invoke_sequential(
                     events.extend(published_events)
 
                     await run.event_store.record_events(events)
+                except NodeExecutionError:
+                    # Already a node failure for this node; do not re-wrap.
+                    raise
                 except Exception as e:
                     raise NodeExecutionError(
                         node_name=node.name,
-                        message=f"Node execution failed: {e}",
+                        message="Node execution failed",
                         invoke_context=invoke_context,
                         cause=e,
                     ) from e

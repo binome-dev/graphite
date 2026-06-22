@@ -2,17 +2,19 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.simple_stream_assistant.simple_stream_function_call_assistant import (
     SimpleStreamFunctionCallAssistant,
 )
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -72,4 +74,5 @@ async def test_simple_function_call_assistant_no_function_call() -> None:
     assert content is not None
 
 
-asyncio.run(test_simple_function_call_assistant_no_function_call())
+with bind_services(runtime.services):
+    asyncio.run(test_simple_function_call_assistant_no_function_call())

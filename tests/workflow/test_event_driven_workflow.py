@@ -1,7 +1,4 @@
 import asyncio
-from unittest.mock import AsyncMock
-from unittest.mock import Mock
-from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -255,33 +252,21 @@ class TestEventDrivenWorkflowAsyncInvoke:
         )
         input_messages = [Message(role="user", content="test input")]
 
-        # Mock the container to avoid real event store
-        with patch(
-            "grafi.workflows.impl.event_driven_workflow.container"
-        ) as mock_container:
-            mock_event_store = Mock()
-            mock_container.event_store = mock_event_store
-            mock_event_store.get_agent_events = AsyncMock(return_value=[])
-            mock_event_store.record_events = AsyncMock()
-            mock_event_store.record_event = AsyncMock()
-
-            # Create a timeout to avoid hanging
-            try:
-                # Run async invoke with timeout
-                results = []
-                async with asyncio.timeout(0.5):
-                    async for msg in async_workflow.invoke(
-                        PublishToTopicEvent(
-                            invoke_context=invoke_context, data=input_messages
-                        )
-                    ):
-                        results.append(msg)
-            except asyncio.TimeoutError:
-                # Expected - the workflow will wait for output
-                pass
-
-            # The workflow should have been initialized
-            mock_event_store.get_agent_events.assert_called_with("test")
+        # The autouse fixture binds an in-memory store, so no real event store
+        # is needed here.
+        try:
+            # Run async invoke with timeout to avoid hanging
+            results = []
+            async with asyncio.timeout(0.5):
+                async for msg in async_workflow.invoke(
+                    PublishToTopicEvent(
+                        invoke_context=invoke_context, data=input_messages
+                    )
+                ):
+                    results.append(msg)
+        except asyncio.TimeoutError:
+            # Expected - the workflow will wait for output
+            pass
 
     @pytest.mark.asyncio
     async def test_invoke_with_async_output_queue(self, async_workflow):

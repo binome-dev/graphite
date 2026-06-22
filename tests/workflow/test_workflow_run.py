@@ -7,7 +7,6 @@ stop-forwarding from the definition, and the seeding/recovery in ``init``.
 """
 
 import uuid
-from unittest.mock import Mock
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -109,12 +108,6 @@ def _and_workflow() -> EventDrivenWorkflow:
         publish_to=[output_topic],
     )
     return EventDrivenWorkflow.builder().node(node).build()
-
-
-def _patch_container(monkeypatch, store: EventStoreInMemory) -> None:
-    fake = Mock()
-    fake.event_store = store
-    monkeypatch.setattr("grafi.workflows.impl.event_driven_workflow.container", fake)
 
 
 # --------------------------------------------------------------------------- #
@@ -301,11 +294,8 @@ class TestProgressPossible:
 class TestRunErrorHandling:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("sequential", [False, True])
-    async def test_node_failure_raises_node_execution_error(
-        self, sequential, monkeypatch
-    ):
+    async def test_node_failure_raises_node_execution_error(self, sequential):
         wf = _workflow(tool=BoomTool())
-        _patch_container(monkeypatch, EventStoreInMemory())
 
         with pytest.raises(NodeExecutionError):
             async for _ in wf.invoke(_pub(), is_sequential=sequential):
@@ -340,9 +330,8 @@ class TestStopForwarding:
         assert run._stop_requested
 
     @pytest.mark.asyncio
-    async def test_active_runs_cleared_after_invoke(self, monkeypatch):
+    async def test_active_runs_cleared_after_invoke(self):
         wf = _workflow()
-        _patch_container(monkeypatch, EventStoreInMemory())
 
         _ = [event async for event in wf.invoke(_pub(), is_sequential=False)]
 

@@ -4,13 +4,14 @@ import uuid
 
 from pydantic import BaseModel
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
@@ -27,7 +28,8 @@ class UserForm(BaseModel):
     gender: str
 
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -262,11 +264,19 @@ async def test_openai_tool_structured_output_serialization() -> None:
     assert len(await event_store.get_events()) == 2
 
 
-asyncio.run(test_openai_tool_with_chat_param())
-asyncio.run(test_openai_tool_with_structured_output())
-asyncio.run(test_openai_tool_stream())
-asyncio.run(test_openai_tool_async())
-asyncio.run(test_llm_stream_node())
-asyncio.run(test_openai_tool_serialization())
-asyncio.run(test_openai_tool_with_chat_param_serialization())
-asyncio.run(test_openai_tool_structured_output_serialization())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_with_chat_param())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_with_structured_output())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_stream())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_async())
+with bind_services(runtime.services):
+    asyncio.run(test_llm_stream_node())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_serialization())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_with_chat_param_serialization())
+with bind_services(runtime.services):
+    asyncio.run(test_openai_tool_structured_output_serialization())

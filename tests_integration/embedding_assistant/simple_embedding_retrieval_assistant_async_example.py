@@ -11,17 +11,19 @@ import chromadb
 from chromadb import Collection
 from llama_index.embeddings.openai import OpenAIEmbedding
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant import (
     SimpleEmbeddingRetrievalAssistant,
 )
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 CURRENT_DIR = Path(__file__).parent
 PERSIST_DIR = CURRENT_DIR / "storage"
@@ -123,4 +125,5 @@ async def test_simple_embedding_retrieval_tool_async() -> None:
     assert len(await event_store.get_events()) == 12
 
 
-asyncio.run(test_simple_embedding_retrieval_tool_async())
+with bind_services(runtime.services):
+    asyncio.run(test_simple_embedding_retrieval_tool_async())

@@ -157,7 +157,7 @@ class OpenAICompatibleTool(LLM):
             raise LLMToolException(
                 tool_name=tool_name,
                 model=self.model,
-                message=f"{self._provider_label} API call failed: {exc}",
+                message=f"{self._provider_label} API call failed",
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc
@@ -165,7 +165,7 @@ class OpenAICompatibleTool(LLM):
             raise LLMToolException(
                 tool_name=tool_name,
                 model=self.model,
-                message=f"Unexpected error during {self._provider_label} call: {exc}",
+                message=f"Unexpected error during {self._provider_label} call",
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc

@@ -6,9 +6,6 @@ single event fanned out to several subscribers was declared quiescent after only
 the first subscriber committed -- silently dropping the rest of the work.
 """
 
-from unittest.mock import Mock
-from unittest.mock import patch
-
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -97,17 +94,13 @@ async def test_parallel_fanout_yields_every_subscriber_output():
     workflow = _build_fanout_workflow()
     request_id = "fanout-parallel"
 
-    fake_container = Mock()
-    fake_container.event_store = EventStoreInMemory()
-
-    with patch("grafi.workflows.impl.event_driven_workflow.container", fake_container):
-        contents = [
-            msg.content
-            async for event in workflow.invoke(
-                _input_event(request_id), is_sequential=False
-            )
-            for msg in event.data
-        ]
+    contents = [
+        msg.content
+        async for event in workflow.invoke(
+            _input_event(request_id), is_sequential=False
+        )
+        for msg in event.data
+    ]
 
     assert "resp-a" in contents
     assert "resp-b" in contents
@@ -150,16 +143,12 @@ async def test_parallel_does_not_hang_on_unsatisfied_and_subscription():
     )
     workflow = EventDrivenWorkflow.builder().node(firing).node(stuck).build()
 
-    fake_container = Mock()
-    fake_container.event_store = EventStoreInMemory()
-
-    with patch("grafi.workflows.impl.event_driven_workflow.container", fake_container):
-        contents = []
-        async with asyncio.timeout(10):  # fails loudly if it hangs
-            async for event in workflow.invoke(
-                _input_event("and-sub"), is_sequential=False
-            ):
-                contents.extend(msg.content for msg in event.data)
+    contents = []
+    async with asyncio.timeout(10):  # fails loudly if it hangs
+        async for event in workflow.invoke(
+            _input_event("and-sub"), is_sequential=False
+        ):
+            contents.extend(msg.content for msg in event.data)
 
     # The firing node's output is produced; the stuck AND-node never fires.
     assert "resp-ok" in contents

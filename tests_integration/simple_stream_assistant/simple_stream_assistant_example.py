@@ -4,15 +4,17 @@ import asyncio
 import os
 import uuid
 
-from grafi.common.containers.container import container
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import GrafiRuntime
+from grafi.runtime.execution_services import bind_services
 from tests_integration.simple_stream_assistant.simple_stream_assistant import (
     SimpleStreamAssistant,
 )
 
-event_store = container.event_store
+runtime = GrafiRuntime()
+event_store = runtime.services.event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -75,4 +77,5 @@ async def test_simple_llm_assistant() -> None:
     # print(f"Saved {len(events)} events to events.json")
 
 
-asyncio.run(test_simple_llm_assistant())
+with bind_services(runtime.services):
+    asyncio.run(test_simple_llm_assistant())
