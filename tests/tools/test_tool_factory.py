@@ -230,7 +230,7 @@ async def test_tool_factory_lazy_registration_without_explicit_register():
         "type": "GeminiTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "gemini-2.5-flash-lite",
+        "model": "gemini-3.5-flash",
         "chat_params": {},
         "is_streaming": False,
         "structured_output": False,
