@@ -109,10 +109,12 @@ jobs:
 
       - name: Run Integration Tests - agents
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/agents/run_agents.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - agents" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -152,10 +154,12 @@ jobs:
 
       - name: Run Integration Tests - embedding_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/embedding_assistant/run_embedding_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - embedding_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -195,10 +199,12 @@ jobs:
 
       - name: Run Integration Tests - function_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/function_assistant/run_function_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - function_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -238,10 +244,12 @@ jobs:
 
       - name: Run Integration Tests - function_call_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/function_call_assistant/run_function_call_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - function_call_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -281,10 +289,12 @@ jobs:
 
       - name: Run Integration Tests - hith_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/hith_assistant/run_hith_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - hith_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -324,10 +334,12 @@ jobs:
 
       - name: Run Integration Tests - input_output_topics
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/input_output_topics/run_input_output_topics.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - input_output_topics" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -367,10 +379,12 @@ jobs:
 
       - name: Run Integration Tests - invoke_kwargs
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/invoke_kwargs/run_invoke_kwargs.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - invoke_kwargs" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -410,10 +424,12 @@ jobs:
 
       - name: Run Integration Tests - multimodal_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/multimodal_assistant/run_multimodal_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - multimodal_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -453,10 +469,12 @@ jobs:
 
       - name: Run Integration Tests - rag_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/rag_assistant/run_rag_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - rag_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -496,10 +514,12 @@ jobs:
 
       - name: Run Integration Tests - react_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/react_assistant/run_react_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - react_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -539,10 +559,12 @@ jobs:
 
       - name: Run Integration Tests - simple_llm_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/simple_llm_assistant/run_simple_llm_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - simple_llm_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -582,10 +604,12 @@ jobs:
 
       - name: Run Integration Tests - simple_stream_assistant
         run: |
-          set -e
+          set +e
           output=$(uv run python tests_integration/simple_stream_assistant/run_simple_stream_assistant.py)
+          status=$?
+          set -e
           echo "$output"
-          if echo "$output" | grep -q "Failed:"; then
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
             echo "### Integration Test Results - simple_stream_assistant" >> $GITHUB_STEP_SUMMARY
             echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
             exit 1
