@@ -57,9 +57,9 @@ class GeminiTool(LLM):
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
     api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
-    # Lowest-cost current Gemini tier; upgrade to "gemini-2.5-flash"/"gemini-2.5-pro"
-    # for harder tasks.
-    model: str = Field(default="gemini-2.5-flash-lite")
+    # Capable current Gemini tier; use "gemini-3.1-flash-lite" for lower cost or
+    # "gemini-3.1-pro-preview" for the hardest tasks.
+    model: str = Field(default="gemini-3.5-flash")
     thinking_budget: Optional[int] = Field(
         default=None,
         description=(
@@ -290,7 +290,7 @@ class GeminiTool(LLM):
             .is_streaming(data.get("is_streaming", False))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("GEMINI_API_KEY"))
-            .model(data.get("model", "gemini-2.5-flash-lite"))
+            .model(data.get("model", "gemini-3.5-flash"))
             .thinking_budget(data.get("thinking_budget"))
             .build()
         )

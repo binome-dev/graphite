@@ -31,7 +31,7 @@ def gemini_instance() -> GeminiTool:
         system_message="dummy system message",
         name="GeminiTool",
         api_key="test_api_key",
-        model="gemini-2.5-flash-lite",
+        model="gemini-3.5-flash",
     )
 
 
@@ -40,7 +40,7 @@ def gemini_instance() -> GeminiTool:
 # --------------------------------------------------------------------------- #
 def test_init(gemini_instance):
     assert gemini_instance.api_key == "test_api_key"
-    assert gemini_instance.model == "gemini-2.5-flash-lite"
+    assert gemini_instance.model == "gemini-3.5-flash"
     assert gemini_instance.system_message == "dummy system message"
 
 
@@ -77,7 +77,7 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
     # Ensure generate_content called with correct args
     mock_client.aio.models.generate_content.assert_called_once()
     call_kwargs = mock_client.aio.models.generate_content.call_args[1]
-    assert call_kwargs["model"] == "gemini-2.5-flash-lite"
+    assert call_kwargs["model"] == "gemini-3.5-flash"
 
     # System prompt is delivered via config.system_instruction (SDK-native),
     # not faked as a leading user turn; contents holds only the real turns.
@@ -190,7 +190,7 @@ def test_to_dict(gemini_instance):
     assert d["name"] == "GeminiTool"
     assert d["type"] == "GeminiTool"
     assert d["api_key"] == "****************"
-    assert d["model"] == "gemini-2.5-flash-lite"
+    assert d["model"] == "gemini-3.5-flash"
 
 
 # --------------------------------------------------------------------------- #
@@ -206,7 +206,7 @@ async def test_from_dict():
         "type": "GeminiTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "gemini-2.5-flash-lite",
+        "model": "gemini-3.5-flash",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
         "structured_output": False,
@@ -216,7 +216,7 @@ async def test_from_dict():
 
     assert isinstance(tool, GeminiTool)
     assert tool.name == "TestGemini"
-    assert tool.model == "gemini-2.5-flash-lite"
+    assert tool.model == "gemini-3.5-flash"
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
 
@@ -244,7 +244,7 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
     tool = GeminiTool(
-        api_key="test_api_key", model="gemini-2.5-flash-lite", thinking_budget=128
+        api_key="test_api_key", model="gemini-3.5-flash", thinking_budget=128
     )
 
     mock_response = Mock()
