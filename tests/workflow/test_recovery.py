@@ -13,6 +13,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -41,7 +43,7 @@ def _build_workflow() -> tuple[EventDrivenWorkflow, InputTopic, str]:
         type="Node",
         tool=EchoTool(),
         subscribed_expressions=[TopicExpr(topic=input_topic)],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     workflow = EventDrivenWorkflow.builder().node(node).build()
     return workflow, input_topic, node.name

@@ -9,7 +9,9 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.callable_component import CallableComponent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.models.message import Messages
 from grafi.nodes.node import Node
+from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -19,18 +21,21 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 class ContainsKeyword(CallableComponent):
-    """Route when the last message's content contains *keyword* (case-insensitive).
+    """Publisher-route predicate: True when the last message contains *keyword*.
 
-    A parameterized, serializable condition demonstrating the CallableComponent
-    pattern: the manifest stores
-    ``{"component": "...:ContainsKeyword", "config": {"keyword": "hello"}}`` --
-    config data, no embedded code.
+    A parameterized, serializable predicate; the manifest stores
+    ``{"component": "...:ContainsKeyword", "config": {"keyword": "hello"}}``.
     """
 
     keyword: str
 
     def __call__(self, event: PublishToTopicEvent) -> bool:
         return self.keyword in str(event.data[-1].content).lower()
+
+
+def forward_input(messages: Messages) -> str:
+    """Identity router tool: re-emit the user's text so it can be content-routed."""
+    return str(messages[-1].content or "")
 
 
 class MIMOLLMAssistant(Assistant):
@@ -76,25 +81,42 @@ class MIMOLLMAssistant(Assistant):
         return MIMOLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "MIMOLLMAssistant":
-        agent_input_greeting_topic = InputTopic(
-            name="agent_input_greeting_topic",
-            condition=ContainsKeyword(keyword="hello"),
-        )
-        agent_input_question_topic = InputTopic(
-            name="agent_input_question_topic",
-            condition=ContainsKeyword(keyword="question"),
-        )
-        agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")
+        # Content-routed MIMO: one input topic feeds a router node whose
+        # publisher routes (ContainsKeyword) fan the message out to the greeting
+        # and/or question paths. Topics are pure queues, so the content gating
+        # lives on the router's routes rather than on the input topics.
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_greeting_input_topic = Topic(name="agent_greeting_input_topic")
+        agent_question_input_topic = Topic(name="agent_question_input_topic")
         agent_greeting_output_topic = OutputTopic(name="agent_greeting_output_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
 
         agent_greeting_merge_topic = Topic(name="agent_greeting_merge_topic")
         agent_question_merge_topic = Topic(name="agent_question_merge_topic")
 
+        router_node = (
+            Node.builder()
+            .name("InputRouterNode")
+            .subscribe(agent_input_topic)
+            .tool(
+                FunctionTool.builder()
+                .name("InputRouter")
+                .function(forward_input)
+                .build()
+            )
+            .publish_to(
+                agent_greeting_input_topic, when=ContainsKeyword(keyword="hello")
+            )
+            .publish_to(
+                agent_question_input_topic, when=ContainsKeyword(keyword="question")
+            )
+            .build()
+        )
+
         llm_greeting_node = (
             Node.builder()
             .name("OpenAIGreetingNode")
-            .subscribe(agent_input_greeting_topic)
+            .subscribe(agent_greeting_input_topic)
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIToolGreeting")
@@ -111,7 +133,7 @@ class MIMOLLMAssistant(Assistant):
         llm_question_node = (
             Node.builder()
             .name("OpenAIQuestionNode")
-            .subscribe(agent_input_question_topic)
+            .subscribe(agent_question_input_topic)
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIToolQuestion")
@@ -154,6 +176,7 @@ class MIMOLLMAssistant(Assistant):
         self.workflow = (
             EventDrivenWorkflow.builder()
             .name("MIMOLLMAssistantWorkflow")
+            .node(router_node)
             .node(llm_greeting_node)
             .node(llm_question_node)
             .node(llm_merge_node)

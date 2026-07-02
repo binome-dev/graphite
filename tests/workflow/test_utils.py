@@ -213,7 +213,10 @@ class TestPublishEvents:
         node = MagicMock(spec=Node)
         node.name = "test_node"
         node.type = "test_type"
-        node.publish_to = [mock_topic1, mock_topic2]
+        # The publisher router owns routing: it selects the destination topic
+        # names; publish_events just delivers + tracks.
+        node.publisher_router = MagicMock()
+        node.publisher_router.select.return_value = ["topic1", "topic2"]
 
         invoke_context = InvokeContext(
             conversation_id="test-conversation",
@@ -233,7 +236,15 @@ class TestPublishEvents:
             data=result,
             consumed_events=consumed_events,
         )
-        mock_event2 = None  # Test case where topic doesn't publish
+        mock_event2 = PublishToTopicEvent(
+            name="topic2",
+            publisher_name=node.name,
+            publisher_type=node.type,
+            invoke_context=invoke_context,
+            offset=0,
+            data=result,
+            consumed_events=consumed_events,
+        )
 
         mock_topic1.name = "topic1"
         mock_topic2.name = "topic2"
@@ -260,21 +271,22 @@ class TestPublishEvents:
             node, publish_to_event, tracker, consumers_of, topics
         )
 
-        assert len(published_events) == 1
-        assert published_events[0] == mock_event1
+        # Both selected topics enqueue (topics are pure queues; they never drop).
+        assert len(published_events) == 2
+        assert published_events == [mock_event1, mock_event2]
 
         # Verify topics were called correctly
         mock_topic1.publish_data.assert_called_once_with(publish_to_event)
+        mock_topic2.publish_data.assert_called_once_with(publish_to_event)
 
         # One delivery registered per consumer, per topic, before publishing.
         assert tracker.on_messages_published.await_args_list == [
             call(2, source="node:test_node->topic1"),
             call(1, source="node:test_node->topic2"),
         ]
-        # topic2's condition filtered the event out, so its delivery is released.
-        tracker.on_messages_committed.assert_awaited_once_with(
-            1, source="discard:topic2"
-        )
+        # Nothing is dropped, so no delivery is released.
+        tracker.on_messages_committed.assert_not_awaited()
+        node.publisher_router.select.assert_called_once_with(publish_to_event)
 
 
 class TestGetNodeInput:

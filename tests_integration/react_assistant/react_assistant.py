@@ -13,11 +13,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.conditions import has_text_response
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -78,14 +78,8 @@ class ReActAssistant(Assistant):
 
         workflow_dag_builder.node(thought_node)
 
-        action_result_search_topic = Topic(
-            name="action_search_result",
-            condition=has_tool_call,
-        )
-        action_result_finish_topic = Topic(
-            name="action_finish_result",
-            condition=has_text_response,
-        )
+        action_result_search_topic = Topic(name="action_search_result")
+        action_result_finish_topic = Topic(name="action_finish_result")
 
         action_node = (
             Node.builder()
@@ -99,8 +93,8 @@ class ReActAssistant(Assistant):
                 .system_message(self.action_llm_system_message)
                 .build()
             )
-            .publish_to(action_result_search_topic)
-            .publish_to(action_result_finish_topic)
+            .publish_to(action_result_search_topic, when=has_tool_call)
+            .publish_to(action_result_finish_topic, when=has_text_response)
             .build()
         )
 

@@ -6,10 +6,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -52,10 +53,7 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     def _construct_workflow(self) -> "SimpleOllamaFunctionCallAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=has_tool_call,
-        )
+        function_call_topic = Topic(name="function_call_topic")
 
         # Create an input LLM node
         llm_input_node = (
@@ -71,18 +69,12 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(agent_output_topic)
+            .publish_to(function_call_topic, when=has_tool_call)
+            .publish_to(agent_output_topic, when=has_text_response)
             .build()
         )
 
         function_result_topic = Topic(name="function_result_topic")
-
-        agent_output_topic.condition = (
-            lambda event: event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != ""
-        )
 
         # Create a function call node
         function_call_node = (
@@ -111,7 +103,7 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
                 .system_message(self.summary_llm_system_message)
                 .build()
             )
-            .publish_to(agent_output_topic)
+            .publish_to(agent_output_topic, when=has_text_response)
             .build()
         )
 

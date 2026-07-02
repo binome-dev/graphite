@@ -100,15 +100,9 @@ class KycAssistant(Assistant):
 
         # Create action node
 
-        hitl_call_topic = Topic(
-            name="hitl_call_topic",
-            condition=needs_human_review,
-        )
+        hitl_call_topic = Topic(name="hitl_call_topic")
 
-        register_user_topic = Topic(
-            name="register_user_topic",
-            condition=is_register_client,
-        )
+        register_user_topic = Topic(name="register_user_topic")
 
         action_node = (
             Node.builder()
@@ -123,8 +117,8 @@ class KycAssistant(Assistant):
                 .system_message(self.action_llm_system_message)
                 .build()
             )
-            .publish_to(hitl_call_topic)
-            .publish_to(register_user_topic)
+            .publish_to(hitl_call_topic, when=needs_human_review)
+            .publish_to(register_user_topic, when=is_register_client)
             .build()
         )
 

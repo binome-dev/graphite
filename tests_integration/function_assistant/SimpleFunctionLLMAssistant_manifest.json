@@ -72,11 +72,19 @@
                         "topic": "agent_input_topic"
                     }
                 ],
-                "publish_to": [
-                    "function_call_topic"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "function_call_topic",
+                            "when": {
+                                "ref": "grafi.nodes.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "FunctionCallNode": {
@@ -102,35 +110,34 @@
                         "topic": "function_call_topic"
                     }
                 ],
-                "publish_to": [
-                    "agent_output_topic"
-                ],
                 "command": {
                     "class": "Command"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "agent_output_topic",
+                            "when": {
+                                "ref": "grafi.nodes.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             }
         },
         "topics": {
             "agent_input_topic": {
                 "name": "agent_input_topic",
-                "type": "AgentInputTopic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "AgentInputTopic"
             },
             "function_call_topic": {
                 "name": "function_call_topic",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "Topic"
             },
             "agent_output_topic": {
                 "name": "agent_output_topic",
-                "type": "AgentOutputTopic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "AgentOutputTopic"
             }
         }
     }

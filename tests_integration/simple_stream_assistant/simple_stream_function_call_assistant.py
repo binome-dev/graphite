@@ -7,11 +7,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.nodes.conditions import has_no_tool_call
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.conditions import has_no_tool_call
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -50,15 +50,9 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         """
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=has_tool_call,
-        )
+        function_call_topic = Topic(name="function_call_topic")
 
-        summary_topic = Topic(
-            name="summary_topic",
-            condition=has_no_tool_call,
-        )
+        summary_topic = Topic(name="summary_topic")
 
         llm_input_node = (
             Node.builder()
@@ -73,8 +67,8 @@ class SimpleStreamFunctionCallAssistant(Assistant):
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(summary_topic)
+            .publish_to(function_call_topic, when=has_tool_call)
+            .publish_to(summary_topic, when=has_no_tool_call)
             .build()
         )
 

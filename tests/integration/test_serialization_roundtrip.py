@@ -27,16 +27,14 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.nodes.conditions import always_true
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
-from grafi.topics.topic_base import always_true
-from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
-from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 # --------------------------------------------------------------------------- #
@@ -51,7 +49,7 @@ def shout(messages: Messages) -> str:
 
 
 def has_content(event: PublishToTopicEvent) -> bool:
-    """A topic condition -> serializes as a reference."""
+    """A publisher-route predicate -> serializes as a reference."""
     return event.data[-1].content is not None
 
 
@@ -65,7 +63,7 @@ class Prefixer(CallableComponent):
 
 
 class MinContentLength(CallableComponent):
-    """A topic condition as a component -> serializes as config."""
+    """A publisher-route predicate as a component -> serializes as config."""
 
     minimum: int
 
@@ -178,62 +176,65 @@ async def test_manifest_contains_no_pickle():
 
 
 # --------------------------------------------------------------------------- #
-# Topic condition forms (reference / component / default)
+# Publisher route predicate forms (reference / component / default)
+#
+# Routing lives on the node's publisher router now (topics are pure queues), so
+# the route ``when`` predicate is what serializes -- via the same pickle-free
+# reference/component path conditions used to.
 # --------------------------------------------------------------------------- #
 
 
-async def _condition_roundtrip(topic: Topic) -> Topic:
-    data = json.loads(json.dumps(topic.to_dict()))
-    return await TopicFactory.from_dict(data)
+async def _route_when_roundtrip(when: object) -> tuple[Node, Node]:
+    agent_input = InputTopic(name="agent_input")
+    agent_output = OutputTopic(name="agent_output")
+    builder = (
+        Node.builder()
+        .name("FunctionNode")
+        .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
+        .tool(FunctionTool.builder().function(shout).build())
+    )
+    if when is None:
+        builder.publish_to(agent_output)
+    else:
+        builder.publish_to(agent_output, when=when)
+    node = builder.build()
+
+    data = json.loads(json.dumps(node.to_dict()))
+    topics = {"agent_input": agent_input, "agent_output": agent_output}
+    restored = await Node.from_dict(data, topics)
+    return node, restored
+
+
+def _first_route(node: Node) -> dict:
+    return node.to_dict()["publisher_router"]["routes"][0]
 
 
 @pytest.mark.asyncio
-async def test_default_condition_is_a_reference():
-    topic = Topic(name="t")
-    assert topic.to_dict()["condition"] == {
+async def test_default_route_predicate_is_a_reference():
+    node, restored = await _route_when_roundtrip(None)
+    assert _first_route(node)["when"] == {
         "ref": f"{always_true.__module__}:always_true"
     }
-    restored = await _condition_roundtrip(topic)
-    assert restored.condition(_event("x")) is True
+    assert restored.publisher_router.routes[0].when is always_true
 
 
 @pytest.mark.asyncio
-async def test_module_function_condition_roundtrips():
-    topic = Topic(name="t", condition=has_content)
-    assert topic.to_dict()["condition"] == {"ref": f"{__name__}:has_content"}
-    restored = await _condition_roundtrip(topic)
-    assert restored.condition is has_content
-    assert restored.condition(_event("x")) is True
+async def test_module_function_route_predicate_roundtrips():
+    node, restored = await _route_when_roundtrip(has_content)
+    assert _first_route(node)["when"] == {"ref": f"{__name__}:has_content"}
+    assert restored.publisher_router.routes[0].when is has_content
 
 
 @pytest.mark.asyncio
-async def test_component_condition_roundtrips():
-    topic = Topic(name="t", condition=MinContentLength(minimum=3))
-    assert topic.to_dict()["condition"] == {
+async def test_component_route_predicate_roundtrips():
+    node, restored = await _route_when_roundtrip(MinContentLength(minimum=3))
+    assert _first_route(node)["when"] == {
         "component": f"{__name__}:MinContentLength",
         "config": {"minimum": 3},
     }
-    restored = await _condition_roundtrip(topic)
-    assert restored.condition(_event("yes")) is True
-    assert restored.condition(_event("no")) is False
-
-
-# -- default condition (omitted / empty falls back to always_true) ----------
-
-
-@pytest.mark.asyncio
-async def test_condition_omitted_defaults_to_always_true():
-    topic = await TopicFactory.from_dict({"name": "t", "type": "Topic"})
-    assert topic.condition is always_true
-    assert topic.condition(_event("anything")) is True
-
-
-@pytest.mark.asyncio
-async def test_condition_empty_string_defaults_to_always_true():
-    topic = await TopicFactory.from_dict(
-        {"name": "t", "type": "Topic", "condition": ""}
-    )
-    assert topic.condition is always_true
+    when = restored.publisher_router.routes[0].when
+    assert when(_event("yes")) is True
+    assert when(_event("no")) is False
 
 
 # --------------------------------------------------------------------------- #

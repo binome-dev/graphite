@@ -13,6 +13,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.workflow import Workflow
 
@@ -650,7 +652,9 @@ class TestAssistant:
                 name="test_node",
                 tool=mock_tool,
                 subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publish_to=[output_topic],
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic=output_topic)]
+                ),
             )
             workflow = EventDrivenWorkflow(nodes={"test_node": node})
 
@@ -722,7 +726,9 @@ class TestAssistant:
                 name="roundtrip_node",
                 tool=mock_tool,
                 subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publish_to=[output_topic],
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic=output_topic)]
+                ),
             )
             workflow = EventDrivenWorkflow(nodes={"roundtrip_node": node})
 

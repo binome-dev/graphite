@@ -14,13 +14,13 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.runtime import GrafiRuntime
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.conditions import has_text_response
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -64,18 +64,12 @@ class ReActAgent(Assistant):
         return ReActAgentBuilder(cls)
 
     def _construct_workflow(self) -> "ReActAgent":
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=has_tool_call,
-        )
+        function_call_topic = Topic(name="function_call_topic")
         function_result_topic = Topic(name="function_result_topic")
 
         agent_input_topic = InputTopic(name="agent_input_topic")
 
-        agent_output_topic = OutputTopic(
-            name="agent_output_topic",
-            condition=has_text_response,
-        )
+        agent_output_topic = OutputTopic(name="agent_output_topic")
 
         llm_node = (
             Node.builder()
@@ -96,21 +90,21 @@ class ReActAgent(Assistant):
                 .system_message(self.system_prompt)
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(agent_output_topic)
+            .publish_to(function_call_topic, when=has_tool_call)
+            .publish_to(agent_output_topic, when=has_text_response)
             .build()
         )
 
         # Create a function call node
 
-        function_call_node = Node(
-            name="Node",
-            type="Node",
-            tool=self.function_call_tool,
-            subscribed_expressions=[
-                SubscriptionBuilder().subscribed_to(function_call_topic).build()
-            ],
-            publish_to=[function_result_topic],
+        function_call_node = (
+            Node.builder()
+            .name("Node")
+            .type("Node")
+            .tool(self.function_call_tool)
+            .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
+            .publish_to(function_result_topic)
+            .build()
         )
 
         # Create a workflow and add the nodes
