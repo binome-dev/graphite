@@ -22,6 +22,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -46,19 +47,19 @@ class Decision(str, Enum):
 
 
 class Stage(str, Enum):
-    """Which stage produced an outgoing event (keys the pause channel)."""
+    """Which pipeline stage requested a pause (keys the pause channel)."""
 
     PRE_HOOK = "pre_hook"
-    TOOL = "tool"
     POST_HOOK = "post_hook"
-    CONSUMER = "consumer"
 
 
 class Entry(str, Enum):
     """Where the consumer router sends an incoming batch."""
 
     PRE_HOOK = "pre_hook"  # normal: run the full pipeline
-    TOOL = "tool"  # pre-hitl resume APPROVED: skip the pause decision
+    # pre-hitl resume APPROVED: run the gated tool -- on the recovered stored
+    # proposal, or on the reply itself when it carries a (possibly edited) call.
+    TOOL = "tool"
     PUBLISHER = "publisher"  # pre-hitl DENY, or post-hitl verdict: skip the tool
 
 
@@ -69,10 +70,15 @@ _APPROVAL_WORDS = {"approve", "approved", "yes", "y", "ok", "okay"}
 
 
 def is_approved(messages: Messages) -> bool:
-    """Heuristic approve/deny verdict over a HITL reply.
+    """Strict approve/deny verdict over a HITL reply.
 
-    Approve when the reply echoes a tool call (the reviewer forwarded the
-    proposed call back), otherwise when its first word is an approval token.
+    Approve when the reply echoes a tool call (the reviewer forwarded the --
+    possibly edited -- proposed call back), or when the ENTIRE reply is a bare
+    approval token ("yes", "approve", "ok", ...). Anything longer, including
+    "yes, but change the amount", is treated as NOT approved and flows back as
+    a reply: an approval here causes the gated tool to actually run, so this
+    predicate is an execution trust boundary and errs conservative.
+
     A named module-level function so it serializes as an import reference;
     overridable per node via :attr:`ConsumerRouter.verdict`.
     """
@@ -84,13 +90,29 @@ def is_approved(messages: Messages) -> bool:
     content = last.content
     if not isinstance(content, str):
         return False
-    words = content.strip().lower().split(maxsplit=1)
-    return bool(words) and words[0].strip(".!,") in _APPROVAL_WORDS
+    return content.strip().lower().strip(".!,") in _APPROVAL_WORDS
 
 
 def _messages(events: List[ConsumeFromTopicEvent]) -> Messages:
     """Flatten the messages across consumed events, preserving order."""
     return [message for event in events for message in event.data]
+
+
+def _ordered_unique_ids(events: List[ConsumeFromTopicEvent]) -> List[str]:
+    """The events' consumed_event_ids, deduplicated, first-occurrence order.
+
+    Deterministic ordering matters: these ids select the stored payload an
+    approved resume recovers and replays, so the same reply must always
+    reconstruct the same input.
+    """
+    seen = set()
+    ordered: List[str] = []
+    for event in events:
+        for event_id in event.consumed_event_ids:
+            if event_id not in seen:
+                seen.add(event_id)
+                ordered.append(event_id)
+    return ordered
 
 
 # --------------------------------------------------------------------------- #
@@ -99,9 +121,17 @@ def _messages(events: List[ConsumeFromTopicEvent]) -> Messages:
 class ConsumerDecision(BaseModel):
     """The consumer router's classification of an incoming batch.
 
-    ``recover_event_ids`` is set only on an approved post-hitl resume: the node
-    reads those events back from the event store and forwards the reviewed
-    result (the tool is not re-run).
+    ``recover_event_ids`` expresses RECOVERY INTENT, not merely id presence:
+
+    * ``None`` -- no recovery; the pipeline runs on ``source_events`` as-is.
+    * a list (possibly empty) -- the node must reconstruct the stored payload
+      from these event ids. On an approved post-hitl resume
+      (``entry=PUBLISHER``) the recovered reviewed result is forwarded without
+      re-running the tool; on an approved pre-hitl resume whose reply carries
+      no tool call (``entry=TOOL``) the recovered proposal is what the gated
+      tool runs. An empty list means recovery was intended but the reply
+      carried no ids -- the node fails loudly rather than running the tool on
+      the reply text.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -127,7 +157,9 @@ class ConsumerRouter(BaseModel):
     pre-hook -> tool path, byte-for-byte as today.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # extra="forbid": a mistyped channel name must fail loudly, not silently
+    # leave the node ungated.
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     pre_hitl_input: Optional[str] = None  # topic name of the pre-hook resume channel
     post_hitl_input: Optional[str] = None  # topic name of the post-hook resume channel
@@ -142,21 +174,40 @@ class ConsumerRouter(BaseModel):
         Messages arriving on a configured channel are gathered by their source
         topic and routed together. HITL resume channels (verdict-driven) take
         priority, then ``source_routes``; anything else flows into the pre-hook.
-        A mixed-source batch routes by the first matching source.
+
+        A mixed-source batch routes as a SINGLE decision by the first matching
+        source; the non-selected events were already consumed by the engine and
+        are dropped from processing (they remain in the event store). This is
+        logged loudly because it usually indicates a fan-in node whose sources
+        should be separated.
         """
         pre = [e for e in node_input if self._on_channel(e, self.pre_hitl_input)]
         if pre:
-            # approve -> run the gated tool; deny -> forward the reply (denial)
-            entry = Entry.TOOL if self.verdict(_messages(pre)) else Entry.PUBLISHER
-            return ConsumerDecision(entry=entry, source_events=pre)
+            self._warn_dropped(
+                pre, node_input, f"pre_hitl_input='{self.pre_hitl_input}'"
+            )
+            if not self.verdict(_messages(pre)):
+                # deny -> forward the reply (a denial) to normal output
+                return ConsumerDecision(entry=Entry.PUBLISHER, source_events=pre)
+            # approve -> run the gated tool. If the reply itself carries a
+            # (possibly edited) tool call, run the reply as-is; otherwise the
+            # node must recover the stored proposal -- what was approved is
+            # what runs.
+            reply_has_call = any(m.tool_calls for m in _messages(pre))
+            return ConsumerDecision(
+                entry=Entry.TOOL,
+                source_events=pre,
+                recover_event_ids=None if reply_has_call else _ordered_unique_ids(pre),
+            )
 
         post = [e for e in node_input if self._on_channel(e, self.post_hitl_input)]
         if post:
+            self._warn_dropped(
+                post, node_input, f"post_hitl_input='{self.post_hitl_input}'"
+            )
             # approve -> recover the reviewed result; deny -> forward the reply
             recover = (
-                [eid for e in post for eid in e.consumed_event_ids]
-                if self.verdict(_messages(post))
-                else None
+                _ordered_unique_ids(post) if self.verdict(_messages(post)) else None
             )
             return ConsumerDecision(
                 entry=Entry.PUBLISHER, source_events=post, recover_event_ids=recover
@@ -165,6 +216,9 @@ class ConsumerRouter(BaseModel):
         for event in node_input:
             if event.name in self.source_routes:
                 matched = [e for e in node_input if e.name == event.name]
+                self._warn_dropped(
+                    matched, node_input, f"source_routes['{event.name}']"
+                )
                 return ConsumerDecision(
                     entry=self.source_routes[event.name], source_events=matched
                 )
@@ -174,6 +228,25 @@ class ConsumerRouter(BaseModel):
     @staticmethod
     def _on_channel(event: ConsumeFromTopicEvent, channel: Optional[str]) -> bool:
         return channel is not None and event.name == channel
+
+    @staticmethod
+    def _warn_dropped(
+        selected: List[ConsumeFromTopicEvent],
+        node_input: List[ConsumeFromTopicEvent],
+        channel: str,
+    ) -> None:
+        """Log the consumed-but-not-processed remainder of a mixed batch."""
+        if len(selected) == len(node_input):
+            return
+        selected_ids = {e.event_id for e in selected}
+        dropped = [e for e in node_input if e.event_id not in selected_ids]
+        logger.warning(
+            f"Consumer router matched {channel} and is processing only "
+            f"{len(selected)}/{len(node_input)} events of a mixed batch; "
+            "dropping already-consumed events "
+            + ", ".join(f"{e.name}#{e.offset}(event_id={e.event_id})" for e in dropped)
+            + ". They remain in the event store but will not be processed."
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return {

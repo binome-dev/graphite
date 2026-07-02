@@ -80,6 +80,17 @@ class TestIsApproved:
         for word in ("no", "deny", "stop", "absolutely not"):
             assert is_approved([Message(role="user", content=word)]) is False
 
+    def test_qualified_approval_is_not_approved(self):
+        # An approval here EXECUTES the gated tool, so anything beyond a bare
+        # token is conservative-denied and flows back as a reply.
+        for text in (
+            "yes, but change the amount",
+            "approve it after lunch",
+            "yes please",
+            "ok - but log it",
+        ):
+            assert is_approved([Message(role="user", content=text)]) is False
+
     def test_non_string_content_is_not_approved(self):
         assert is_approved([Message(role="assistant", content=None)]) is False
 
@@ -99,9 +110,37 @@ class TestConsumerRouter:
         assert d.source_events == batch
         assert d.recover_event_ids is None
 
-    def test_pre_hitl_approve_routes_to_tool(self):
+    def test_pre_hitl_plain_approve_intends_recovery(self):
+        # A plain-text approval carries no tool call, so the decision expresses
+        # recovery intent: the node must run the STORED proposal.
+        router = ConsumerRouter(pre_hitl_input="pre_in")
+        d = router.classify(
+            [
+                _consume(
+                    "pre_in",
+                    [Message(role="user", content="yes")],
+                    consumed_event_ids=["pause-1", "pause-2", "pause-1"],
+                )
+            ]
+        )
+        assert d.entry is Entry.TOOL
+        # ordered, deduplicated -- deterministic recovery
+        assert d.recover_event_ids == ["pause-1", "pause-2"]
+
+    def test_pre_hitl_approve_without_ids_still_intends_recovery(self):
+        # Empty list (intent, no ids) -- the node fails loudly downstream
+        # instead of silently running the tool on the reply text.
         router = ConsumerRouter(pre_hitl_input="pre_in")
         d = router.classify([_consume("pre_in", [Message(role="user", content="yes")])])
+        assert d.entry is Entry.TOOL
+        assert d.recover_event_ids == []
+
+    def test_pre_hitl_echoed_call_approve_runs_reply(self):
+        # A reply that carries the (possibly edited) call runs as-is: no recovery.
+        router = ConsumerRouter(pre_hitl_input="pre_in")
+        d = router.classify(
+            [_consume("pre_in", [_tool_call()], consumed_event_ids=["pause-1"])]
+        )
         assert d.entry is Entry.TOOL
         assert d.recover_event_ids is None
 
@@ -296,3 +335,32 @@ class TestPublisherPauseRoutes:
         restored = PublisherRouter.from_dict(router.to_dict(), topics)
         assert restored.routes[1].from_stage is Stage.PRE_HOOK
         assert restored.request_topic(Stage.PRE_HOOK) == "pre_hitl_out"
+
+
+class TestConsumerRouterStrictness:
+    def test_mistyped_field_is_rejected(self):
+        # extra="forbid": a typo'd channel name must not silently leave the
+        # node ungated.
+        import pytest
+
+        with pytest.raises(Exception, match="pre_hitl_inpt|extra"):
+            ConsumerRouter(pre_hitl_inpt="hitl_in")
+
+    def test_mixed_batch_warns_about_dropped_events(self):
+        from loguru import logger
+
+        router = ConsumerRouter(pre_hitl_input="pre_in")
+        records: list = []
+        sink_id = logger.add(lambda m: records.append(str(m)), level="WARNING")
+        try:
+            d = router.classify(
+                [
+                    _consume("pre_in", [Message(role="user", content="yes")]),
+                    _consume("other_topic", [Message(role="user", content="lost")]),
+                ]
+            )
+        finally:
+            logger.remove(sink_id)
+        assert [e.name for e in d.source_events] == ["pre_in"]
+        # The dropped event is loudly identified by source and id.
+        assert any("other_topic" in r and "dropping" in r for r in records)

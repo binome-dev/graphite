@@ -46,7 +46,7 @@ The framework has three conceptual layers coordinated through pub/sub workflow o
 
 2. **Workflows** (`grafi/workflows/`) - Orchestrate interactions among Nodes using pub/sub with in-memory FIFO message queuing. `EventDrivenWorkflow` is the primary implementation.
 
-3. **Nodes** (`grafi/nodes/`) - Discrete workflow components that subscribe to Topics, execute Tools, and publish results. A Node wraps a Tool and handles event subscriptions/publishing.
+3. **Nodes** (`grafi/nodes/`) - Discrete workflow components that subscribe to Topics, execute Tools, and publish results. A Node wraps a Tool and handles event subscriptions/publishing. Routing predicates live on the node's publisher routes (`publish_to(topic, when=...)`; reusable predicates in `grafi/nodes/conditions.py`). `HookedNode` (`grafi/nodes/impl/hooked_node.py`) extends Node with a five-stage pipeline — consumer router → pre-tool hooks → Tool → post-tool hooks → publisher router — for guardrails and human-in-the-loop approval gates (`grafi/nodes/hooks/`, `grafi/nodes/routing.py`). An approved pause runs the stored proposal recovered from the event store: what was approved is what runs.
 
 4. **Tools** (`grafi/tools/`) - Core execution units that transform input to output. Categories:
    - `llms/` - LLM integrations (OpenAI, Claude, Gemini, Ollama, DeepSeek, OpenRouter)

@@ -24,6 +24,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
+from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.conditions import always_true
 from grafi.nodes.routing import Stage
@@ -102,8 +103,23 @@ class PublisherRouter(BaseModel):
         ]
 
     def request_topic(self, stage: Stage) -> str:
-        """Name the pause channel a pause request at ``stage`` should route to."""
-        return next(r.topic.name for r in self.routes if r.from_stage is stage)
+        """Name the pause channel a pause request at ``stage`` should route to.
+
+        Raises:
+            ValueError: If the node declares no pause route for ``stage``. Raised
+                descriptively here because inside the node's async generator a
+                bare ``StopIteration`` would surface as an opaque
+                ``RuntimeError: async generator raised StopIteration``.
+        """
+        for route in self.routes:
+            if route.from_stage is stage:
+                return route.topic.name
+        raise ValueError(
+            f"A hook requested a pause at stage '{stage.value}' but this node "
+            "declares no matching pause channel. Add "
+            f".publish_to(<InWorkflowOutputTopic>, from_stage=Stage.{stage.name}) "
+            "to the node."
+        )
 
     @staticmethod
     def _condition_ok(
@@ -149,7 +165,10 @@ class PublisherRouter(BaseModel):
 class NodeBase(BaseModel):
     """Abstract base class for nodes in a graph-based agent system."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # extra="forbid": a mistyped field on a node (e.g. pre_tool_hook instead of
+    # pre_tool_hooks) must fail loudly -- silently ignoring it can drop an
+    # approval gate.
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     node_id: str = default_id
     name: str = Field(default="Node")
@@ -185,6 +204,15 @@ class NodeBase(BaseModel):
     def subscribed_topics(self) -> List[TopicBase]:
         """Return a list of subscribed topics."""
         return list(self._subscribed_topics.values())
+
+    def spec_augmenters(self) -> List[Callable[[FunctionSpecs], FunctionSpecs]]:
+        """Function-spec transforms this node contributes at workflow build time.
+
+        The workflow applies these when linking function specs onto LLM nodes.
+        A plain node contributes none; hooked nodes surface their hooks'
+        ``augment_spec`` here (the typed seam that replaces duck-typing).
+        """
+        return []
 
     async def invoke(
         self,

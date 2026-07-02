@@ -8,6 +8,7 @@ from typing import Self
 from typing import TypeVar
 from typing import Union
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import Field
@@ -148,16 +149,29 @@ class LLM(Tool):
 
         This is idempotent: the workflow links function specs into LLM tools in
         ``model_post_init`` (which Pydantic re-runs on every reconstruction /
-        ``from_dict`` round-trip), so without dedup the same specs would
-        accumulate, bloating prompts and confusing the model.
+        ``from_dict`` round-trip), so re-adding an identical spec is a no-op.
+
+        A same-name spec with DIFFERENT content replaces the stored one (last
+        write wins, with a warning): the workflow being constructed now defines
+        the contract. Silent first-wins would drop hook-augmented specs (e.g.
+        an injected required ``tool_call_reason``) when a tool instance is
+        reused across workflow constructions, quietly disabling the HITL gate.
         """
         if not function_spec:
             return
-        existing = {spec.name for spec in self._function_specs}
+        existing = {spec.name: index for index, spec in enumerate(self._function_specs)}
         for spec in function_spec:
-            if spec.name not in existing:
+            index = existing.get(spec.name)
+            if index is None:
+                existing[spec.name] = len(self._function_specs)
                 self._function_specs.append(spec)
-                existing.add(spec.name)
+            elif self._function_specs[index] != spec:
+                logger.warning(
+                    f"Function spec '{spec.name}' redefined with different "
+                    "content; replacing the previously linked spec (last write "
+                    "wins)."
+                )
+                self._function_specs[index] = spec
 
     def get_function_specs(self) -> FunctionSpecs:
         """Return the function specifications for this LLM."""

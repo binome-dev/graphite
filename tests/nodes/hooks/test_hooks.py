@@ -113,3 +113,30 @@ class TestHookSerialization:
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="Unknown tool hook type"):
             hook_from_dict({"type": "NoSuchHook"})
+
+
+class TestHookRegistry:
+    def test_custom_hook_auto_registers_and_round_trips(self):
+        class CustomAuditHook(ToolHook):
+            note: str = "default"
+
+            def to_dict(self):
+                return {"type": type(self).__name__, "note": self.note}
+
+            @classmethod
+            def from_dict(cls, data):
+                return cls(note=data.get("note", "default"))
+
+        # Defining the class registered it; the factory reconstructs it.
+        restored = hook_from_dict({"type": "CustomAuditHook", "note": "n1"})
+        assert isinstance(restored, CustomAuditHook)
+        assert restored.note == "n1"
+
+    def test_unknown_type_error_is_actionable(self):
+        with pytest.raises(ValueError) as err:
+            hook_from_dict({"type": "NeverImportedHook"})
+        message = str(err.value)
+        # Names the type, lists known ones, and explains the import fix.
+        assert "NeverImportedHook" in message
+        assert "HITLApprovalHook" in message
+        assert "import" in message.lower()

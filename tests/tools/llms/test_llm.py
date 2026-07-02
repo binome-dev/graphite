@@ -43,6 +43,25 @@ class TestAddFunctionSpecs:
         names = sorted(s.name for s in llm.get_function_specs())
         assert names == ["a", "b"]
 
+    def test_same_name_different_content_replaces(self):
+        # Last write wins: a hook-augmented spec (e.g. with an injected required
+        # tool_call_reason) must not be silently dropped because the raw spec
+        # was linked first.
+        llm = LLM()
+        llm.add_function_specs([_spec("gated")])
+        augmented = _spec("gated")
+        augmented.description = "gated description (requires justification)"
+        llm.add_function_specs([augmented])
+        specs = llm.get_function_specs()
+        assert len(specs) == 1
+        assert specs[0].description == "gated description (requires justification)"
+        # Steady state: re-adding the identical (now-current) spec is a no-op --
+        # model_post_init re-runs add_function_specs on every reconstruction.
+        llm.add_function_specs([augmented.model_copy(deep=True)])
+        specs = llm.get_function_specs()
+        assert len(specs) == 1
+        assert specs[0].description == "gated description (requires justification)"
+
 
 class SampleModel(BaseModel):
     """Sample Pydantic model for testing."""

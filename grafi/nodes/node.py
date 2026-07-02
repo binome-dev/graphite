@@ -22,7 +22,13 @@ from grafi.topics.topic_base import TopicBase
 
 
 class Node(NodeBase):
-    """Abstract base class for nodes in a graph-based agent system."""
+    """The default node: consume events, run the tool, stream the output.
+
+    A plain node has no hooks or consumer routing -- its ``invoke`` is a
+    straight pass through the tool, yielding one publish event per tool batch.
+    For pre/post tool hooks and HITL pause/resume, use
+    :class:`~grafi.nodes.impl.hooked_node.HookedNode`.
+    """
 
     def model_post_init(self, _context: Any) -> None:
         # Set up the subscribed topics based on the expressions

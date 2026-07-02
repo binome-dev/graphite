@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 
+from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
@@ -12,9 +13,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
-from grafi.nodes.impl.hooked_node import HookedNode
-from grafi.nodes.node import Node
 from grafi.nodes.node_base import NodeBase
+from grafi.nodes.node_factory import NodeFactory
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
@@ -70,7 +70,16 @@ class EventDrivenWorkflow(Workflow):
            ``InWorkflowOutputTopic`` paired to the node's matching resume input.
         3. A consumer router's ``pre_hitl_input``/``post_hitl_input`` (when set)
            is subscribed by the node and is an ``InWorkflowInputTopic``.
+        4. ``pre_hitl_input`` and ``post_hitl_input`` are distinct (classify
+           checks the pre channel first, so a shared channel would misroute
+           post-pause approvals into re-running the tool).
+        5. A pause route whose paired resume input the node itself subscribes
+           must be classified by the consumer router -- otherwise every resume
+           reply re-enters the pipeline and pauses again, forever. Raised for
+           an unconditional built-in HITL hook; warned otherwise (a gated hook
+           can be a deliberate human-in-the-loop revision cycle).
         """
+        from grafi.nodes.hooks.hitl_approval_hook import HITLApprovalHook
         from grafi.nodes.routing import ConsumerRouter
         from grafi.nodes.routing import Stage
         from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
@@ -89,6 +98,25 @@ class EventDrivenWorkflow(Workflow):
                 Stage.PRE_HOOK: consumer.pre_hitl_input,
                 Stage.POST_HOOK: consumer.post_hitl_input,
             }
+            stage_hooks = {
+                Stage.PRE_HOOK: getattr(node, "pre_tool_hooks", []),
+                Stage.POST_HOOK: getattr(node, "post_tool_hooks", []),
+            }
+
+            if (
+                consumer.pre_hitl_input is not None
+                and consumer.pre_hitl_input == consumer.post_hitl_input
+            ):
+                raise WorkflowError(
+                    message=(
+                        f"Node '{node_name}' uses the same topic "
+                        f"'{consumer.pre_hitl_input}' as both pre_hitl_input and "
+                        "post_hitl_input; the pre channel is checked first, so "
+                        "post-pause approvals would misroute into re-running "
+                        "the tool. Use two distinct resume channels."
+                    ),
+                    severity="CRITICAL",
+                )
 
             if pause_routes and not normal_routes:
                 raise WorkflowError(
@@ -135,6 +163,51 @@ class EventDrivenWorkflow(Workflow):
                             f"input '{resume_input}'."
                         ),
                         severity="CRITICAL",
+                    )
+
+                # Rule 5 -- pause-loop: replies on a paired resume input the
+                # node itself subscribes must be classified, or they re-enter
+                # the pipeline and pause again forever.
+                unrouted = [
+                    paired
+                    for paired in route.topic.paired_in_workflow_input_topic_names
+                    if paired in node._subscribed_topics
+                    and paired != stage_input.get(stage)
+                    and paired not in consumer.source_routes
+                ]
+                if unrouted:
+                    hooks = stage_hooks.get(stage, [])
+                    unconditional_hitl = any(
+                        isinstance(hook, HITLApprovalHook) and hook.gate_when is None
+                        for hook in hooks
+                    )
+                    channel_kwarg = (
+                        "pre_hitl_input"
+                        if stage is Stage.PRE_HOOK
+                        else "post_hitl_input"
+                    )
+                    fix = (
+                        f".consumer_router(ConsumerRouter("
+                        f"{channel_kwarg}='{unrouted[0]}')) or "
+                        f".consumer_router(ConsumerRouter(source_routes="
+                        f"{{'{unrouted[0]}': Entry...}}))"
+                    )
+                    if unconditional_hitl:
+                        raise WorkflowError(
+                            message=(
+                                f"Node '{node_name}' pauses unconditionally at "
+                                f"{stage.value} and subscribes its own resume "
+                                f"input(s) {unrouted} without classifying them; "
+                                f"every reply would pause again forever. Fix: {fix}."
+                            ),
+                            severity="CRITICAL",
+                        )
+                    logger.warning(
+                        f"Node '{node_name}' subscribes resume input(s) "
+                        f"{unrouted} paired to its {stage.value} pause channel "
+                        "but does not classify them; replies will re-enter the "
+                        "pipeline (a deliberate revision loop needs a gated "
+                        f"hook to terminate). If unintended: {fix}."
                     )
 
             for channel in (consumer.pre_hitl_input, consumer.post_hitl_input):
@@ -270,13 +343,8 @@ class EventDrivenWorkflow(Workflow):
                         function_node.tool, FunctionCallTool
                     ):
                         specs = function_node.tool.get_function_specs()
-                        for hook in (
-                            getattr(publisher_node, "pre_tool_hook", None),
-                            getattr(publisher_node, "post_tool_hook", None),
-                        ):
-                            augment = getattr(hook, "augment_spec", None)
-                            if callable(augment):
-                                specs = augment(specs)
+                        for augment in publisher_node.spec_augmenters():
+                            specs = augment(specs)
                         publisher_node.tool.add_function_specs(specs)
 
     @record_workflow_invoke
@@ -326,12 +394,9 @@ class EventDrivenWorkflow(Workflow):
             topics[topic.name] = topic
 
         for node_dict in data.get("nodes", {}).values():
-            # Dispatch on the serialized class: hooked nodes carry extra fields
-            # (hooks + consumer router) that plain nodes do not.
-            if node_dict.get("class") == "HookedNode":
-                node: Node = await HookedNode.from_dict(node_dict, topics)
-            else:
-                node = await Node.from_dict(node_dict, topics)
+            # Registry dispatch on the serialized class -- unknown classes fail
+            # loudly instead of silently deserializing as an ungated plain Node.
+            node = await NodeFactory.from_dict(node_dict, topics)
             workflow_builder = workflow_builder.node(node)
 
         return workflow_builder.build()

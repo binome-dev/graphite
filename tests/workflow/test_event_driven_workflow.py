@@ -500,3 +500,72 @@ class TestEventDrivenWorkflowSerialization:
         finally:
             # Clean up: unregister MockTool
             ToolFactory.unregister_tool_class("MockTool")
+
+
+class TestHookedNodeWorkflowRoundTrip:
+    @pytest.mark.asyncio
+    async def test_from_dict_roundtrip_hooked_node_restores_gating(self):
+        """The approval gate must survive a full workflow to_dict/from_dict.
+
+        Pushes a fully-loaded HookedNode through the whole restore stack:
+        NodeFactory class dispatch + HookedNode.from_dict hook-chain loops +
+        validation rules re-running on the restored graph. An empty restored
+        chain here is the silent-ungating regression this suite exists to
+        catch.
+        """
+        import json
+
+        from grafi.nodes.hooks.hitl_approval_hook import HITLApprovalHook
+        from grafi.nodes.impl.hooked_node import HookedNode
+        from grafi.nodes.routing import ConsumerRouter
+        from grafi.nodes.routing import Stage
+        from grafi.tools.tool_factory import ToolFactory
+        from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+        from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
+        from grafi.topics.topic_impl.in_workflow_output_topic import (
+            InWorkflowOutputTopic,
+        )
+
+        ToolFactory.register_tool_class("MockTool", MockTool)
+        try:
+            agent_input = InputTopic(name="agent_input")
+            agent_output = OutputTopic(name="agent_output")
+            hitl_in = InWorkflowInputTopic(name="hitl_in")
+            hitl_out = InWorkflowOutputTopic(
+                name="hitl_out", paired_in_workflow_input_topic_names=["hitl_in"]
+            )
+            node = (
+                HookedNode.builder()
+                .name("gated")
+                .subscribe(
+                    SubscriptionBuilder()
+                    .subscribed_to(agent_input)
+                    .or_()
+                    .subscribed_to(hitl_in)
+                    .build()
+                )
+                .tool(MockTool())
+                .pre_tool_hook(HITLApprovalHook())
+                .consumer_router(ConsumerRouter(pre_hitl_input="hitl_in"))
+                .publish_to(agent_output)
+                .publish_to(hitl_out, from_stage=Stage.PRE_HOOK)
+                .build()
+            )
+            original = EventDrivenWorkflow.builder().name("hitl_wf").node(node).build()
+
+            # json round trip pins JSON-safety of the whole manifest too
+            restored = await EventDrivenWorkflow.from_dict(
+                json.loads(json.dumps(original.to_dict()))
+            )
+
+            restored_node = restored.nodes["gated"]
+            assert type(restored_node) is HookedNode
+            assert len(restored_node.pre_tool_hooks) == 1
+            assert isinstance(restored_node.pre_tool_hooks[0], HITLApprovalHook)
+            assert restored_node.consumer_router.pre_hitl_input == "hitl_in"
+            assert any(
+                r.from_stage is Stage.PRE_HOOK
+                for r in restored_node.publisher_router.routes
+            )
+        finally:
+            ToolFactory.unregister_tool_class("MockTool")

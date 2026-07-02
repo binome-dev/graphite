@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 from typing import List
 from typing import Set
 
+from loguru import logger
+
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.topics.topic_base import TopicBase
@@ -22,6 +24,28 @@ from grafi.topics.topic_types import TopicType
 
 if TYPE_CHECKING:
     from grafi.workflows.impl.workflow_run import WorkflowRun
+
+
+def _same_payload(a: list, b: list) -> bool:
+    """Semantic message equality: role/content/tool calls, ignoring ids/times.
+
+    Used to tell a crash-replayed or double-submitted resume (identical
+    payload -> skip) apart from a changed-mind reply about the same pause
+    (different payload -> reissue). Message ids and timestamps are fresh on
+    every client construction, so full model equality would never match.
+    """
+
+    def key(messages: list) -> list:
+        return [
+            (
+                m.role,
+                m.content,
+                [(c.function.name, c.function.arguments) for c in (m.tool_calls or [])],
+            )
+            for m in messages
+        ]
+
+    return key(a) == key(b)
 
 
 async def init_run(
@@ -111,7 +135,15 @@ async def _reissue_paired_inputs(
     is_sequential: bool,
 ) -> None:
     """Re-issue paired in-workflow inputs for any consumed in-workflow output
-    (e.g. a human-in-the-loop response resuming the flow)."""
+    (e.g. a human-in-the-loop response resuming the flow).
+
+    Idempotent per resume request: if the store already holds a paired-input
+    publish carrying these exact ``consumed_event_ids`` AND the same message
+    payload (a crash-replayed or double-submitted resume), it is not reissued
+    -- an approved side-effecting tool must not run twice for one approval. A
+    DIFFERENT reply about the same pause (e.g. a deny followed by a
+    changed-mind approve) has a different payload and is reissued normally.
+    """
     consumed_event_ids = input_data.consumed_event_ids
     consumed_events = [
         event for event in events if event.event_id in consumed_event_ids
@@ -122,6 +154,7 @@ async def _reissue_paired_inputs(
         if event.type == TopicType.IN_WORKFLOW_OUTPUT_TOPIC_TYPE
     )
 
+    reissued = 0
     for in_workflow_output_topic_name in in_workflow_output_topic_names:
         in_workflow_output_topic = run.topics.get(in_workflow_output_topic_name)
         if not (
@@ -142,6 +175,23 @@ async def _reissue_paired_inputs(
             ):
                 continue
 
+            already_reissued = any(
+                isinstance(event, PublishToTopicEvent)
+                and event.name == paired_in_workflow_input_topic_name
+                and event.consumed_event_ids == consumed_event_ids
+                and _same_payload(event.data, input_data.data)
+                for event in events
+            )
+            if already_reissued:
+                logger.info(
+                    f"Resume for consumed_event_ids={consumed_event_ids} with an "
+                    "identical payload was already reissued to "
+                    f"'{paired_in_workflow_input_topic_name}'; skipping duplicate "
+                    "reissue (crash-replayed or double-submitted resume)."
+                )
+                reissued += 1
+                continue
+
             paired_event = await paired_in_workflow_input_topic.publish_data(
                 input_data.model_copy(
                     update={
@@ -154,6 +204,7 @@ async def _reissue_paired_inputs(
             if not paired_event:
                 continue
 
+            reissued += 1
             if not is_sequential:
                 delivery_count = len(
                     run._topic_consumers(paired_in_workflow_input_topic_name)
@@ -165,3 +216,11 @@ async def _reissue_paired_inputs(
             if is_sequential:
                 await run._add_to_invoke_queue(paired_event)
             await run.event_store.record_event(paired_event)
+
+    if in_workflow_output_topic_names and not reissued:
+        logger.warning(
+            "Resume request consumed in-workflow output(s) "
+            f"{sorted(in_workflow_output_topic_names)} but no paired input was "
+            "reissued; the run will quiesce without output. Check the "
+            "paired_in_workflow_input_topic_names wiring."
+        )
