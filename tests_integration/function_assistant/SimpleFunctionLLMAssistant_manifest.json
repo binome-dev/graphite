@@ -80,7 +80,7 @@
                         {
                             "topic": "function_call_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
@@ -118,7 +118,7 @@
                         {
                             "topic": "agent_output_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }

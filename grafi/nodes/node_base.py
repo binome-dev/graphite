@@ -25,9 +25,9 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.nodes.conditions import always_true
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
-from grafi.topics.conditions import always_true
 from grafi.topics.expressions.topic_expression import SubExpr
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.expressions.topic_expression import evaluate_subscription

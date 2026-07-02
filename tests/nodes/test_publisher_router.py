@@ -8,10 +8,10 @@ from openai.types.chat.chat_completion_message_tool_call import Function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
-from grafi.topics.conditions import has_text_response
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.topic_base import TopicBase
 
 

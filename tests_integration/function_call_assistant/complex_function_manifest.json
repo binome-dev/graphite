@@ -42,14 +42,14 @@
                         {
                             "topic": "function_call_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:has_tool_call"
+                                "ref": "grafi.nodes.conditions:has_tool_call"
                             },
                             "from_stage": null
                         },
                         {
                             "topic": "agent_output_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:has_text_response"
+                                "ref": "grafi.nodes.conditions:has_text_response"
                             },
                             "from_stage": null
                         }
@@ -119,7 +119,7 @@
                         {
                             "topic": "function_result_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
@@ -159,7 +159,7 @@
                         {
                             "topic": "agent_output_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:has_text_response"
+                                "ref": "grafi.nodes.conditions:has_text_response"
                             },
                             "from_stage": null
                         }

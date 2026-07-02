@@ -7,11 +7,11 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.nodes.conditions import has_no_tool_call
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.conditions import has_no_tool_call
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic

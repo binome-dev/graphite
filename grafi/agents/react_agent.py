@@ -14,13 +14,13 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
 from grafi.runtime import GrafiRuntime
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.conditions import has_text_response
-from grafi.topics.conditions import has_tool_call
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic

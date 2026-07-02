@@ -48,7 +48,7 @@
                         {
                             "topic": "thought_result",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
@@ -88,14 +88,14 @@
                         {
                             "topic": "action_search_result",
                             "when": {
-                                "ref": "grafi.topics.conditions:has_tool_call"
+                                "ref": "grafi.nodes.conditions:has_tool_call"
                             },
                             "from_stage": null
                         },
                         {
                             "topic": "action_finish_result",
                             "when": {
-                                "ref": "grafi.topics.conditions:has_text_response"
+                                "ref": "grafi.nodes.conditions:has_text_response"
                             },
                             "from_stage": null
                         }
@@ -158,7 +158,7 @@
                         {
                             "topic": "search_function_result",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
@@ -198,7 +198,7 @@
                         {
                             "topic": "observation_result",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
@@ -238,7 +238,7 @@
                         {
                             "topic": "agent_output_topic",
                             "when": {
-                                "ref": "grafi.topics.conditions:always_true"
+                                "ref": "grafi.nodes.conditions:always_true"
                             },
                             "from_stage": null
                         }
