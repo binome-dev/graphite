@@ -54,10 +54,7 @@ class SimpleHITLAssistant(Assistant):
         return SimpleHITLAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleHITLAssistant":
-        hitl_call_topic = Topic(
-            name="hitl_call_topic",
-            condition=has_tool_call,
-        )
+        hitl_call_topic = Topic(name="hitl_call_topic")
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         in_workflow_input_topic = InWorkflowInputTopic(name="human_response_topic")
@@ -66,10 +63,7 @@ class SimpleHITLAssistant(Assistant):
             paired_in_workflow_input_topic_names=[in_workflow_input_topic.name],
         )
 
-        register_user_topic = Topic(
-            name="register_user_topic",
-            condition=has_no_tool_call,
-        )
+        register_user_topic = Topic(name="register_user_topic")
 
         llm_input_node = (
             Node.builder()
@@ -90,8 +84,8 @@ class SimpleHITLAssistant(Assistant):
                 .system_message(self.hitl_llm_system_message)
                 .build()
             )
-            .publish_to(hitl_call_topic)
-            .publish_to(register_user_topic)
+            .publish_to(hitl_call_topic, when=has_tool_call)
+            .publish_to(register_user_topic, when=has_no_tool_call)
             .build()
         )
 

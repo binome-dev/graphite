@@ -21,6 +21,8 @@ from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -84,7 +86,7 @@ def _workflow(tool: Tool = None) -> EventDrivenWorkflow:
         type="Node",
         tool=tool or EchoTool(),
         subscribed_expressions=[TopicExpr(topic=input_topic)],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     return EventDrivenWorkflow.builder().node(node).build()
 
@@ -105,7 +107,7 @@ def _and_workflow() -> EventDrivenWorkflow:
             .subscribed_to(gate)
             .build()
         ],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     return EventDrivenWorkflow.builder().node(node).build()
 

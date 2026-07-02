@@ -1,8 +1,9 @@
-"""Reusable topic-condition predicates.
+"""Reusable routing predicates.
 
-A topic ``condition`` decides whether an event is published to that topic. These
-named, importable predicates cover the common routing checks so workflows can
-reference them (``condition=has_tool_call``) instead of embedding inline lambdas.
+A publisher route's ``when`` decides whether an outgoing event is delivered to
+that route's topic. These named, importable predicates cover the common content
+checks so workflows can reference them (``when=has_tool_call``) instead of
+embedding inline lambdas.
 
 Named predicates are preferred over lambdas because they:
 
@@ -16,6 +17,15 @@ For richer, parameterized routing, implement a
 """
 
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+
+
+def always_true(_: PublishToTopicEvent) -> bool:
+    """Default routing predicate: take the route for every event.
+
+    A named module-level function (rather than an inline ``lambda``) so it
+    serializes as a tiny import reference instead of inline code.
+    """
+    return True
 
 
 def has_tool_call(event: PublishToTopicEvent) -> bool:

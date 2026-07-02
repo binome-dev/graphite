@@ -101,14 +101,10 @@ class TestTopicBaseCacheIntegration:
         assert not await topic.can_consume("consumer2")
 
     @pytest.mark.asyncio
-    async def test_conditional_publishing(self, invoke_context):
-        # Create topic with condition
-        topic = Topic(
-            name="conditional_topic",
-            condition=lambda event: any(m.role == "user" for m in event.data),
-        )
+    async def test_publish_data_enqueues_all(self, invoke_context):
+        # Topics are pure queues: every event is enqueued (routing is on the node)
+        topic = Topic(name="plain_topic")
 
-        # Message that meets condition
         user_messages = [Message(role="user", content="Hello")]
         event1 = await topic.publish_data(
             PublishToTopicEvent(
@@ -121,7 +117,6 @@ class TestTopicBaseCacheIntegration:
         )
         assert event1 is not None
 
-        # Message that doesn't meet condition
         assistant_messages = [Message(role="assistant", content="Hi")]
         event2 = await topic.publish_data(
             PublishToTopicEvent(
@@ -132,9 +127,9 @@ class TestTopicBaseCacheIntegration:
                 consumed_event_ids=[],
             )
         )
-        assert event2 is None
+        assert event2 is not None
 
-        # Only one event should be in cache
+        # Both events are enqueued -- no topic-level filtering.
 
     @pytest.mark.asyncio
     async def test_reset_functionality(
@@ -391,7 +386,7 @@ class TestTopicBaseCacheIntegration:
         topic_dict = topic.to_dict()
         assert topic_dict["name"] == "test_topic"
         assert topic_dict["type"] == "Topic"
-        assert "condition" in topic_dict
+        assert "condition" not in topic_dict
 
     @pytest.mark.asyncio
     async def test_async_reset(self, topic: Topic, invoke_context, sample_messages):

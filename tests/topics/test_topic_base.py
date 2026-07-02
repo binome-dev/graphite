@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 
-from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -10,8 +9,6 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_base import always_true
-from grafi.topics.topic_base import deserialize_condition
 
 
 class MockTopic(TopicBase):
@@ -114,45 +111,27 @@ async def test_restore_topic_consume_event_does_not_skip_next(
     assert [event.offset for event in remaining] == [1, 2]
 
 
-# Module-level condition used to exercise reference-based serialization.
-def module_level_condition(event: PublishToTopicEvent) -> bool:
-    """A named, importable condition -> serializes as an import reference."""
-    return True
+def test_to_dict_has_no_condition():
+    """Topics are pure queues -- the manifest carries only name and type."""
+    topic = MockTopic(name="plain_topic")
+    assert topic.to_dict() == {"name": "plain_topic", "type": topic.type.value}
 
 
-def test_default_condition_serializes_as_reference():
-    """The default condition is a named function, not an inline lambda, so it
-    serializes as a tiny import reference rather than inline code."""
-    topic = MockTopic(name="default_condition_topic")
-    data = topic.to_dict()
-    assert data["condition"] == {"ref": f"{always_true.__module__}:always_true"}
+@pytest.mark.asyncio
+async def test_publish_data_always_enqueues(
+    topic: TopicBase, invoke_context: InvokeContext
+):
+    """publish_data stamps name/type and enqueues -- routing lives on the node."""
+    event = PublishToTopicEvent(
+        publisher_name="p",
+        publisher_type="t",
+        invoke_context=invoke_context,
+        consumed_event_ids=[],
+        data=[Message(role="assistant", content="hi")],
+    )
+    published = await topic.publish_data(event)
+    assert published is not None
+    assert published.name == "test_topic"
 
-
-def test_named_condition_roundtrips_via_reference():
-    topic = MockTopic(name="named_topic", condition=module_level_condition)
-    data = topic.to_dict()
-    assert data["condition"] == {
-        "ref": f"{module_level_condition.__module__}:module_level_condition"
-    }
-    assert deserialize_condition(data) is module_level_condition
-
-
-def test_lambda_condition_cannot_be_serialized():
-    # A lambda is neither an importable reference nor a component, so it cannot
-    # be serialized without pickle -- use a named predicate or a component.
-    topic = MockTopic(name="lambda_topic", condition=lambda _: False)
-    with pytest.raises(CallableSerializationError, match="without pickle"):
-        topic.to_dict()
-
-
-def test_missing_condition_defaults_to_always_true():
-    """A manifest without a condition restores to the always-publish default."""
-    assert deserialize_condition({"name": "no_condition"}) is always_true
-
-
-def test_legacy_pickle_condition_dict_is_rejected():
-    """Legacy {"base64": ...} pickle conditions are no longer supported."""
-    with pytest.raises(CallableSerializationError, match="pickle payload"):
-        deserialize_condition(
-            {"name": "legacy", "condition": {"base64": "x", "code": "lambda _: True"}}
-        )
+    consumed = await topic.consume("c")
+    assert len(consumed) == 1

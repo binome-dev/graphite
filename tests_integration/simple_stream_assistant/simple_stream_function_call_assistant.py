@@ -50,15 +50,9 @@ class SimpleStreamFunctionCallAssistant(Assistant):
         """
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=has_tool_call,
-        )
+        function_call_topic = Topic(name="function_call_topic")
 
-        summary_topic = Topic(
-            name="summary_topic",
-            condition=has_no_tool_call,
-        )
+        summary_topic = Topic(name="summary_topic")
 
         llm_input_node = (
             Node.builder()
@@ -73,8 +67,8 @@ class SimpleStreamFunctionCallAssistant(Assistant):
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(summary_topic)
+            .publish_to(function_call_topic, when=has_tool_call)
+            .publish_to(summary_topic, when=has_no_tool_call)
             .build()
         )
 

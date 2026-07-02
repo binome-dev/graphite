@@ -78,14 +78,8 @@ class ReActAssistant(Assistant):
 
         workflow_dag_builder.node(thought_node)
 
-        action_result_search_topic = Topic(
-            name="action_search_result",
-            condition=has_tool_call,
-        )
-        action_result_finish_topic = Topic(
-            name="action_finish_result",
-            condition=has_text_response,
-        )
+        action_result_search_topic = Topic(name="action_search_result")
+        action_result_finish_topic = Topic(name="action_finish_result")
 
         action_node = (
             Node.builder()
@@ -99,8 +93,8 @@ class ReActAssistant(Assistant):
                 .system_message(self.action_llm_system_message)
                 .build()
             )
-            .publish_to(action_result_search_topic)
-            .publish_to(action_result_finish_topic)
+            .publish_to(action_result_search_topic, when=has_tool_call)
+            .publish_to(action_result_finish_topic, when=has_text_response)
             .build()
         )
 

@@ -109,21 +109,21 @@ async def publish_events(
     """
     published_events: List[PublishToTopicEvent] = []
 
-    for topic in node.publish_to:
-        run_topic = topics[topic.name]
-        delivery_count = len(consumers_of(topic.name))
+    for topic_name in node.publisher_router.select(publish_event):
+        run_topic = topics[topic_name]
+        delivery_count = len(consumers_of(topic_name))
         if delivery_count:
             await tracker.on_messages_published(
-                delivery_count, source=f"node:{node.name}->{topic.name}"
+                delivery_count, source=f"node:{node.name}->{topic_name}"
             )
         event = await run_topic.publish_data(publish_event)
         if event:
             published_events.append(event)
         elif delivery_count:
-            # Condition not met: the event was never enqueued, so no consumer
-            # will ever commit these deliveries. Release them immediately.
+            # The topic dropped the event (still enqueued nothing), so no
+            # consumer will ever commit these deliveries. Release them now.
             await tracker.on_messages_committed(
-                delivery_count, source=f"discard:{topic.name}"
+                delivery_count, source=f"discard:{topic_name}"
             )
 
     return published_events

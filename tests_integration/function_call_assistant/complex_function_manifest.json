@@ -34,12 +34,26 @@
                         "topic": "agent_input_topic"
                     }
                 ],
-                "publish_to": [
-                    "function_call_topic",
-                    "agent_output_topic"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "function_call_topic",
+                            "when": {
+                                "ref": "grafi.topics.conditions:has_tool_call"
+                            },
+                            "from_stage": null
+                        },
+                        {
+                            "topic": "agent_output_topic",
+                            "when": {
+                                "ref": "grafi.topics.conditions:has_text_response"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "FunctionCallNode": {
@@ -97,11 +111,19 @@
                         "topic": "function_call_topic"
                     }
                 ],
-                "publish_to": [
-                    "function_result_topic"
-                ],
                 "command": {
                     "class": "FunctionCallCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "function_result_topic",
+                            "when": {
+                                "ref": "grafi.topics.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "OpenAIOutputNode": {
@@ -129,42 +151,38 @@
                         "topic": "function_result_topic"
                     }
                 ],
-                "publish_to": [
-                    "agent_output_topic"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "agent_output_topic",
+                            "when": {
+                                "ref": "grafi.topics.conditions:has_text_response"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             }
         },
         "topics": {
             "agent_input_topic": {
                 "name": "agent_input_topic",
-                "type": "AgentInputTopic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "AgentInputTopic"
             },
             "function_call_topic": {
                 "name": "function_call_topic",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.conditions:has_tool_call"
-                }
+                "type": "Topic"
             },
             "agent_output_topic": {
                 "name": "agent_output_topic",
-                "type": "AgentOutputTopic",
-                "condition": {
-                    "ref": "grafi.topics.conditions:has_text_response"
-                }
+                "type": "AgentOutputTopic"
             },
             "function_result_topic": {
                 "name": "function_result_topic",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "Topic"
             }
         }
     }

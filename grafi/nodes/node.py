@@ -12,6 +12,7 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
+from grafi.nodes.node_base import PublisherRouter
 from grafi.tools.command import Command
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.expressions.topic_expression import CombinedExpr
@@ -73,17 +74,21 @@ class Node(NodeBase):
         }
 
     @classmethod
-    async def from_dict(
+    async def _builder_from_dict(
         cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "Node":
-        """Create a Node instance from a dictionary representation."""
+    ) -> NodeBaseBuilder:
+        """Reconstruct this node's builder from a dictionary representation.
+
+        Subclasses extend deserialization by calling this and then applying
+        their own fields to the returned builder.
+        """
         from openinference.semconv.trace import OpenInferenceSpanKindValues
 
         # Deserialize the tool
         tool = await ToolFactory.from_dict(node_dict["tool"])
 
         node_builder = (
-            Node.builder()
+            cls.builder()
             .name(node_dict["name"])
             .type(node_dict["type"])
             .oi_span_type(
@@ -103,11 +108,16 @@ class Node(NodeBase):
             elif "op" in expr_dict:
                 node_builder.subscribe(await CombinedExpr.from_dict(expr_dict, topics))
 
-        for topic_name in node_dict["publish_to"]:
-            # Check if topic already exists in topics dict
-            if topic_name in topics:
-                node_builder.publish_to(topics[topic_name])
-            else:
-                raise ValueError(f"Unknown topic: {topic_name}")
+        node_builder.publisher_router(
+            PublisherRouter.from_dict(node_dict["publisher_router"], topics)
+        )
 
+        return node_builder
+
+    @classmethod
+    async def from_dict(
+        cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
+    ) -> "Node":
+        """Create a Node instance from a dictionary representation."""
+        node_builder = await cls._builder_from_dict(node_dict, topics)
         return node_builder.build()

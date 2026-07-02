@@ -13,6 +13,8 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import NodeBaseBuilder
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -318,7 +320,7 @@ class TestNode:
 
         assert "node_id" in result
         assert result["subscribed_expressions"] == []
-        assert result["publish_to"] == []
+        assert result["publisher_router"]["routes"] == []
         assert result["command"] is None
 
     def test_to_dict_node_with_tool(self, node_with_tool: Node):
@@ -327,7 +329,7 @@ class TestNode:
 
         assert "node_id" in result
         assert result["subscribed_expressions"] == []
-        assert result["publish_to"] == []
+        assert result["publisher_router"]["routes"] == []
         assert result["command"] is not None  # Command should have to_dict method
 
     def test_to_dict_node_with_subscriptions(self, node_with_subscriptions: Node):
@@ -336,17 +338,20 @@ class TestNode:
 
         assert "node_id" in result
         assert len(result["subscribed_expressions"]) == 1
-        assert result["publish_to"] == []
+        assert result["publisher_router"]["routes"] == []
 
     def test_to_dict_node_with_publish_to(self, mock_topic: MockTopic):
         """Test to_dict for a Node with publish_to topics."""
-        node = Node(name="test_node", publish_to=[mock_topic])
+        node = Node(
+            name="test_node",
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
+        )
         result = node.to_dict()
 
         assert "node_id" in result
         assert result["subscribed_expressions"] == []
-        assert len(result["publish_to"]) == 1
-        assert result["publish_to"][0] == "test_topic"
+        assert len(result["publisher_router"]["routes"]) == 1
+        assert result["publisher_router"]["routes"][0]["topic"] == "test_topic"
 
     def test_to_dict_complete_node(self, mock_tool: MockTool, mock_topic: MockTopic):
         """Test to_dict for a Node with all features."""
@@ -356,15 +361,15 @@ class TestNode:
             name="complete_node",
             tool=mock_tool,
             subscribed_expressions=[topic_expr],
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         result = node.to_dict()
 
         assert "node_id" in result
         assert len(result["subscribed_expressions"]) == 1
-        assert len(result["publish_to"]) == 1
-        assert result["publish_to"][0] == "test_topic"
+        assert len(result["publisher_router"]["routes"]) == 1
+        assert result["publisher_router"]["routes"][0]["topic"] == "test_topic"
         assert result["command"] is not None
 
     # Test Property Access
@@ -405,7 +410,7 @@ class TestNode:
             name="async_workflow_node",
             tool=mock_tool,
             subscribed_expressions=[topic_expr],
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         sample_events = [
@@ -439,7 +444,7 @@ class TestNode:
 
     def test_node_with_empty_publish_to_list(self):
         """Test Node with empty publish_to list."""
-        node = Node(name="test_node", publish_to=[])
+        node = Node(name="test_node", publisher_router=PublisherRouter())
         assert len(node.publish_to) == 0
 
     def test_node_id_generation(self):
@@ -487,7 +492,7 @@ class TestNode:
             name="serialization_test_node",
             tool=mock_tool,
             subscribed_expressions=[topic_expr],
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         node_dict = node.to_dict()

@@ -9,6 +9,8 @@ from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicType
@@ -53,7 +55,7 @@ class TestEventDrivenWorkflowBuilder:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         workflow = EventDrivenWorkflow.builder().node(node).build()
@@ -82,7 +84,7 @@ class TestEventDrivenWorkflowInit:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
@@ -103,7 +105,7 @@ class TestEventDrivenWorkflowInit:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=missing_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         with pytest.raises(
@@ -120,7 +122,7 @@ class TestEventDrivenWorkflowInit:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[],
+            publisher_router=PublisherRouter(),
         )
 
         with pytest.raises(
@@ -142,7 +144,7 @@ class TestEventDrivenWorkflowTopicManagement:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -160,7 +162,7 @@ class TestEventDrivenWorkflowEventHandling:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
@@ -179,7 +181,7 @@ class TestEventDrivenWorkflowOutputEvents:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
@@ -213,7 +215,7 @@ class TestEventDrivenWorkflowInvoke:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -231,7 +233,7 @@ class TestEventDrivenWorkflowAsyncInvoke:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -289,7 +291,7 @@ class TestEventDrivenWorkflowInitialWorkflow:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -312,7 +314,7 @@ class TestEventDrivenWorkflowToDict:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         workflow = EventDrivenWorkflow(nodes={"test_node": node})
@@ -337,7 +339,7 @@ class TestEventDrivenWorkflowAsyncNodeTracker:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -383,7 +385,7 @@ class TestEventDrivenWorkflowStopFlag:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publish_to=[output_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
         )
 
         return EventDrivenWorkflow(nodes={"test_node": node})
@@ -420,7 +422,9 @@ class TestEventDrivenWorkflowSerialization:
                 name="test_node",
                 tool=mock_tool,
                 subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publish_to=[output_topic],
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic=output_topic)]
+                ),
             )
 
             # Create original workflow
@@ -460,7 +464,9 @@ class TestEventDrivenWorkflowSerialization:
                 name="roundtrip_node",
                 tool=mock_tool,
                 subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publish_to=[output_topic],
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic=output_topic)]
+                ),
             )
 
             # Create original workflow

@@ -51,6 +51,16 @@ def _mock_passthrough(messages: Messages) -> Messages:
     return messages
 
 
+def _is_final_response(event: PublishToTopicEvent) -> bool:
+    """Publish predicate: message has content and no tool calls."""
+    return event.data[-1].content is not None and event.data[-1].tool_calls is None
+
+
+def _has_tool_calls(event: PublishToTopicEvent) -> bool:
+    """Publish predicate: message contains tool calls."""
+    return event.data[-1].tool_calls is not None
+
+
 @use_command(Command)
 class LLMMockTool(Tool):
     name: str = "LLMMockTool"
@@ -180,17 +190,8 @@ class TestReActAgentWithMockLLM:
 
         # Create topics
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            # Only output when there's content and no tool calls
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
 
         # Create LLM node
         llm_node = (
@@ -198,8 +199,8 @@ class TestReActAgentWithMockLLM:
             .name("MockLLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -272,16 +273,8 @@ class TestReActAgentWithMockLLM:
 
         # Create topics
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         # Create LLM node
@@ -296,8 +289,8 @@ class TestReActAgentWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -393,16 +386,8 @@ class TestReActAgentWithMockLLM:
 
         # Create topics
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -416,8 +401,8 @@ class TestReActAgentWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -501,24 +486,16 @@ class TestHumanInTheLoopWithMockLLM:
             return [Message(role="assistant", content="I can answer this directly!")]
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        hitl_call_topic = Topic(
-            name="hitl_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        hitl_call_topic = Topic(name="hitl_call")
 
         llm_node = (
             Node.builder()
             .name("MockLLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(hitl_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(hitl_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -601,16 +578,8 @@ class TestHumanInTheLoopWithMockLLM:
 
         # Create topics following integration test pattern
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        hitl_call_topic = Topic(
-            name="hitl_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        hitl_call_topic = Topic(name="hitl_call")
 
         # HITL topics - the key components for true HITL pattern
         human_response_topic = InWorkflowInputTopic(name="human_response")
@@ -631,8 +600,8 @@ class TestHumanInTheLoopWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(hitl_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(hitl_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -761,16 +730,8 @@ class TestHumanInTheLoopWithMockLLM:
 
         # Topics
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        hitl_call_topic = Topic(
-            name="hitl_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        hitl_call_topic = Topic(name="hitl_call")
         human_response_topic = InWorkflowInputTopic(name="human_response")
         human_request_topic = InWorkflowOutputTopic(
             name="human_request",
@@ -788,8 +749,8 @@ class TestHumanInTheLoopWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(hitl_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(hitl_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -930,16 +891,8 @@ class TestHumanInTheLoopWithMockLLM:
             )
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        hitl_call_topic = Topic(
-            name="hitl_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        hitl_call_topic = Topic(name="hitl_call")
         human_response_topic = InWorkflowInputTopic(name="human_response")
         human_request_topic = InWorkflowOutputTopic(
             name="human_request",
@@ -957,8 +910,8 @@ class TestHumanInTheLoopWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(hitl_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(hitl_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1063,16 +1016,8 @@ class TestHumanInTheLoopWithMockLLM:
             return "Action APPROVED automatically"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -1086,8 +1031,8 @@ class TestHumanInTheLoopWithMockLLM:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1200,28 +1145,9 @@ class TestComplexWorkflowPatterns:
             ]
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        weather_topic = Topic(
-            name="weather_call",
-            condition=lambda event: (
-                event.data[-1].tool_calls is not None
-                and any(
-                    tc.function.name == "weather" for tc in event.data[-1].tool_calls
-                )
-            ),
-        )
-        math_topic = Topic(
-            name="math_call",
-            condition=lambda event: (
-                event.data[-1].tool_calls is not None
-                and any(tc.function.name == "math" for tc in event.data[-1].tool_calls)
-            ),
-        )
+        agent_output = OutputTopic(name="agent_output")
+        weather_topic = Topic(name="weather_call")
+        math_topic = Topic(name="math_call")
         function_result_topic = Topic(name="function_result")
 
         router_node = (
@@ -1229,9 +1155,26 @@ class TestComplexWorkflowPatterns:
             .name("RouterNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=mock_router))
-            .publish_to(agent_output)
-            .publish_to(weather_topic)
-            .publish_to(math_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(
+                weather_topic,
+                when=lambda event: (
+                    event.data[-1].tool_calls is not None
+                    and any(
+                        tc.function.name == "weather"
+                        for tc in event.data[-1].tool_calls
+                    )
+                ),
+            )
+            .publish_to(
+                math_topic,
+                when=lambda event: (
+                    event.data[-1].tool_calls is not None
+                    and any(
+                        tc.function.name == "math" for tc in event.data[-1].tool_calls
+                    )
+                ),
+            )
             .build()
         )
 
@@ -1260,7 +1203,7 @@ class TestComplexWorkflowPatterns:
                 SubscriptionBuilder().subscribed_to(function_result_topic).build()
             )
             .tool(LLMMockTool(function=mock_response))
-            .publish_to(agent_output)
+            .publish_to(agent_output, when=_is_final_response)
             .build()
         )
 
@@ -1330,16 +1273,8 @@ class TestComplexWorkflowPatterns:
             return "News: Markets up 2%"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -1353,8 +1288,8 @@ class TestComplexWorkflowPatterns:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm_parallel))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1431,16 +1366,8 @@ class TestComplexWorkflowPatterns:
             return "Error: Service unavailable"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -1454,8 +1381,8 @@ class TestComplexWorkflowPatterns:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1529,16 +1456,8 @@ class TestComplexWorkflowPatterns:
             return "Context function executed"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -1552,8 +1471,8 @@ class TestComplexWorkflowPatterns:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm_with_context))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1637,24 +1556,16 @@ class TestEdgeCasesAndExceptions:
             raise ValueError("Intentional test error in function call")
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
 
         llm_node = (
             Node.builder()
             .name("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1668,7 +1579,7 @@ class TestEdgeCasesAndExceptions:
                 .function(raise_error)
                 .build()
             )
-            .publish_to(agent_output)
+            .publish_to(agent_output, when=_is_final_response)
             .build()
         )
 
@@ -1708,17 +1619,17 @@ class TestEdgeCasesAndExceptions:
             raise RuntimeError("LLM processing failed")
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: event.data[-1].content is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
 
         llm_node = (
             Node.builder()
             .name("FailingLLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=failing_llm))
-            .publish_to(agent_output)
+            .publish_to(
+                agent_output,
+                when=lambda event: event.data[-1].content is not None,
+            )
             .build()
         )
 
@@ -1755,17 +1666,17 @@ class TestEdgeCasesAndExceptions:
             return [Message(role="assistant", content="")]
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: event.data[-1].content is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
 
         llm_node = (
             Node.builder()
             .name("EmptyLLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=empty_content_llm))
-            .publish_to(agent_output)
+            .publish_to(
+                agent_output,
+                when=lambda event: event.data[-1].content is not None,
+            )
             .build()
         )
 
@@ -1802,17 +1713,17 @@ class TestEdgeCasesAndExceptions:
             return Message(role="assistant", content="Single message response")
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: event.data[-1].content is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
 
         llm_node = (
             Node.builder()
             .name("SingleMsgLLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=single_message_llm))
-            .publish_to(agent_output)
+            .publish_to(
+                agent_output,
+                when=lambda event: event.data[-1].content is not None,
+            )
             .build()
         )
 
@@ -1865,24 +1776,16 @@ class TestEdgeCasesAndExceptions:
             return "Should not reach here"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
 
         llm_node = (
             Node.builder()
             .name("LLMNode")
             .subscribe(SubscriptionBuilder().subscribed_to(agent_input).build())
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -1893,7 +1796,7 @@ class TestEdgeCasesAndExceptions:
             .tool(
                 FunctionCallTool.builder().name("SomeFunc").function(some_func).build()
             )
-            .publish_to(agent_output)
+            .publish_to(agent_output, when=_is_final_response)
             .build()
         )
 
@@ -1954,16 +1857,8 @@ class TestEdgeCasesAndExceptions:
             return "This is an existing function"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -1977,8 +1872,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -2049,16 +1944,8 @@ class TestEdgeCasesAndExceptions:
             raise Exception("Node failure - workflow should stop")
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -2072,8 +1959,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -2170,16 +2057,8 @@ class TestEdgeCasesAndExceptions:
             return "Result B"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -2193,8 +2072,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -2280,16 +2159,8 @@ class TestEdgeCasesAndExceptions:
             )
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -2303,8 +2174,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -2378,16 +2249,8 @@ class TestEdgeCasesAndExceptions:
             return f"Processed: {text}"
 
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         llm_node = (
@@ -2401,8 +2264,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 
@@ -2498,16 +2361,8 @@ class TestEdgeCasesAndExceptions:
 
         # Create topics
         agent_input = InputTopic(name="agent_input")
-        agent_output = OutputTopic(
-            name="agent_output",
-            condition=lambda event: (
-                event.data[-1].content is not None and event.data[-1].tool_calls is None
-            ),
-        )
-        function_call_topic = Topic(
-            name="function_call",
-            condition=lambda event: event.data[-1].tool_calls is not None,
-        )
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
         function_result_topic = Topic(name="function_result")
 
         # Create LLM node
@@ -2522,8 +2377,8 @@ class TestEdgeCasesAndExceptions:
                 .build()
             )
             .tool(LLMMockTool(function=mock_llm))
-            .publish_to(agent_output)
-            .publish_to(function_call_topic)
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
             .build()
         )
 

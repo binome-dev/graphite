@@ -14,6 +14,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -63,14 +65,14 @@ def _build_fanout_workflow() -> EventDrivenWorkflow:
         type="Node",
         tool=LabelTool(label="a"),
         subscribed_expressions=[TopicExpr(topic=input_topic)],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     node_b = Node(
         name="node_b",
         type="Node",
         tool=LabelTool(label="b"),
         subscribed_expressions=[TopicExpr(topic=input_topic)],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     return EventDrivenWorkflow.builder().node(node_a).node(node_b).build()
 
@@ -125,7 +127,7 @@ async def test_parallel_does_not_hang_on_unsatisfied_and_subscription():
         type="Node",
         tool=LabelTool(label="ok"),
         subscribed_expressions=[TopicExpr(topic=input_topic)],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     # Subscribes to (agent_input AND gate_topic); gate_topic never fires.
     stuck = Node(
@@ -139,7 +141,7 @@ async def test_parallel_does_not_hang_on_unsatisfied_and_subscription():
             .subscribed_to(gate)
             .build()
         ],
-        publish_to=[output_topic],
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     workflow = EventDrivenWorkflow.builder().node(firing).node(stuck).build()
 

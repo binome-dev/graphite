@@ -213,7 +213,10 @@ class TestPublishEvents:
         node = MagicMock(spec=Node)
         node.name = "test_node"
         node.type = "test_type"
-        node.publish_to = [mock_topic1, mock_topic2]
+        # The publisher router owns routing: it selects the destination topic
+        # names; publish_events just delivers + tracks.
+        node.publisher_router = MagicMock()
+        node.publisher_router.select.return_value = ["topic1", "topic2"]
 
         invoke_context = InvokeContext(
             conversation_id="test-conversation",
@@ -271,10 +274,12 @@ class TestPublishEvents:
             call(2, source="node:test_node->topic1"),
             call(1, source="node:test_node->topic2"),
         ]
-        # topic2's condition filtered the event out, so its delivery is released.
+        # topic2 dropped the event (publish_data returned None), so its
+        # delivery is released.
         tracker.on_messages_committed.assert_awaited_once_with(
             1, source="discard:topic2"
         )
+        node.publisher_router.select.assert_called_once_with(publish_to_event)
 
 
 class TestGetNodeInput:

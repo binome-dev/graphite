@@ -13,6 +13,8 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.nodes.node_base import NodeBase
 from grafi.nodes.node_base import NodeBaseBuilder
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import SubExpr
@@ -159,7 +161,7 @@ class TestNodeBase:
             tool=mock_tool,
             oi_span_type=OpenInferenceSpanKindValues.AGENT,
             subscribed_expressions=[topic_expr],
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         assert node.node_id == custom_node_id
@@ -285,7 +287,7 @@ class TestNodeBase:
         """Test that publish_to field accepts valid TopicBase objects."""
         node = ConcreteNodeBase(
             name="test_node",
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         assert len(node.publish_to) == 1
@@ -326,7 +328,12 @@ class TestNodeBase:
     def test_invalid_publish_to_type_raises_error(self):
         """Test that invalid publish_to type raises validation error."""
         with pytest.raises(Exception):  # Pydantic validation error
-            ConcreteNodeBase(name="test_node", publish_to=["invalid_topic"])
+            ConcreteNodeBase(
+                name="test_node",
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic="invalid_topic")]
+                ),
+            )
 
     def test_invalid_oi_span_type_raises_error(self):
         """Test that invalid oi_span_type raises validation error."""
@@ -376,7 +383,7 @@ class TestNodeBase:
         # Add items
         topic_expr = TopicExpr(topic=mock_topic)
         node.subscribed_expressions.append(topic_expr)
-        node.publish_to.append(mock_topic)
+        node.publisher_router.routes.append(PublishRoute(topic=mock_topic))
 
         # Verify changes
         assert len(node.subscribed_expressions) == 1
@@ -403,7 +410,7 @@ class TestNodeBase:
             name="test_node",
             tool=mock_tool,
             subscribed_expressions=[topic_expr],
-            publish_to=[mock_topic],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=mock_topic)]),
         )
 
         dumped = node.model_dump()
@@ -413,7 +420,7 @@ class TestNodeBase:
         assert "node_id" in dumped
         assert "tool" in dumped
         assert "subscribed_expressions" in dumped
-        assert "publish_to" in dumped
+        assert "publisher_router" in dumped
 
     def test_model_equality(self):
         """Test that model equality works correctly."""
@@ -480,7 +487,9 @@ class TestNodeBase:
             tool=mock_tool,
             oi_span_type=OpenInferenceSpanKindValues.AGENT,
             subscribed_expressions=[expr1, expr2],
-            publish_to=[topic2, topic3],
+            publisher_router=PublisherRouter(
+                routes=[PublishRoute(topic=topic2), PublishRoute(topic=topic3)]
+            ),
         )
 
         # Verify all configurations
@@ -524,7 +533,9 @@ class TestNodeBase:
         node = ConcreteNodeBase(
             name="test_node",
             subscribed_expressions=expressions,
-            publish_to=topics,
+            publisher_router=PublisherRouter(
+                routes=[PublishRoute(topic=topic) for topic in topics]
+            ),
         )
 
         assert len(node.subscribed_expressions) == 50
@@ -633,9 +644,10 @@ class TestNodeBaseBuilder:
         result = builder.publish_to(mock_topic)
 
         assert result is builder
-        assert "publish_to" in builder.kwargs
-        assert len(builder.kwargs["publish_to"]) == 1
-        assert builder.kwargs["publish_to"][0] is mock_topic
+        assert "publisher_router" in builder.kwargs
+        routes = builder.kwargs["publisher_router"].routes
+        assert len(routes) == 1
+        assert routes[0].topic is mock_topic
 
     def test_builder_publish_to_method_multiple_calls(self, builder: NodeBaseBuilder):
         """Test multiple calls to publish_to() method."""
@@ -644,9 +656,10 @@ class TestNodeBaseBuilder:
 
         builder.publish_to(topic1).publish_to(topic2)
 
-        assert len(builder.kwargs["publish_to"]) == 2
-        assert builder.kwargs["publish_to"][0] is topic1
-        assert builder.kwargs["publish_to"][1] is topic2
+        routes = builder.kwargs["publisher_router"].routes
+        assert len(routes) == 2
+        assert routes[0].topic is topic1
+        assert routes[1].topic is topic2
 
     # Test Builder Chaining
     def test_builder_method_chaining(self, mock_tool: MockTool, mock_topic: MockTopic):
@@ -668,7 +681,7 @@ class TestNodeBaseBuilder:
         assert builder.kwargs["oi_span_type"] == OpenInferenceSpanKindValues.AGENT
         assert builder.kwargs["tool"] is mock_tool
         assert len(builder.kwargs["subscribed_expressions"]) == 1
-        assert len(builder.kwargs["publish_to"]) == 1
+        assert len(builder.kwargs["publisher_router"].routes) == 1
 
     # Test Builder Build Method
     def test_builder_build_basic(self, builder: NodeBaseBuilder):
@@ -762,13 +775,13 @@ class TestNodeBaseBuilder:
     def test_builder_publish_to_creates_list_if_not_exists(
         self, builder: NodeBaseBuilder, mock_topic: MockTopic
     ):
-        """Test that publish_to() creates publish_to list if it doesn't exist."""
-        assert "publish_to" not in builder.kwargs
+        """Test that publish_to() creates the publisher router if absent."""
+        assert "publisher_router" not in builder.kwargs
 
         builder.publish_to(mock_topic)
 
-        assert "publish_to" in builder.kwargs
-        assert isinstance(builder.kwargs["publish_to"], list)
+        assert "publisher_router" in builder.kwargs
+        assert isinstance(builder.kwargs["publisher_router"].routes, list)
 
     def test_builder_subscribe_appends_to_existing_list(self, builder: NodeBaseBuilder):
         """Test that subscribe() appends to existing subscribed_expressions list."""
@@ -786,17 +799,17 @@ class TestNodeBaseBuilder:
     def test_builder_publish_to_appends_to_existing_list(
         self, builder: NodeBaseBuilder
     ):
-        """Test that publish_to() appends to existing publish_to list."""
+        """Test that publish_to() appends to the existing publisher router."""
         topic1 = MockTopic(name="topic1")
         topic2 = MockTopic(name="topic2")
 
         # First topic
         builder.publish_to(topic1)
-        assert len(builder.kwargs["publish_to"]) == 1
+        assert len(builder.kwargs["publisher_router"].routes) == 1
 
         # Second topic
         builder.publish_to(topic2)
-        assert len(builder.kwargs["publish_to"]) == 2
+        assert len(builder.kwargs["publisher_router"].routes) == 2
 
     # Test Builder Return Types
     def test_builder_methods_return_self(

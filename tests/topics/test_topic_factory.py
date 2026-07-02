@@ -19,7 +19,6 @@ async def test_topic_factory_default_topic():
     data = {
         "name": "test_topic",
         "type": "Topic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -35,7 +34,6 @@ async def test_topic_factory_input_topic():
     data = {
         "name": "input_topic",
         "type": "AgentInputTopic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -51,7 +49,6 @@ async def test_topic_factory_output_topic():
     data = {
         "name": "output_topic",
         "type": "AgentOutputTopic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -67,7 +64,6 @@ async def test_topic_factory_in_workflow_input_topic():
     data = {
         "name": "in_workflow_input",
         "type": "InWorkflowInputTopic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -83,7 +79,6 @@ async def test_topic_factory_in_workflow_output_topic():
     data = {
         "name": "in_workflow_output",
         "type": "InWorkflowOutputTopic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
         "paired_in_workflow_input_topic_names": ["approval", "rejection"],
     }
 
@@ -101,7 +96,6 @@ async def test_topic_factory_with_topic_type_enum():
     data = {
         "name": "test_topic",
         "type": TopicType.DEFAULT_TOPIC_TYPE,
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await TopicFactory.from_dict(data)
@@ -116,7 +110,6 @@ async def test_topic_factory_unknown_type_string():
     data = {
         "name": "test_topic",
         "type": "UnknownTopicType",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(ValueError, match="Unknown topic type string"):
@@ -128,7 +121,6 @@ async def test_topic_factory_missing_type():
     """Test factory raises KeyError when type is missing."""
     data = {
         "name": "test_topic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(KeyError, match="Missing required key 'type'"):
@@ -141,7 +133,6 @@ async def test_topic_factory_invalid_type():
     data = {
         "name": "test_topic",
         "type": 12345,  # Invalid type
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     with pytest.raises(ValueError, match="Invalid topic type"):

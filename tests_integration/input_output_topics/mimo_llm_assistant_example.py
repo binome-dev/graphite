@@ -62,9 +62,9 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Greeting Output: {greeting_output}")
     assert len(greeting_output) == 2
 
-    # Event store is idempotent on event_id; counts reflect deduped events
-    # (previously 20, which double-counted a duplicate publish).
-    assert len(await event_store.get_events()) == 19
+    # Cumulative event count after this invoke (greeting path: router + greeting
+    # + merge nodes). The router node content-routes the single input.
+    assert len(await event_store.get_events()) == 25
 
     # Test question input
     print("\nTesting question input...")
@@ -85,7 +85,7 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Question Output: {question_output}")
     assert len(question_output) == 2
 
-    assert len(await event_store.get_events()) == 38
+    assert len(await event_store.get_events()) == 50
 
     # Test mixed input (both greeting and question)
     print("\nTesting mixed input...")
@@ -107,7 +107,7 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Mixed Output: {mixed_output}")
     assert len(mixed_output) == 3
 
-    assert len(await event_store.get_events()) == 65
+    assert len(await event_store.get_events()) == 83
 
 
 with bind_services(runtime.services):

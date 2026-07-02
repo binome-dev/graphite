@@ -30,7 +30,6 @@ class TopicFactory:
         >>> topic_data = {
         ...     "name": "my_topic",
         ...     "type": "AgentInputTopic",
-        ...     "condition": "..."
         ... }
         >>> topic = TopicFactory.from_dict(topic_data)
         >>> isinstance(topic, InputTopic)
@@ -68,7 +67,6 @@ class TopicFactory:
                 Must contain at least:
                 - "type": The topic type (string or TopicType enum value)
                 - "name": The topic name
-                - "condition": The serialized condition function
 
         Returns:
             TopicBase: An instance of the appropriate topic subclass.
@@ -81,7 +79,6 @@ class TopicFactory:
             >>> data = {
             ...     "name": "user_input",
             ...     "type": "AgentInputTopic",
-            ...     "condition": "<serialized_condition>"
             ... }
             >>> topic = await TopicFactory.from_dict(data)
             >>> isinstance(topic, InputTopic)

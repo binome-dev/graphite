@@ -40,11 +40,19 @@
                         }
                     }
                 ],
-                "publish_to": [
-                    "thought_result"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "thought_result",
+                            "when": {
+                                "ref": "grafi.topics.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "ActionNode": {
@@ -72,12 +80,26 @@
                         "topic": "thought_result"
                     }
                 ],
-                "publish_to": [
-                    "action_search_result",
-                    "action_finish_result"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "action_search_result",
+                            "when": {
+                                "ref": "grafi.topics.conditions:has_tool_call"
+                            },
+                            "from_stage": null
+                        },
+                        {
+                            "topic": "action_finish_result",
+                            "when": {
+                                "ref": "grafi.topics.conditions:has_text_response"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "SearchNode": {
@@ -128,11 +150,19 @@
                         "topic": "action_search_result"
                     }
                 ],
-                "publish_to": [
-                    "search_function_result"
-                ],
                 "command": {
                     "class": "FunctionCallCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "search_function_result",
+                            "when": {
+                                "ref": "grafi.topics.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "ObservationNode": {
@@ -160,11 +190,19 @@
                         "topic": "search_function_result"
                     }
                 ],
-                "publish_to": [
-                    "observation_result"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "observation_result",
+                            "when": {
+                                "ref": "grafi.topics.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             },
             "SummariesNode": {
@@ -192,63 +230,50 @@
                         "topic": "action_finish_result"
                     }
                 ],
-                "publish_to": [
-                    "agent_output_topic"
-                ],
                 "command": {
                     "class": "LLMCommand"
+                },
+                "publisher_router": {
+                    "routes": [
+                        {
+                            "topic": "agent_output_topic",
+                            "when": {
+                                "ref": "grafi.topics.conditions:always_true"
+                            },
+                            "from_stage": null
+                        }
+                    ]
                 }
             }
         },
         "topics": {
             "agent_input_topic": {
                 "name": "agent_input_topic",
-                "type": "AgentInputTopic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "AgentInputTopic"
             },
             "observation_result": {
                 "name": "observation_result",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "Topic"
             },
             "thought_result": {
                 "name": "thought_result",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "Topic"
             },
             "action_search_result": {
                 "name": "action_search_result",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.conditions:has_tool_call"
-                }
+                "type": "Topic"
             },
             "action_finish_result": {
                 "name": "action_finish_result",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.conditions:has_text_response"
-                }
+                "type": "Topic"
             },
             "search_function_result": {
                 "name": "search_function_result",
-                "type": "Topic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "Topic"
             },
             "agent_output_topic": {
                 "name": "agent_output_topic",
-                "type": "AgentOutputTopic",
-                "condition": {
-                    "ref": "grafi.topics.topic_base:always_true"
-                }
+                "type": "AgentOutputTopic"
             }
         }
     }

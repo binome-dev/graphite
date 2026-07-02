@@ -4,7 +4,6 @@ from typing import Self
 
 from pydantic import Field
 
-from grafi.topics.topic_base import deserialize_condition
 from grafi.topics.topic_impl.topic import Topic
 from grafi.topics.topic_impl.topic import TopicBuilder
 from grafi.topics.topic_types import TopicType
@@ -73,7 +72,6 @@ class InWorkflowOutputTopic(Topic):
         return cls(
             name=data["name"],
             type=data["type"],
-            condition=deserialize_condition(data),
             paired_in_workflow_input_topic_names=data.get(
                 "paired_in_workflow_input_topic_names", []
             ),

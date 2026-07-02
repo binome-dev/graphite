@@ -1,5 +1,3 @@
-from unittest.mock import Mock
-
 import pytest
 import pytest_asyncio
 
@@ -111,17 +109,14 @@ class TestOutputTopic:
         assert topic.name == "custom_topic"
 
     @pytest.mark.asyncio
-    async def test_publish_data_with_condition_true(
+    async def test_publish_data_enqueues(
         self,
         output_topic: OutputTopic,
         sample_invoke_context,
         sample_messages,
         sample_consumed_events,
     ):
-        """Test publishing data when condition is met."""
-        # Mock condition to return True
-        output_topic.condition = Mock(return_value=True)
-
+        """A pure-queue topic stamps and enqueues every event (no filtering)."""
         event = await output_topic.publish_data(
             PublishToTopicEvent(
                 invoke_context=sample_invoke_context,
@@ -139,27 +134,3 @@ class TestOutputTopic:
         assert event.data == sample_messages
         assert event.consumed_event_ids == ["test_id_1", "test_id_2"]
         assert event.offset == 0
-
-    @pytest.mark.asyncio
-    async def test_publish_data_with_condition_false(
-        self,
-        output_topic: OutputTopic,
-        sample_invoke_context,
-        sample_messages,
-        sample_consumed_events,
-    ):
-        """Test publishing data when condition is not met."""
-        # Mock condition to return False
-        output_topic.condition = Mock(return_value=False)
-
-        event = await output_topic.publish_data(
-            PublishToTopicEvent(
-                invoke_context=sample_invoke_context,
-                publisher_name="test_publisher",
-                publisher_type="test_type",
-                data=sample_messages,
-                consumed_event_ids=[event.event_id for event in sample_consumed_events],
-            )
-        )
-
-        assert event is None

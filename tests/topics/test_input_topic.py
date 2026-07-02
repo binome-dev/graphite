@@ -178,11 +178,10 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
 @pytest.mark.asyncio
 async def test_from_dict():
-    """Test deserialization from a dictionary with a reference condition."""
+    """Test deserialization from a dictionary (pure-queue topic)."""
     data = {
         "name": "test_input_topic",
         "type": "AgentInputTopic",
-        "condition": {"ref": "grafi.topics.topic_base:always_true"},
     }
 
     topic = await InputTopic.from_dict(data)
@@ -190,8 +189,6 @@ async def test_from_dict():
     assert isinstance(topic, InputTopic)
     assert topic.name == "test_input_topic"
     assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
-    assert topic.condition is not None
-    assert topic.condition("anything") is True
 
 
 @pytest.mark.asyncio
@@ -210,4 +207,3 @@ async def test_from_dict_roundtrip():
     assert isinstance(restored, InputTopic)
     assert restored.name == original.name
     assert restored.type == original.type
-    assert restored.condition is not None

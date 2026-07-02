@@ -67,12 +67,7 @@ class MultiFunctionsCallAssistant(Assistant):
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
 
-        function_call_topic = Topic(
-            name="function_call_topic",
-            condition=has_tool_call,
-        )
-
-        agent_output_topic.condition = has_text_response
+        function_call_topic = Topic(name="function_call_topic")
 
         # Create an input LLM node
         llm_input_node = (
@@ -88,17 +83,14 @@ class MultiFunctionsCallAssistant(Assistant):
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(function_call_topic)
-            .publish_to(agent_output_topic)
+            .publish_to(function_call_topic, when=has_tool_call)
+            .publish_to(agent_output_topic, when=has_text_response)
             .build()
         )
 
         workflow_dag_builder.node(llm_input_node)
 
-        function_result_topic = Topic(
-            name="function_result_topic",
-            condition=has_text_response,
-        )
+        function_result_topic = Topic(name="function_result_topic")
 
         # Create function call node
         for function_tool in self.function_tools:
@@ -111,7 +103,7 @@ class MultiFunctionsCallAssistant(Assistant):
                     SubscriptionBuilder().subscribed_to(function_call_topic).build()
                 )
                 .tool(function_tool)
-                .publish_to(function_result_topic)
+                .publish_to(function_result_topic, when=has_text_response)
                 .build()
             )
             workflow_dag_builder.node(function_call_node)
@@ -131,7 +123,7 @@ class MultiFunctionsCallAssistant(Assistant):
                 .system_message(self.summary_llm_system_message)
                 .build()
             )
-            .publish_to(agent_output_topic)
+            .publish_to(agent_output_topic, when=has_text_response)
             .build()
         )
 
