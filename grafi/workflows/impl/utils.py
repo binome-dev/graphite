@@ -148,6 +148,9 @@ async def get_node_input(
                     consumer_name=node.name,
                     consumer_type=node.type,
                     offset=event.offset,
+                    # Carry the source publish event's links so the node can
+                    # resolve a HITL resume reply back to its review event.
+                    consumed_event_ids=getattr(event, "consumed_event_ids", []),
                     data=event.data,
                 )
                 consumed_events.append(consumed_event)

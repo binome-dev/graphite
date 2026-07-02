@@ -75,6 +75,7 @@ def node_invoke_event_dict():
                     "event_context": {
                         "consumer_name": "test_node",
                         "consumer_type": "test_type",
+                        "consumed_event_ids": [],
                         "name": "test_topic",
                         "type": "AgentOutputTopic",
                         "offset": -1,

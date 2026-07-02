@@ -9,7 +9,9 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.nodes.conditions import has_no_tool_call
 from grafi.nodes.conditions import has_tool_call
-from grafi.nodes.node import Node
+from grafi.nodes.hooks.hitl_approval_hook import ToolCallReasonHook
+from grafi.nodes.impl.hooked_node import HookedNode
+from grafi.nodes.routing import ConsumerRouter
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
@@ -22,28 +24,19 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 class HumanApprovalAssistant(Assistant):
-    """A human-in-the-loop assistant that surfaces a tool call for review.
+    """
+    A simple assistant class that uses OpenAI's language model to process input,
+    make function calls, and generate responses.
 
-    This is the plain pause/resume form: the LLM proposes a tool call, the
-    function node runs it and publishes the result to a paired
-    ``InWorkflowOutputTopic`` (surfacing it to a human), and the human's reply
-    resumes the workflow through the LLM, which produces the final answer.
-    Routing is content-based on the LLM node's publisher routes
-    (``publish_to(..., when=has_tool_call)``); there is a single human-response
-    channel and no approve/deny verdict branching.
-
-    Verdict-gated approval (run the tool only if the human approves, deny to
-    forward a rejection) is a consumer-router capability introduced with the
-    tool-hooks change; this example is intentionally limited to the pause/resume
-    mechanics that the pure publisher-route routing supports.
+    This class sets up a workflow with three nodes: an input LLM node, a function call node,
+    and an output LLM node. It provides a method to run input through this workflow.
 
     Attributes:
         name (str): The name of the assistant.
-        api_key (str): The API key for OpenAI. If not provided, it tries to use
-            the OPENAI_API_KEY environment variable.
+        api_key (str): The API key for OpenAI. If not provided, it tries to use the OPENAI_API_KEY environment variable.
         model (str): The name of the OpenAI model to use.
-        function_tool (FunctionCallTool): The tool whose call is surfaced for
-            human review.
+        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
+        function (Callable): The function to be called by the assistant.
     """
 
     oi_span_type: OpenInferenceSpanKindValues = Field(
@@ -55,7 +48,6 @@ class HumanApprovalAssistant(Assistant):
     model: str = Field(default="gpt-4o")
     function_tool: FunctionCallTool
     function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
 
     @classmethod
     def builder(cls) -> "HumanApprovalAssistantBuilder":
@@ -63,27 +55,32 @@ class HumanApprovalAssistant(Assistant):
         return HumanApprovalAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "HumanApprovalAssistant":
+        # HITL via a consumer-verdict gate on the function node:
+        #   * the LLM proposes a tool call and (via ToolCallReasonHook) justifies
+        #     it; the call is content-routed to an InWorkflowOutputTopic, which
+        #     surfaces for human review and pairs to the resume input.
+        #   * the human echoes the call back with a verdict; the function node's
+        #     consumer router approves (runs the tool) or denies (forwards the
+        #     reply, which the LLM then answers).
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
-        tool_call_topic = Topic(name="human_tool_call_topic")
-        register_topic = Topic(name="human_tool_call_response_topic")
+        function_output_topic = Topic(name="human_tool_call_response_topic")
+
         human_response_topic = InWorkflowInputTopic(name="human_response_topic")
-        human_request_topic = InWorkflowOutputTopic(
+        in_workflow_output_topic = InWorkflowOutputTopic(
             name="human_tool_call_request_topic",
             paired_in_workflow_input_topic_names=[human_response_topic.name],
         )
 
-        # The human's reply re-enters this node; a tool-call proposal is routed
-        # to the function node, a plain answer to the summary node.
         llm_input_node = (
-            Node.builder()
+            HookedNode.builder()
             .name("OpenAIInputNode")
             .type("LLMNode")
             .subscribe(
                 SubscriptionBuilder()
                 .subscribed_to(agent_input_topic)
                 .or_()
-                .subscribed_to(human_response_topic)
+                .subscribed_to(function_output_topic)
                 .build()
             )
             .tool(
@@ -94,39 +91,25 @@ class HumanApprovalAssistant(Assistant):
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(tool_call_topic, when=has_tool_call)
-            .publish_to(register_topic, when=has_no_tool_call)
+            # Make the model justify each tool call (surfaced to the reviewer).
+            .pre_tool_hook(ToolCallReasonHook())
+            .publish_to(in_workflow_output_topic, when=has_tool_call)
+            .publish_to(agent_output_topic, when=has_no_tool_call)
             .build()
         )
 
-        # The function node runs the proposed tool call and surfaces the result
-        # to a human for review via the paired in-workflow output topic.
+        # The function node gates on the human verdict: approve -> run the
+        # (echoed) tool call; deny -> forward the reply back to the LLM.
         function_call_node = (
-            Node.builder()
+            HookedNode.builder()
             .name("FunctionCallNode")
             .type("FunctionCallNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(tool_call_topic).build())
-            .tool(self.function_tool)
-            .publish_to(human_request_topic)
-            .build()
-        )
-
-        # Once the input LLM produces a plain answer (no tool call), summarize it
-        # for the user.
-        llm_output_node = (
-            Node.builder()
-            .name("OpenAIOutputNode")
-            .type("LLMNode")
-            .subscribe(SubscriptionBuilder().subscribed_to(register_topic).build())
-            .tool(
-                OpenAITool.builder()
-                .name("UserOutputLLM")
-                .api_key(self.api_key)
-                .model(self.model)
-                .system_message(self.summary_llm_system_message)
-                .build()
+            .subscribe(
+                SubscriptionBuilder().subscribed_to(human_response_topic).build()
             )
-            .publish_to(agent_output_topic)
+            .tool(self.function_tool)
+            .consumer_router(ConsumerRouter(pre_hitl_input=human_response_topic.name))
+            .publish_to(function_output_topic)
             .build()
         )
 
@@ -136,7 +119,6 @@ class HumanApprovalAssistant(Assistant):
             .name("HumanApprovalWorkflow")
             .node(llm_input_node)
             .node(function_call_node)
-            .node(llm_output_node)
             .build()
         )
 
@@ -160,10 +142,6 @@ class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]
         self.kwargs["function_call_llm_system_message"] = (
             function_call_llm_system_message
         )
-        return self
-
-    def summary_llm_system_message(self, summary_llm_system_message: str) -> Self:
-        self.kwargs["summary_llm_system_message"] = summary_llm_system_message
         return self
 
     def function_tool(self, function_tool: FunctionCallTool) -> Self:

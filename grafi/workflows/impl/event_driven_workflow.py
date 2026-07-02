@@ -12,6 +12,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
+from grafi.nodes.impl.hooked_node import HookedNode
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
@@ -57,7 +58,107 @@ class EventDrivenWorkflow(Workflow):
 
     def model_post_init(self, _context: Any) -> None:
         self._add_topics()
+        self._validate_router_wiring()
         self._handle_function_calling_nodes()
+
+    def _validate_router_wiring(self) -> None:
+        """Build-time check of each node's HITL router wiring (pure read).
+
+        Catches misconfigured nodes early rather than at run time:
+        1. A node with a pause route also has at least one normal output route.
+        2. Each ``from_stage`` is used by exactly one route, on an
+           ``InWorkflowOutputTopic`` paired to the node's matching resume input.
+        3. A consumer router's ``pre_hitl_input``/``post_hitl_input`` (when set)
+           is subscribed by the node and is an ``InWorkflowInputTopic``.
+        """
+        from grafi.nodes.routing import ConsumerRouter
+        from grafi.nodes.routing import Stage
+        from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
+        from grafi.topics.topic_impl.in_workflow_output_topic import (
+            InWorkflowOutputTopic,
+        )
+
+        for node_name, node in self.nodes.items():
+            routes = node.publisher_router.routes
+            pause_routes = [r for r in routes if r.from_stage is not None]
+            normal_routes = [r for r in routes if r.from_stage is None]
+            # Plain nodes have no consumer router; validate them against the
+            # no-op default so pause-route misconfigurations still surface.
+            consumer = getattr(node, "consumer_router", None) or ConsumerRouter()
+            stage_input = {
+                Stage.PRE_HOOK: consumer.pre_hitl_input,
+                Stage.POST_HOOK: consumer.post_hitl_input,
+            }
+
+            if pause_routes and not normal_routes:
+                raise WorkflowError(
+                    message=(
+                        f"Node '{node_name}' has a pause route but no normal "
+                        "output route; PROCEED/DENY emissions would have nowhere "
+                        "to go."
+                    ),
+                    severity="CRITICAL",
+                )
+
+            seen_stages: set = set()
+            for route in pause_routes:
+                stage = route.from_stage
+                assert stage is not None  # pause_routes are filtered to a stage
+                if stage in seen_stages:
+                    raise WorkflowError(
+                        message=(
+                            f"Node '{node_name}' has more than one pause route "
+                            f"for stage {stage.value}."
+                        ),
+                        severity="CRITICAL",
+                    )
+                seen_stages.add(stage)
+                if not isinstance(route.topic, InWorkflowOutputTopic):
+                    raise WorkflowError(
+                        message=(
+                            f"Node '{node_name}' pause route for "
+                            f"{stage.value} must target an "
+                            "InWorkflowOutputTopic."
+                        ),
+                        severity="CRITICAL",
+                    )
+                resume_input = stage_input.get(stage)
+                if (
+                    resume_input is not None
+                    and resume_input
+                    not in route.topic.paired_in_workflow_input_topic_names
+                ):
+                    raise WorkflowError(
+                        message=(
+                            f"Node '{node_name}' pause topic "
+                            f"'{route.topic.name}' is not paired to its resume "
+                            f"input '{resume_input}'."
+                        ),
+                        severity="CRITICAL",
+                    )
+
+            for channel in (consumer.pre_hitl_input, consumer.post_hitl_input):
+                if channel is None:
+                    continue
+                if channel not in node._subscribed_topics:
+                    raise WorkflowError(
+                        message=(
+                            f"Node '{node_name}' consumer input '{channel}' is "
+                            "not subscribed; a resume could not admit the node."
+                        ),
+                        severity="CRITICAL",
+                    )
+                topic = node._subscribed_topics.get(channel) or self._topics.get(
+                    channel
+                )
+                if not isinstance(topic, InWorkflowInputTopic):
+                    raise WorkflowError(
+                        message=(
+                            f"Node '{node_name}' consumer input '{channel}' must "
+                            "be an InWorkflowInputTopic."
+                        ),
+                        severity="CRITICAL",
+                    )
 
     def stop(self) -> None:
         """
@@ -159,16 +260,24 @@ class EventDrivenWorkflow(Workflow):
                             ].append(node)
 
         # If a function node subscribes to a topic that an Node publishes to,
-        # we add the function specs to the LLM node.
+        # we add the function specs to the LLM node. A hook on the LLM node may
+        # augment those specs (e.g. HITLApprovalHook injects a required
+        # ``tool_call_reason`` so the model justifies a call it must get approved).
         for function_node in function_calling_nodes:
             for topic_name in function_node._subscribed_topics:
                 for publisher_node in published_topics_to_nodes.get(topic_name, []):
                     if isinstance(publisher_node.tool, LLM) and isinstance(
                         function_node.tool, FunctionCallTool
                     ):
-                        publisher_node.tool.add_function_specs(
-                            function_node.tool.get_function_specs()
-                        )
+                        specs = function_node.tool.get_function_specs()
+                        for hook in (
+                            getattr(publisher_node, "pre_tool_hook", None),
+                            getattr(publisher_node, "post_tool_hook", None),
+                        ):
+                            augment = getattr(hook, "augment_spec", None)
+                            if callable(augment):
+                                specs = augment(specs)
+                        publisher_node.tool.add_function_specs(specs)
 
     @record_workflow_invoke
     async def invoke(
@@ -217,7 +326,12 @@ class EventDrivenWorkflow(Workflow):
             topics[topic.name] = topic
 
         for node_dict in data.get("nodes", {}).values():
-            node = await Node.from_dict(node_dict, topics)
+            # Dispatch on the serialized class: hooked nodes carry extra fields
+            # (hooks + consumer router) that plain nodes do not.
+            if node_dict.get("class") == "HookedNode":
+                node: Node = await HookedNode.from_dict(node_dict, topics)
+            else:
+                node = await Node.from_dict(node_dict, topics)
             workflow_builder = workflow_builder.node(node)
 
         return workflow_builder.build()

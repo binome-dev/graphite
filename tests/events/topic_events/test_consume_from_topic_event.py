@@ -80,6 +80,7 @@ def consume_from_topic_event_dict():
             "offset": 0,
             "consumer_name": "test_node",
             "consumer_type": "test_type",
+            "consumed_event_ids": [],
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",
@@ -106,6 +107,7 @@ def consume_from_topic_event_dict_message():
             "offset": 0,
             "consumer_name": "test_node",
             "consumer_type": "test_type",
+            "consumed_event_ids": [],
             "invoke_context": {
                 "conversation_id": "conversation_id",
                 "invoke_id": "invoke_id",

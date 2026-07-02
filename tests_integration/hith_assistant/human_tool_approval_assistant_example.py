@@ -45,16 +45,14 @@ def get_invoke_context(
     )
 
 
-async def test_human_tool_approval_pause_then_resume() -> None:
-    """Plain pause/resume: propose a tool call, surface it, resume on a reply.
+async def test_function_call_assistant() -> None:
+    conversation_id = "test_conversation_id_approve"
+    assistant_request_id = "test_assistant_request_id_approve"
 
-    (Verdict-gated approve/deny lands with the tool-hooks change; this example
-    only exercises the pause/resume mechanics.)
-    """
-    conversation_id = "test_conversation_id_review"
-    assistant_request_id = "test_assistant_request_id_review"
-
-    invoke_context = get_invoke_context(conversation_id, assistant_request_id)
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
 
     assistant = (
         HumanApprovalAssistant.builder()
@@ -64,8 +62,7 @@ async def test_human_tool_approval_pause_then_resume() -> None:
         .build()
     )
 
-    # 1) Propose the tool call; the function node runs it and surfaces the
-    #    result to the human, pausing the workflow.
+    # Test the run method
     input_data = [
         Message(role="user", content="Hello, I want to delete database user_backup.")
     ]
@@ -81,18 +78,27 @@ async def test_human_tool_approval_pause_then_resume() -> None:
     )
     print(output)
     assert output is not None
+    assert output[0].data[0].tool_calls is not None
 
-    # 2) The human reviews and replies; the reply resumes the workflow and the
-    #    LLM produces the final answer.
-    resume_data = [Message(role="user", content="Looks good, thanks.")]
+    # Test the run method
+    input_data = output[0].data
+    input_data.append(
+        Message(
+            role="user",
+            content="YES",
+        )
+    )
 
-    invoke_context = get_invoke_context(conversation_id, assistant_request_id)
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
 
     output = await async_func_wrapper(
         assistant.invoke(
             PublishToTopicEvent(
                 invoke_context=invoke_context,
-                data=resume_data,
+                data=input_data,
                 consumed_event_ids=[event.event_id for event in output],
             ),
             is_sequential=True,
@@ -103,5 +109,206 @@ async def test_human_tool_approval_pause_then_resume() -> None:
     assert output[0].data[0].tool_calls is None
 
 
+async def test_function_call_assistant_disapproval() -> None:
+    conversation_id = "test_conversation_id_disapprove"
+    assistant_request_id = "test_assistant_request_id_disapprove"
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    assistant = (
+        HumanApprovalAssistant.builder()
+        .name("HumanApprovalAssistant")
+        .api_key(api_key)
+        .function_tool(DeleteDatabase(name="DeleteDatabase"))
+        .build()
+    )
+
+    # Test the run method
+    input_data = [
+        Message(role="user", content="Hello, I want to delete database user_backup.")
+    ]
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            ),
+            is_sequential=True,
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is not None
+
+    # Test the run method
+    input_data = []
+    input_data.append(
+        Message(
+            role="user",
+            content="NO",
+        )
+    )
+
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is None
+
+
+async def test_function_call_assistant_suggestion() -> None:
+    conversation_id = "test_conversation_id_suggest"
+    assistant_request_id = "test_assistant_request_id_suggest"
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    assistant = (
+        HumanApprovalAssistant.builder()
+        .name("HumanApprovalAssistant")
+        .api_key(api_key)
+        .function_tool(DeleteDatabase(name="DeleteDatabase"))
+        .build()
+    )
+
+    # Test the run method
+    input_data = [
+        Message(role="user", content="Hello, I want to delete database user_backup.")
+    ]
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            )
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is not None
+
+    # Test the run method
+    input_data = []
+    input_data.append(
+        Message(
+            role="user",
+            content="NO. You should add 'staging.' prefix to all the database names.",
+        )
+    )
+
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is not None
+    arguments = output[0].data[0].tool_calls[0].function.arguments
+    import json
+
+    parsed_args = json.loads(arguments)
+    assert parsed_args["db_name"] == "staging.user_backup"
+
+    # Test the run method
+    input_data = []
+    input_data.append(
+        Message(
+            role="user",
+            content="YES",
+        )
+    )
+
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+                consumed_event_ids=[event.event_id for event in output],
+            )
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is None
+
+
+async def test_function_call_assistant_suggestion_mem() -> None:
+    conversation_id = "test_conversation_id_suggest"
+    assistant_request_id = "test_assistant_request_id_mem"
+    invoke_context = get_invoke_context(
+        conversation_id,
+        assistant_request_id,
+    )
+
+    assistant = (
+        HumanApprovalAssistant.builder()
+        .name("HumanApprovalAssistant")
+        .api_key(api_key)
+        .function_tool(DeleteDatabase(name="DeleteDatabase"))
+        .function_call_llm_system_message(
+            "You must consider previous user's suggestions, think about how to incorporate them when calling the tools"
+        )
+        .build()
+    )
+
+    # Test the run method
+    input_data = [
+        Message(role="user", content="Hello, I want to delete database product_backup.")
+    ]
+
+    output = await async_func_wrapper(
+        assistant.invoke(
+            PublishToTopicEvent(
+                invoke_context=invoke_context,
+                data=input_data,
+            )
+        )
+    )
+    print(output)
+    assert output is not None
+    assert output[0].data[0].tool_calls is not None
+    arguments = output[0].data[0].tool_calls[0].function.arguments
+    import json
+
+    parsed_args = json.loads(arguments)
+    assert parsed_args["db_name"] == "staging.product_backup"
+
+
 with bind_services(runtime.services):
-    asyncio.run(test_human_tool_approval_pause_then_resume())
+    asyncio.run(test_function_call_assistant())
+with bind_services(runtime.services):
+    asyncio.run(test_function_call_assistant_disapproval())
+# test_function_call_assistant_suggestion()
+# test_function_call_assistant_suggestion_mem()

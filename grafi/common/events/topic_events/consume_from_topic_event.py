@@ -1,7 +1,9 @@
 import json
 from typing import Any
 from typing import Dict
+from typing import List
 
+from pydantic import Field
 from pydantic import TypeAdapter
 from pydantic_core import to_jsonable_python
 
@@ -17,6 +19,10 @@ class ConsumeFromTopicEvent(TopicEvent):
     event_type: EventType = EventType.CONSUME_FROM_TOPIC
     consumer_name: str = ""
     consumer_type: str = ""
+    # The publish events this consumed batch derives from. Propagated from the
+    # source PublishToTopicEvent so a node can resolve a HITL resume reply back
+    # to the recorded review event it approves (recover-from-store, D11).
+    consumed_event_ids: List[str] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         event_context = {
@@ -25,6 +31,7 @@ class ConsumeFromTopicEvent(TopicEvent):
             "name": self.name,
             "type": self.type.value,
             "offset": self.offset,
+            "consumed_event_ids": self.consumed_event_ids,
             "invoke_context": self.invoke_context.model_dump(),
         }
 
@@ -52,6 +59,7 @@ class ConsumeFromTopicEvent(TopicEvent):
             name=data[EVENT_CONTEXT]["name"],
             type=TopicType(data[EVENT_CONTEXT]["type"]),
             offset=data[EVENT_CONTEXT]["offset"],
+            consumed_event_ids=data[EVENT_CONTEXT].get("consumed_event_ids", []),
             invoke_context=invoke_context,
             data=data_obj,
         )

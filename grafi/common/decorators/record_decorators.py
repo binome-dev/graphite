@@ -109,6 +109,10 @@ record_workflow_invoke = create_async_decorator(_workflow_config)
 def process_node_async_result(
     args: List[Union[PublishToTopicEvent]],
 ) -> List[Union[PublishToTopicEvent]]:
+    if not args:
+        # The node yielded nothing (e.g. a tool produced no batch). There is no
+        # output to record; avoid the args[-1] IndexError.
+        return None
     result_content = ""
     is_streaming = False
     for event in args:

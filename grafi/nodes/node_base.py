@@ -26,6 +26,7 @@ from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.conditions import always_true
+from grafi.nodes.routing import Stage
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import SubExpr
@@ -38,17 +39,21 @@ class PublishRoute(BaseModel):
     """One destination in the publisher router's table.
 
     ``when`` is the CONTENT predicate (what used to live on ``topic.condition``).
+    A route with ``from_stage`` set is a *pause-only* channel: reached by a
+    directed name (the node names it on a pause request), never by content.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     topic: TopicBase  # destination (definition-time instance)
     when: Callable[[PublishToTopicEvent], bool] = always_true  # content predicate
+    from_stage: Optional[Stage] = None  # set => pause channel, reached by name
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "topic": self.topic.name,
             "when": serialize_callable(self.when),
+            "from_stage": self.from_stage.value if self.from_stage else None,
         }
 
     @classmethod
@@ -67,9 +72,11 @@ class PublishRoute(BaseModel):
             if raw
             else always_true
         )
+        stage = data.get("from_stage")
         return cls(
             topic=topics[topic_name],
             when=when,
+            from_stage=Stage(stage) if stage else None,
         )
 
 
@@ -81,8 +88,22 @@ class PublisherRouter(BaseModel):
     routes: List[PublishRoute] = Field(default_factory=list)
 
     def select(self, event: PublishToTopicEvent) -> List[str]:
-        """Destination topic names for an outgoing event, routed by content."""
-        return [r.topic.name for r in self.routes if self._condition_ok(r.when, event)]
+        """Destination topic names for an outgoing event.
+
+        A directed pause (``event.name`` set) routes to exactly that channel; a
+        normal emission is content-routed over the non-pause routes.
+        """
+        if event.name:  # a directed pause -> exactly that channel
+            return [event.name]
+        return [
+            r.topic.name
+            for r in self.routes
+            if r.from_stage is None and self._condition_ok(r.when, event)
+        ]
+
+    def request_topic(self, stage: Stage) -> str:
+        """Name the pause channel a pause request at ``stage`` should route to."""
+        return next(r.topic.name for r in self.routes if r.from_stage is stage)
 
     @staticmethod
     def _condition_ok(
@@ -351,6 +372,7 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
         self,
         topic: TopicBase,
         when: Optional[Callable[[PublishToTopicEvent], bool]] = None,
+        from_stage: Optional[Stage] = None,
     ) -> Self:
         """Add a publisher route to a topic this node publishes to.
 
@@ -358,13 +380,15 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
             topic: The topic to publish output events to.
             when: Optional content predicate (defaults to "always"); the route is
                 taken when it returns True for the outgoing event.
+            from_stage: Mark this a pause-only channel for the given stage,
+                reached by directed name rather than by content.
 
         Returns:
             Self for method chaining.
         """
         if "publisher_router" not in self.kwargs:
             self.kwargs["publisher_router"] = PublisherRouter()
-        route_kwargs: Dict[str, Any] = {"topic": topic}
+        route_kwargs: Dict[str, Any] = {"topic": topic, "from_stage": from_stage}
         if when is not None:
             route_kwargs["when"] = when
         self.kwargs["publisher_router"].routes.append(PublishRoute(**route_kwargs))

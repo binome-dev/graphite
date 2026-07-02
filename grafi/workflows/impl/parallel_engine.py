@@ -95,6 +95,7 @@ async def invoke_parallel(
                 consumer_type=run.type,
                 invoke_context=event.invoke_context,
                 offset=event.offset,
+                consumed_event_ids=getattr(event, "consumed_event_ids", []),
                 data=event.data,
             )
             yield consumed_event
@@ -199,6 +200,11 @@ async def _invoke_node(
                                 consumer_name=node.name,
                                 consumer_type=node.type,
                                 offset=event.offset,
+                                # Carry the source links so the node can resolve a
+                                # HITL resume reply back to its review event.
+                                consumed_event_ids=getattr(
+                                    event, "consumed_event_ids", []
+                                ),
                                 data=event.data,
                             )
                         )
