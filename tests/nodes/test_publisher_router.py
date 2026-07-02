@@ -1,5 +1,6 @@
 """Unit tests for the node's publisher router (isolated, no engine)."""
 
+import pytest
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
 )
@@ -92,3 +93,12 @@ class TestPublisherRouter:
         ]
         assert restored.routes[0].when is has_tool_call
         assert restored.routes[1].when is has_text_response
+
+    def test_from_dict_unknown_topic_raises_descriptive_error(self):
+        # A manifest referencing a topic that was not reconstructed should fail
+        # with a message naming the missing topic and the available ones.
+        data = {"routes": [{"topic": "ghost", "when": None, "from_stage": None}]}
+        with pytest.raises(ValueError, match="unknown topic 'ghost'"):
+            PublisherRouter.from_dict(
+                data, {"agent_output": TopicBase(name="agent_output")}
+            )

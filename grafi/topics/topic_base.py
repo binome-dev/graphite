@@ -13,6 +13,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.exceptions.event_exceptions import TopicPublicationError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
@@ -39,11 +40,11 @@ class TopicBase(BaseModel):
 
     async def publish_data(
         self, publish_event: PublishToTopicEvent
-    ) -> Optional[PublishToTopicEvent]:
+    ) -> PublishToTopicEvent:
         """Stamp the event with this topic's name/type and enqueue it.
 
-        Returns the enqueued event. Routing has already happened on the node's
-        publisher router, so a topic never drops an event.
+        Always returns the enqueued event: routing already happened on the
+        node's publisher router, so a topic never drops an event.
         """
         event = publish_event.model_copy(
             update={
@@ -52,7 +53,20 @@ class TopicBase(BaseModel):
             },
             deep=True,
         )
-        return await self.add_event(event)
+        published = await self.add_event(event)
+        if not isinstance(published, PublishToTopicEvent):
+            # add_event only returns None for non-publish events; publish_data
+            # always enqueues a PublishToTopicEvent, so reaching here means a
+            # subclass or queue broke the pure-queue contract.
+            raise TopicPublicationError(
+                topic_name=self.name,
+                message=(
+                    f"[{self.name}] publish_data failed to enqueue the event; "
+                    "topics must always enqueue (they no longer drop by "
+                    "condition)."
+                ),
+            )
+        return published
 
     async def can_consume(self, consumer_name: str) -> bool:
         """

@@ -55,14 +55,20 @@ class PublishRoute(BaseModel):
     def from_dict(
         cls, data: Dict[str, Any], topics: Dict[str, TopicBase]
     ) -> "PublishRoute":
+        topic_name = data["topic"]
+        if topic_name not in topics:
+            raise ValueError(
+                f"Publisher route references unknown topic {topic_name!r}. "
+                f"Available topics: {sorted(topics)}."
+            )
         raw = data.get("when")
         when = (
-            deserialize_callable(raw, context=f"route '{data['topic']}' when")
+            deserialize_callable(raw, context=f"route '{topic_name}' when")
             if raw
             else always_true
         )
         return cls(
-            topic=topics[data["topic"]],
+            topic=topics[topic_name],
             when=when,
         )
 

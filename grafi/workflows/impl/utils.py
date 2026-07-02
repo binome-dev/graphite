@@ -116,15 +116,10 @@ async def publish_events(
             await tracker.on_messages_published(
                 delivery_count, source=f"node:{node.name}->{topic_name}"
             )
+        # A topic is a pure queue and never drops (routing already happened on
+        # the publisher router), so every selected topic yields an event.
         event = await run_topic.publish_data(publish_event)
-        if event:
-            published_events.append(event)
-        elif delivery_count:
-            # The topic dropped the event (still enqueued nothing), so no
-            # consumer will ever commit these deliveries. Release them now.
-            await tracker.on_messages_committed(
-                delivery_count, source=f"discard:{topic_name}"
-            )
+        published_events.append(event)
 
     return published_events
 

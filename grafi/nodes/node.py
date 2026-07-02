@@ -108,6 +108,12 @@ class Node(NodeBase):
             elif "op" in expr_dict:
                 node_builder.subscribe(await CombinedExpr.from_dict(expr_dict, topics))
 
+        if "publisher_router" not in node_dict:
+            raise ValueError(
+                "Node manifest is missing required key 'publisher_router'. It "
+                "replaced the legacy 'publish_to' topic-name list; regenerate "
+                "the manifest from the current assistant."
+            )
         node_builder.publisher_router(
             PublisherRouter.from_dict(node_dict["publisher_router"], topics)
         )

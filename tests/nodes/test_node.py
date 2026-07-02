@@ -551,3 +551,18 @@ class TestNodeIdRoundTrip:
         restored = await Node.from_dict(data, {})
         # Recovered node keeps its identity instead of getting a fresh uuid.
         assert restored.node_id == original.node_id
+
+    @pytest.mark.asyncio
+    async def test_from_dict_missing_publisher_router_raises_descriptive_error(self):
+        from grafi.tools.llms.impl.openai_tool import OpenAITool
+
+        original = Node(
+            name="n",
+            type="Node",
+            tool=OpenAITool.builder().name("llm").model("gpt-4o-mini").build(),
+        )
+        data = original.to_dict()
+        # Simulate a legacy manifest that predates the publisher router.
+        data.pop("publisher_router")
+        with pytest.raises(ValueError, match="publisher_router"):
+            await Node.from_dict(data, {})
