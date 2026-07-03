@@ -310,6 +310,51 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+  integration-hooked-node-assistant:
+    name: Integration - hooked_node_assistant
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run Integration Tests - hooked_node_assistant
+        run: |
+          set +e
+          output=$(uv run python tests_integration/hooked_node_assistant/run_hooked_node_assistant.py)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -ne 0 ] || echo "$output" | grep -q "Failed:"; then
+            echo "### Integration Test Results - hooked_node_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### Integration Test Results - hooked_node_assistant" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
   integration-input-output-topics:
     name: Integration - input_output_topics
     runs-on: ubuntu-latest
@@ -638,6 +683,7 @@ jobs:
       - integration-function-assistant
       - integration-function-call-assistant
       - integration-hith-assistant
+      - integration-hooked-node-assistant
       - integration-input-output-topics
       - integration-invoke-kwargs
       - integration-multimodal-assistant
