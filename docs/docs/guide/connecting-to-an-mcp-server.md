@@ -678,3 +678,43 @@ With this foundation, you can extend your implementation by:
 The combination of Graphite's event-driven architecture with MCP servers provides a powerful foundation for building sophisticated AI applications that can access and reason with real-time data from multiple sources.
 
 Remember: the key to successful MCP integration lies in detailed tool descriptions that help the AI model make intelligent routing decisions between its training data and external sources.
+
+## Keyless web search example
+
+The runnable [Parallel Search example](https://github.com/binome-dev/graphite/blob/main/tests_integration/mcp_assistant/parallel_search_example.py)
+uses `MCPFunctionTool` in a single-node `EventDrivenWorkflow`, invoked through
+`GrafiRuntime`. It sends your objective and keyword queries to the remote
+`web_search` tool and prints source excerpts and URLs. No LLM is involved.
+
+From a Graphite source checkout, install the locked development dependencies and run:
+
+```bash
+uv sync --dev --locked
+uv run python -m tests_integration.mcp_assistant.parallel_search_example \
+  "Find the official Python documentation for asyncio TaskGroup" \
+  --query "Python asyncio TaskGroup documentation"
+```
+
+Repeat `--query` to supply multiple keyword queries. The example explicitly loads
+this FastMCP configuration through `MCPFunctionTool.initialize`:
+
+```json
+{
+  "mcpServers": {
+    "parallel": {
+      "transport": "http",
+      "url": "https://search.parallel.ai/mcp",
+      "headers": {"User-Agent": "graphite-parallel-search-example"}
+    }
+  }
+}
+```
+
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) offers
+free anonymous search in `fast` mode with rate limits. This example needs no API
+key, account, local MCP server or environment configuration. It generates a
+session identifier for each run and doesn't load credentials from `.env`.
+Your objective and queries are sent to Parallel. The output is search material,
+not an LLM-generated answer. Network or rate-limit failures can interrupt a run.
+The configuration applies only to this example; existing tools and workflows
+keep their current settings.
