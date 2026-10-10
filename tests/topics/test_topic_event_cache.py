@@ -42,6 +42,81 @@ class TestTopicEventQueue:
         assert len(cache._committed) == 0
 
     @pytest.mark.asyncio
+    async def test_cancelled_fetch_propagates_without_consuming(
+        self, cache, sample_event, monkeypatch
+    ):
+        waiting = asyncio.Event()
+        original_wait = cache._cond.wait
+
+        async def wait():
+            waiting.set()
+            return await original_wait()
+
+        monkeypatch.setattr(cache._cond, "wait", wait)
+        task = asyncio.create_task(cache.fetch("consumer", timeout=None))
+        try:
+            await asyncio.wait_for(waiting.wait(), 1)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert cache._consumed["consumer"] == 0
+            await cache.put(sample_event)
+            assert await cache.fetch("consumer", timeout=0) == [sample_event]
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    @pytest.mark.asyncio
+    async def test_none_waits_until_publication(self, cache, sample_event, monkeypatch):
+        waiting = asyncio.Event()
+        original_wait = cache._cond.wait
+
+        async def wait():
+            waiting.set()
+            return await original_wait()
+
+        monkeypatch.setattr(cache._cond, "wait", wait)
+        task = asyncio.create_task(cache.fetch("consumer", timeout=None))
+        try:
+            await asyncio.wait_for(waiting.wait(), 1)
+            assert not task.done()
+            await cache.put(sample_event)
+            assert await asyncio.wait_for(task, 1) == [sample_event]
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    @pytest.mark.asyncio
+    async def test_zero_timeout_never_waits(self, cache, sample_event, monkeypatch):
+        async def unexpected_wait():
+            pytest.fail("A nonblocking read must not wait")
+
+        monkeypatch.setattr(cache._cond, "wait", unexpected_wait)
+        assert await cache.fetch("consumer", timeout=0) == []
+        await cache.put(sample_event)
+        assert await cache.fetch("consumer", timeout=0) == [sample_event]
+
+    @pytest.mark.asyncio
+    async def test_timeout_is_not_restarted_by_spurious_wakeups(self, cache):
+        task = asyncio.create_task(cache.fetch("consumer", timeout=0.02))
+
+        async def notify_until_finished():
+            while not task.done():
+                async with cache._cond:
+                    cache._cond.notify_all()
+                await asyncio.sleep(0.001)
+
+        notifier = asyncio.create_task(notify_until_finished())
+        try:
+            # Wakeups continue until fetch finishes. Restarting its deadline on
+            # every wakeup would make this read never time out.
+            assert await asyncio.wait_for(task, 1) == []
+        finally:
+            task.cancel()
+            notifier.cancel()
+            await asyncio.gather(task, notifier, return_exceptions=True)
+
+    @pytest.mark.asyncio
     async def test_reset(self, cache: TopicEventQueue, sample_event):
         # Add some data
         await cache.put(sample_event)

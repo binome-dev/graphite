@@ -4,8 +4,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from loguru import logger
-
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.default_id import default_id
 from grafi.topics.topic_event_queue import TopicEventQueue
@@ -63,22 +61,21 @@ class InMemTopicEventQueue(TopicEventQueue):
         Await fresh records newer than the consumer's consumed offset.
         Immediately advances consumed offset to prevent duplicate fetches.
         Returns [] if `timeout` (seconds) elapses with no data.
-        If timeout is None or 0, returns immediately with available data (or empty list).
+        None waits indefinitely; 0 reads immediately without waiting. Positive
+        timeouts bound the entire wait, including repeated wakeups.
+        Cancellation propagates without advancing the consumer cursor.
         """
 
         async with self._cond:
-            # If timeout is 0 or None and no data, return immediately
-            while not self._can_consume_unlocked(consumer_id):
-                try:
-                    logger.debug(
-                        f"Consumer {consumer_id} waiting for new messages with timeout={timeout}"
-                    )
-                    await asyncio.wait_for(self._cond.wait(), timeout)
-                except asyncio.TimeoutError:
+            if not self._can_consume_unlocked(consumer_id):
+                if timeout is not None and timeout <= 0:
                     return []
-                except asyncio.CancelledError:
-                    # Handle cancellation gracefully
-                    logger.debug("Fetch operation was cancelled.")
+                try:
+                    async with asyncio.timeout(timeout):
+                        await self._cond.wait_for(
+                            lambda: self._can_consume_unlocked(consumer_id)
+                        )
+                except TimeoutError:
                     return []
 
             start = self._consumed[consumer_id]

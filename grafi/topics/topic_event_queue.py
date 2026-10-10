@@ -42,10 +42,12 @@ class TopicEventQueue(ABC):
         Args:
             consumer_id: Unique identifier for the consumer
             offset: Optional specific offset to fetch up to
-            timeout: Optional timeout in seconds to wait for new events
+            timeout: None waits indefinitely, 0 reads without waiting, and a
+                positive value bounds the entire wait in seconds.
 
         Returns:
-            List of fetched events, empty if timeout or no new events
+            List of fetched events, empty on timeout or an empty nonblocking read.
+            Cancellation propagates to the caller.
         """
         pass
 

@@ -84,7 +84,9 @@ class TopicBase(BaseModel):
         self, consumer_name: str, timeout: Optional[float] = None
     ) -> List[TopicEvent]:
         """
-        Asynchronously retrieve new/unconsumed messages for the given node by fetching them
+        Retrieve unread messages. None waits indefinitely, 0 reads without
+        waiting, and a positive timeout bounds the wait in seconds. Cancellation
+        propagates to the caller.
         """
         return await self.event_queue.fetch(consumer_name, timeout=timeout)
 
