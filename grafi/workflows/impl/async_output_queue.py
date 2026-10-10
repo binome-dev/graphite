@@ -93,7 +93,13 @@ class AsyncOutputQueue:
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
-                break
+                if not self._stopped:
+                    if self._listener_error is None:
+                        self._listener_error = RuntimeError(
+                            "Output topic read was unexpectedly cancelled"
+                        )
+                    self.tracker.force_stop_sync()
+                raise
             except Exception as e:
                 # Transport the error to the consumer via __anext__ (which
                 # re-raises it) and force termination so it is not swallowed. The

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from inspect import signature
 
 import pytest
 
@@ -11,6 +12,13 @@ from grafi.topics.queue_impl.in_mem_topic_event_queue import TopicEventQueue
 
 
 class TestTopicEventQueue:
+    def test_default_timeout_matches_queue_interface(self) -> None:
+        assert (
+            signature(InMemTopicEventQueue.fetch).parameters["timeout"].default
+            is signature(TopicEventQueue.fetch).parameters["timeout"].default
+            is None
+        )
+
     @pytest.fixture
     def cache(self):
         return InMemTopicEventQueue()
@@ -43,12 +51,15 @@ class TestTopicEventQueue:
 
     @pytest.mark.asyncio
     async def test_cancelled_fetch_propagates_without_consuming(
-        self, cache, sample_event, monkeypatch
-    ):
+        self,
+        cache: InMemTopicEventQueue,
+        sample_event: PublishToTopicEvent,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         waiting = asyncio.Event()
         original_wait = cache._cond.wait
 
-        async def wait():
+        async def wait() -> bool:
             waiting.set()
             return await original_wait()
 
@@ -67,16 +78,27 @@ class TestTopicEventQueue:
             await asyncio.gather(task, return_exceptions=True)
 
     @pytest.mark.asyncio
-    async def test_none_waits_until_publication(self, cache, sample_event, monkeypatch):
+    @pytest.mark.parametrize("explicit_none", [False, True])
+    async def test_none_waits_until_publication(
+        self,
+        cache: InMemTopicEventQueue,
+        sample_event: PublishToTopicEvent,
+        monkeypatch: pytest.MonkeyPatch,
+        explicit_none: bool,
+    ) -> None:
         waiting = asyncio.Event()
         original_wait = cache._cond.wait
 
-        async def wait():
+        async def wait() -> bool:
             waiting.set()
             return await original_wait()
 
         monkeypatch.setattr(cache._cond, "wait", wait)
-        task = asyncio.create_task(cache.fetch("consumer", timeout=None))
+        task = asyncio.create_task(
+            cache.fetch("consumer", timeout=None)
+            if explicit_none
+            else cache.fetch("consumer")
+        )
         try:
             await asyncio.wait_for(waiting.wait(), 1)
             assert not task.done()
@@ -87,8 +109,13 @@ class TestTopicEventQueue:
             await asyncio.gather(task, return_exceptions=True)
 
     @pytest.mark.asyncio
-    async def test_zero_timeout_never_waits(self, cache, sample_event, monkeypatch):
-        async def unexpected_wait():
+    async def test_zero_timeout_never_waits(
+        self,
+        cache: InMemTopicEventQueue,
+        sample_event: PublishToTopicEvent,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def unexpected_wait() -> bool:
             pytest.fail("A nonblocking read must not wait")
 
         monkeypatch.setattr(cache._cond, "wait", unexpected_wait)
@@ -97,10 +124,12 @@ class TestTopicEventQueue:
         assert await cache.fetch("consumer", timeout=0) == [sample_event]
 
     @pytest.mark.asyncio
-    async def test_timeout_is_not_restarted_by_spurious_wakeups(self, cache):
+    async def test_timeout_is_not_restarted_by_spurious_wakeups(
+        self, cache: InMemTopicEventQueue
+    ) -> None:
         task = asyncio.create_task(cache.fetch("consumer", timeout=0.02))
 
-        async def notify_until_finished():
+        async def notify_until_finished() -> None:
             while not task.done():
                 async with cache._cond:
                     cache._cond.notify_all()

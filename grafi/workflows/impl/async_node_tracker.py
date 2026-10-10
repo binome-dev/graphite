@@ -252,10 +252,8 @@ class AsyncNodeTracker:
 
         This is a synchronous version for use from sync contexts (e.g., stop() method).
         It sets the stop flag and event without acquiring the async lock.
-        This is safe because:
-        1. Setting _force_stopped to True is atomic for the stop signal
-        2. asyncio.Event.set() is thread-safe
-        3. Readers will see the updated state on their next lock acquisition
+        Call only on the owning event-loop thread. Asyncio primitives are not
+        thread-safe; other threads must schedule this call on that loop.
 
         Termination waiters block on ``_quiescence_event`` (set here), not on
         ``self._cond``, so setting the event is sufficient to wake them.

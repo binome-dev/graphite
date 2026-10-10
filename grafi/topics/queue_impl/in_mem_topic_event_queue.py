@@ -55,7 +55,7 @@ class InMemTopicEventQueue(TopicEventQueue):
         self,
         consumer_id: str,
         offset: Optional[int] = None,
-        timeout: Optional[float] = 1.0,
+        timeout: Optional[float] = None,
     ) -> List[TopicEvent]:
         """
         Await fresh records newer than the consumer's consumed offset.

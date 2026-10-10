@@ -37,16 +37,6 @@ async def invoke_parallel(
 ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
     invoke_context = input_data.invoke_context
 
-    # Validate the entire topology before spawning any workers. Empty triggers
-    # otherwise bypass the input wait and enter an unbounded busy loop.
-    for node in run.nodes.values():
-        if not node.subscribed_expressions or not node.subscribed_topics:
-            raise NodeExecutionError(
-                node_name=node.name,
-                message="Parallel nodes require at least one subscription",
-                invoke_context=invoke_context,
-            )
-
     node_processing_task = [
         asyncio.create_task(
             _invoke_node(run, invoke_context=invoke_context, node=node),
@@ -173,23 +163,31 @@ async def _invoke_node(
             ]
             active_tasks.extend(tasks)
             _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for t in pending:
-                t.cancel()
+            cancelled_readers = set()
+            for task in pending:
+                if task.cancel():
+                    cancelled_readers.add(task)
             results = await asyncio.gather(*tasks, return_exceptions=True)
             active_tasks.clear()
             # Observe every result before merging. A sibling can complete while
             # cancellation is being delivered, so gather includes all readers.
-            for result in results:
-                if isinstance(result, BaseException) and not isinstance(
-                    result, asyncio.CancelledError
-                ):
-                    raise result
-            for result in results:
+            read_error: BaseException | None = None
+            for task, result in zip(tasks, results):
                 if isinstance(result, BaseException):
+                    if isinstance(result, asyncio.CancelledError):
+                        if task in cancelled_readers:
+                            continue
+                        result = RuntimeError("Topic read was unexpectedly cancelled")
+                    if read_error is None:
+                        read_error = result
                     continue
                 topic_name, recs = result
                 if recs:
                     buffer.setdefault(topic_name, []).extend(recs)
+            if read_error is not None:
+                # Abort without acknowledging any of this batch. A fresh run
+                # restores fetched-but-uncommitted publications from the store.
+                raise read_error
 
     async def _cancel_all_active_tasks() -> None:
         for task in active_tasks:
@@ -242,29 +240,15 @@ async def _invoke_node(
                 await run.event_store.record_events(
                     get_async_output_events(node_output_events)
                 )
-            except Exception as node_error:
-                await run.tracker.force_stop()
-                if isinstance(node_error, NodeExecutionError):
-                    raise
-                raise NodeExecutionError(
-                    node_name=node.name,
-                    message="Node execution failed",
-                    invoke_context=invoke_context,
-                    cause=node_error,
-                ) from node_error
             finally:
                 await run.tracker.leave(node.name)
                 buffer.clear()
-    except asyncio.CancelledError:
-        # Cancellation is normal shutdown, not a failure -- do not log/report it.
-        raise
-    except NodeExecutionError:
-        await run.tracker.force_stop()
-        raise
     except Exception as e:
-        # Read failures must wake the output iterator even before a node has
-        # produced output or entered the processing tracker.
-        await run.tracker.force_stop()
+        # Signal once on the owning loop, without a cancellation point that
+        # could replace the node/read failure before it reaches the caller.
+        run.tracker.force_stop_sync()
+        if isinstance(e, NodeExecutionError):
+            raise
         raise NodeExecutionError(
             node_name=node.name,
             message="Node execution failed",

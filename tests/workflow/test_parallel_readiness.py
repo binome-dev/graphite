@@ -1,16 +1,25 @@
 """Regression tests for parallel input readiness and owned read tasks."""
 
 import asyncio
+from typing import Any
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 from pydantic import PrivateAttr
 
+from grafi.common.event_stores.event_store import EventStore
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions import NodeExecutionError
+from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.common.models.message import Messages
+from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -20,6 +29,8 @@ from grafi.topics.expressions.topic_expression import LogicalOp
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.topic_impl.topic import Topic
+from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.impl.parallel_engine import _invoke_node
 from grafi.workflows.impl.parallel_engine import invoke_parallel
@@ -31,18 +42,20 @@ class RecordingTool(Tool):
     calls: list[list[str]] = Field(default_factory=list)
     _called: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
-    async def invoke(self, invoke_context, input_data):
+    async def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
         self.calls.append([message.content for message in input_data])
         self._called.set()
         yield [Message(role="assistant", content="joined")]
 
     @classmethod
-    async def from_dict(cls, data):
+    async def from_dict(cls, data: dict[str, Any]) -> "RecordingTool":
         return cls()
 
 
-def make_run(op=LogicalOp.AND):
-    a, b = InputTopic(name="a"), InputTopic(name="b")
+def make_run(op: LogicalOp = LogicalOp.AND) -> tuple[WorkflowRun, Node]:
+    a, b = InputTopic(name="a"), Topic(name="b")
     node = Node(
         name="join",
         type="Node",
@@ -58,7 +71,7 @@ def make_run(op=LogicalOp.AND):
     return WorkflowRun(workflow), node
 
 
-def event(content):
+def event(content: str) -> PublishToTopicEvent:
     return PublishToTopicEvent(
         name="a",
         publisher_name="test",
@@ -72,17 +85,27 @@ def event(content):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("delayed_b", [False, True])
-async def test_repeated_a_does_not_satisfy_and_join(monkeypatch, delayed_b):
+@pytest.mark.parametrize("swallow_cancellation", [False, True])
+async def test_repeated_a_does_not_satisfy_and_join(
+    monkeypatch: pytest.MonkeyPatch, delayed_b: bool, swallow_cancellation: bool
+) -> None:
     run, node = make_run()
     read_rounds = asyncio.Queue()
     readers = []
     queue = run.topics["b"].event_queue
     original_fetch = queue.fetch
 
-    async def fetch(*args, **kwargs):
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
         readers.append(asyncio.current_task())
         read_rounds.put_nowait(None)
-        return await original_fetch(*args, **kwargs)
+        try:
+            return await original_fetch(*args, **kwargs)
+        except asyncio.CancelledError:
+            if swallow_cancellation:
+                # Compatibility with queues that turn cancellation into an
+                # empty batch. They still terminate; readiness must stay false.
+                return []
+            raise
 
     monkeypatch.setattr(queue, "fetch", fetch)
     await run.tracker.on_messages_published(3 if delayed_b else 2)
@@ -107,18 +130,20 @@ async def test_repeated_a_does_not_satisfy_and_join(monkeypatch, delayed_b):
 
 
 @pytest.mark.asyncio
-async def test_empty_read_does_not_make_a_topic_ready(monkeypatch):
+async def test_empty_read_does_not_make_a_topic_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     run, node = make_run()
     second_read = asyncio.Event()
     calls = 0
 
-    async def fetch(*args, **kwargs):
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
         nonlocal calls
         calls += 1
         if calls == 1:
             return []
         second_read.set()
-        await asyncio.Event().wait()
+        return await asyncio.Future()
 
     monkeypatch.setattr(run.topics["b"].event_queue, "fetch", fetch)
     await run.tracker.on_messages_published(1)
@@ -133,7 +158,7 @@ async def test_empty_read_does_not_make_a_topic_ready(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_or_join_accepts_one_nonempty_topic():
+async def test_or_join_accepts_one_nonempty_topic() -> None:
     run, node = make_run(LogicalOp.OR)
     await run.tracker.on_messages_published(1)
     await run.topics["a"].publish_data(event("A1"))
@@ -147,12 +172,14 @@ async def test_or_join_accepts_one_nonempty_topic():
 
 
 @pytest.mark.asyncio
-async def test_read_failure_reaches_caller_without_output(monkeypatch):
+async def test_read_failure_reaches_caller_without_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     run, node = make_run()
     failure = RuntimeError("transport failed")
     readers = []
 
-    async def fetch(*args, **kwargs):
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
         readers.append(asyncio.current_task())
         raise failure
 
@@ -168,16 +195,18 @@ async def test_read_failure_reaches_caller_without_output(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cancellation_joins_readers_before_return(monkeypatch):
+async def test_cancellation_joins_readers_before_return(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     run, node = make_run()
     started, cleaning, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
     readers = []
 
-    async def fetch(*args, **kwargs):
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
         readers.append(asyncio.current_task())
         started.set()
         try:
-            await asyncio.Event().wait()
+            return await asyncio.Future()
         finally:
             cleaning.set()
             await release.wait()
@@ -202,15 +231,157 @@ async def test_cancellation_joins_readers_before_return(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_empty_subscriptions_rejected_before_workers_start(monkeypatch):
-    run, node = make_run()
+@pytest.mark.parametrize("is_sequential", [False, True])
+async def test_empty_subscriptions_rejected_before_input_is_saved(
+    event_store: EventStore, is_sequential: bool
+) -> None:
+    _, node = make_run(LogicalOp.OR)
     empty = Node(name="empty", type="Node", tool=RecordingTool())
-    run.nodes = {node.name: node, empty.name: empty}
+    with pytest.raises(WorkflowError, match="at least one subscription"):
+        EventDrivenWorkflow.builder().node(node).node(empty).build()
+    input_event = event("input")
+    assert (
+        await event_store.get_agent_events(
+            input_event.invoke_context.assistant_request_id
+        )
+        == []
+    )
+    workflow = EventDrivenWorkflow.builder().node(node).build()
+    async with asyncio.timeout(2):
+        outputs = [
+            message.content
+            async for output in workflow.invoke(input_event, is_sequential)
+            for message in output.data
+        ]
+    assert outputs == ["joined"]
 
-    def unexpected_task(*args, **kwargs):
-        pytest.fail("Validate all subscriptions before spawning workers")
 
-    monkeypatch.setattr(asyncio, "create_task", unexpected_task)
-    with pytest.raises(NodeExecutionError, match="at least one subscription"):
-        async for _ in invoke_parallel(run, event("input")):
-            pytest.fail("Invalid topology must not produce output")
+@pytest.mark.asyncio
+async def test_unexpected_reader_cancellation_is_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, node = make_run()
+    calls = 0
+
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        nonlocal calls
+        calls += 1
+        raise asyncio.CancelledError("transport interrupted")
+
+    monkeypatch.setattr(run.topics["a"].event_queue, "fetch", fetch)
+    await run.tracker.on_messages_published(1)
+    async with asyncio.timeout(2):
+        with pytest.raises(NodeExecutionError) as raised:
+            async for _ in invoke_parallel(run, event("input")):
+                pytest.fail("An interrupted read must not invoke the node")
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert "unexpectedly cancelled" in str(raised.value.__cause__)
+    assert calls == 1
+    assert node.tool.calls == []
+
+
+@pytest.mark.asyncio
+async def test_node_failure_signals_stop_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, node = make_run(LogicalOp.OR)
+    failure = NodeExecutionError(node_name=node.name, message="original failure")
+    stop_calls = 0
+    original_stop = run.tracker.force_stop_sync
+
+    def stop() -> None:
+        nonlocal stop_calls
+        stop_calls += 1
+        original_stop()
+
+    async def invoke(
+        self: RecordingTool, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
+        raise failure
+        yield []  # pragma: no cover - declares the generator interface
+
+    monkeypatch.setattr(run.tracker, "force_stop_sync", stop)
+    monkeypatch.setattr(RecordingTool, "invoke", invoke)
+    await run.tracker.on_messages_published(1)
+    await run.topics["a"].publish_data(event("input"))
+    with pytest.raises(NodeExecutionError) as raised:
+        await _invoke_node(run, event("input").invoke_context, node)
+    assert raised.value is failure
+    assert stop_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_sibling_fetched_input_replays_after_read_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, node = make_run()
+    workflow = EventDrivenWorkflow.builder().node(node).build()
+    input_event = event("A1")
+    await run.init(input_event, is_sequential=False)
+    a_fetched = asyncio.Event()
+    a_queue = run.topics["a"].event_queue
+    original_fetch = a_queue.fetch
+
+    async def fetch_a(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        records = await original_fetch(*args, **kwargs)
+        a_fetched.set()
+        return records
+
+    async def fail_b(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        await a_fetched.wait()
+        raise RuntimeError("B transport failed")
+
+    monkeypatch.setattr(a_queue, "fetch", fetch_a)
+    monkeypatch.setattr(run.topics["b"].event_queue, "fetch", fail_b)
+    async with asyncio.timeout(2):
+        with pytest.raises(NodeExecutionError):
+            await _invoke_node(run, input_event.invoke_context, node)
+    assert a_queue._consumed[node.name] == 1
+    assert a_queue._committed[node.name] == -1
+    assert node.tool.calls == []
+    assert not any(
+        isinstance(record, ConsumeFromTopicEvent)
+        for record in await run.event_store.get_agent_events(
+            input_event.invoke_context.assistant_request_id
+        )
+    )
+    recovered = WorkflowRun(workflow, run.event_store)
+    await recovered.init(input_event, is_sequential=False)
+    assert [
+        message.content
+        for record in await recovered.topics["a"].consume(node.name, timeout=0)
+        for message in record.data
+    ] == ["A1"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("expected_stop", [False, True])
+async def test_output_listener_propagates_cancellation(
+    monkeypatch: pytest.MonkeyPatch, expected_stop: bool
+) -> None:
+    run, _ = make_run()
+    queue = AsyncOutputQueue([run.topics["output"]], run.name, run.tracker)
+    started = asyncio.Event()
+
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        started.set()
+        return await asyncio.Future()
+
+    monkeypatch.setattr(run.topics["output"].event_queue, "fetch", fetch)
+    await run.tracker.on_messages_published(1)
+    await queue.start_listeners()
+    listener = queue._listener_tasks[0]
+    try:
+        await asyncio.wait_for(started.wait(), 2)
+        if expected_stop:
+            await queue.stop_listeners()
+            assert queue._listener_error is None
+        else:
+            listener.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await listener
+            with pytest.raises(RuntimeError, match="unexpectedly cancelled"):
+                await anext(queue)
+        assert listener.cancelled()
+    finally:
+        await queue.stop_listeners()
