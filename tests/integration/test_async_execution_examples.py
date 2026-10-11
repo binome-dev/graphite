@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests_integration.async_execution.run_async_execution import run_scripts
+from tests_integration.async_execution.run_async_execution import collect_results
 
 EXAMPLE_DIRECTORY = (
     Path(__file__).resolve().parents[2] / "tests_integration/async_execution"
@@ -14,9 +14,7 @@ EXAMPLES = sorted(path.name for path in EXAMPLE_DIRECTORY.glob("*_example.py"))
 
 @pytest.fixture(scope="module")
 def example_results() -> list[dict[str, str]]:
-    results = run_scripts(collect=True)
-    assert isinstance(results, list)
-    return results
+    return collect_results()
 
 
 def test_all_execution_examples_are_discovered(

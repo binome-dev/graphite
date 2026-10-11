@@ -97,6 +97,15 @@ class AsyncNodeTracker:
             self._active.add(node_name)
             self._processing_count[node_name] += 1
 
+    async def hold(self, node_name: str) -> None:
+        """Keep reader cleanup active without counting a processing cycle.
+
+        Balance with leave() when cleanup finishes, including on failure.
+        """
+        async with self._cond:
+            self._quiescence_event.clear()
+            self._active.add(node_name)
+
     async def leave(self, node_name: str) -> None:
         """Called when a node finishes processing."""
         async with self._cond:

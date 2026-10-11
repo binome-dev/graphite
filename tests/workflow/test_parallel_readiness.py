@@ -30,6 +30,7 @@ from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
+from grafi.workflows.impl import async_output_queue
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.impl.parallel_engine import _invoke_node
@@ -123,6 +124,7 @@ async def test_repeated_a_does_not_satisfy_and_join(
                 await node.tool._called.wait()
                 await read_rounds.get()  # Invocation completed; next input wait.
                 assert node.tool.calls == [["A1", "A2", "B1"]]
+            assert await run.tracker.get_activity_count() == int(delayed_b)
     finally:
         worker.cancel()
         await asyncio.gather(worker, return_exceptions=True)
@@ -152,6 +154,7 @@ async def test_empty_read_does_not_make_a_topic_ready(
     try:
         await asyncio.wait_for(second_read.wait(), 2)
         assert node.tool.calls == []
+        assert await run.tracker.get_activity_count() == 0
     finally:
         worker.cancel()
         await asyncio.gather(worker, return_exceptions=True)
@@ -396,6 +399,7 @@ async def test_slow_reader_cleanup_does_not_end_run_early(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run, node = make_run(LogicalOp.OR)
+    monkeypatch.setattr(async_output_queue, "QUIESCENCE_POLL_INTERVAL", 0.01)
     started, cleaning, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
 
     async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
@@ -423,14 +427,22 @@ async def test_slow_reader_cleanup_does_not_end_run_early(
             await run.topics["a"].publish_data(event("A1"))
             await cleaning.wait()
             assert await run._progress_possible()
+            assert await run.tracker.get_activity_count() == 0
             # Cross every idle poll that previously caused a successful early
             # exit while the winning reader's cursor had already advanced.
-            done, _ = await asyncio.wait({task}, timeout=1.7)
+            # Include the initial activity poll and scheduling slack. Shorten
+            # the same interval the output loop uses rather than waiting 1.7s.
+            poll_window = (
+                async_output_queue.IDLE_POLLS_BEFORE_STOP + 3
+            ) * async_output_queue.QUIESCENCE_POLL_INTERVAL
+            done, _ = await asyncio.wait({task}, timeout=poll_window)
             assert not done
+            assert not run._stop_requested
             assert node.tool.calls == []
             release.set()
             assert await task == ["joined"]
         assert await run.tracker.is_idle()
+        assert await run.tracker.get_activity_count() == 1
     finally:
         release.set()
         if not task.done():

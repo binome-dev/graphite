@@ -86,7 +86,8 @@ class WorkflowRun:
         """Request shutdown, including from another thread.
 
         Schedule tracker changes on the run's owning loop so asyncio waiters
-        are awakened safely. A run whose loop has closed is already finished.
+        are awakened safely. Cross-thread requests take effect asynchronously
+        when that loop runs. A run whose loop has closed is already finished.
         """
         try:
             caller_loop = asyncio.get_running_loop()

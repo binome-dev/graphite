@@ -10,6 +10,9 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.topics.topic_base import TopicBase
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
+QUIESCENCE_POLL_INTERVAL = 0.5
+IDLE_POLLS_BEFORE_STOP = 2
+
 
 class AsyncOutputQueue:
     """
@@ -151,7 +154,7 @@ class AsyncOutputQueue:
             # Wait for queue item or quiescence
             queue_task = asyncio.create_task(self.queue.get())
             quiescent_task = asyncio.create_task(
-                self.tracker.wait_for_quiescence(timeout=0.5)
+                self.tracker.wait_for_quiescence(timeout=QUIESCENCE_POLL_INTERVAL)
             )
 
             done, pending = await asyncio.wait(
@@ -207,7 +210,7 @@ class AsyncOutputQueue:
                     self._stuck_polls = 0
                 else:
                     self._stuck_polls += 1
-                    if self._stuck_polls >= 2:
+                    if self._stuck_polls >= IDLE_POLLS_BEFORE_STOP:
                         logger.debug(
                             "Output queue: no progress possible; ending iteration "
                             "(parked deliveries)."

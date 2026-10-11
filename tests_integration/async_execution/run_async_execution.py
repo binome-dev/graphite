@@ -65,13 +65,14 @@ def report_results(results: list[dict[str, str]]) -> int:
 def run_scripts(
     pass_local: bool = True, collect: bool = False
 ) -> list[dict[str, str]] | int:
-    """Preserve run_all.py's interface; local/provider services are unnecessary."""
+    """Run examples; pass_local is retained for run_all.py's interface only."""
     results = collect_results()
     return results if collect else report_results(results)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    # Accept the shared runner flag; these examples use no local services.
     parser.add_argument("--no-pass-local", dest="pass_local", action="store_false")
     parser.parse_args()
     return report_results(collect_results())
