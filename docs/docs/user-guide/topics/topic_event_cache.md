@@ -104,6 +104,11 @@ def fetch(self, consumer_id: str, offset: Optional[int] = None) -> List[TopicEve
 #### async fetch(consumer_id: str, offset: Optional[int] = None, timeout: Optional[float] = None) → List[TopicEvent]
 Asynchronously fetch events with blocking and timeout support.
 
+`timeout=None` waits indefinitely, `timeout=0` returns immediately, and a positive
+timeout bounds the entire wait in seconds. Cancellation propagates and leaves
+the read cursor unchanged. An empty result means the wait timed out, a nonblocking
+read found nothing, or no unread events fall within the requested offset range.
+
 ```python
 async def fetch(
     self,
@@ -114,19 +119,24 @@ async def fetch(
     """
     Await fresh records newer than the consumer's consumed offset.
     Immediately advances consumed offset to prevent duplicate fetches.
+    Returns [] if `timeout` (seconds) elapses with no data.
+    Also returns [] when the requested offset range has no unread records.
+    None waits indefinitely; 0 reads immediately without waiting. Positive
+    timeouts bound the entire wait, including repeated wakeups.
+    Cancellation propagates without advancing the consumer cursor.
     """
-    self._ensure_consumer(consumer_id)
 
     async with self._cond:
-        # Wait for data to become available
-        while not self.can_consume(consumer_id):
-            if timeout is None:
-                await self._cond.wait()
-            else:
-                try:
-                    await asyncio.wait_for(self._cond.wait(), timeout)
-                except asyncio.TimeoutError:
-                    return []
+        if not self._can_consume_unlocked(consumer_id):
+            if timeout is not None and timeout <= 0:
+                return []
+            try:
+                async with asyncio.timeout(timeout):
+                    await self._cond.wait_for(
+                        lambda: self._can_consume_unlocked(consumer_id)
+                    )
+            except TimeoutError:
+                return []
 
         start = self._consumed[consumer_id]
         if offset is not None:
@@ -135,8 +145,9 @@ async def fetch(
         else:
             batch = self._records[start:]
 
-        # Advance consumed offset immediately
+        # Advance consumed offset immediately to prevent duplicate fetches
         self._consumed[consumer_id] += len(batch)
+
         return batch
 ```
 
@@ -305,7 +316,7 @@ async def test_cache_behavior():
     assert events[0] == event
 
     # Test duplicate fetch prevention
-    events2 = await cache.fetch(consumer_id)
+    events2 = await cache.fetch(consumer_id, timeout=0)
     assert len(events2) == 0  # Should be empty due to consumed offset
 
     # Test commit and reset

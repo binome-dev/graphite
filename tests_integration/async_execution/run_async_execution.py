@@ -7,14 +7,8 @@ import sys
 from pathlib import Path
 
 
-def run_scripts(
-    pass_local: bool = True, collect: bool = False
-) -> list[dict[str, str]] | int:
-    """Run all examples; pass_local preserves the run_all.py runner interface.
-
-    These examples require no providers or local services, so both settings run
-    the same scenarios.
-    """
+def collect_results() -> list[dict[str, str]]:
+    """Run all provider-free examples and return their results."""
     directory = Path(__file__).resolve().parent
     env = os.environ.copy()
     root = str(directory.parent.parent)
@@ -57,15 +51,31 @@ def run_scripts(
                     "error": "Example exceeded its 20-second failure bound",
                 }
             )
-    if collect:
-        return results
+    return results
+
+
+def report_results(results: list[dict[str, str]]) -> int:
+    """Print results and return a process exit code."""
     for result in results:
         print(f"{result['status']}: {result['name']}")
         print(result["output"] if result["status"] == "passed" else result["error"])
     return int(any(result["status"] != "passed" for result in results))
 
 
-if __name__ == "__main__":
+def run_scripts(
+    pass_local: bool = True, collect: bool = False
+) -> list[dict[str, str]] | int:
+    """Preserve run_all.py's interface; local/provider services are unnecessary."""
+    results = collect_results()
+    return results if collect else report_results(results)
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-pass-local", dest="pass_local", action="store_false")
-    sys.exit(run_scripts(pass_local=parser.parse_args().pass_local))
+    parser.parse_args()
+    return report_results(collect_results())
+
+
+if __name__ == "__main__":
+    sys.exit(main())

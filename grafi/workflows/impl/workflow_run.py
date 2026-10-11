@@ -22,6 +22,7 @@ itself lives in focused modules: :mod:`grafi.workflows.impl.run_recovery`
 :mod:`grafi.workflows.impl.parallel_engine`.
 """
 
+import asyncio
 from collections import deque
 from typing import Any
 from typing import AsyncGenerator
@@ -72,14 +73,35 @@ class WorkflowRun:
         self.tracker: AsyncNodeTracker = AsyncNodeTracker()
         self.invoke_queue: deque[NodeBase] = deque()
         self._stop_requested: bool = False
+        try:
+            self._loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
 
     # ------------------------------------------------------------------ #
     # Control
     # ------------------------------------------------------------------ #
 
     def stop(self) -> None:
-        """Stop this run. Sets the stop flag and force-stops the tracker so the
-        parallel output loop and node tasks wind down."""
+        """Request shutdown, including from another thread.
+
+        Schedule tracker changes on the run's owning loop so asyncio waiters
+        are awakened safely. A run whose loop has closed is already finished.
+        """
+        try:
+            caller_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            caller_loop = None
+        if self._loop is not None and caller_loop is not self._loop:
+            try:
+                self._loop.call_soon_threadsafe(self._stop_on_loop)
+            except RuntimeError:
+                if not self._loop.is_closed():
+                    raise
+            return
+        self._stop_on_loop()
+
+    def _stop_on_loop(self) -> None:
         self._stop_requested = True
         self.tracker.force_stop_sync()
 
@@ -195,6 +217,7 @@ class WorkflowRun:
 
     async def init(self, input_data: PublishToTopicEvent, is_sequential: bool) -> None:
         """Seed input topics for a fresh request, or restore state on recovery."""
+        self._loop = asyncio.get_running_loop()
         await init_run(self, input_data, is_sequential)
 
     async def run(

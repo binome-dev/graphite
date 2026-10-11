@@ -276,6 +276,9 @@ async def test_unexpected_reader_cancellation_is_not_retried(
                 pytest.fail("An interrupted read must not invoke the node")
     assert isinstance(raised.value.__cause__, RuntimeError)
     assert "unexpectedly cancelled" in str(raised.value.__cause__)
+    assert isinstance(raised.value.__cause__.__cause__, asyncio.CancelledError)
+    assert str(raised.value.__cause__.__cause__) == "transport interrupted"
+    assert raised.value.__cause__.__cause__.__traceback__ is not None
     assert calls == 1
     assert node.tool.calls == []
 
@@ -382,6 +385,102 @@ async def test_output_listener_propagates_cancellation(
                 await listener
             with pytest.raises(RuntimeError, match="unexpectedly cancelled"):
                 await anext(queue)
+            assert isinstance(queue._listener_error.__cause__, asyncio.CancelledError)
         assert listener.cancelled()
+    finally:
+        await queue.stop_listeners()
+
+
+@pytest.mark.asyncio
+async def test_slow_reader_cleanup_does_not_end_run_early(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, node = make_run(LogicalOp.OR)
+    started, cleaning, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        started.set()
+        try:
+            return await asyncio.Future()
+        finally:
+            cleaning.set()
+            await release.wait()
+
+    monkeypatch.setattr(run.topics["b"].event_queue, "fetch", fetch)
+    await run.tracker.on_messages_published(1)
+
+    async def drain() -> list[str]:
+        return [
+            message.content
+            async for output in invoke_parallel(run, event("A1"))
+            for message in output.data
+        ]
+
+    task = asyncio.create_task(drain())
+    try:
+        async with asyncio.timeout(5):
+            await started.wait()
+            await run.topics["a"].publish_data(event("A1"))
+            await cleaning.wait()
+            assert await run._progress_possible()
+            # Cross every idle poll that previously caused a successful early
+            # exit while the winning reader's cursor had already advanced.
+            done, _ = await asyncio.wait({task}, timeout=1.7)
+            assert not done
+            assert node.tool.calls == []
+            release.set()
+            assert await task == ["joined"]
+        assert await run.tracker.is_idle()
+    finally:
+        release.set()
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_reader_base_exception_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class TransportFailure(BaseException):
+        pass
+
+    failure = TransportFailure("transport failed")
+    run, node = make_run()
+
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        raise failure
+
+    monkeypatch.setattr(run.topics["a"].event_queue, "fetch", fetch)
+    await run.tracker.on_messages_published(1)
+    async with asyncio.timeout(2):
+        with pytest.raises(NodeExecutionError) as raised:
+            async for _ in invoke_parallel(run, event("input")):
+                pytest.fail("Failed reads cannot produce outputs")
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert raised.value.__cause__.__cause__ is failure
+    assert node.tool.calls == []
+    assert await run.tracker.is_idle()
+
+
+@pytest.mark.asyncio
+async def test_output_transport_timeout_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, _ = make_run()
+    failure = TimeoutError("transport deadline exceeded")
+
+    async def fetch(*args: Any, **kwargs: Any) -> list[TopicEvent]:
+        raise failure
+
+    monkeypatch.setattr(run.topics["output"].event_queue, "fetch", fetch)
+    await run.tracker.on_messages_published(1)
+    queue = AsyncOutputQueue([run.topics["output"]], run.name, run.tracker)
+    await queue.start_listeners()
+    try:
+        async with asyncio.timeout(2):
+            with pytest.raises(TimeoutError) as raised:
+                await anext(queue)
+        assert raised.value is failure
     finally:
         await queue.stop_listeners()

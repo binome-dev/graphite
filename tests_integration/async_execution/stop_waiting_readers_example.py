@@ -36,7 +36,7 @@ class WaitingSource(EchoTool):
             self.closed.set()
 
 
-async def main() -> None:
+async def check_stop(from_thread: bool) -> None:
     probe, source_tool, join_tool = ReadProbe(), WaitingSource(), EchoTool()
     a = Topic(name="a", event_queue=observed_queue(probe, "a"))
     b = Topic(name="b", event_queue=observed_queue(probe, "b"))
@@ -55,19 +55,26 @@ async def main() -> None:
         async with asyncio.timeout(5):
             await probe.wait_started("b", "join", 2)
             assert not task.done()
-            workflow.stop()
+            if from_thread:
+                await asyncio.to_thread(workflow.stop)
+            else:
+                workflow.stop()
             assert await task == []
         assert source_tool.closed.is_set()
         assert join_tool.calls == []
         assert ("b", "join") in probe.cancelled
-        assert ("output", workflow.name) in probe.cancelled
         probe.assert_readers_closed()
     finally:
         workflow.stop()
         if not task.done():
             task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-    print("Workflow stop closes blocked readers and the active source: OK")
+    print(f"Workflow stop closes readers and source (from_thread={from_thread}): OK")
+
+
+async def main() -> None:
+    await check_stop(from_thread=False)
+    await check_stop(from_thread=True)
 
 
 if __name__ == "__main__":

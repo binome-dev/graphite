@@ -90,14 +90,13 @@ class AsyncOutputQueue:
                     await self.tracker.on_messages_committed(
                         len(events), source=f"output_listener:{topic.name}"
                     )
-            except asyncio.TimeoutError:
-                continue
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as error:
                 if not self._stopped:
                     if self._listener_error is None:
                         self._listener_error = RuntimeError(
                             "Output topic read was unexpectedly cancelled"
                         )
+                        self._listener_error.__cause__ = error
                     self.tracker.force_stop_sync()
                 raise
             except Exception as e:

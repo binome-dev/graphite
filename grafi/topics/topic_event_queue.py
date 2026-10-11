@@ -46,11 +46,13 @@ class TopicEventQueue(ABC):
                 positive value bounds the entire wait in seconds.
 
         Returns:
-            List of fetched events, empty on timeout or an empty nonblocking read.
+            List of fetched events, empty on timeout, an empty nonblocking read,
+            or when no unread events fall within the requested offset range.
             Cancellation propagates to the caller.
 
         Implementations must terminate promptly on cancellation, including any
-        local cleanup. Workflow shutdown awaits readers; a backend that ignores
+        local cleanup. A cancelled fetch must leave the read cursor unchanged.
+        Workflow shutdown awaits readers; a backend that ignores
         cancellation can block shutdown. Fetching advances the read cursor, not
         the durable acknowledgment: after a failed run, replay uncommitted
         publications into fresh queues rather than reusing its read cursors.

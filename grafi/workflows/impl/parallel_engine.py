@@ -145,11 +145,21 @@ async def _invoke_node(
     """Node invocation loop for the parallel engine."""
     buffer: Dict[str, List[TopicEvent]] = {}
     active_tasks: List[asyncio.Task[Tuple[str, List[TopicEvent]]]] = []
+    reader_cancellations: Dict[asyncio.Task, asyncio.CancelledError] = {}
 
     async def _read_topic(
         consumer_name: str, topic: TopicBase
     ) -> Tuple[str, List[TopicEvent]]:
-        recs = await topic.consume(consumer_name)
+        try:
+            recs = await topic.consume(consumer_name)
+        except asyncio.CancelledError as error:
+            # gather may replace a task's cancellation with a new exception,
+            # discarding the transport message and traceback. Retain the cause
+            # until the owning node has observed this read round.
+            task = asyncio.current_task()
+            if task is not None:
+                reader_cancellations[task] = error
+            raise
         return topic.name, recs
 
     async def wait_node_invoke(node: NodeBase) -> None:
@@ -167,23 +177,37 @@ async def _invoke_node(
             for task in pending:
                 if task.cancel():
                     cancelled_readers.add(task)
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # A completed read may already have advanced its cursor. Keep the
+            # node active during sibling cleanup so that slow cancellation
+            # cannot make the output loop mistake this work for parked inputs.
+            await run.tracker.enter(node.name)
+            try:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+            finally:
+                await run.tracker.leave(node.name)
             active_tasks.clear()
             # Observe every result before merging. A sibling can complete while
             # cancellation is being delivered, so gather includes all readers.
-            read_error: BaseException | None = None
+            read_error: Exception | None = None
             for task, result in zip(tasks, results):
                 if isinstance(result, BaseException):
                     if isinstance(result, asyncio.CancelledError):
                         if task in cancelled_readers:
                             continue
-                        result = RuntimeError("Topic read was unexpectedly cancelled")
+                        error = RuntimeError("Topic read was unexpectedly cancelled")
+                        error.__cause__ = reader_cancellations.get(task, result)
+                        result = error
+                    elif not isinstance(result, Exception):
+                        error = RuntimeError("Topic read failed")
+                        error.__cause__ = result
+                        result = error
                     if read_error is None:
                         read_error = result
                     continue
                 topic_name, recs = result
                 if recs:
                     buffer.setdefault(topic_name, []).extend(recs)
+            reader_cancellations.clear()
             if read_error is not None:
                 # Abort without acknowledging any of this batch. A fresh run
                 # restores fetched-but-uncommitted publications from the store.
@@ -195,6 +219,7 @@ async def _invoke_node(
                 task.cancel()
         await asyncio.gather(*active_tasks, return_exceptions=True)
         active_tasks.clear()
+        reader_cancellations.clear()
 
     try:
         while not run._stop_requested:
