@@ -109,48 +109,6 @@ timeout bounds the entire wait in seconds. Cancellation propagates and leaves
 the read cursor unchanged. An empty result means the wait timed out, a nonblocking
 read found nothing, or no unread events fall within the requested offset range.
 
-```python
-async def fetch(
-    self,
-    consumer_id: str,
-    offset: Optional[int] = None,
-    timeout: Optional[float] = None,
-) -> List[TopicEvent]:
-    """
-    Await fresh records newer than the consumer's consumed offset.
-    Immediately advances consumed offset to prevent duplicate fetches.
-    Returns [] if `timeout` (seconds) elapses with no data.
-    Also returns [] when the requested offset range has no unread records.
-    None waits indefinitely; 0 reads immediately without waiting. Positive
-    timeouts bound the entire wait, including repeated wakeups.
-    Cancellation propagates without advancing the consumer cursor.
-    """
-
-    async with self._cond:
-        if not self._can_consume_unlocked(consumer_id):
-            if timeout is not None and timeout <= 0:
-                return []
-            try:
-                async with asyncio.timeout(timeout):
-                    await self._cond.wait_for(
-                        lambda: self._can_consume_unlocked(consumer_id)
-                    )
-            except TimeoutError:
-                return []
-
-        start = self._consumed[consumer_id]
-        if offset is not None:
-            end = min(len(self._records), offset + 1)
-            batch = self._records[start:end]
-        else:
-            batch = self._records[start:]
-
-        # Advance consumed offset immediately to prevent duplicate fetches
-        self._consumed[consumer_id] += len(batch)
-
-        return batch
-```
-
 ### Offset Commitment
 
 #### commit_to(consumer_id: str, offset: int) → int

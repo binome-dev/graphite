@@ -8,6 +8,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 from pydantic import PrivateAttr
 
+from grafi.assistants.assistant import Assistant
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -23,6 +24,7 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import GrafiRuntime
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import CombinedExpr
 from grafi.topics.expressions.topic_expression import LogicalOp
@@ -231,6 +233,49 @@ async def test_cancellation_joins_readers_before_return(
         await asyncio.gather(worker, return_exceptions=True)
     assert all(reader.done() for reader in readers)
     assert node.tool.calls == []
+
+
+@pytest.mark.asyncio
+async def test_public_workflow_stop_from_another_thread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, node = make_run(LogicalOp.OR)
+    workflow = EventDrivenWorkflow.builder().node(node).build()
+    started, closed = asyncio.Event(), asyncio.Event()
+
+    async def invoke(
+        self: RecordingTool, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
+        try:
+            started.set()
+            await asyncio.Future()
+            yield []
+        finally:
+            closed.set()
+
+    monkeypatch.setattr(RecordingTool, "invoke", invoke)
+
+    async def drain() -> list[ConsumeFromTopicEvent]:
+        return [
+            output
+            async for output in GrafiRuntime().invoke(
+                Assistant(workflow=workflow), event("input")
+            )
+        ]
+
+    task = asyncio.create_task(drain())
+    try:
+        async with asyncio.timeout(2):
+            await started.wait()
+            await asyncio.to_thread(workflow.stop)
+            assert await task == []
+        assert closed.is_set()
+        assert not workflow._active_runs
+    finally:
+        workflow.stop()
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 @pytest.mark.asyncio

@@ -84,9 +84,8 @@ class TopicBase(BaseModel):
         self, consumer_name: str, timeout: Optional[float] = None
     ) -> List[TopicEvent]:
         """
-        Retrieve unread messages. None waits indefinitely, 0 reads without
-        waiting, and a positive timeout bounds the wait in seconds. Cancellation
-        propagates to the caller.
+        Retrieve unread messages for this consumer.
+        See :meth:`TopicEventQueue.fetch` for timeout and cancellation behavior.
         """
         return await self.event_queue.fetch(consumer_name, timeout=timeout)
 

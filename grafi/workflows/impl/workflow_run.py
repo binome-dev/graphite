@@ -73,10 +73,7 @@ class WorkflowRun:
         self.tracker: AsyncNodeTracker = AsyncNodeTracker()
         self.invoke_queue: deque[NodeBase] = deque()
         self._stop_requested: bool = False
-        try:
-            self._loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
-        except RuntimeError:
-            self._loop = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     # ------------------------------------------------------------------ #
     # Control

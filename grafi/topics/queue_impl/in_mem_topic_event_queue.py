@@ -58,13 +58,8 @@ class InMemTopicEventQueue(TopicEventQueue):
         timeout: Optional[float] = None,
     ) -> List[TopicEvent]:
         """
-        Await fresh records newer than the consumer's consumed offset.
+        See :meth:`TopicEventQueue.fetch` for the fetch contract.
         Immediately advances consumed offset to prevent duplicate fetches.
-        Returns [] if `timeout` (seconds) elapses with no data.
-        Also returns [] when the requested offset range has no unread records.
-        None waits indefinitely; 0 reads immediately without waiting. Positive
-        timeouts bound the entire wait, including repeated wakeups.
-        Cancellation propagates without advancing the consumer cursor.
         """
 
         async with self._cond:

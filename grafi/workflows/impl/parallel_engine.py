@@ -150,13 +150,12 @@ async def _invoke_node(
         consumer_name: str, topic: TopicBase
     ) -> Tuple[str, List[TopicEvent]]:
         try:
-            recs = await topic.consume(consumer_name)
+            return topic.name, await topic.consume(consumer_name)
         except asyncio.CancelledError as error:
             task = asyncio.current_task()
             if task is not None and task.cancelling() == 0:
                 raise RuntimeError("Topic read was unexpectedly cancelled") from error
             raise
-        return topic.name, recs
 
     async def wait_node_invoke(node: NodeBase) -> None:
         while not node.can_invoke_with_topics(list(buffer.keys())):
@@ -180,29 +179,18 @@ async def _invoke_node(
             finally:
                 await run.tracker.leave(node.name)
             active_tasks.clear()
-            # Observe every result before merging. A sibling can complete while
-            # cancellation is being delivered, so gather includes all readers.
-            read_error: Exception | None = None
+            # Abort on the first failure without acknowledging this batch; a
+            # fresh run restores uncommitted publications from the store.
             for result in results:
+                if isinstance(result, asyncio.CancelledError):
+                    continue  # _read_topic wraps transport-raised cancellation.
+                if isinstance(result, Exception):
+                    raise result
                 if isinstance(result, BaseException):
-                    if isinstance(result, asyncio.CancelledError):
-                        # The reader wraps transport-raised cancellations;
-                        # these remaining cancellations were requested.
-                        continue
-                    elif not isinstance(result, Exception):
-                        error = RuntimeError("Topic read failed")
-                        error.__cause__ = result
-                        result = error
-                    if read_error is None:
-                        read_error = result
-                    continue
+                    raise RuntimeError("Topic read failed") from result
                 topic_name, recs = result
                 if recs:
                     buffer.setdefault(topic_name, []).extend(recs)
-            if read_error is not None:
-                # Abort without acknowledging any of this batch. A fresh run
-                # restores fetched-but-uncommitted publications from the store.
-                raise read_error
 
     async def _cancel_all_active_tasks() -> None:
         for task in active_tasks:
