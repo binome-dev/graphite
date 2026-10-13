@@ -42,10 +42,20 @@ class TopicEventQueue(ABC):
         Args:
             consumer_id: Unique identifier for the consumer
             offset: Optional specific offset to fetch up to
-            timeout: Optional timeout in seconds to wait for new events
+            timeout: None waits indefinitely, 0 reads without waiting, and a
+                positive value bounds the entire wait in seconds.
 
         Returns:
-            List of fetched events, empty if timeout or no new events
+            List of fetched events, empty on timeout, an empty nonblocking read,
+            or when no unread events fall within the requested offset range.
+            Cancellation propagates to the caller.
+
+        Implementations must terminate promptly on cancellation, including any
+        local cleanup. A cancelled fetch must leave the read cursor unchanged.
+        Workflow shutdown awaits readers; a backend that ignores
+        cancellation can block shutdown. Fetching advances the read cursor, not
+        the durable acknowledgment: after a failed run, replay uncommitted
+        publications into fresh queues rather than reusing its read cursors.
         """
         pass
 

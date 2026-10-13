@@ -56,6 +56,12 @@ class EventDrivenWorkflow(Workflow):
     _active_runs: Dict[int, WorkflowRun] = PrivateAttr(default_factory=dict)
 
     def model_post_init(self, _context: Any) -> None:
+        for node in self.nodes.values():
+            if not node.subscribed_expressions or not node.subscribed_topics:
+                raise WorkflowError(
+                    message=f"Node {node.name!r} requires at least one subscription.",
+                    severity="CRITICAL",
+                )
         self._add_topics()
         self._handle_function_calling_nodes()
 
@@ -65,6 +71,8 @@ class EventDrivenWorkflow(Workflow):
 
         Sets the definition-level stop flag and forwards the stop to every
         in-flight run so their trackers and node tasks wind down.
+        Cross-thread requests are scheduled and take effect asynchronously
+        when the runs' event loops execute.
         """
         super().stop()
         for run in list(self._active_runs.values()):

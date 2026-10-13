@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from typing import AsyncGenerator
 from typing import Dict
 from typing import List
+from typing import Tuple
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -143,19 +144,18 @@ async def _invoke_node(
 ) -> None:
     """Node invocation loop for the parallel engine."""
     buffer: Dict[str, List[TopicEvent]] = {}
-    active_tasks: List[asyncio.Task] = []
+    active_tasks: List[asyncio.Task[Tuple[str, List[TopicEvent]]]] = []
 
-    async def _wait_and_buffer(consumer_name: str, topic: TopicBase) -> None:
-        recs = await topic.consume(consumer_name)
-        if topic.name not in buffer:
-            buffer[topic.name] = []
-        buffer[topic.name].extend(recs)
-
-    async def _ignore_cancel(task: asyncio.Task) -> None:
+    async def _read_topic(
+        consumer_name: str, topic: TopicBase
+    ) -> Tuple[str, List[TopicEvent]]:
         try:
-            await task
-        except asyncio.CancelledError:
-            pass
+            return topic.name, await topic.consume(consumer_name)
+        except asyncio.CancelledError as error:
+            task = asyncio.current_task()
+            if task is not None and task.cancelling() == 0:
+                raise RuntimeError("Topic read was unexpectedly cancelled") from error
+            raise
 
     async def wait_node_invoke(node: NodeBase) -> None:
         while not node.can_invoke_with_topics(list(buffer.keys())):
@@ -163,20 +163,40 @@ async def _invoke_node(
                 return
             # Wait on this run's copy of each subscribed topic.
             tasks = [
-                asyncio.create_task(_wait_and_buffer(node.name, run.topics[topic.name]))
+                asyncio.create_task(_read_topic(node.name, run.topics[topic.name]))
                 for topic in node.subscribed_topics
             ]
             active_tasks.extend(tasks)
             _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for t in pending:
-                t.cancel()
-                asyncio.create_task(_ignore_cancel(t))
-            active_tasks[:] = [t for t in active_tasks if not t.done()]
+            for task in pending:
+                task.cancel()
+            # A completed read may already have advanced its cursor. Keep the
+            # node active during sibling cleanup so that slow cancellation
+            # cannot make the output loop mistake this work for parked inputs.
+            await run.tracker.hold(node.name)
+            try:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+            finally:
+                await run.tracker.leave(node.name)
+            active_tasks.clear()
+            # Abort on the first failure without acknowledging this batch; a
+            # fresh run restores uncommitted publications from the store.
+            for result in results:
+                if isinstance(result, asyncio.CancelledError):
+                    continue  # _read_topic wraps transport-raised cancellation.
+                if isinstance(result, Exception):
+                    raise result
+                if isinstance(result, BaseException):
+                    raise RuntimeError("Topic read failed") from result
+                topic_name, recs = result
+                if recs:
+                    buffer.setdefault(topic_name, []).extend(recs)
 
-    def _cancel_all_active_tasks() -> None:
+    async def _cancel_all_active_tasks() -> None:
         for task in active_tasks:
             if not task.done():
                 task.cancel()
+        await asyncio.gather(*active_tasks, return_exceptions=True)
         active_tasks.clear()
 
     try:
@@ -223,28 +243,15 @@ async def _invoke_node(
                 await run.event_store.record_events(
                     get_async_output_events(node_output_events)
                 )
-            except Exception as node_error:
-                await run.tracker.force_stop()
-                if isinstance(node_error, NodeExecutionError):
-                    raise
-                raise NodeExecutionError(
-                    node_name=node.name,
-                    message="Node execution failed",
-                    invoke_context=invoke_context,
-                    cause=node_error,
-                ) from node_error
             finally:
                 await run.tracker.leave(node.name)
                 buffer.clear()
-    except asyncio.CancelledError:
-        # Cancellation is normal shutdown, not a failure -- do not log/report it.
-        _cancel_all_active_tasks()
-        raise
-    except NodeExecutionError:
-        _cancel_all_active_tasks()
-        raise
     except Exception as e:
-        _cancel_all_active_tasks()
+        # Signal once on the owning loop, without a cancellation point that
+        # could replace the node/read failure before it reaches the caller.
+        run.tracker.force_stop_sync()
+        if isinstance(e, NodeExecutionError):
+            raise
         raise NodeExecutionError(
             node_name=node.name,
             message="Node execution failed",
@@ -252,5 +259,5 @@ async def _invoke_node(
             cause=e,
         ) from e
     finally:
-        _cancel_all_active_tasks()
+        await _cancel_all_active_tasks()
         buffer.clear()

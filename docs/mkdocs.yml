@@ -36,6 +36,7 @@ repo_url: https://github.com/binome-dev/graphite
 nav:
   - Home: index.md
   - Features: getting-started/features.md
+  - Release Notes: release-notes.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md

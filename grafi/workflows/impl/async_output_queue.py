@@ -10,6 +10,9 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.topics.topic_base import TopicBase
 from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
+QUIESCENCE_POLL_INTERVAL = 0.5
+IDLE_POLLS_BEFORE_STOP = 2
+
 
 class AsyncOutputQueue:
     """
@@ -90,10 +93,15 @@ class AsyncOutputQueue:
                     await self.tracker.on_messages_committed(
                         len(events), source=f"output_listener:{topic.name}"
                     )
-            except asyncio.TimeoutError:
-                continue
-            except asyncio.CancelledError:
-                break
+            except asyncio.CancelledError as error:
+                if not self._stopped:
+                    if self._listener_error is None:
+                        self._listener_error = RuntimeError(
+                            "Output topic read was unexpectedly cancelled"
+                        )
+                        self._listener_error.__cause__ = error
+                    self.tracker.force_stop_sync()
+                raise
             except Exception as e:
                 # Transport the error to the consumer via __anext__ (which
                 # re-raises it) and force termination so it is not swallowed. The
@@ -146,7 +154,7 @@ class AsyncOutputQueue:
             # Wait for queue item or quiescence
             queue_task = asyncio.create_task(self.queue.get())
             quiescent_task = asyncio.create_task(
-                self.tracker.wait_for_quiescence(timeout=0.5)
+                self.tracker.wait_for_quiescence(timeout=QUIESCENCE_POLL_INTERVAL)
             )
 
             done, pending = await asyncio.wait(
@@ -202,7 +210,7 @@ class AsyncOutputQueue:
                     self._stuck_polls = 0
                 else:
                     self._stuck_polls += 1
-                    if self._stuck_polls >= 2:
+                    if self._stuck_polls >= IDLE_POLLS_BEFORE_STOP:
                         logger.debug(
                             "Output queue: no progress possible; ending iteration "
                             "(parked deliveries)."
