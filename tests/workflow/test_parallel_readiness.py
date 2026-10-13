@@ -1,6 +1,7 @@
 """Regression tests for parallel input readiness and owned read tasks."""
 
 import asyncio
+import threading
 from typing import Any
 
 import pytest
@@ -33,6 +34,7 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl import async_output_queue
+from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.impl.parallel_engine import _invoke_node
@@ -242,6 +244,14 @@ async def test_public_workflow_stop_from_another_thread(
     _, node = make_run(LogicalOp.OR)
     workflow = EventDrivenWorkflow.builder().node(node).build()
     started, closed = asyncio.Event(), asyncio.Event()
+    stop_threads: list[int] = []
+    force_stop_sync = AsyncNodeTracker.force_stop_sync
+
+    def record_stop(self: AsyncNodeTracker) -> None:
+        stop_threads.append(threading.get_ident())
+        force_stop_sync(self)
+
+    monkeypatch.setattr(AsyncNodeTracker, "force_stop_sync", record_stop)
 
     async def invoke(
         self: RecordingTool, invoke_context: InvokeContext, input_data: Messages
@@ -271,6 +281,7 @@ async def test_public_workflow_stop_from_another_thread(
             assert await task == []
         assert closed.is_set()
         assert not workflow._active_runs
+        assert set(stop_threads) == {threading.get_ident()}
     finally:
         workflow.stop()
         if not task.done():
