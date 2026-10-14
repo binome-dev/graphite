@@ -289,9 +289,11 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
 
 
 @pytest.mark.asyncio
-async def test_fanin_gap_from_failed_producer_is_reported_on_recovery(
+@pytest.mark.parametrize("fan_in", [False, True], ids=["pipeline", "fan-in"])
+async def test_internal_topic_dependency_on_failed_producer_is_reported_on_recovery(
     event_store: EventStore,
     monkeypatch: pytest.MonkeyPatch,
+    fan_in: bool,
 ) -> None:
     a_enqueued, b_stored, sink_consumed = (asyncio.Event() for _ in range(3))
     original_record = event_store.record_events
@@ -318,7 +320,8 @@ async def test_fanin_gap_from_failed_producer_is_reported_on_recovery(
         if self.name == "a":
             yield [Message(role="assistant", content="a")]
             a_enqueued.set()
-            await b_stored.wait()
+            if fan_in:
+                await b_stored.wait()
             await sink_consumed.wait()
             raise RuntimeError("producer a failed")
         if self.name == "b":
@@ -341,13 +344,14 @@ async def test_fanin_gap_from_failed_producer_is_reported_on_recovery(
             publisher_router=PublisherRouter(routes=[PublishRoute(topic=destination)]),
         )
 
-    workflow = (
+    builder = (
         EventDrivenWorkflow.builder()
         .node(node("a", TopicExpr(topic=input_topic), mid))
-        .node(node("b", TopicExpr(topic=input_topic), mid))
         .node(node("sink", TopicExpr(topic=mid), out))
-        .build()
     )
+    if fan_in:
+        builder.node(node("b", TopicExpr(topic=input_topic), mid))
+    workflow = builder.build()
     _, _, event = workflow_and_input()
     async with asyncio.timeout(3):
         with pytest.raises(NodeExecutionError, match="producer a failed"):
@@ -358,15 +362,62 @@ async def test_fanin_gap_from_failed_producer_is_reported_on_recovery(
         event.offset
         for event in history
         if isinstance(event, PublishToTopicEvent) and event.name == "mid"
-    ] == [1]
+    ] == ([1] if fan_in else [])
     assert any(
         isinstance(event, ConsumeFromTopicEvent)
         and event.name == "mid"
         and event.offset == 0
         for event in history
     )
-    with pytest.raises(WorkflowError, match="expected offset 0, found 1"):
+    error = (
+        "expected offset 0, found 1"
+        if fan_in
+        else "no publication at consumed offset 0"
+    )
+    with pytest.raises(WorkflowError, match=error):
         await WorkflowRun(workflow, event_store).init(event, False)
+
+
+@pytest.mark.asyncio
+async def test_node_persistence_failure_keeps_inputs_unacknowledged_for_retry(
+    event_store: EventStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow, tool, event = workflow_and_input()
+    original_record = event_store.record_events
+    failed_batches: list[list[Event]] = []
+    failure = OSError("step persistence failed")
+
+    async def record(events: Sequence[Event]) -> None:
+        if not failed_batches and any(
+            isinstance(record, PublishToTopicEvent) and record.name == "output_a"
+            for record in events
+        ):
+            failed_batches.append(list(events))
+            raise failure
+        await original_record(events)
+
+    monkeypatch.setattr(event_store, "record_events", record)
+    async with asyncio.timeout(3):
+        with pytest.raises(NodeExecutionError) as raised:
+            async for _ in workflow.invoke(event):
+                pass
+    assert raised.value.__cause__ is failure
+    history = await event_store.get_agent_events("r")
+    assert not any(isinstance(record, ConsumeFromTopicEvent) for record in history)
+    assert len(failed_batches) == 1
+    assert (
+        sum(isinstance(record, ConsumeFromTopicEvent) for record in failed_batches[0])
+        == 2
+    )
+    assert (
+        sum(isinstance(record, PublishToTopicEvent) for record in failed_batches[0])
+        == 6
+    )
+    async with asyncio.timeout(3):
+        outputs = [output async for output in workflow.invoke(event)]
+    assert len(outputs) == 6
+    assert tool.calls == 2
 
 
 @pytest.mark.asyncio

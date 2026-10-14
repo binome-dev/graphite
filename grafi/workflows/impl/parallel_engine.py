@@ -244,8 +244,9 @@ async def _invoke_node(
                 await run._commit_events(
                     consumer_name=node.name, topic_events=consumed_events
                 )
-                await run.event_store.record_events(consumed_events)
-                await run.event_store.record_events(node_output_events)
+                await run.event_store.record_events(
+                    [*consumed_events, *node_output_events]
+                )
                 run._persisted_publications.update(
                     (event.name, event.offset) for event in node_output_events
                 )

@@ -31,7 +31,11 @@ before determining readiness. Missing or conflicting publication offsets and
 consumption beyond surviving publications raise `WorkflowError` instead of
 silently renumbering history or skipping records. Historical publications lost
 through ID collisions or stream aggregation cannot be reconstructed automatically.
-This does not make legacy acknowledgment and publication writes atomic.
+
+A finished parallel node now submits its consumed inputs and publications in
+one `record_events()` batch, matching the sequential engine. Postgres writes
+that batch in one transaction; custom stores retain their own failure semantics.
+This does not make downstream execution atomic with producer persistence.
 
 Ready nodes restored in sequential mode now run in node-definition order,
 rather than the history's publication order.
@@ -42,8 +46,12 @@ required publications. Backward-compatible event decoding does not repair those
 histories; requests with complete history can still resume.
 
 The current parallel engine still exposes internal-topic publications before
-their producer finishes and persists them. With fan-in, a failed producer can
-leave a missing earlier offset while another producer or a downstream node has
-already persisted later publications or consumption. Recovery reports this gap
-with `WorkflowError`. Output acknowledgment filtering does not repair that case;
-atomic step commits in the planned journal work are needed to close it.
+their producer finishes and persists them. If a downstream node consumes and
+records one of those publications, or another producer stores a later position
+on the topic, before the first producer stores its publications, a subsequent
+failure of the first producer leaves consumption without a publication or
+missing earlier offsets. This also affects a single-producer pipeline; fan-in
+is not required.
+Recovery reports the inconsistency with `WorkflowError`. Output acknowledgment
+filtering and completed-node batching do not repair this case; atomic step
+commits in the planned journal work are needed to close it.
