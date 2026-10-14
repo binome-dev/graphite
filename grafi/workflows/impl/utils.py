@@ -16,9 +16,11 @@ from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
 def get_async_output_events(events: Sequence[TopicEvent]) -> List[TopicEvent]:
     """
-    Process a list of TopicEvents, grouping by name and aggregating streaming messages.
+    Build a derived display view, grouping streaming text by topic.
 
-    NO CHANGES NEEDED - this is read-only aggregation.
+    Projections keep the first event's identity and offset. They must not be
+    persisted as canonical publications or consumption records for recovery.
+    Source events and messages remain unchanged.
     """
     # Group events by name
     events_by_topic: Dict[str, List[TopicEvent]] = {}

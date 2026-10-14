@@ -2,6 +2,7 @@ import json
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 
 from pydantic import TypeAdapter
 from pydantic_core import to_jsonable_python
@@ -15,6 +16,8 @@ from grafi.topics.topic_types import TopicType
 
 
 class PublishToTopicEvent(TopicEvent):
+    # The immediate source emission; event_id identifies this destination's publication.
+    emission_id: Optional[str] = None
     consumed_event_ids: List[str] = []
     publisher_name: str = ""
     publisher_type: str = ""
@@ -30,6 +33,8 @@ class PublishToTopicEvent(TopicEvent):
             "offset": self.offset,
             "invoke_context": self.invoke_context.model_dump(),
         }
+        if self.emission_id is not None:
+            event_context["emission_id"] = self.emission_id
 
         return {
             EVENT_CONTEXT: event_context,
@@ -48,9 +53,9 @@ class PublishToTopicEvent(TopicEvent):
 
         data_obj = TypeAdapter(Messages).validate_python(data_dict)
 
-        base_event = cls.event_base(data)
         return cls(
             **base_event,
+            emission_id=data[EVENT_CONTEXT].get("emission_id"),
             consumed_event_ids=data[EVENT_CONTEXT]["consumed_event_ids"],
             publisher_name=data[EVENT_CONTEXT]["publisher_name"],
             publisher_type=data[EVENT_CONTEXT]["publisher_type"],

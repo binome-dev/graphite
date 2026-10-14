@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -135,3 +136,46 @@ async def test_publish_data_always_enqueues(
 
     consumed = await topic.consume("c")
     assert len(consumed) == 1
+
+
+@pytest.mark.asyncio
+async def test_destination_publications_have_distinct_ids_and_source_lineage(
+    invoke_context: InvokeContext,
+) -> None:
+    a, b = MockTopic(name="a"), MockTopic(name="b")
+    source = PublishToTopicEvent(
+        name="source",
+        offset=-1,
+        invoke_context=invoke_context,
+        data=[Message(role="assistant", content="hello")],
+    )
+    snapshot = source.model_dump()
+    first = await a.publish_data(source)
+    second = await b.publish_data(source)
+    repeated = await a.publish_data(source)
+    assert (
+        len({source.event_id, first.event_id, second.event_id, repeated.event_id}) == 4
+    )
+    assert (
+        first.emission_id
+        == second.emission_id
+        == repeated.emission_id
+        == source.event_id
+    )
+    assert [first.offset, second.offset, repeated.offset] == [0, 0, 1]
+    assert source.model_dump() == snapshot
+    first.data[0].content = "changed"
+    assert source.data[0].content == second.data[0].content == "hello"
+
+    store = EventStoreInMemory()
+    await store.record_events([first, second, repeated, first])
+    assert await store.get_events() == [first, second, repeated]
+    restored = MockTopic(name="a")
+    await restored.restore_topic(first)
+    replayed = await restored.consume("consumer", timeout=0)
+    assert replayed[0].event_id == first.event_id
+    assert replayed[0].emission_id == source.event_id
+    # Republishing uses the immediate source publication, not its ancestor.
+    forwarded = await b.publish_data(first)
+    assert forwarded.emission_id == first.event_id
+    assert forwarded.event_id not in {source.event_id, first.event_id, second.event_id}

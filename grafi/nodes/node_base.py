@@ -81,8 +81,12 @@ class PublisherRouter(BaseModel):
     routes: List[PublishRoute] = Field(default_factory=list)
 
     def select(self, event: PublishToTopicEvent) -> List[str]:
-        """Destination topic names for an outgoing event, routed by content."""
-        return [r.topic.name for r in self.routes if self._condition_ok(r.when, event)]
+        """Matched destinations, once each in first matched route order."""
+        return list(
+            dict.fromkeys(
+                r.topic.name for r in self.routes if self._condition_ok(r.when, event)
+            )
+        )
 
     @staticmethod
     def _condition_ok(

@@ -1,5 +1,7 @@
 """Unit tests for the node's publisher router (isolated, no engine)."""
 
+from typing import Callable
+
 import pytest
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
@@ -45,6 +47,32 @@ def _publish(data, name: str = "") -> PublishToTopicEvent:
 
 
 class TestPublisherRouter:
+    def test_duplicate_destinations_evaluate_all_predicates_then_deduplicate(
+        self,
+    ) -> None:
+        a, b = TopicBase(name="a"), TopicBase(name="b")
+        calls: list[str] = []
+
+        def condition(
+            label: str, matched: bool
+        ) -> Callable[[PublishToTopicEvent], bool]:
+            def predicate(event: PublishToTopicEvent) -> bool:
+                calls.append(label)
+                return matched
+
+            return predicate
+
+        router = PublisherRouter(
+            routes=[
+                PublishRoute(topic=a, when=condition("a-false", False)),
+                PublishRoute(topic=b, when=condition("b", True)),
+                PublishRoute(topic=a, when=condition("a-true", True)),
+                PublishRoute(topic=b, when=condition("b-again", True)),
+            ]
+        )
+        assert router.select(_publish([])) == ["b", "a"]
+        assert calls == ["a-false", "b", "a-true", "b-again"]
+
     def _llm_router(self):
         fc = TopicBase(name="function_call")
         out = TopicBase(name="agent_output")

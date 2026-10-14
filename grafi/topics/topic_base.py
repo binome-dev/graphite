@@ -3,6 +3,7 @@ from typing import List
 from typing import Optional
 from typing import Self
 from typing import TypeVar
+from uuid import uuid4
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -41,8 +42,11 @@ class TopicBase(BaseModel):
     async def publish_data(
         self, publish_event: PublishToTopicEvent
     ) -> PublishToTopicEvent:
-        """Stamp the event with this topic's name/type and enqueue it.
+        """Create a distinct destination publication from a source emission.
 
+        Each call allocates a new event ID, even for a repeated source event.
+        Source lineage is retained in emission_id. Replay uses restore_topic()
+        to preserve a stored publication's identity instead.
         Always returns the enqueued event: routing already happened on the
         node's publisher router, so a topic never drops an event.
         """
@@ -50,6 +54,8 @@ class TopicBase(BaseModel):
             update={
                 "name": self.name,
                 "type": self.type,
+                "event_id": uuid4().hex,
+                "emission_id": publish_event.event_id,
             },
             deep=True,
         )
