@@ -1,6 +1,7 @@
 import pytest
 
 from grafi.common.events.event import EVENT_CONTEXT
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -151,3 +152,37 @@ def test_publish_to_topic_event_from_dict_message(
         PublishToTopicEvent.from_dict(publish_to_topic_event_dict_message)
         == publish_to_topic_event_message
     )
+
+
+@pytest.mark.parametrize("emission_id", [None, "source-emission"])
+def test_publication_lineage_codec_round_trip(
+    publish_to_topic_event: PublishToTopicEvent, emission_id: str | None
+) -> None:
+    event = publish_to_topic_event.model_copy(update={"emission_id": emission_id})
+    encoded = event.to_dict()
+    if emission_id is None:
+        assert "emission_id" not in encoded[EVENT_CONTEXT]
+    else:
+        assert encoded[EVENT_CONTEXT]["emission_id"] == emission_id
+    decoded = default_event_codec.decode(encoded)
+    assert isinstance(decoded, PublishToTopicEvent)
+    assert decoded.emission_id == emission_id
+    assert decoded == event
+
+
+@pytest.mark.parametrize("emission_id", [None, "source-emission"])
+def test_postgres_jsonb_publication_round_trip_without_database(
+    publish_to_topic_event: PublishToTopicEvent, emission_id: str | None
+) -> None:
+    pytest.importorskip("sqlalchemy")
+    from grafi.common.event_stores.event_store_postgres import EventModel
+    from grafi.common.event_stores.event_store_postgres import EventStorePostgres
+
+    event = publish_to_topic_event.model_copy(update={"emission_id": emission_id})
+    values = EventStorePostgres._event_values(event)
+    assert values["event_id"] == event.event_id
+    assert values["event_data"][EVENT_CONTEXT].get("emission_id") == emission_id
+    # Exercise the real column encoder and row decoder without creating engines
+    # or making a database connection. Live SQL persistence is separate coverage.
+    store = EventStorePostgres.__new__(EventStorePostgres)
+    assert store._row_to_event(EventModel(**values)) == event

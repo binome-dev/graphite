@@ -25,7 +25,6 @@ from grafi.nodes.node_base import NodeBase
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.async_output_queue import AsyncOutputQueue
-from grafi.workflows.impl.utils import get_async_output_events
 from grafi.workflows.impl.utils import publish_events
 
 if TYPE_CHECKING:
@@ -103,18 +102,24 @@ async def invoke_parallel(
     finally:
         await output_queue.stop_listeners()
 
+        # A node may fail, stop or be cancelled after yielding chunks but before
+        # persisting its publications. Leave those outputs unacknowledged so a
+        # fresh run can replay the input and deliver the complete stream again.
+        persisted_outputs = [
+            event
+            for event in consumed_output_events
+            if (event.name, event.offset) in run._persisted_publications
+        ]
         await run._commit_events(
             consumer_name=run.name,
-            topic_events=consumed_output_events,
+            topic_events=persisted_outputs,
             track_commit=False,
         )
 
         run.stop()
 
-        if consumed_output_events:
-            await run.event_store.record_events(
-                get_async_output_events(consumed_output_events)
-            )
+        if persisted_outputs:
+            await run.event_store.record_events(persisted_outputs)
 
         for t in node_processing_task:
             t.cancel()
@@ -239,9 +244,11 @@ async def _invoke_node(
                 await run._commit_events(
                     consumer_name=node.name, topic_events=consumed_events
                 )
-                await run.event_store.record_events(consumed_events)
                 await run.event_store.record_events(
-                    get_async_output_events(node_output_events)
+                    [*consumed_events, *node_output_events]
+                )
+                run._persisted_publications.update(
+                    (event.name, event.offset) for event in node_output_events
                 )
             finally:
                 await run.tracker.leave(node.name)

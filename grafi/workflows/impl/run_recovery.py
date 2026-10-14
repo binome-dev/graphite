@@ -10,11 +10,16 @@ definition-level ``init_workflow`` -- this performs no resets.
 """
 
 from typing import TYPE_CHECKING
+from typing import Dict
 from typing import List
 from typing import Set
 
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.exceptions import WorkflowError
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -80,6 +85,9 @@ async def _seed_fresh(
                 seeded_delivery_count, source="init_workflow"
             )
         await run.event_store.record_events(events_to_record)
+        run._persisted_publications.update(
+            (event.name, event.offset) for event in events_to_record
+        )
 
 
 async def _restore(
@@ -88,11 +96,46 @@ async def _restore(
     events: List[TopicEvent],
     is_sequential: bool,
 ) -> None:
-    """Restore topic state from persisted events and resume."""
-    for topic_event in events:
-        await run.topics[topic_event.name].restore_topic(topic_event)
-        if is_sequential and isinstance(topic_event, PublishToTopicEvent):
-            await run._add_to_invoke_queue(topic_event)
+    """Restore publications by topic offset, then committed consumer cursors."""
+    publications = sorted(
+        (event for event in events if isinstance(event, PublishToTopicEvent)),
+        key=lambda event: (event.name, event.offset),
+    )
+    # Store timestamps/insertion order need not match a topic's queue order.
+    # Validate the entire snapshot before queue.put() could renumber anything.
+    next_offsets: Dict[str, int] = {}
+    for event in publications:
+        expected = next_offsets.get(event.name, 0)
+        if event.offset != expected:
+            raise WorkflowError(
+                message=(
+                    f"Topic {event.name!r} history has missing or conflicting offsets: "
+                    f"expected offset {expected}, found {event.offset}"
+                ),
+                invoke_context=input_data.invoke_context,
+            )
+        next_offsets[event.name] = expected + 1
+    consumptions = [
+        event for event in events if isinstance(event, ConsumeFromTopicEvent)
+    ]
+    for event in consumptions:
+        if not 0 <= event.offset < next_offsets.get(event.name, 0):
+            raise WorkflowError(
+                message=f"Topic {event.name!r} history has no publication at consumed offset {event.offset}",
+                invoke_context=input_data.invoke_context,
+            )
+
+    for publication in publications:
+        await run.topics[publication.name].restore_topic(publication)
+    for consumption in consumptions:
+        await run.topics[consumption.name].restore_topic(consumption)
+    run._persisted_publications.update(
+        (event.name, event.offset) for event in publications
+    )
+    if is_sequential:
+        for node in run.nodes.values():
+            if await run._node_can_invoke(node):
+                run.invoke_queue.append(node)
 
     # Re-seed the tracker with messages still pending consumption so the resumed
     # parallel run drains restored work instead of declaring immediate quiescence.
@@ -165,3 +208,4 @@ async def _reissue_paired_inputs(
             if is_sequential:
                 await run._add_to_invoke_queue(paired_event)
             await run.event_store.record_event(paired_event)
+            run._persisted_publications.add((paired_event.name, paired_event.offset))
