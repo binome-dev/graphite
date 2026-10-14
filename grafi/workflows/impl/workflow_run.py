@@ -74,6 +74,9 @@ class WorkflowRun:
         self.invoke_queue: deque[NodeBase] = deque()
         self._stop_requested: bool = False
         self._loop: asyncio.AbstractEventLoop | None = None
+        # Only publications confirmed by the store may be acknowledged as
+        # workflow output. Streaming listeners can read ahead of persistence.
+        self._persisted_publications: set[tuple[str, int]] = set()
 
     # ------------------------------------------------------------------ #
     # Control

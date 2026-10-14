@@ -10,6 +10,7 @@ from pydantic_core import to_jsonable_python
 from grafi.common.events.event import EVENT_CONTEXT
 from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.models.event_id import EventId
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
 from grafi.topics.topic_types import TopicType
@@ -17,7 +18,7 @@ from grafi.topics.topic_types import TopicType
 
 class PublishToTopicEvent(TopicEvent):
     # The immediate source emission; event_id identifies this destination's publication.
-    emission_id: Optional[str] = None
+    emission_id: Optional[EventId] = None
     consumed_event_ids: List[str] = []
     publisher_name: str = ""
     publisher_type: str = ""

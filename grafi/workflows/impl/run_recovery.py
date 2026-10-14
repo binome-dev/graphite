@@ -85,6 +85,9 @@ async def _seed_fresh(
                 seeded_delivery_count, source="init_workflow"
             )
         await run.event_store.record_events(events_to_record)
+        run._persisted_publications.update(
+            (event.name, event.offset) for event in events_to_record
+        )
 
 
 async def _restore(
@@ -126,6 +129,9 @@ async def _restore(
         await run.topics[publication.name].restore_topic(publication)
     for consumption in consumptions:
         await run.topics[consumption.name].restore_topic(consumption)
+    run._persisted_publications.update(
+        (event.name, event.offset) for event in publications
+    )
     if is_sequential:
         for node in run.nodes.values():
             if await run._node_can_invoke(node):
@@ -202,3 +208,4 @@ async def _reissue_paired_inputs(
             if is_sequential:
                 await run._add_to_invoke_queue(paired_event)
             await run.event_store.record_event(paired_event)
+            run._persisted_publications.add((paired_event.name, paired_event.offset))

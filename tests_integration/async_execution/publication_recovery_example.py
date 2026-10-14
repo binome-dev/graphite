@@ -3,10 +3,14 @@
 import asyncio
 from uuid import uuid4
 
+from pydantic import Field
+
+from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -31,6 +35,20 @@ class StreamTool(EchoTool):
         self.calls.append(["seed"])
         for text in ("one", "two", "three"):
             yield [Message(role="assistant", content=text, is_streaming=True)]
+
+
+class InterruptedStreamTool(EchoTool):
+    partial_received: asyncio.Event = Field(default_factory=asyncio.Event, exclude=True)
+
+    async def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
+        self.calls.append(["seed"])
+        for text in ("one", "two", "three"):
+            yield [Message(role="assistant", content=text, is_streaming=True)]
+            if len(self.calls) == 1 and text == "two":
+                await self.partial_received.wait()
+                raise RuntimeError("stream interrupted")
 
 
 async def check_recovery(sequential: bool) -> None:
@@ -108,6 +126,45 @@ async def check_recovery(sequential: bool) -> None:
 async def main() -> None:
     await check_recovery(sequential=False)
     await check_recovery(sequential=True)
+    await check_interrupted_stream_retry()
+
+
+async def check_interrupted_stream_retry() -> None:
+    tool = InterruptedStreamTool()
+    node = Node(
+        name="source",
+        tool=tool,
+        subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
+        publisher_router=PublisherRouter(
+            routes=[PublishRoute(topic=OutputTopic(name="out"))]
+        ),
+    )
+    workflow = EventDrivenWorkflow.builder().node(node).build()
+    runtime, event = GrafiRuntime(), input_event()
+    partial = []
+    async with asyncio.timeout(5):
+        try:
+            async for output in runtime.invoke(Assistant(workflow=workflow), event):
+                text = output.data[0].content
+                partial.append(text)
+                if text == "two":
+                    tool.partial_received.set()
+        except NodeExecutionError as error:
+            assert "stream interrupted" in str(error)
+        else:
+            raise AssertionError("Interrupted stream ended as a success")
+    assert partial == ["one", "two"]
+    history = await runtime.services.event_store.get_agent_events(
+        event.invoke_context.assistant_request_id
+    )
+    assert not any(
+        isinstance(record, ConsumeFromTopicEvent) and record.name == "out"
+        for record in history
+    )
+    async with asyncio.timeout(5):
+        assert await drain(runtime, workflow, event) == ["one", "two", "three"]
+    assert len(tool.calls) == 2
+    print("Mid-stream failure retries the full stream with the same request ID: OK")
 
 
 if __name__ == "__main__":
