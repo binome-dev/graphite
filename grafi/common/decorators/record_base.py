@@ -236,13 +236,15 @@ def _current(span: Span) -> AbstractContextManager[Span]:
 
 
 def _set_payload(span: Span, key: str, value: Any) -> None:
-    """Set ``value`` on a recording span as JSON, cut to
-    ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit). Set
-    ``GRAFI_SPAN_DISABLE_PAYLOADS`` where prompts, tool arguments or message
-    contents must never reach the tracing backend."""
+    """Set ``value`` on a recording span as JSON (its repr if JSON cannot hold
+    it), cut to ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit),
+    unless ``GRAFI_SPAN_DISABLE_PAYLOADS`` keeps payloads off spans."""
     if not span.is_recording() or env_bool("GRAFI_SPAN_DISABLE_PAYLOADS"):
         return
-    text = to_json(value, fallback=repr).decode()
+    try:
+        text = to_json(value, fallback=repr).decode()
+    except ValueError:  # Circular data, a lone surrogate, bytes not UTF-8...
+        text = repr(value)
     try:
         limit = max(0, int(os.environ["GRAFI_SPAN_MAX_PAYLOAD_CHARS"]))
     except (KeyError, ValueError):

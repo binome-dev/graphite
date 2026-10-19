@@ -94,6 +94,8 @@ class Opaque:
         ),
         (Color, {"type": "string", "enum": ["red", "blue"]}),
         (Opaque, {"type": "object"}),
+        (bytes, {"type": "string"}),
+        (type("Name", (str,), {}), {"type": "string"}),
         (Iterator[int], {}),
         (Callable[[int], str], {}),
         (TypeVar("T"), {}),

@@ -1,5 +1,7 @@
 """Tests for the payloads record_base sets on spans."""
 
+import json
+
 import pytest
 
 from grafi.common.decorators.record_base import _set_payload
@@ -30,13 +32,12 @@ def _payload(value, recording: bool = True):
 
 
 def test_a_payload_is_set_as_json():
-    assert _payload({"a": 1}) == '{"a":1}'
+    assert json.loads(_payload({"a": 1})) == {"a": 1}
 
 
 def test_a_large_payload_is_truncated(monkeypatch):
     monkeypatch.setenv("GRAFI_SPAN_MAX_PAYLOAD_CHARS", "50")
-    payload = _payload({"data": "x" * 1000})
-    assert payload == '{"data":"' + "x" * 41 + "...[truncated 961 chars]"
+    assert _payload("x" * 1000) == '"' + "x" * 49 + "...[truncated 952 chars]"
 
 
 def test_an_invalid_limit_falls_back_to_the_default(monkeypatch):
@@ -64,3 +65,14 @@ def test_a_value_json_cannot_hold_is_set_as_its_repr():
             return "WEIRD"
 
     assert _payload(Weird()) == '"WEIRD"'
+
+
+def _circular() -> list:
+    circular: list = []
+    circular.append(circular)
+    return circular
+
+
+@pytest.mark.parametrize("value", ["\ud800", b"\xff", _circular()])
+def test_a_value_json_cannot_encode_is_set_as_its_repr(value):
+    assert _payload(value) == repr(value)

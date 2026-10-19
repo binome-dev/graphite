@@ -45,7 +45,7 @@ Type hints map to JSON Schema as follows:
 | Python type | JSON Schema |
 |-------------|-------------|
 | `str`, `int`, `float`, `bool`, `None` | `string`, `integer`, `number`, `boolean`, `null` |
-| `list[T]`, `tuple[T, ...]`, `set[T]`, `Iterable[T]`, any other collection | `array` of `T` |
+| `list[T]`, `tuple[T, ...]`, `set[T]`, `Iterable[T]`, any other collection | `array` of `T` (but `bytes` is a `string`) |
 | `dict[str, T]`, `Mapping[str, T]`, any other mapping | `object` whose values are `T` |
 | `Optional[T]`, `Union[...]`, `T \| None` | `anyOf` |
 | `Literal[...]`, an `Enum` | the values as `enum` |
@@ -112,5 +112,5 @@ code between reads is never traced as part of it.
 | Variable | Effect |
 |----------|--------|
 | `GRAFI_SPAN_DISABLE_PAYLOADS` | When true, `input`, `output` and `error.details` are left off spans. |
-| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | The most characters of a payload a span keeps (default 10,000; `0` means no limit). |
+| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | A payload longer than this many characters is cut short (default 10,000; `0` means no limit). |
 | `GRAFI_ERROR_INCLUDE_TRACEBACK` | When false, failed events carry no traceback. |

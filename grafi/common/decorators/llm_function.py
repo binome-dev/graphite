@@ -117,6 +117,8 @@ def _type_to_schema(annotation: Any) -> JsonSchema:
         return _dataclass_schema(container)
     if issubclass(container, enum.Enum):
         return _enum_schema([member.value for member in container])
+    if issubclass(container, (str, bytes, bytearray)):
+        return {"type": "string"}
     if issubclass(container, Mapping):
         if len(args) == 2:
             return {"type": "object", "additionalProperties": _type_to_schema(args[1])}

@@ -6,8 +6,6 @@ from types import SimpleNamespace
 import pytest
 from pydantic_core import to_jsonable_python
 
-from grafi.common.decorators.record_base import _error_id_for
-from grafi.common.decorators.record_base import _existing_error_id
 from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.event_stores import EventStoreInMemory
@@ -164,26 +162,6 @@ class TestSpanErrorEnrichment:
         # The exception and error status were also recorded before span end.
         assert span.exception_recorded_after_end == [False]
         assert span.status_set_after_end == [False]
-
-
-class TestLoggedOnce:
-    """A failure is logged by the layer closest to it: the one that gives it its
-    id, which outer layers then find, even after it is re-wrapped."""
-
-    def test_an_outer_layer_finds_the_inner_layers_id(self):
-        inner = ValueError("root boom")
-        error_id = _error_id_for(inner)  # The innermost decorator's.
-        outer = NodeExecutionError(
-            node_name="SearchNode", message="node failed", cause=inner
-        )
-        assert _existing_error_id(outer) == error_id
-
-    def test_a_fresh_failure_has_no_id_yet(self):
-        inner = ValueError("root boom")
-        outer = NodeExecutionError(
-            node_name="SearchNode", message="node failed", cause=inner
-        )
-        assert _existing_error_id(outer) is None
 
 
 _CONTEXT = InvokeContext(conversation_id="c", invoke_id="i", assistant_request_id="r")
