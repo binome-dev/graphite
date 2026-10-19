@@ -66,10 +66,10 @@ The `-d` flag runs the container in detached mode, allowing it to run in the bac
 
 Now let's integrate the PostgreSQL event store with your Graphite workflow. You need to have followed the [quickstart](../getting-started/quickstart.md)  to create a `uv` project with grafite installed.
 
-You will have to add `sqlalchemy` and `psycopg2` dependencies to it since we will be using postgres as the event store.
+Install Graphite's `postgres` extra, which brings SQLAlchemy and the asyncpg driver:
 
 <div class="bash"><pre>
-<code><span style="color:#FF4689">uv</span> add sqlalchemy psycopg2</code></pre></div>
+<code><span style="color:#FF4689">uv</span> add 'grafi[postgres]'</code></pre></div>
 
 
 ### Context and Message Setup
@@ -110,20 +110,23 @@ Nothing fancy here, just initialization of context and setting up of variables.
 
 ### Event Store Initialization
 
-We create a PostgreSQL event store instance with the connection URL matching your Docker container configuration, then place it in an `ExecutionServices` bundle and build a `GrafiRuntime` from it. Invocations run through that runtime; we keep a reference to the store for reading events later.
+We create a PostgreSQL event store with the connection URL matching your Docker container, and make it the process default at startup: every invocation then records its events there. Creating the store does not connect; its first use creates the `events` table, if need be.
 
 ```python
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
-from grafi.runtime import GrafiRuntime, ExecutionServices
+from grafi.runtime import ExecutionServices, set_default_services
 
-postgres_event_store = EventStorePostgres(
+event_store = EventStorePostgres(
     # must match what is in docker-compose.yaml
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
 
-runtime = GrafiRuntime(ExecutionServices(event_store=postgres_event_store))
-event_store = runtime.services.event_store
+set_default_services(ExecutionServices(event_store=event_store))
 ```
+
+The store's pooled connections belong to the event loop that opened them, so
+run your application in one event loop (one `asyncio.run(...)`). For TLS, add
+`?ssl=require` to the URL (asyncpg's name for libpq's `sslmode`).
 
 ## Running the agent and Retrieving Events
 
@@ -137,8 +140,7 @@ async def run_agent():
 
     react_agent = create_react_agent()
 
-    # Run through the runtime so the agent uses the Postgres store.
-    result = await react_agent.run(user_input, invoke_context, runtime=runtime)
+    result = await react_agent.run(user_input, invoke_context)
 
     print("Output from React Agent:", result)
 
@@ -167,6 +169,7 @@ Here's the complete `event_store.py` file that demonstrates the full integration
 ```python
 # event_store.py
 
+import asyncio
 import os
 import uuid
 
@@ -174,16 +177,12 @@ from grafi.agents.react_agent import create_react_agent
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime, ExecutionServices
+from grafi.runtime import ExecutionServices, set_default_services
 
-postgres_event_store = EventStorePostgres(
+event_store = EventStorePostgres(
     db_url="postgresql://postgres:postgres@localhost:5432/grafi_test_db",
 )
-
-
-runtime = GrafiRuntime(ExecutionServices(event_store=postgres_event_store))
-
-event_store = runtime.services.event_store
+set_default_services(ExecutionServices(event_store=event_store))
 
 # Generate consistent IDs for the conversation
 conversation_id = uuid.uuid4().hex
@@ -212,7 +211,7 @@ async def run_agent():
 
     react_agent = create_react_agent()
 
-    result = await react_agent.run(user_input, invoke_context, runtime=runtime)
+    result = await react_agent.run(user_input, invoke_context)
 
     print("Output from React Agent:", result)
 

@@ -7,14 +7,12 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from tests_integration.simple_llm_assistant.simple_ollama_assistant import (
     SimpleOllamaAssistant,
 )
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 
 def get_invoke_context() -> InvokeContext:
@@ -84,5 +82,4 @@ async def test_simple_llm_assistant() -> None:
     assert len(await event_store.get_events()) == 24
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_simple_llm_assistant())
+asyncio.run(test_simple_llm_assistant())

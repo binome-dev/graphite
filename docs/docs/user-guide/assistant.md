@@ -138,7 +138,7 @@ assistant = (builder
     .oi_span_type(OpenInferenceSpanKindValues.AGENT)
     .build())
 
-# The event store / tracer are supplied at runtime, not on the assistant:
-#   runtime = GrafiRuntime(ExecutionServices(event_store=...))
-#   async for event in runtime.invoke(assistant, input_data): ...
+# The event store and tracer are set at startup, not on the assistant:
+#   set_default_services(ExecutionServices(event_store=...))
+#   async for event in assistant.invoke(input_data): ...
 ```

@@ -16,6 +16,7 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import ExecutionServices
 from grafi.runtime import GrafiRuntime
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -50,6 +51,7 @@ class GatedSource(EchoTool):
 
 
 async def main() -> None:
+    # Each run gets a store of its own: until_stored scans the whole store.
     for send_b in (False, True):
         join = EchoTool()
         a, b = Topic(name="a"), Topic(name="b")
@@ -84,7 +86,9 @@ async def main() -> None:
             builder.node(source)
         workflow = builder.node(worker).build()
         async with asyncio.timeout(5):
-            outputs = await drain(GrafiRuntime(), workflow, input_event())
+            outputs = await drain(
+                GrafiRuntime(ExecutionServices()), workflow, input_event()
+            )
         assert outputs == (["A1|A2|B1"] if send_b else [])
         assert join.calls == ([["A1", "A2", "B1"]] if send_b else [])
         assert_steps_ended("first_a", "second_a", "late_b", "join")
@@ -100,7 +104,7 @@ async def main() -> None:
     )
     async with asyncio.timeout(5):
         outputs = await drain(
-            GrafiRuntime(),
+            GrafiRuntime(ExecutionServices()),
             EventDrivenWorkflow(nodes={worker.name: worker}),
             input_event("A1"),
         )

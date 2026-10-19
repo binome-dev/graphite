@@ -131,25 +131,16 @@ workflow = (
 With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`.
 
 ```python linenums="54"
-# Bind a runtime scope so the workflow's components can resolve their services
-# (event store / tracer / error reporter). ExecutionServices() uses in-process
-# defaults; pass a durable store/tracer in production.
-from grafi.runtime import bind_services, ExecutionServices
-
-with bind_services(ExecutionServices()):
-    async for result in workflow.invoke(
-        invoke_context,
-        [message]
-    ):
-        for output_message in result:
-            print("Output message:", output_message.content)
+async for result in workflow.invoke(invoke_context, [message]):
+    for output_message in result:
+        print("Output message:", output_message.content)
 ```
 
 ### 6. Entry Point
 
 Finally, add the standard Python entry point to run the main function when the script is executed directly.
 
-```python linenums="62"
+```python linenums="57"
 if __name__ == "__main__":
     main()
 ```

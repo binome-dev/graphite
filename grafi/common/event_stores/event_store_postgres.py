@@ -1,5 +1,7 @@
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
+from typing import AsyncIterator
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -15,19 +17,22 @@ try:
     from sqlalchemy import DateTime
     from sqlalchemy import Integer
     from sqlalchemy import String
-    from sqlalchemy import create_engine
     from sqlalchemy import delete
     from sqlalchemy import select
+    from sqlalchemy import text
     from sqlalchemy.dialects.postgresql import JSONB
     from sqlalchemy.dialects.postgresql import insert as pg_insert
+    from sqlalchemy.engine import make_url
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.orm import DeclarativeBase
 except ImportError:
-    raise ImportError(
-        "`sqlalchemy` not installed. Please install using `pip install sqlalchemy[asyncio] asyncpg`"
-    )
+    raise ImportError("EventStorePostgres needs: pip install 'grafi[postgres]'")
+
+
+# The key of the advisory lock taken while creating the events table.
+_TABLE_LOCK = 0x67726166690001
 
 
 class Base(DeclarativeBase):
@@ -57,7 +62,8 @@ class EventModel(Base):
 
 
 class EventStorePostgres(EventStore):
-    """Postgres-backed implementation of the EventStore interface with async support."""
+    """An EventStore in Postgres, through asyncpg. It connects lazily, and creates
+    its table on first use."""
 
     def __init__(
         self,
@@ -67,38 +73,48 @@ class EventStorePostgres(EventStore):
         pool_timeout: int = 30,
     ):
         """
-        Initialize the Postgres event store.
-
         Args:
-            db_url: The SQLAlchemy database URL, e.g. 'postgresql://user:pass@host/dbname'.
+            db_url: The database URL, e.g. 'postgresql://user:pass@host/dbname'.
             pool_size: The number of connections to keep in the pool (default: 5).
             max_overflow: Maximum overflow connections beyond pool_size (default: 10).
             pool_timeout: Seconds to wait for a connection from the pool (default: 30).
         """
-        # Keep sync engine for initialization and sync methods
-        self.engine = create_engine(
-            db_url,
-            echo=False,
+        self.async_engine = create_async_engine(
+            make_url(db_url).set(drivername="postgresql+asyncpg"),
             pool_size=pool_size,
             max_overflow=max_overflow,
             pool_timeout=pool_timeout,
         )
-        Base.metadata.create_all(self.engine)
-
-        # Create async engine and session for async methods
-        # Convert postgresql:// to postgresql+asyncpg://
-        async_db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
-        if "psycopg2" in async_db_url:
-            async_db_url = async_db_url.replace("psycopg2", "asyncpg")
-        self.async_engine = create_async_engine(
-            async_db_url,
-            echo=False,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-        )
         self.AsyncSession = async_sessionmaker(
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
+        self._table_ready = False
+
+    async def initialize(self) -> None:
+        """Create the events table unless it exists. The first use does so; call
+        it at startup to fail fast if the database is unreachable."""
+        try:
+            async with self.async_engine.begin() as connection:
+                # Serializes creators, in this process or others starting alike.
+                await connection.execute(
+                    text("SELECT pg_advisory_xact_lock(:key)"), {"key": _TABLE_LOCK}
+                )
+                await connection.run_sync(Base.metadata.create_all)
+        except Exception as e:
+            raise self._persistence_error(
+                "Failed to reach the database or create the events table",
+                "initialize",
+                e,
+            ) from e
+        self._table_ready = True
+
+    @asynccontextmanager
+    async def _session(self) -> AsyncIterator[AsyncSession]:
+        """A session on the events table, created first if need be."""
+        if not self._table_ready:
+            await self.initialize()
+        async with self.AsyncSession() as session:
+            yield session
 
     @staticmethod
     def _persistence_error(
@@ -117,7 +133,7 @@ class EventStorePostgres(EventStore):
 
     async def clear_events(self) -> None:
         """Clear all events from the database."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 await session.execute(delete(EventModel))
                 await session.commit()
@@ -138,7 +154,7 @@ class EventStorePostgres(EventStore):
 
     async def get_events(self) -> List[Event]:
         """Get all events from the database."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 result = await session.execute(
                     select(EventModel).order_by(EventModel.timestamp, EventModel.id)
@@ -179,7 +195,7 @@ class EventStorePostgres(EventStore):
 
     async def record_event(self, event: Event) -> None:
         """Record a single event idempotently (no-op on duplicate event_id)."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 stmt = (
                     pg_insert(EventModel)
@@ -202,7 +218,7 @@ class EventStorePostgres(EventStore):
         """
         if not events:
             return
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 # One statement, compiled once and executed for every row in
                 # one transaction, so a batch of any size is written atomically.
@@ -221,7 +237,7 @@ class EventStorePostgres(EventStore):
 
     async def get_event(self, event_id: str) -> Optional[Event]:
         """Get an event by ID asynchronously."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 result = await session.execute(
                     select(EventModel).where(EventModel.event_id == event_id)
@@ -239,7 +255,7 @@ class EventStorePostgres(EventStore):
 
     async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given assistant_request_id asynchronously."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 result = await session.execute(
                     select(EventModel)
@@ -267,7 +283,7 @@ class EventStorePostgres(EventStore):
 
     async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID asynchronously."""
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 result = await session.execute(
                     select(EventModel)
@@ -298,7 +314,7 @@ class EventStorePostgres(EventStore):
         if not offsets:
             return []
 
-        async with self.AsyncSession() as session:
+        async with self._session() as session:
             try:
                 # Use JSONB operators for efficient filtering at the database level
                 # The topic name and offset are now in event_context
@@ -342,8 +358,3 @@ class EventStorePostgres(EventStore):
                 raise self._persistence_error(
                     "Failed to read topic events", f"get_topic_events:{name}", e
                 ) from e
-
-    async def initialize(self) -> None:
-        """Initialize the database tables asynchronously."""
-        async with self.async_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)

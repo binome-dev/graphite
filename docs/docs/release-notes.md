@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+Invocations run with process default services, as tracing uses OpenTelemetry's
+global provider:
+- Set them once at startup with `set_default_services(ExecutionServices(...))`.
+  Until then, the first invocation creates in-process ones (an in-memory event
+  store) and logs once that their events are lost on exit.
+- `assistant.invoke(...)` works without `GrafiRuntime` or `bind_services`. Those
+  still give one invocation other services, such as a tenant's store.
+- `current_services()` no longer raises outside a binding.
+- `GrafiRuntime()` without services runs with the current services, no longer
+  with new in-process ones. So `ReActAgent.run()` keeps a conversation's
+  history across turns again.
+
+`ReActAgent.run()` without an invoke context continues a conversation of the
+agent's own; before, every agent in a process shared one conversation id. A
+server passes an `InvokeContext` per user or session.
+
+`EventStorePostgres` connects lazily: constructing it does no I/O, and its
+first use creates the `events` table, under an advisory lock, so processes
+starting together do not race. It uses only the asyncpg driver; install it
+with `pip install 'grafi[postgres]'`. psycopg2 is no longer needed, and the
+sync `engine` attribute is gone (`async_engine` remains).
+
 Tracing is set up with a single call: `setup_tracing(project_name=...)`. It
 follows OpenTelemetry's standard environment (`OTEL_EXPORTER_OTLP_ENDPOINT`,
 `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`), returns the tracer

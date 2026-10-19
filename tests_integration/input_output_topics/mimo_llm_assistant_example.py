@@ -8,12 +8,10 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from tests_integration.input_output_topics.mimo_llm_assistant import MIMOLLMAssistant
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -115,5 +113,4 @@ async def test_mimo_llm_assistant() -> None:
     assert len(await event_store.get_events()) == 88
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_mimo_llm_assistant())
+asyncio.run(test_mimo_llm_assistant())

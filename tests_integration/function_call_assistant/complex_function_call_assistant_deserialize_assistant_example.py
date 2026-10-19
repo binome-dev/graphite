@@ -8,8 +8,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.tool_factory import ToolFactory
 from tests_integration.function_call_assistant.simple_function_call_assistant_complex_function_example import (  # noqa: E501
     LocalFileMock,
@@ -29,8 +28,7 @@ def get_invoke_context() -> InvokeContext:
     )
 
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 
 async def test_deserialized_assistant() -> None:
@@ -72,5 +70,4 @@ async def test_deserialized_assistant() -> None:
 
 
 if __name__ == "__main__":
-    with bind_services(runtime.services):
-        asyncio.run(test_deserialized_assistant())
+    asyncio.run(test_deserialized_assistant())

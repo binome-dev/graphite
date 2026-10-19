@@ -7,8 +7,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.function_call_assistant.multi_functions_call_assistant import (
     MultiFunctionsCallAssistant,
@@ -16,8 +15,7 @@ from tests_integration.function_call_assistant.multi_functions_call_assistant im
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 
 class WeatherMock(FunctionCallTool):
@@ -187,5 +185,4 @@ async def test_multi_functions_call_assistant() -> None:
     # assistant.generate_workflow_graph()
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_multi_functions_call_assistant())
+asyncio.run(test_multi_functions_call_assistant())

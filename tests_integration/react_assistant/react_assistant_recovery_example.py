@@ -8,13 +8,11 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 tavily_api_key = os.getenv("TAVILY_API_KEY", "")
@@ -111,5 +109,4 @@ async def test_react_assistant() -> None:
     print("Assistant output:", output)
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_react_assistant())
+asyncio.run(test_react_assistant())

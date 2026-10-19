@@ -1,6 +1,7 @@
 """Tests for GrafiRuntime: request-scoped binding and propagation/isolation."""
 
 import asyncio
+import contextvars
 import gc
 from typing import Any
 from typing import AsyncIterator
@@ -8,6 +9,7 @@ from typing import AsyncIterator
 import pytest
 
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.runtime import execution_services
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import current_services
 from grafi.runtime.runtime import GrafiRuntime
@@ -32,24 +34,24 @@ class _ProbeAssistant:
         yield (direct, in_task)
 
 
-class TestDefaultRuntime:
-    def test_default_runtime_uses_in_memory_store(self):
-        runtime = GrafiRuntime()
-        assert isinstance(runtime.services.event_store, EventStoreInMemory)
+class TestRuntimeWithoutServices:
+    def test_it_runs_with_the_bound_services(self, bound_services):
+        assert GrafiRuntime().services is bound_services
 
-    def test_each_default_runtime_is_independent(self):
-        assert GrafiRuntime() is not GrafiRuntime()
-        # ... with distinct stores (no shared process-global state).
-        assert (
-            GrafiRuntime().services.event_store
-            is not GrafiRuntime().services.event_store
+    def test_outside_a_binding_runtimes_share_the_process_default(self, monkeypatch):
+        # As ReActAgent.run() does each turn, so the conversation's events stay.
+        monkeypatch.setattr(execution_services, "_default_services", None)
+        first, second = contextvars.Context().run(
+            lambda: (GrafiRuntime().services, GrafiRuntime().services)
         )
+        assert first is second is contextvars.Context().run(current_services)
+        assert isinstance(first.event_store, EventStoreInMemory)
 
 
 class TestRuntimeInvokeBinding:
     @pytest.mark.asyncio
     async def test_invoke_binds_services_for_the_invocation_and_child_tasks(self):
-        runtime = GrafiRuntime()
+        runtime = GrafiRuntime(ExecutionServices())
 
         results = [item async for item in runtime.invoke(_ProbeAssistant(), None)]
 
@@ -61,8 +63,8 @@ class TestRuntimeInvokeBinding:
 
     @pytest.mark.asyncio
     async def test_concurrent_invocations_are_isolated(self):
-        rt_a = GrafiRuntime()
-        rt_b = GrafiRuntime()
+        rt_a = GrafiRuntime(ExecutionServices())
+        rt_b = GrafiRuntime(ExecutionServices())
 
         async def _drain(rt):
             return [item async for item in rt.invoke(_ProbeAssistant(), None)][0]
@@ -79,7 +81,7 @@ class TestRuntimeInvokeBinding:
     @pytest.mark.asyncio
     async def test_binding_released_after_close(self, bound_services):
         # A distinct runtime from the test's autouse-bound services.
-        rt = GrafiRuntime()
+        rt = GrafiRuntime(ExecutionServices())
         assert rt.services is not bound_services
 
         agen = rt.invoke(_ProbeAssistant(), None)
@@ -97,7 +99,7 @@ class TestRuntimeInvokeBinding:
         # Regression: the runtime bound its services in the caller's context
         # for as long as the stream was open, as a generator's body runs in
         # the context of whoever iterates it.
-        rt = GrafiRuntime()
+        rt = GrafiRuntime(ExecutionServices())
         agen = rt.invoke(_ProbeAssistant(), None)
         direct, in_task = await agen.__anext__()
         assert direct is rt.services and in_task is rt.services
@@ -121,7 +123,7 @@ class TestRuntimeInvokeBinding:
                 finally:
                     closed.append(current_services())
 
-        rt = GrafiRuntime()
+        rt = GrafiRuntime(ExecutionServices())
         agen = rt.invoke(_ClosingProbe(), None)
         await agen.__anext__()
         del agen
@@ -136,7 +138,7 @@ class TestRuntimeInvokeBinding:
     async def test_a_stream_closed_from_another_task_does_not_fail(self) -> None:
         # Regression: closing a stream from another task (as the loop does for
         # an abandoned one) reset the binding in the wrong context.
-        rt = GrafiRuntime()
+        rt = GrafiRuntime(ExecutionServices())
         agen = rt.invoke(_ProbeAssistant(), None)
         await agen.__anext__()
         await asyncio.create_task(agen.aclose())

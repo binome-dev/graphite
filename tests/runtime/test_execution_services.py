@@ -7,10 +7,12 @@ import pytest
 from opentelemetry.trace import NoOpTracer
 
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.runtime import execution_services
 from grafi.runtime.execution_services import ErrorReporter
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
+from grafi.runtime.execution_services import set_default_services
 
 
 def _services() -> ExecutionServices:
@@ -43,16 +45,32 @@ class TestExecutionServicesShape:
         assert text == "ExecutionServices()"
 
 
+class TestProcessDefault:
+    @pytest.fixture(autouse=True)
+    def _no_default_yet(self, monkeypatch):
+        monkeypatch.setattr(execution_services, "_default_services", None)
+
+    @staticmethod
+    def _unbound() -> ExecutionServices:
+        """current_services() outside any binding."""
+        return contextvars.Context().run(current_services)
+
+    def test_outside_a_binding_it_is_created_once_in_memory(self):
+        services = self._unbound()
+        assert services is self._unbound()
+        assert isinstance(services.event_store, EventStoreInMemory)
+
+    def test_set_default_services_sets_it(self):
+        services = ExecutionServices()
+        set_default_services(services)
+        assert self._unbound() is services
+
+    def test_a_binding_overrides_it(self, bound_services):
+        assert current_services() is bound_services
+        assert bound_services is not self._unbound()
+
+
 class TestBinding:
-    def test_current_services_raises_outside_scope(self):
-        # A fresh context has the ContextVar at its default (None).
-        ctx = contextvars.Context()
-
-        def _call() -> None:
-            with pytest.raises(RuntimeError):
-                current_services()
-
-        ctx.run(_call)
 
     def test_bind_makes_services_current(self):
         services = _services()

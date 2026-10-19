@@ -350,13 +350,9 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 from assistant import StockAssistant
-
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
 
 async def create_assistant():
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -398,7 +394,7 @@ async def main():
         invoke_context=execution_context, data=input_messages
     )
 
-    async for response in runtime.invoke(assistant, publish_event):
+    async for response in assistant.invoke(publish_event):
         print("Assistant output:")
         for output in response:
             print(output.content)

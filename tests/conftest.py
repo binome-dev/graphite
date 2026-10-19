@@ -2,24 +2,27 @@ import pytest
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.runtime import execution_services
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 
 
 @pytest.fixture(autouse=True)
 def bound_services() -> ExecutionServices:
-    """Bind a fresh default ExecutionServices for every test.
+    """Bind fresh in-process services for every test, so tests never share a
+    store through the process default.
 
-    Replaces the old process-global container default: ``current_services()`` is
-    available throughout each test (and in the asyncio tasks it spawns, because
-    this sync fixture binds the ContextVar before the event loop runs the test
-    coroutine). ``ExecutionServices()`` supplies the in-process defaults; tests
-    that need a specific store or tracer bind their own scope with
-    ``grafi.runtime.bind_services(ExecutionServices(...))``, which shadows this.
+    The binding holds throughout the test, and in the asyncio tasks it starts:
+    this sync fixture binds before the event loop runs the test coroutine. A
+    test needing other services binds them with ``bind_services``. A test that
+    escaped the binding, and so created the process default, fails.
     """
     services = ExecutionServices()
     with bind_services(services):
         yield services
+    escaped = execution_services._default_services
+    execution_services._default_services = None  # Spare the tests after it.
+    assert escaped is None, "the test ran outside its bound services"
 
 
 @pytest.fixture

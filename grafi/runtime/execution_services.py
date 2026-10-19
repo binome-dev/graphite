@@ -1,10 +1,11 @@
-"""Runtime-only dependency container and its request-scoped binding.
+"""The services an invocation runs with, and how it finds them.
 
 ``ExecutionServices`` holds the three live runtime dependencies an invocation
-needs -- the event store, the tracer, and the error reporter. It is owned by
-:class:`~grafi.runtime.runtime.GrafiRuntime`, bound to a request-scoped
-``ContextVar`` for the duration of each ``invoke``, and read through
-:func:`current_services`.
+needs -- the event store, the tracer, and the error reporter. Components read
+them through :func:`current_services`: those bound for the invocation, by
+:func:`bind_services` or :class:`~grafi.runtime.runtime.GrafiRuntime`, else the
+process default, which :func:`set_default_services` sets once at startup, as
+``setup_tracing`` sets the tracer provider.
 
 It is deliberately NOT a Pydantic model and exposes no serialization: it must
 never be persisted into an event, a manifest, or an ``InvokeContext``. Request
@@ -15,6 +16,7 @@ strictly separate.
 from __future__ import annotations
 
 import contextlib
+import threading
 from contextvars import ContextVar
 from contextvars import Token
 from dataclasses import dataclass
@@ -82,30 +84,45 @@ class ExecutionServices:
     error_reporter: ErrorReporter = field(default_factory=ErrorReporter, repr=False)
 
 
-# Request-scoped binding. Holds the services for the currently executing
-# invocation. ``None`` outside any ``GrafiRuntime.invoke`` / ``bind_services``
-# scope -- there is intentionally no process-global default.
+# The services bound for the current invocation, if any.
 _current_services: ContextVar[Optional[ExecutionServices]] = ContextVar(
     "grafi_current_services", default=None
 )
+_default_services: Optional[ExecutionServices] = None
+_default_lock = threading.Lock()
 
 
 def current_services() -> ExecutionServices:
-    """Return the ``ExecutionServices`` bound for the current invocation.
+    """The services bound for the current invocation, else the process default:
+    those given to :func:`set_default_services`, or, from first use, in-process
+    ones with an in-memory event store."""
+    return _current_services.get() or _default_services or _create_default()
 
-    Raises ``RuntimeError`` when called outside a bound scope, rather than
-    silently constructing a process-global default. Drive invocations through
-    :meth:`GrafiRuntime.invoke` (or wrap direct component calls in
-    :func:`bind_services`).
-    """
-    services = _current_services.get()
-    if services is None:
-        raise RuntimeError(
-            "No ExecutionServices bound for the current invocation. Invoke through "
-            "GrafiRuntime.invoke(...), or wrap direct component calls in "
-            "grafi.runtime.bind_services(...)."
-        )
-    return services
+
+def set_default_services(services: ExecutionServices) -> None:
+    """Make ``services`` the process default: what every invocation not bound to
+    others runs with. Call it once at startup, before the first invocation."""
+    global _default_services
+    with _default_lock:
+        if _default_services is not None:
+            logger.warning(
+                "set_default_services replaced earlier default services: set "
+                "them once, at startup"
+            )
+        _default_services = services
+
+
+def _create_default() -> ExecutionServices:
+    global _default_services
+    with _default_lock:
+        if _default_services is None:
+            logger.warning(
+                "grafi keeps events in memory, where they are lost on exit: call "
+                "grafi.runtime.set_default_services(...) at startup with a "
+                "durable event store."
+            )
+            _default_services = ExecutionServices()
+        return _default_services
 
 
 @contextlib.contextmanager

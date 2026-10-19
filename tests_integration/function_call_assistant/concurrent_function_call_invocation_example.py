@@ -20,8 +20,7 @@ from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
@@ -29,8 +28,7 @@ from tests_integration.function_call_assistant.simple_function_call_assistant im
 
 load_dotenv()
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 # Distinct, non-overlapping postcodes so each answer is traceable to its request.
@@ -100,5 +98,4 @@ async def test_concurrent_function_call_invokes_are_isolated() -> None:
     print("Concurrent function-call invocation isolation: OK")
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_concurrent_function_call_invokes_are_isolated())
+asyncio.run(test_concurrent_function_call_invokes_are_isolated())

@@ -7,8 +7,6 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime.execution_services import ExecutionServices
-from grafi.runtime.execution_services import bind_services
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from grafi.tools.tool_factory import ToolFactory
 
@@ -57,5 +55,4 @@ async def test_deserialized_assistant() -> None:
 
 
 if __name__ == "__main__":
-    with bind_services(ExecutionServices()):
-        asyncio.run(test_deserialized_assistant())
+    asyncio.run(test_deserialized_assistant())

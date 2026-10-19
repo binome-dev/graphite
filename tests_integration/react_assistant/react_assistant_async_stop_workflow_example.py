@@ -5,13 +5,11 @@ import uuid
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
 from tests_integration.react_assistant.react_assistant import ReActAssistant
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 tavily_api_key = os.getenv("TAVILY_API_KEY", "")
 
 api_key = os.getenv("OPENAI_API_KEY", "")
@@ -101,5 +99,4 @@ async def run_concurrent_test() -> None:
     await asyncio.gather(test_react_assistant_async(), stop_workflow())
 
 
-with bind_services(runtime.services):
-    asyncio.run(run_concurrent_test())
+asyncio.run(run_concurrent_test())

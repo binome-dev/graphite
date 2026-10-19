@@ -286,8 +286,8 @@ def build(self) -> MyComponent:
 When working with Graphite's existing components, use their provided builders:
 
 ```python
-# Assistant construction (the event store is supplied at runtime via
-# GrafiRuntime/ExecutionServices, not on the assistant builder).
+# Assistant construction (the event store is set at startup with
+# set_default_services, not on the assistant builder).
 assistant = (MyAssistant.builder()
     .name("Customer Support")
     .type("support")

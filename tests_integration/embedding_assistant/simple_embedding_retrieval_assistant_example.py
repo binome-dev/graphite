@@ -15,8 +15,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from tests_integration.embedding_assistant.simple_embedding_retrieval_assistant import (
     SimpleEmbeddingRetrievalAssistant,
 )
@@ -29,8 +28,7 @@ PERSIST_DIR = CURRENT_DIR / "storage"
 Scalar = Union[str, int, float, bool]
 Meta = Mapping[str, Scalar]
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 # Delete the PERSIST_DIR and all files in it
 if os.path.exists(PERSIST_DIR):
@@ -129,5 +127,4 @@ async def test_simple_embedding_retrieval_tool() -> None:
     assert len(await event_store.get_events()) == 12
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_simple_embedding_retrieval_tool())
+asyncio.run(test_simple_embedding_retrieval_tool())

@@ -18,16 +18,14 @@ from dotenv import load_dotenv
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from tests_integration.simple_llm_assistant.simple_llm_assistant import (
     SimpleLLMAssistant,
 )
 
 load_dotenv()
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 api_key = os.getenv("OPENAI_API_KEY", "")
 
 WORDS = ["ALPHA", "BETA", "GAMMA"]
@@ -84,5 +82,4 @@ async def test_concurrent_sequential_invokes_are_isolated() -> None:
     print("Concurrent sequential invocation isolation: OK")
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_concurrent_sequential_invokes_are_isolated())
+asyncio.run(test_concurrent_sequential_invokes_are_isolated())
