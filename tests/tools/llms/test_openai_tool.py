@@ -1,9 +1,11 @@
+from typing import Any
 from typing import List
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
 from openai.types.chat import ChatCompletion
+from openai.types.chat import ChatCompletionChunk
 from openai.types.chat import ChatCompletionMessage
 
 from grafi.common.event_stores import EventStoreInMemory
@@ -351,3 +353,115 @@ def test_prepare_api_input(openai_instance):
             "type": "function",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_client_close_failure_does_not_fail_completed_call(
+    monkeypatch: pytest.MonkeyPatch,
+    openai_instance: OpenAITool,
+    invoke_context: InvokeContext,
+) -> None:
+    mock_response = Mock(spec=ChatCompletion)
+    mock_response.choices = [
+        Mock(message=ChatCompletionMessage(role="assistant", content="done"))
+    ]
+
+    async def mock_create(*args: Any, **kwargs: Any) -> Mock:
+        return mock_response
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = mock_create
+
+    async def mock_aenter(self: Any) -> MagicMock:
+        return mock_client
+
+    async def mock_aexit(self: Any, *args: Any) -> None:
+        raise OSError("connection pool shutdown failed")
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+    monkeypatch.setattr(
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient",
+        MagicMock(return_value=mock_context_manager),
+    )
+
+    result = [
+        message
+        async for batch in openai_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert [message.content for message in result] == ["done"]
+
+
+class FakeStream:
+    """An OpenAI response stream whose close fails."""
+
+    def __init__(self, texts: List[str]) -> None:
+        self.texts = texts
+        self.exited = False
+
+    async def __aenter__(self) -> "FakeStream":
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        self.exited = True
+        raise OSError("stream close failed")
+
+    async def __aiter__(self) -> Any:
+        for index, text in enumerate(self.texts):
+            yield ChatCompletionChunk.model_validate(
+                {
+                    "id": "c",
+                    "object": "chat.completion.chunk",
+                    "created": 0,
+                    "model": "m",
+                    "choices": [
+                        {
+                            "index": index,
+                            "delta": {"role": "assistant", "content": text},
+                            "finish_reason": None,
+                        }
+                    ],
+                }
+            )
+
+
+@pytest.mark.asyncio
+async def test_stream_is_closed_and_its_close_failure_does_not_fail_the_call(
+    monkeypatch: pytest.MonkeyPatch,
+    invoke_context: InvokeContext,
+) -> None:
+    stream = FakeStream(["a", "b"])
+
+    async def mock_create(*args: Any, **kwargs: Any) -> FakeStream:
+        return stream
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = mock_create
+
+    async def mock_aenter(self: Any) -> MagicMock:
+        return mock_client
+
+    async def mock_aexit(self: Any, *args: Any) -> None:
+        return None
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+    monkeypatch.setattr(
+        "grafi.tools.llms.impl.openai_compatible.AsyncClient",
+        MagicMock(return_value=mock_context_manager),
+    )
+    tool = OpenAITool(api_key="test_api_key", is_streaming=True)
+    result = [
+        message.content
+        async for batch in tool.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert result == ["a", "b"]
+    assert stream.exited

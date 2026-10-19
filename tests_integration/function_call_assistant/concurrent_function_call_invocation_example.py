@@ -4,8 +4,8 @@ The hardest concurrency case: a single ``SimpleFunctionCallAssistant`` (a 3-node
 workflow -- input LLM -> function call -> output LLM) is invoked several times at
 once, each asking about a distinct postcode. Each response must reference its own
 postcode and none of the others, proving the per-invocation isolation holds
-across a multi-node, function-calling workflow (each run owns its own topic
-queues, tracker, and stop flag).
+across a multi-node, function-calling workflow (each run keeps its own topics'
+events, steps and stop flag).
 
 Requires ``OPENAI_API_KEY`` (loaded from ``.env`` at the repo root).
 """

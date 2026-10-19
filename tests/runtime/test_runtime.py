@@ -1,10 +1,14 @@
 """Tests for GrafiRuntime: request-scoped binding and propagation/isolation."""
 
 import asyncio
+import gc
+from typing import Any
+from typing import AsyncIterator
 
 import pytest
 
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import current_services
 from grafi.runtime.runtime import GrafiRuntime
 
@@ -85,3 +89,96 @@ class TestRuntimeInvokeBinding:
         # ...and the prior (outer) binding is restored once it is closed.
         await agen.aclose()
         assert current_services() is bound_services
+
+    @pytest.mark.asyncio
+    async def test_the_callers_binding_holds_between_reads(
+        self, bound_services: ExecutionServices
+    ) -> None:
+        # Regression: the runtime bound its services in the caller's context
+        # for as long as the stream was open, as a generator's body runs in
+        # the context of whoever iterates it.
+        rt = GrafiRuntime()
+        agen = rt.invoke(_ProbeAssistant(), None)
+        direct, in_task = await agen.__anext__()
+        assert direct is rt.services and in_task is rt.services
+        assert current_services() is bound_services
+        await agen.aclose()
+
+    @pytest.mark.asyncio
+    async def test_an_abandoned_stream_leaves_the_callers_binding(
+        self, bound_services: ExecutionServices
+    ) -> None:
+        # Regression: a stream left open was closed from another task, which
+        # could not reset the binding it had left in the caller's context.
+        closed: list[ExecutionServices] = []
+
+        class _ClosingProbe(_ProbeAssistant):
+            async def invoke(
+                self, input_data: Any, is_sequential: bool = False
+            ) -> AsyncIterator[tuple[ExecutionServices, None]]:
+                try:
+                    yield (current_services(), None)
+                finally:
+                    closed.append(current_services())
+
+        rt = GrafiRuntime()
+        agen = rt.invoke(_ClosingProbe(), None)
+        await agen.__anext__()
+        del agen
+        gc.collect()
+        async with asyncio.timeout(5):
+            while not closed:  # The loop closes the abandoned stream.
+                await asyncio.sleep(0)
+        assert closed == [rt.services]  # Closed with the runtime's services.
+        assert current_services() is bound_services
+
+    @pytest.mark.asyncio
+    async def test_a_stream_closed_from_another_task_does_not_fail(self) -> None:
+        # Regression: closing a stream from another task (as the loop does for
+        # an abandoned one) reset the binding in the wrong context.
+        rt = GrafiRuntime()
+        agen = rt.invoke(_ProbeAssistant(), None)
+        await agen.__anext__()
+        await asyncio.create_task(agen.aclose())
+
+
+def test_a_stream_left_open_at_loop_shutdown_records_no_false_failure() -> None:
+    # Regression: as the loop shut down it closed every open async generator
+    # at once, the closing helpers too, in the middle of their own exits; the
+    # clash ("athrow(): asynchronous generator is already running") was
+    # recorded as the assistant's failure.
+    from grafi.assistants.assistant import Assistant
+    from grafi.common.events.component_base import FailedEvent
+    from grafi.runtime.execution_services import ExecutionServices
+    from grafi.topics.expressions.topic_expression import TopicExpr
+    from grafi.topics.topic_impl.input_topic import InputTopic
+    from grafi.topics.topic_impl.output_topic import OutputTopic
+    from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+    from tests_integration.async_execution.support import EchoTool
+    from tests_integration.async_execution.support import input_event
+    from tests_integration.async_execution.support import make_node
+
+    node = make_node(
+        "echo",
+        EchoTool(),
+        TopicExpr(topic=InputTopic(name="input")),
+        OutputTopic(name="output"),
+    )
+    assistant = Assistant(
+        name="assistant", workflow=EventDrivenWorkflow.builder().node(node).build()
+    )
+    store = EventStoreInMemory()
+    runtime = GrafiRuntime(ExecutionServices(event_store=store))
+    left_open: list[Any] = []
+
+    async def main() -> None:
+        stream = runtime.invoke(assistant, input_event())
+        await anext(stream)
+        left_open.append(stream)  # Still open as asyncio.run() shuts down.
+
+    asyncio.run(main())
+    events = asyncio.run(store.get_events())
+    # The shutdown cancels the run's tasks, which the run records as its
+    # failure; no component records the helpers' clash as its own.
+    errors = [event.error for event in events if isinstance(event, FailedEvent)]
+    assert not [error for error in errors if "generator" in error]

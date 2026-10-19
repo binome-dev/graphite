@@ -8,12 +8,11 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 
 class TopicEventQueue(ABC):
     """
-    Abstract interface for topic event queue implementations.
+    Abstract interface for the event queue of a topic used on its own.
 
-    Can be implemented with different storage backends such as:
-    - In-memory (current implementation)
-    - Redis (for distributed systems with persistence)
-    - Kafka (for high-throughput streaming)
+    Workflow runs keep their topics in memory and rely on the event store as
+    their only durable state, so a workflow rejects a topic whose queue is not
+    the in-memory implementation.
     """
 
     @abstractmethod
@@ -52,10 +51,7 @@ class TopicEventQueue(ABC):
 
         Implementations must terminate promptly on cancellation, including any
         local cleanup. A cancelled fetch must leave the read cursor unchanged.
-        Workflow shutdown awaits readers; a backend that ignores
-        cancellation can block shutdown. Fetching advances the read cursor, not
-        the durable acknowledgment: after a failed run, replay uncommitted
-        publications into fresh queues rather than reusing its read cursors.
+        Fetching advances the read cursor, not the committed offset.
         """
         pass
 
@@ -73,17 +69,16 @@ class TopicEventQueue(ABC):
     @abstractmethod
     async def restore_consumer(self, consumer_id: str, committed_offset: int) -> None:
         """
-        Restore a consumer's cursors during recovery, without consuming events.
+        Restore a consumer's cursors, without consuming events.
 
         Marks the consumer as having consumed and committed every offset up to
         and including ``committed_offset``. The next event delivered to this
         consumer is ``committed_offset + 1``: nothing at or before
         ``committed_offset`` is re-delivered, and nothing after it is skipped.
 
-        Unlike :meth:`fetch`, this never blocks and never returns events. It is a
-        pure cursor restore used only by replay-based recovery, so its meaning is
-        unambiguous (``fetch`` over-advances the consumed cursor by one when
-        misused for restore).
+        Unlike :meth:`fetch`, this never blocks and never returns events: it only
+        restores cursors (``fetch`` over-advances the consumed cursor by one when
+        misused for that).
 
         Args:
             consumer_id: Unique identifier for the consumer
@@ -112,14 +107,12 @@ class TopicEventQueue(ABC):
         """
         pass
 
-    @abstractmethod
     async def unconsumed_count(self, consumer_id: str) -> int:
         """
         Exact number of events the consumer has not yet fetched.
 
-        This must be an exact count: it is summed to seed the workflow quiescence
-        tracker on recovery, so a 0/1 approximation would under-count pending work
-        and cause a resumed run to terminate early. Backends must implement it.
+        An exact count, not a 0/1 approximation. Optional for a backend: the
+        workflow engine does not use it.
 
         Args:
             consumer_id: Unique identifier for the consumer
@@ -127,4 +120,4 @@ class TopicEventQueue(ABC):
         Returns:
             Count of unconsumed events (>= 0).
         """
-        ...
+        raise NotImplementedError

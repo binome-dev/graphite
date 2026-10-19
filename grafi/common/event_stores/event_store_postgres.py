@@ -204,13 +204,14 @@ class EventStorePostgres(EventStore):
             return
         async with self.AsyncSession() as session:
             try:
-                values = [self._event_values(event) for event in events]
-                stmt = (
-                    pg_insert(EventModel)
-                    .values(values)
-                    .on_conflict_do_nothing(index_elements=["event_id"])
+                # One statement, compiled once and executed for every row in
+                # one transaction, so a batch of any size is written atomically.
+                await session.execute(
+                    pg_insert(EventModel).on_conflict_do_nothing(
+                        index_elements=["event_id"]
+                    ),
+                    [self._event_values(event) for event in events],
                 )
-                await session.execute(stmt)
                 await session.commit()
             except Exception as e:
                 await session.rollback()

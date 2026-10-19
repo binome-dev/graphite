@@ -1,4 +1,3 @@
-from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Sequence
@@ -6,12 +5,8 @@ from typing import Sequence
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
-from grafi.nodes.node_base import NodeBase
-from grafi.topics.topic_base import TopicBase
-from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 
 
 def get_async_output_events(events: Sequence[TopicEvent]) -> List[TopicEvent]:
@@ -86,72 +81,16 @@ def get_async_output_events(events: Sequence[TopicEvent]) -> List[TopicEvent]:
     return output_events
 
 
-async def publish_events(
-    node: NodeBase,
-    publish_event: PublishToTopicEvent,
-    tracker: AsyncNodeTracker,
-    consumers_of: Callable[[str], Sequence[str]],
-    topics: Dict[str, TopicBase],
-) -> List[PublishToTopicEvent]:
-    """
-    Publish events to all topics the node publishes to.
-
-    ``topics`` maps topic name to the *current run's* topic instance (with its
-    per-run queue); a node's ``publish_to`` only identifies which topics, by name,
-    it targets. Routing through the run's topics keeps concurrent invocations
-    isolated.
-
-    The tracker counts outstanding *deliveries* -- one per consumer of each
-    published event -- not publications. ``consumers_of(topic_name)`` returns the
-    consumers the workflow topology will route a topic's events to (subscribing
-    nodes, plus the workflow itself for output topics). Each delivery is
-    registered *before* the event is enqueued, so a consumer can never commit a
-    delivery the tracker has not yet counted (which would strand the count and
-    prevent quiescence).
-    """
-    published_events: List[PublishToTopicEvent] = []
-
-    for topic_name in node.publisher_router.select(publish_event):
-        run_topic = topics[topic_name]
-        delivery_count = len(consumers_of(topic_name))
-        if delivery_count:
-            await tracker.on_messages_published(
-                delivery_count, source=f"node:{node.name}->{topic_name}"
-            )
-        # A topic is a pure queue and never drops (routing already happened on
-        # the publisher router), so every selected topic yields an event.
-        event = await run_topic.publish_data(publish_event)
-        published_events.append(event)
-
-    return published_events
-
-
-async def get_node_input(
-    node: NodeBase, topics: Dict[str, TopicBase]
-) -> List[ConsumeFromTopicEvent]:
-    """
-    Get input events for a node from its subscribed topics.
-
-    ``topics`` maps topic name to the current run's topic instance; the node's
-    subscriptions only identify which topics, by name, it reads. Consumption
-    tracking happens at commit time.
-    """
-    consumed_events: List[ConsumeFromTopicEvent] = []
-
-    for topic_name in node._subscribed_topics:
-        subscribed_topic = topics[topic_name]
-        if await subscribed_topic.can_consume(node.name):
-            node_consumed_events = await subscribed_topic.consume(node.name)
-            for event in node_consumed_events:
-                consumed_event = ConsumeFromTopicEvent(
-                    invoke_context=event.invoke_context,
-                    name=event.name,
-                    type=event.type,
-                    consumer_name=node.name,
-                    consumer_type=node.type,
-                    offset=event.offset,
-                    data=event.data,
-                )
-                consumed_events.append(consumed_event)
-
-    return consumed_events
+def consumption_of(
+    event: TopicEvent, consumer_name: str, consumer_type: str
+) -> ConsumeFromTopicEvent:
+    """The record of a consumer taking ``event`` from its topic."""
+    return ConsumeFromTopicEvent(
+        name=event.name,
+        type=event.type,
+        consumer_name=consumer_name,
+        consumer_type=consumer_type,
+        invoke_context=event.invoke_context,
+        offset=event.offset,
+        data=event.data,
+    )

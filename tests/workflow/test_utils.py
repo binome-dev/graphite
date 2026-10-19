@@ -1,21 +1,12 @@
-from unittest.mock import AsyncMock
-from unittest.mock import MagicMock
-from unittest.mock import call
-
-import pytest
-
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.node import Node
-from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_types import TopicType
+from grafi.workflows.impl.utils import consumption_of
 from grafi.workflows.impl.utils import get_async_output_events
-from grafi.workflows.impl.utils import get_node_input
-from grafi.workflows.impl.utils import publish_events
 
 
 class TestGetAsyncOutputEvents:
@@ -202,137 +193,37 @@ class TestGetAsyncOutputEvents:
         assert result[0].data[0].is_streaming is False
 
 
-class TestPublishEvents:
-    @pytest.mark.asyncio
-    async def test_publish_events(self):
-        # Mock node and topics
-        mock_topic1 = AsyncMock(spec=TopicBase)
-        mock_topic2 = AsyncMock(spec=TopicBase)
-        tracker = AsyncMock()
+def _context() -> InvokeContext:
+    return InvokeContext(
+        conversation_id="test-conversation",
+        invoke_id="test-invoke",
+        assistant_request_id="test-request",
+    )
 
-        node = MagicMock(spec=Node)
-        node.name = "test_node"
-        node.type = "test_type"
-        # The publisher router owns routing: it selects the destination topic
-        # names; publish_events just delivers + tracks.
-        node.publisher_router = MagicMock()
-        node.publisher_router.select.return_value = ["topic1", "topic2"]
 
-        invoke_context = InvokeContext(
-            conversation_id="test-conversation",
-            invoke_id="test-invoke",
-            assistant_request_id="test-request",
-        )
-        result = [Message(role="assistant", content="Test result")]
-        consumed_events = []
-
-        # Mock publish_data to return events
-        mock_event1 = PublishToTopicEvent(
+class TestConsumptionOf:
+    def test_records_the_consumer_taking_the_publication(self) -> None:
+        publication = PublishToTopicEvent(
             name="topic1",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=0,
-            data=result,
-            consumed_events=consumed_events,
-        )
-        mock_event2 = PublishToTopicEvent(
-            name="topic2",
-            publisher_name=node.name,
-            publisher_type=node.type,
-            invoke_context=invoke_context,
-            offset=0,
-            data=result,
-            consumed_events=consumed_events,
+            type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            publisher_name="producer",
+            publisher_type="Node",
+            invoke_context=_context(),
+            offset=3,
+            data=[Message(role="user", content="Test")],
         )
 
-        mock_topic1.name = "topic1"
-        mock_topic2.name = "topic2"
-        mock_topic1.publish_data.return_value = mock_event1
-        mock_topic2.publish_data.return_value = mock_event2
+        consumed = consumption_of(publication, "test_node", "test_type")
 
-        # topic1 fans out to two consumers; topic2 to one.
-        consumers = {"topic1": ["A", "B"], "topic2": ["C"]}
-
-        def consumers_of(topic_name: str):
-            return consumers.get(topic_name, [])
-
-        publish_to_event = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            publisher_name=node.name,
-            publisher_type=node.type,
-            data=result,
-            consumed_event_ids=[event.event_id for event in consumed_events],
+        assert isinstance(consumed, ConsumeFromTopicEvent)
+        assert (consumed.consumer_name, consumed.consumer_type) == (
+            "test_node",
+            "test_type",
         )
-
-        # The run routes I/O through its own topic instances, keyed by name.
-        topics = {"topic1": mock_topic1, "topic2": mock_topic2}
-        published_events = await publish_events(
-            node, publish_to_event, tracker, consumers_of, topics
+        assert (consumed.name, consumed.type, consumed.offset) == (
+            "topic1",
+            TopicType.AGENT_OUTPUT_TOPIC_TYPE,
+            3,
         )
-
-        # Both selected topics enqueue (topics are pure queues; they never drop).
-        assert len(published_events) == 2
-        assert published_events == [mock_event1, mock_event2]
-
-        # Verify topics were called correctly
-        mock_topic1.publish_data.assert_called_once_with(publish_to_event)
-        mock_topic2.publish_data.assert_called_once_with(publish_to_event)
-
-        # One delivery registered per consumer, per topic, before publishing.
-        assert tracker.on_messages_published.await_args_list == [
-            call(2, source="node:test_node->topic1"),
-            call(1, source="node:test_node->topic2"),
-        ]
-        # Nothing is dropped, so no delivery is released.
-        tracker.on_messages_committed.assert_not_awaited()
-        node.publisher_router.select.assert_called_once_with(publish_to_event)
-
-
-class TestGetNodeInput:
-    @pytest.mark.asyncio
-    async def test_get_node_input_async(self):
-        # Mock node and subscribed topics
-        mock_topic1 = MagicMock(spec=TopicBase)
-        mock_topic2 = MagicMock(spec=TopicBase)
-
-        node = MagicMock(spec=Node)
-        node.name = "test_node"
-        node.type = "test_type"
-        node._subscribed_topics = {"topic1": mock_topic1, "topic2": mock_topic2}
-
-        invoke_context = InvokeContext(
-            conversation_id="test-conversation",
-            invoke_id="test-invoke",
-            assistant_request_id="test-request",
-        )
-
-        # Mock can_consume and consume methods
-        mock_topic1.can_consume.return_value = True
-        mock_topic2.can_consume.return_value = False  # This topic has no messages
-
-        mock_event = MagicMock()
-        mock_event.invoke_context = invoke_context
-        mock_event.name = "topic1"
-        mock_event.type = TopicType.AGENT_OUTPUT_TOPIC_TYPE
-        mock_event.offset = 0
-        mock_event.data = [Message(role="user", content="Test")]
-
-        mock_topic1.consume.return_value = [mock_event]
-
-        topics = {"topic1": mock_topic1, "topic2": mock_topic2}
-        consumed_events = await get_node_input(node, topics)
-
-        assert len(consumed_events) == 1
-        assert isinstance(consumed_events[0], ConsumeFromTopicEvent)
-        assert consumed_events[0].consumer_name == node.name
-        assert consumed_events[0].consumer_type == node.type
-        assert consumed_events[0].name == "topic1"
-
-        # Verify can_consume was called
-        mock_topic1.can_consume.assert_called_once_with(node.name)
-        mock_topic2.can_consume.assert_called_once_with(node.name)
-
-        # Verify consume was only called on topic1
-        mock_topic1.consume.assert_called_once_with(node.name)
-        mock_topic2.consume.assert_not_called()
+        assert consumed.invoke_context == publication.invoke_context
+        assert consumed.data == publication.data

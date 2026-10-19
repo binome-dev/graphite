@@ -1,4 +1,4 @@
-"""Canonical publication IDs and offsets survive both workflow engines."""
+"""Canonical publication IDs and offsets survive parallel and sequential runs."""
 
 import asyncio
 from typing import Any
@@ -14,6 +14,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
@@ -30,12 +31,8 @@ from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
-from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.parallel_engine import invoke_parallel
 from grafi.workflows.impl.utils import get_async_output_events
-from grafi.workflows.impl.utils import publish_events
-from grafi.workflows.impl.workflow_run import WorkflowRun
 
 
 class StreamTool(Tool):
@@ -78,6 +75,15 @@ def workflow_and_input() -> tuple[EventDrivenWorkflow, StreamTool, PublishToTopi
         data=[Message(role="user", content="seed")],
     )
     return workflow, tool, event
+
+
+async def topic_history(event_store: EventStore) -> list[TopicEvent]:
+    """The request's stored publications and consumptions."""
+    return [
+        record
+        for record in await event_store.get_agent_events("r")
+        if isinstance(record, TopicEvent)
+    ]
 
 
 @pytest.mark.asyncio
@@ -171,10 +177,18 @@ async def test_fanout_stream_history_and_same_request_recovery(
 async def test_readiness_uses_completed_recovery_snapshot(
     event_store: EventStore, sequential: bool
 ) -> None:
-    workflow, _, event = workflow_and_input()
-    run = WorkflowRun(workflow, event_store)
-    await run.init(event, sequential)
-    publications = await event_store.get_agent_events("r")
+    workflow, tool, event = workflow_and_input()
+    seeds = [
+        event.model_copy(
+            update={
+                "event_id": f"seed-{name}",
+                "name": name,
+                "type": workflow._topics[name].type,
+                "offset": 0,
+            }
+        )
+        for name in ("input_a", "input_b")
+    ]
     # Only A was consumed. An AND join with remaining B must stay parked.
     consumed = ConsumeFromTopicEvent(
         name="input_a",
@@ -185,16 +199,12 @@ async def test_readiness_uses_completed_recovery_snapshot(
         invoke_context=event.invoke_context,
         data=event.data,
     )
-    await event_store.record_event(consumed)
-    recovered = WorkflowRun(workflow, event_store)
-    await recovered.init(event, sequential)
-    if sequential:
-        assert list(recovered.invoke_queue) == []
-    else:
-        assert (await recovered.tracker.get_metrics())["uncommitted_messages"] == 1
-    assert await recovered.topics["input_a"].consume("stream", timeout=0) == []
-    assert len(await recovered.topics["input_b"].consume("stream", timeout=0)) == 1
-    assert len(publications) == 2
+    await event_store.record_events([*seeds, consumed])
+    async with asyncio.timeout(5):
+        outputs = [output async for output in workflow.invoke(event, sequential)]
+    assert outputs == [] and tool.calls == 0
+    # Resuming published no new input either.
+    assert len(await topic_history(event_store)) == 3
 
 
 @pytest.mark.asyncio
@@ -202,7 +212,7 @@ async def test_readiness_uses_completed_recovery_snapshot(
 async def test_incomplete_or_conflicting_history_is_not_renumbered(
     event_store: EventStore, offsets: list[int]
 ) -> None:
-    workflow, _, event = workflow_and_input()
+    workflow, tool, event = workflow_and_input()
     records = [
         PublishToTopicEvent(
             name="input_a",
@@ -215,11 +225,13 @@ async def test_incomplete_or_conflicting_history_is_not_renumbered(
     ]
     await event_store.record_events(records)
     snapshot = [record.model_dump() for record in records]
-    run = WorkflowRun(workflow, event_store)
     with pytest.raises(WorkflowError, match="history.*offset"):
-        await run.init(event, is_sequential=False)
+        async with asyncio.timeout(5):
+            async for _ in workflow.invoke(event):
+                pass
     assert [record.model_dump() for record in records] == snapshot
-    assert await run.topics["input_a"].consume("stream", timeout=0) == []
+    assert len(await topic_history(event_store)) == len(records)
+    assert tool.calls == 0
 
 
 @pytest.mark.asyncio
@@ -250,9 +262,7 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
     )
     workflow = EventDrivenWorkflow.builder().node(node).build()
     _, _, event = workflow_and_input()
-    run = WorkflowRun(workflow, event_store)
-    await run.init(event, is_sequential=False)
-    engine = invoke_parallel(run, event)
+    engine = workflow.invoke(event)
     try:
         async with asyncio.timeout(3):
             assert (await anext(engine)).data[0].content == "one"
@@ -262,14 +272,14 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
                 with pytest.raises(NodeExecutionError, match="stream interrupted"):
                     await anext(engine)
             elif termination == "stop":
-                run.stop()
+                workflow.stop()
                 with pytest.raises(StopAsyncIteration):
                     await anext(engine)
             elif termination == "close":
                 await engine.aclose()
             else:
-                # Cancellation injected at a streamed yield still runs the
-                # engine's acknowledgment and node-task cleanup path.
+                # Cancellation injected at a streamed yield still stops the
+                # step and runs the acknowledgement path.
                 with pytest.raises(asyncio.CancelledError):
                     await engine.athrow(asyncio.CancelledError())
     finally:
@@ -280,53 +290,47 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
         for record in history
     ), "A streamed output cannot be acknowledged before its publication is persisted"
     async with asyncio.timeout(3):
-        retried = [
-            output
-            async for output in WorkflowRun(workflow, event_store).run(event, False)
-        ]
+        retried = [output async for output in workflow.invoke(event)]
     assert [output.data[0].content for output in retried] == ["one", "two", "three"]
     assert tool.calls == 2
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fan_in", [False, True], ids=["pipeline", "fan-in"])
-async def test_internal_topic_dependency_on_failed_producer_is_reported_on_recovery(
+async def test_failed_producer_never_exposes_internal_publications(
     event_store: EventStore,
     monkeypatch: pytest.MonkeyPatch,
     fan_in: bool,
 ) -> None:
-    a_enqueued, b_stored, sink_consumed = (asyncio.Event() for _ in range(3))
+    a_emitted, b_stored = asyncio.Event(), asyncio.Event()
     original_record = event_store.record_events
 
     async def record(events: Sequence[Event]) -> None:
         await original_record(events)
-        for event in events:
-            if (
-                isinstance(event, PublishToTopicEvent)
-                and event.name == "mid"
-                and event.publisher_name == "b"
-            ):
-                b_stored.set()
-            if (
-                isinstance(event, ConsumeFromTopicEvent)
-                and event.name == "mid"
-                and event.offset == 0
-            ):
-                sink_consumed.set()
+        if any(
+            isinstance(event, PublishToTopicEvent) and event.publisher_name == "b"
+            for event in events
+        ):
+            b_stored.set()
 
     async def invoke(
         self: StreamTool, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
+        self.calls += 1
+        self.inputs.append([str(message.content) for message in input_data])
         if self.name == "a":
             yield [Message(role="assistant", content="a")]
-            a_enqueued.set()
-            if fan_in:
-                await b_stored.wait()
-            await sink_consumed.wait()
-            raise RuntimeError("producer a failed")
+            a_emitted.set()
+            if self.calls == 1:
+                if fan_in:
+                    await b_stored.wait()
+                raise RuntimeError("producer a failed")
+            return
         if self.name == "b":
-            await a_enqueued.wait()
-        yield [Message(role="assistant", content=self.name)]
+            await a_emitted.wait()
+            yield [Message(role="assistant", content="b")]
+            return
+        yield [Message(role="assistant", content="|".join(self.inputs[-1]))]
 
     monkeypatch.setattr(event_store, "record_events", record)
     monkeypatch.setattr(StreamTool, "invoke", invoke)
@@ -335,11 +339,13 @@ async def test_internal_topic_dependency_on_failed_producer_is_reported_on_recov
         Topic(name="mid"),
         OutputTopic(name="out"),
     )
+    tools: dict[str, StreamTool] = {}
 
     def node(name: str, subscription: TopicExpr, destination: TopicBase) -> Node:
+        tools[name] = StreamTool(name=name)
         return Node(
             name=name,
-            tool=StreamTool(name=name),
+            tool=tools[name],
             subscribed_expressions=[subscription],
             publisher_router=PublisherRouter(routes=[PublishRoute(topic=destination)]),
         )
@@ -353,29 +359,41 @@ async def test_internal_topic_dependency_on_failed_producer_is_reported_on_recov
         builder.node(node("b", TopicExpr(topic=input_topic), mid))
     workflow = builder.build()
     _, _, event = workflow_and_input()
+    first_run: list[str] = []
     async with asyncio.timeout(3):
         with pytest.raises(NodeExecutionError, match="producer a failed"):
-            async for _ in workflow.invoke(event):
-                pass
+            async for output in workflow.invoke(event):
+                first_run.extend(str(output.data[0].content).split("|"))
+
+    # The failed step's chunk was never visible to the downstream node, and the
+    # stored topic positions have no gap that recovery would have to reject.
+    assert ["a"] not in tools["sink"].inputs
     history = await event_store.get_agent_events("r")
-    assert [
-        event.offset
-        for event in history
-        if isinstance(event, PublishToTopicEvent) and event.name == "mid"
-    ] == ([1] if fan_in else [])
-    assert any(
-        isinstance(event, ConsumeFromTopicEvent)
-        and event.name == "mid"
-        and event.offset == 0
-        for event in history
-    )
-    error = (
-        "expected offset 0, found 1"
-        if fan_in
-        else "no publication at consumed offset 0"
-    )
-    with pytest.raises(WorkflowError, match=error):
-        await WorkflowRun(workflow, event_store).init(event, False)
+    stored_mid = [
+        (record.offset, record.data[0].content)
+        for record in history
+        if isinstance(record, PublishToTopicEvent) and record.name == "mid"
+    ]
+    assert stored_mid == ([(0, "b")] if fan_in else [])
+
+    async with asyncio.timeout(3):
+        outputs = [output async for output in workflow.invoke(event)]
+    assert tools["a"].calls == 2
+    # Each input reaches the sink's output once; B's output may be redelivered
+    # because the first run can fail before the caller acknowledges it.
+    delivered = [
+        part for output in outputs for part in str(output.data[0].content).split("|")
+    ]
+    assert delivered.count("a") == 1
+    # Nothing is lost across both runs; B's output may repeat (at least once).
+    assert set(first_run + delivered) == ({"a", "b"} if fan_in else {"a"})
+    history = await event_store.get_agent_events("r")
+    offsets = [
+        record.offset
+        for record in history
+        if isinstance(record, PublishToTopicEvent) and record.name == "mid"
+    ]
+    assert sorted(offsets) == list(range(len(offsets)))
 
 
 @pytest.mark.asyncio
@@ -399,9 +417,11 @@ async def test_node_persistence_failure_keeps_inputs_unacknowledged_for_retry(
 
     monkeypatch.setattr(event_store, "record_events", record)
     async with asyncio.timeout(3):
-        with pytest.raises(NodeExecutionError) as raised:
+        # A failure to store a step's records fails the run, not the node.
+        with pytest.raises(WorkflowError) as raised:
             async for _ in workflow.invoke(event):
                 pass
+    assert not isinstance(raised.value, NodeExecutionError)
     assert raised.value.__cause__ is failure
     history = await event_store.get_agent_events("r")
     assert not any(isinstance(record, ConsumeFromTopicEvent) for record in history)
@@ -421,23 +441,6 @@ async def test_node_persistence_failure_keeps_inputs_unacknowledged_for_retry(
 
 
 @pytest.mark.asyncio
-async def test_duplicate_routes_register_one_delivery_per_destination() -> None:
-    workflow, _, event = workflow_and_input()
-    run = WorkflowRun(workflow)
-    tracker = AsyncNodeTracker()
-    publications = await publish_events(
-        run.nodes["stream"], event, tracker, run._topic_consumers, run.topics
-    )
-    assert [publication.name for publication in publications] == [
-        "output_a",
-        "output_b",
-    ]
-    assert (await tracker.get_metrics())["uncommitted_messages"] == 2
-    assert await run.topics["output_a"].unconsumed_count(run.name) == 1
-    assert await run.topics["output_b"].unconsumed_count(run.name) == 1
-
-
-@pytest.mark.asyncio
 async def test_consumption_past_surviving_history_is_not_silently_replayed(
     event_store: EventStore,
 ) -> None:
@@ -452,14 +455,15 @@ async def test_consumption_past_surviving_history_is_not_silently_replayed(
         data=event.data,
     )
     await event_store.record_events([publication, consumption])
-    run = WorkflowRun(workflow, event_store)
     with pytest.raises(WorkflowError, match="history.*consumed offset 2"):
-        await run.init(event, is_sequential=False)
-    assert await run.topics["input_a"].consume("stream", timeout=0) == []
+        async with asyncio.timeout(5):
+            async for _ in workflow.invoke(event):
+                pass
+    assert len(await topic_history(event_store)) == 2
 
 
 @pytest.mark.asyncio
-async def test_sequential_recovery_queues_ready_nodes_in_definition_order(
+async def test_sequential_recovery_runs_ready_nodes_in_definition_order(
     event_store: EventStore,
 ) -> None:
     _, _, event = workflow_and_input()
@@ -486,6 +490,18 @@ async def test_sequential_recovery_queues_ready_nodes_in_definition_order(
             ),
         ]
     )
-    run = WorkflowRun(definition, event_store)
-    await run.init(event, is_sequential=True)
-    assert [node.name for node in run.invoke_queue] == ["first", "second"]
+    async with asyncio.timeout(5):
+        outputs = [output async for output in definition.invoke(event, True)]
+    assert len(outputs) == 6
+    publishers = [
+        record.publisher_name
+        for record in sorted(
+            (
+                record
+                for record in await event_store.get_agent_events("r")
+                if isinstance(record, PublishToTopicEvent) and record.name == "out"
+            ),
+            key=lambda record: record.offset,
+        )
+    ]
+    assert publishers == ["first"] * 3 + ["second"] * 3

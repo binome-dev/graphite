@@ -1,3 +1,4 @@
+from typing import AsyncIterator
 from typing import List
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
@@ -58,6 +59,7 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
 
     # Stub client and method - need to mock the async aio interface
     mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock()
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     # Patch genai.Client ctor inside the module
@@ -108,6 +110,7 @@ async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context
     mock_response.function_calls = [mock_function_call]
 
     mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock()
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
@@ -147,6 +150,7 @@ async def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
         raise Exception("Failure")
 
     mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock()
     mock_client.aio.models.generate_content.side_effect = _raise
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
@@ -252,6 +256,7 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
     mock_response.function_calls = None
 
     mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock()
     mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
@@ -263,3 +268,136 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
     cfg = mock_client.aio.models.generate_content.call_args[1]["config"]
     assert cfg.thinking_config is not None
     assert cfg.thinking_config.thinking_budget == 128
+
+
+@pytest.mark.asyncio
+async def test_early_close_releases_stream_and_client(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    closed: List[str] = []
+
+    async def chunks() -> AsyncIterator[Mock]:
+        try:
+            for text in ("a", "b"):
+                chunk = Mock()
+                chunk.text = text
+                yield chunk
+        finally:
+            closed.append("stream")
+
+    mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock(side_effect=lambda: closed.append("aio"))
+    mock_client.close = Mock(side_effect=lambda: closed.append("client"))
+    mock_client.aio.models.generate_content_stream = AsyncMock(return_value=chunks())
+    monkeypatch.setattr(
+        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
+    )
+    tool = GeminiTool(api_key="test_api_key", is_streaming=True)
+    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+    assert (await anext(stream))[0].content == "a"
+    await stream.aclose()
+    assert closed == ["stream", "aio", "client"]
+
+
+@pytest.mark.asyncio
+async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    async def chunks() -> AsyncIterator[Mock]:
+        try:
+            for text in ("a", "b"):
+                chunk = Mock()
+                chunk.text = text
+                yield chunk
+        finally:
+            raise OSError("stream close failed")
+
+    mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock()
+    mock_client.aio.models.generate_content_stream = AsyncMock(return_value=chunks())
+    monkeypatch.setattr(
+        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
+    )
+    tool = GeminiTool(api_key="test_api_key", is_streaming=True)
+    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+    assert (await anext(stream))[0].content == "a"
+    await stream.aclose()  # Releasing the stream failed; the call did not.
+    mock_client.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_client_close_failure_does_not_fail_completed_call(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    response = Mock()
+    response.text = "done"
+    response.function_calls = None
+    mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock(side_effect=OSError("close"))
+    mock_client.aio.models.generate_content = AsyncMock(return_value=response)
+    monkeypatch.setattr(
+        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
+    )
+    tool = GeminiTool(api_key="test_api_key")
+    result = [
+        message
+        async for batch in tool.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert [message.content for message in result] == ["done"]
+    mock_client.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_invalid_config_creates_no_client(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    client_factory = MagicMock()
+    monkeypatch.setattr(gm_module, "genai", MagicMock(Client=client_factory))
+    tool = GeminiTool(api_key="test_api_key", chat_params={"not_a_field": 1})
+    with pytest.raises(Exception):
+        async for _ in tool.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
+    client_factory.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_client_close_does_not_replace_an_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+    gemini_instance: GeminiTool,
+    invoke_context: InvokeContext,
+) -> None:
+    # Regression: the per-call client was closed in a plain finally, so a
+    # cancellation raised while closing it replaced an interrupt already
+    # propagating.
+    import asyncio
+
+    import grafi.tools.llms.impl.gemini_tool as gm_module
+
+    def interrupted(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt()
+
+    mock_client = MagicMock()
+    mock_client.aio.aclose = AsyncMock(side_effect=asyncio.CancelledError())
+    mock_client.aio.models.generate_content.side_effect = interrupted
+    monkeypatch.setattr(
+        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
+    )
+    with pytest.raises(KeyboardInterrupt) as raised:
+        async for _ in gemini_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
+    assert any("CancelledError" in note for note in raised.value.__notes__)

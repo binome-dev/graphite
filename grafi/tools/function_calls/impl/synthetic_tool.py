@@ -10,6 +10,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 from pydantic import field_validator
 
+from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
@@ -216,52 +217,55 @@ class SyntheticTool(FunctionCallTool):
                 raise ValueError("output_model must be set to call LLM")
 
             client = AsyncOpenAI(api_key=self.openai_api_key)
+            # Created per call, so closed per call.
+            async with best_effort_exit(client, "OpenAI client"):
+                # If output model is json (dict)
+                if isinstance(self.output_model, dict):
+                    # Ensure schema is compatible with strict mode
+                    strict_schema = self.ensure_strict_schema(self.output_model)
 
-            # If output model is json (dict)
-            if isinstance(self.output_model, dict):
-                # Ensure schema is compatible with strict mode
-                strict_schema = self.ensure_strict_schema(self.output_model)
+                    response_format = {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": f"{self.tool_name}_output",
+                            "schema": strict_schema,
+                            "strict": True,
+                        },
+                    }
 
-                response_format = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": f"{self.tool_name}_output",
-                        "schema": strict_schema,
-                        "strict": True,
-                    },
-                }
+                    # Use standard chat completion (not parse). The plain message
+                    # and response_format dicts are valid at runtime but do not
+                    # match the SDK's TypedDict overloads, which require
+                    # literal-keyed construction.
+                    chat = client.chat.completions
+                    completion = await chat.create(  # type: ignore[call-overload]
+                        model=self.model,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format=response_format,
+                    )
 
-                # Use standard chat completion (not parse). The plain message and
-                # response_format dicts are valid at runtime but do not match the
-                # SDK's TypedDict overloads, which require literal-keyed construction.
-                completion = await client.chat.completions.create(  # type: ignore[call-overload]
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format=response_format,
-                )
+                    content = completion.choices[0].message.content
+                    if not content:
+                        return json.dumps({"error": "Empty response"})
 
-                content = completion.choices[0].message.content
-                if not content:
-                    return json.dumps({"error": "Empty response"})
+                    return content
 
-                return content
+                # If output model is pydantic model
+                else:
+                    # Use Pydantic mode with parse
+                    completion = await client.beta.chat.completions.parse(
+                        model=self.model,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format=self.output_model,
+                    )
 
-            # If output model is pydantic model
-            else:
-                # Use Pydantic mode with parse
-                completion = await client.beta.chat.completions.parse(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format=self.output_model,
-                )
+                    parsed_response = completion.choices[0].message.parsed
 
-                parsed_response = completion.choices[0].message.parsed
+                    if not parsed_response:
+                        return json.dumps({"error": "Empty response"})
 
-                if not parsed_response:
-                    return json.dumps({"error": "Empty response"})
-
-                # Return as JSON string
-                return parsed_response.model_dump_json()
+                    # Return as JSON string
+                    return parsed_response.model_dump_json()
 
         except OpenAIError as exc:
             # Surface the failure instead of returning a JSON "error" string as a

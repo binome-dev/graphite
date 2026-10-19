@@ -6,6 +6,7 @@ from typing import Type
 
 from pydantic import BaseModel
 
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -47,8 +48,11 @@ class Command(BaseModel):
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
     ) -> MsgsAGen:
         tool_input = await self.get_tool_input(invoke_context, input_data)
-        async for messages in self.tool.invoke(invoke_context, tool_input):
-            yield messages
+        async with owned_iterator(
+            self.tool.invoke(invoke_context, tool_input)
+        ) as stream:
+            async for messages in stream:
+                yield messages
 
     async def get_tool_input(
         self,

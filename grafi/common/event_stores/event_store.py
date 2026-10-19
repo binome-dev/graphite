@@ -27,7 +27,13 @@ class EventStore(ABC):
     async def record_event(self, event: Event) -> None: ...
 
     @abstractmethod
-    async def record_events(self, events: Sequence[Event]) -> None: ...
+    async def record_events(self, events: Sequence[Event]) -> None:
+        """Record a batch atomically: all of its events, or none.
+
+        A workflow writes the consumptions and publications of the steps that
+        finish together as one batch; a step only partly written could not be
+        resumed correctly.
+        """
 
     @abstractmethod
     async def clear_events(self) -> None: ...

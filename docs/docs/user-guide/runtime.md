@@ -85,8 +85,10 @@ async for event in runtime.invoke(assistant, input_data):
     print(event)
 ```
 
-`runtime.invoke(...)` binds its services for the duration of the invocation;
-components resolve them through `current_services()`. **No `invoke()` signature
+`runtime.invoke(...)` binds its services while the assistant's stream runs
+(each read, and its close) and in the tasks it starts; components resolve them
+through `current_services()`. Your own code between reads keeps its own
+binding: to call a component there, use `bind_services(runtime.services)`. **No `invoke()` signature
 carries a `services` parameter** — tools, nodes, and commands are unchanged.
 
 Reuse one runtime across calls when you want shared conversation history (a
@@ -130,12 +132,14 @@ rather than silently constructing a default — so a forgotten runtime fails lou
 ### How propagation works
 
 `bind_services` sets a `ContextVar` for the block. Because `asyncio` tasks copy
-the current context when created, every node task, output listener, and streaming
-producer spawned during the invocation inherits the binding automatically.
+the current context when created, the run's coordinator and every step task
+spawned during the invocation inherit the binding automatically.
 Concurrent invocations run as separate tasks, so each gets its own services with
 no cross-talk — genuine per-invocation isolation. (This relies on `asyncio`
 context propagation; Graphite uses no thread offloads. Code that hands work to a
-thread — `run_in_executor`/`to_thread` — must re-bind the context explicitly.)
+thread does not get the context, except through `asyncio.to_thread()`, which
+copies it: code run with `run_in_executor()` or `threading.Thread` must re-bind
+the services explicitly.)
 
 ## Custom error reporting
 

@@ -190,27 +190,17 @@ class _RecordingSpan:
     def set_status(self, status):
         self.status_set_after_end.append(self.ended)
 
-
-class _RecordingSpanCM:
-    def __init__(self, span: _RecordingSpan) -> None:
-        self.span = span
-
-    def __enter__(self) -> _RecordingSpan:
-        return self.span
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        # Ending the span (as OTel's context manager does) must happen AFTER
-        # error enrichment, never before.
-        self.span.ended = True
-        return False  # do not suppress the exception
+    def end(self) -> None:
+        # Ending the span must happen AFTER error enrichment, never before.
+        self.ended = True
 
 
 class _RecordingTracer:
     def __init__(self) -> None:
         self.span = _RecordingSpan()
 
-    def start_as_current_span(self, _name):
-        return _RecordingSpanCM(self.span)
+    def start_span(self, _name: str) -> "_RecordingSpan":
+        return self.span
 
 
 class TestSpanErrorEnrichment:
@@ -238,7 +228,7 @@ class TestSpanErrorEnrichment:
                     pass
 
         span = tracer.span
-        # The span was ended by the context manager exit.
+        # The span was ended.
         assert span.ended is True
         # Every error attribute was set while the span was still recording.
         assert span.attr_set_after_end.get("error.type") is False

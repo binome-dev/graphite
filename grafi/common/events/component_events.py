@@ -6,6 +6,7 @@ This module replaces 20+ separate event files with a single, maintainable module
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 
 from grafi.common.events.component_base import AssistantEventBase
 from grafi.common.events.component_base import NodeEventBase
@@ -32,6 +33,20 @@ def serialize_topic_event(event: PublishToTopicEvent) -> Dict[str, Any]:
 def deserialize_topic_event(data: Dict[str, Any]) -> PublishToTopicEvent:
     """Deserialize a PublishToTopicEvent."""
     return PublishToTopicEvent.from_dict(data)
+
+
+def serialize_node_output(
+    event: Optional[PublishToTopicEvent],
+) -> Optional[Dict[str, Any]]:
+    """Serialize a node's output: None when it published nothing."""
+    return None if event is None else serialize_topic_event(event)
+
+
+def deserialize_node_output(
+    data: Optional[Dict[str, Any]],
+) -> Optional[PublishToTopicEvent]:
+    """Deserialize a node's output: None when it published nothing."""
+    return None if data is None else deserialize_topic_event(data)
 
 
 def serialize_consume_events(
@@ -66,11 +81,11 @@ NodeInvokeEvent, NodeRespondEvent, NodeFailedEvent = create_component_events(
     base_class=NodeEventBase,
     component_name="NODE",
     input_type=List[ConsumeFromTopicEvent],
-    output_type=PublishToTopicEvent,
+    output_type=Optional[PublishToTopicEvent],
     serialize_input_fn=serialize_consume_events,
-    serialize_output_fn=serialize_topic_event,
+    serialize_output_fn=serialize_node_output,
     deserialize_input_fn=deserialize_consume_events,
-    deserialize_output_fn=deserialize_topic_event,
+    deserialize_output_fn=deserialize_node_output,
 )
 
 

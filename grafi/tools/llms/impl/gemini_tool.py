@@ -5,7 +5,6 @@ Uses the **new Google Gen AI SDK** (package ``google-genai>=1.5``).
 Docs & examples:  https://ai.google.dev/gemini-api  :contentReference[oaicite:0]{index=0}
 """
 
-import asyncio
 import json
 import os
 import uuid
@@ -18,6 +17,8 @@ from typing import Self
 from google.genai import types
 from pydantic import Field
 
+from grafi.common.async_lifecycle import cleanup_on_exit
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -157,11 +158,9 @@ class GeminiTool(LLM):
     ) -> MsgsAGen:  # → async generator just like OpenAITool
         contents, tools, system_instruction = self.prepare_api_input(input_data)
 
-        client = genai.Client(api_key=self.api_key)  # same lightweight client
-
-        # Always build the config from chat_params (previously it was dropped
-        # entirely when no tools were present), then layer on tools, the system
-        # instruction, and the thinking budget when each is set.
+        # The config is chat_params, with the tools (replacing any configured
+        # there) and, unless chat_params sets them, the system instruction and
+        # the thinking budget.
         config_kwargs: Dict[str, Any] = dict(self.chat_params)
         if tools:
             config_kwargs["tools"] = tools
@@ -175,33 +174,44 @@ class GeminiTool(LLM):
 
         cfg = types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
 
-        try:
-            if self.is_streaming:
-                async for chunk in await client.aio.models.generate_content_stream(
-                    model=self.model,
-                    contents=contents,
-                    config=cfg,
-                ):
-                    yield self.to_stream_messages(chunk)
-            else:
-                response: GenerateContentResponse = (
-                    await client.aio.models.generate_content(
-                        model=self.model,
-                        contents=contents,
-                        config=cfg,
+        client = self._client()
+
+        async def close_client() -> None:
+            # The client has an async and a sync half, each closed on its own.
+            try:
+                await client.aio.aclose()
+            finally:
+                client.close()
+
+        # Created per call, so closed per call.
+        async with cleanup_on_exit(close_client, best_effort="Gemini client"):
+            try:
+                if self.is_streaming:
+                    stream = await client.aio.models.generate_content_stream(
+                        model=self.model, contents=contents, config=cfg
                     )
-                )
-                yield self.to_messages(response)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message="Gemini async call failed",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
+                    async with owned_iterator(
+                        stream, best_effort="Gemini stream"
+                    ) as chunks:
+                        async for chunk in chunks:
+                            yield self.to_stream_messages(chunk)
+                else:
+                    response: GenerateContentResponse = (
+                        await client.aio.models.generate_content(
+                            model=self.model,
+                            contents=contents,
+                            config=cfg,
+                        )
+                    )
+                    yield self.to_messages(response)
+            except Exception as exc:
+                raise LLMToolException(
+                    tool_name=self.name,
+                    model=self.model,
+                    message="Gemini async call failed",
+                    invoke_context=invoke_context,
+                    cause=exc,
+                ) from exc
 
     # --------------------------------------------------------------------- #
     # Response conversion helpers

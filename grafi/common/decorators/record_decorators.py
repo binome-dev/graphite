@@ -5,6 +5,7 @@ This replaces 8 separate files with a single, maintainable module.
 """
 
 from typing import List
+from typing import Optional
 from typing import Union
 
 from grafi.common.decorators.record_base import ComponentConfig
@@ -72,6 +73,7 @@ _assistant_config = ComponentConfig(
     ),
     process_async_result=process_async_result,
     span_name_suffix="run",
+    isolate_event_writes=True,
 )
 
 # Async assistant decorator
@@ -95,6 +97,7 @@ _workflow_config = ComponentConfig(
     ),
     process_async_result=process_async_result,
     span_name_suffix="invoke",
+    isolate_event_writes=True,
 )
 
 # Async workflow decorator
@@ -107,8 +110,12 @@ record_workflow_invoke = create_async_decorator(_workflow_config)
 
 
 def process_node_async_result(
-    args: List[Union[PublishToTopicEvent]],
-) -> List[Union[PublishToTopicEvent]]:
+    args: List[PublishToTopicEvent],
+) -> Optional[PublishToTopicEvent]:
+    """The node's last publication (its streamed chunks joined), or None when
+    it published nothing."""
+    if not args:
+        return None
     result_content = ""
     is_streaming = False
     for event in args:

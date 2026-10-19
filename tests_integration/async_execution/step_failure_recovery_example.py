@@ -1,6 +1,14 @@
-"""Transport failures expose no output and replay unacknowledged sibling input."""
+"""A failed join exposes no output and replays the inputs it took on resume.
+
+The join takes A1 and B1 together. Its step fails (or its tool raises
+CancelledError on its own, as a transport's timeout may), so neither input is
+recorded as consumed: resuming the same request runs the join again on both,
+without rerunning the source that committed them.
+"""
 
 import asyncio
+
+from pydantic import Field
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -21,11 +29,10 @@ from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from tests_integration.async_execution.support import EchoTool
-from tests_integration.async_execution.support import ReadProbe
+from tests_integration.async_execution.support import assert_steps_ended
 from tests_integration.async_execution.support import drain
 from tests_integration.async_execution.support import input_event
 from tests_integration.async_execution.support import make_node
-from tests_integration.async_execution.support import observed_queue
 from tests_integration.async_execution.support import route_a
 from tests_integration.async_execution.support import route_b
 
@@ -39,11 +46,30 @@ class PairSource(EchoTool):
         yield [Message(role="assistant", content="B1")]
 
 
+class FailingJoin(EchoTool):
+    """Fails its first call with ``failure``."""
+
+    failure: BaseException = Field(exclude=True)
+
+    async def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
+        if not self.calls:
+            self.calls.append([str(message.content) for message in input_data])
+            raise self.failure
+        async for messages in super().invoke(invoke_context, input_data):
+            yield messages
+
+
 async def main() -> None:
     for cancelled in (False, True):
-        probe, source_tool, join_tool = ReadProbe(), PairSource(), EchoTool()
-        a = Topic(name="a", event_queue=observed_queue(probe, "a"))
-        b = Topic(name="b", event_queue=observed_queue(probe, "b"))
+        failure: BaseException = (
+            asyncio.CancelledError("transport interrupted")
+            if cancelled
+            else RuntimeError("B transport failed")
+        )
+        source_tool, join_tool = PairSource(), FailingJoin(failure=failure)
+        a, b = Topic(name="a"), Topic(name="b")
         source = Node(
             name="source",
             tool=source_tool,
@@ -63,16 +89,6 @@ async def main() -> None:
         )
         workflow = EventDrivenWorkflow.builder().node(source).node(join).build()
         runtime, event = GrafiRuntime(), input_event()
-        failure = RuntimeError("B transport failed")
-
-        async def fail_b(topic: str, consumer: str) -> None:
-            if topic == "b" and consumer == "join":
-                await probe.wait_fetched("a", "join")
-                if cancelled:
-                    raise asyncio.CancelledError("transport interrupted")
-                raise failure
-
-        probe.before_fetch = fail_b
         async with asyncio.timeout(5):
             try:
                 await drain(runtime, workflow, event)
@@ -80,12 +96,13 @@ async def main() -> None:
                 if cancelled:
                     assert isinstance(error.__cause__, RuntimeError)
                     assert "unexpectedly cancelled" in str(error.__cause__)
+                    assert error.__cause__.__cause__ is failure
                 else:
                     assert error.__cause__ is failure
             else:
-                raise AssertionError("Transport failure ended as a success")
-        assert join_tool.calls == []
-        probe.assert_readers_closed()
+                raise AssertionError("The join's failure ended as a success")
+        assert join_tool.calls == [["A1", "B1"]]
+        assert_steps_ended("source", "join")
         history = await runtime.services.event_store.get_agent_events(
             event.invoke_context.assistant_request_id
         )
@@ -93,15 +110,12 @@ async def main() -> None:
             isinstance(record, ConsumeFromTopicEvent) and record.consumer_name == "join"
             for record in history
         )
-        probe.before_fetch = None
         async with asyncio.timeout(5):
             assert await drain(runtime, workflow, event) == ["A1|B1"]
         assert source_tool.calls == [["seed"]], "Recovery reran committed upstream work"
-        assert join_tool.calls == [["A1", "B1"]]
-        probe.assert_readers_closed()
-        print(
-            f"Failed read and same-request replay, transport cancellation={cancelled}: OK"
-        )
+        assert join_tool.calls == [["A1", "B1"], ["A1", "B1"]]
+        assert_steps_ended("source", "join")
+        print(f"Failed join and same-request replay, tool cancellation={cancelled}: OK")
 
 
 if __name__ == "__main__":

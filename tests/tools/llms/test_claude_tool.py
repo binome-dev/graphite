@@ -1,3 +1,4 @@
+from typing import Any
 from typing import List
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
@@ -348,3 +349,86 @@ def test_to_messages_refusal(claude_instance):
     messages = claude_instance.to_messages(resp)
     assert messages[0].refusal == "declined for policy reasons"
     assert messages[0].content == ""
+
+
+@pytest.mark.asyncio
+async def test_client_close_failure_does_not_fail_completed_call(
+    monkeypatch: pytest.MonkeyPatch,
+    claude_instance: ClaudeTool,
+    invoke_context: InvokeContext,
+) -> None:
+    import grafi.tools.llms.impl.claude_tool as cl_module
+
+    fake_block = Mock(TextBlock)
+    fake_block.text = "done"
+    fake_block.role = "assistant"
+    mock_client = MagicMock()
+    mock_client.messages.create = AsyncMock(return_value=Mock(content=[fake_block]))
+
+    async def mock_aenter(self: Any) -> MagicMock:
+        return mock_client
+
+    async def mock_aexit(self: Any, *args: Any) -> None:
+        raise OSError("connection pool shutdown failed")
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+    monkeypatch.setattr(
+        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
+    )
+
+    result = [
+        message
+        async for batch in claude_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert [message.content for message in result] == ["done"]
+
+
+@pytest.mark.asyncio
+async def test_stream_close_failure_does_not_fail_the_call(
+    monkeypatch: pytest.MonkeyPatch,
+    invoke_context: InvokeContext,
+) -> None:
+    from types import SimpleNamespace
+
+    import grafi.tools.llms.impl.claude_tool as cl_module
+
+    class FakeStream:
+        async def __aenter__(self) -> "FakeStream":
+            return self
+
+        async def __aexit__(self, *exc_info: Any) -> None:
+            raise OSError("stream close failed")
+
+        async def __aiter__(self) -> Any:
+            for text in ("a", "b"):
+                yield SimpleNamespace(type="text", text=text)
+
+    mock_client = MagicMock()
+    mock_client.messages.stream = Mock(return_value=FakeStream())
+
+    async def mock_aenter(self: Any) -> MagicMock:
+        return mock_client
+
+    async def mock_aexit(self: Any, *args: Any) -> None:
+        return None
+
+    mock_context_manager = MagicMock()
+    mock_context_manager.__aenter__ = mock_aenter
+    mock_context_manager.__aexit__ = mock_aexit
+    monkeypatch.setattr(
+        cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
+    )
+    tool = ClaudeTool(api_key="test_api_key", is_streaming=True)
+    result = [
+        message.content
+        async for batch in tool.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert result == ["a", "b"]

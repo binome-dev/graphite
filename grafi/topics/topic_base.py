@@ -23,14 +23,16 @@ from grafi.topics.topic_types import TopicType
 
 class TopicBase(BaseModel):
     """
-    Represents a topic in a message queue system: a pure FIFO queue.
+    A named channel that nodes publish to and subscribe to.
 
-    A topic only stores and delivers events; it carries no routing ``condition``
-    (all routing lives on the node's publisher router). ``publish_data`` stamps
-    the event with this topic's name/type and enqueues it.
+    A topic carries no routing ``condition`` (all routing lives on the node's
+    publisher router). In a workflow, each run keeps the topic's events itself
+    and builds every publication with ``prepare_publication()``, the hook for
+    transforming or validating one. ``publish_data`` and the queue methods are
+    for using a topic on its own, through its ``event_queue``.
 
     - name: string (the topic's name)
-    - event_queue: FIFO cache for recently accessed events
+    - event_queue: FIFO queue of the topic's events, for use on its own
     """
 
     name: str = Field(default="")
@@ -45,12 +47,30 @@ class TopicBase(BaseModel):
         """Create a distinct destination publication from a source emission.
 
         Each call allocates a new event ID, even for a repeated source event.
-        Source lineage is retained in emission_id. Replay uses restore_topic()
-        to preserve a stored publication's identity instead.
+        Source lineage is retained in emission_id. ``restore_topic()`` puts a
+        stored publication back unchanged instead.
         Always returns the enqueued event: routing already happened on the
         node's publisher router, so a topic never drops an event.
         """
-        event = publish_event.model_copy(
+        published = await self.add_event(self.prepare_publication(publish_event))
+        if not isinstance(published, PublishToTopicEvent):
+            # add_event only returns None for non-publish events, so reaching here
+            # means a subclass or queue broke the pure-queue contract.
+            raise TopicPublicationError(
+                topic_name=self.name,
+                message=f"[{self.name}] add_event() did not enqueue the publication",
+            )
+        return published
+
+    def prepare_publication(
+        self, publish_event: PublishToTopicEvent
+    ) -> PublishToTopicEvent:
+        """Build this topic's publication of a source emission without enqueueing it.
+
+        The copy gets a fresh event ID and records the source in ``emission_id``;
+        the source event is left unchanged.
+        """
+        return publish_event.model_copy(
             update={
                 "name": self.name,
                 "type": self.type,
@@ -59,20 +79,6 @@ class TopicBase(BaseModel):
             },
             deep=True,
         )
-        published = await self.add_event(event)
-        if not isinstance(published, PublishToTopicEvent):
-            # add_event only returns None for non-publish events; publish_data
-            # always enqueues a PublishToTopicEvent, so reaching here means a
-            # subclass or queue broke the pure-queue contract.
-            raise TopicPublicationError(
-                topic_name=self.name,
-                message=(
-                    f"[{self.name}] publish_data failed to enqueue the event; "
-                    "topics must always enqueue (they no longer drop by "
-                    "condition)."
-                ),
-            )
-        return published
 
     async def can_consume(self, consumer_name: str) -> bool:
         """
@@ -120,12 +126,9 @@ class TopicBase(BaseModel):
             )
 
     async def add_event(self, event: TopicEvent) -> Optional[TopicEvent]:
-        """
-        Asynchronously add an event to the topic cache and update total_published.
-        This method should be used by subclasses when publishing events.
+        """Enqueue a publication and return it with its offset set.
 
-        Returns ``None`` for non-publish events (only PublishToTopicEvents are
-        appended to the queue).
+        Returns ``None`` for non-publish events, which are not enqueued.
         """
         if isinstance(event, PublishToTopicEvent):
             return await self.event_queue.put(event)

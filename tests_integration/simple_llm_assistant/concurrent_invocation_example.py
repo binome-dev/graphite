@@ -4,7 +4,8 @@ Exercises the runtime isolation work (Defect #3 / runtime Gap 00) against a real
 LLM. A single ``SimpleLLMAssistant`` instance is invoked several times
 concurrently, each with a distinct one-word prompt. Each response must echo its
 own word and none of the others -- proving the concurrent runs do not share or
-corrupt each other's runtime state (topic queues, tracker, stop flag).
+corrupt each other's runtime state (each run keeps its own topics' events,
+steps and stop flag).
 
 API keys are read from the environment, loaded from a ``.env`` file at the repo
 root (see ``.env.example``). Requires ``OPENAI_API_KEY``.

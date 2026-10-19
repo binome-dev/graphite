@@ -1,114 +1,112 @@
-import asyncio
+from collections import deque
 from typing import Any
 from typing import AsyncGenerator
+from typing import Deque
 from typing import Generator
+from typing import NoReturn
 from typing import Optional
-from typing import cast
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 
-_SENTINEL = object()
+
+class _CapturedFailure:
+    """A failure kept to be raised again.
+
+    Each raise starts from the original traceback and context, so repeated
+    raises neither keep growing the traceback nor keep the context of an
+    earlier raise.
+    """
+
+    def __init__(self, error: BaseException) -> None:
+        self.error = error
+        self._traceback = error.__traceback__
+        self._context = error.__context__
+
+    def raise_again(self) -> NoReturn:
+        self.error.__context__ = self._context
+        raise self.error.with_traceback(self._traceback)
 
 
 class AsyncResult:
+    """An async iterator of output events that can also be awaited.
+
+    - ``async for event in result`` reads the events as the source yields them.
+    - ``await result`` returns a list of the events not yet read.
+
+    The source runs in the reader's task and nothing is read ahead, so
+    cancelling a read closes the source. Read from one task at a time, and
+    bound a read with ``asyncio.timeout()``, not ``asyncio.wait_for()`` (on
+    Python 3.11 it runs the read in another task, which a second cancellation
+    abandons even while it closes the source).
+
+    A stream that did not finish never looks complete: after a failure or a
+    cancelled read every later read raises, and ``await`` raises for a source
+    closed early by ``aclose()`` (iteration then just ends, as for a
+    generator). Events an ``await`` collected before it failed or was
+    cancelled stay readable with ``async for`` first, as the source counted
+    them as delivered.
     """
-    Wraps one of:
-      - an async generator
-      - an awaitable (coroutine / Future / Task)
-      - a plain sync value
 
-    Behaviors:
-      - `async for x in wrapper:` yields stream elements.
-      - `await wrapper`:
-          * if source is an async generator -> returns a `list` of all items
-          * if source is awaitable or plain value -> returns that single value
-
-    Notes:
-      - The wrapper internally starts a producer task on first use, buffering
-        items in a queue and mirroring them into a list so that `await` and
-        `async for` can be used in any order (but data is still consumed once).
-      - If you only ever need iteration OR a single await, you still get the
-        expected behavior without extra overhead.
-    """
-
-    def __init__(self, source: AsyncGenerator[ConsumeFromTopicEvent, None]):
+    def __init__(self, source: AsyncGenerator[ConsumeFromTopicEvent, None]) -> None:
         self._source = source
+        self._received: Deque[ConsumeFromTopicEvent] = deque()
+        self._failure: Optional[_CapturedFailure] = None
+        self._ended = False  # The source ended by itself.
+        self._closed = False  # aclose() was called.
 
-        # Holds stream items plus the end-of-stream sentinel, hence ``object``.
-        self._queue: asyncio.Queue[object] = asyncio.Queue()
-        self._items: list[ConsumeFromTopicEvent] = []
-        self._done = asyncio.Event()
-        self._started = False
-        self._exc: Optional[BaseException] = None
-        self._producer_task: Optional[asyncio.Task] = None
-
-    def _ensure_started(self) -> None:
-        if not self._started:
-            loop = asyncio.get_running_loop()
-            self._producer_task = loop.create_task(self._producer())
-            self._started = True
-
-    async def _producer(self) -> None:
-        try:
-            async for item in self._source:
-                self._items.append(item)
-                await self._queue.put(item)
-        except BaseException as e:  # propagate cancellation/errors too
-            self._exc = e
-        finally:
-            self._done.set()
-            # Signal end of stream to any active iterator.
-            await self._queue.put(_SENTINEL)
-
-    # --- async iteration support ---
     def __aiter__(self) -> "AsyncResult":
-        self._ensure_started()
         return self
 
     async def __anext__(self) -> ConsumeFromTopicEvent:
-        self._ensure_started()
-        item = await self._queue.get()
-        if item is _SENTINEL:
-            if self._exc:
-                raise self._exc
-            raise StopAsyncIteration
-        return cast(ConsumeFromTopicEvent, item)
+        if self._received:
+            return self._received.popleft()
+        return await self._read()
 
-    # --- awaitable support ---
+    async def _read(self) -> ConsumeFromTopicEvent:
+        if self._failure is None:
+            try:
+                return await anext(self._source)
+            except StopAsyncIteration:
+                if not self._closed:
+                    self._ended = True
+                raise
+            except Exception as error:
+                self._failure = _CapturedFailure(error)
+            except BaseException:
+                # The cancelled read closed the source.
+                self._failure = _CapturedFailure(_closed_early())
+                raise
+        self._failure.raise_again()  # Every read raises it the same way.
+
     def __await__(self) -> Generator[Any, None, list[ConsumeFromTopicEvent]]:
-        async def _await_impl() -> list[ConsumeFromTopicEvent]:
-            self._ensure_started()
-            await self._done.wait()
-            if self._exc:
-                raise self._exc
-            return list(self._items)
+        return self._collect().__await__()
 
-        return _await_impl().__await__()
+    async def _collect(self) -> list[ConsumeFromTopicEvent]:
+        while True:
+            try:
+                self._received.append(await self._read())
+            except StopAsyncIteration:
+                break
+        if not self._ended:
+            raise _closed_early()
+        items = list(self._received)
+        self._received.clear()
+        return items
 
-    # --- optional helpers ---
     async def to_list(self) -> list[ConsumeFromTopicEvent]:
-        """Always return a list of items (collects singles into a one-item list)."""
-        result = await self
-        return result if isinstance(result, list) else [result]
+        """Return the events not yet read."""
+        return await self
 
     async def aclose(self) -> None:
-        """Cancel producer task and close the underlying async generator."""
-        # Cancel the producer task if it's running
-        if self._producer_task is not None and not self._producer_task.done():
-            self._producer_task.cancel()
-            try:
-                await self._producer_task
-            except asyncio.CancelledError:
-                # The task was cancelled by aclose(); a CancelledError here is expected.
-                pass
-        # Close the underlying source generator
-        try:
-            await self._source.aclose()
-        except Exception:
-            # Best-effort cleanup: ignore errors from closing the underlying source.
-            pass
+        """Close the source, as ``aclose()`` closes a generator."""
+        self._closed = True
+        await self._source.aclose()
+
+
+def _closed_early() -> RuntimeError:
+    return RuntimeError("AsyncResult was closed before its stream finished")
 
 
 def async_func_wrapper(

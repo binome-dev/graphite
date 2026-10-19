@@ -2,7 +2,6 @@
 ClaudeTool - Anthropic Claude implementation of grafi.tools.llms.llm.LLM
 """
 
-import asyncio
 import json
 import os
 from typing import Any
@@ -14,6 +13,7 @@ from typing import Union
 
 from pydantic import Field
 
+from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -219,9 +219,13 @@ class ClaudeTool(LLM):
         request_kwargs = self._request_kwargs(system, messages, tools)
 
         try:
-            async with AsyncAnthropic(api_key=self.api_key) as client:
+            async with best_effort_exit(
+                AsyncAnthropic(api_key=self.api_key), "Anthropic client"
+            ) as client:
                 if self.is_streaming:
-                    async with client.messages.stream(**request_kwargs) as stream:
+                    async with best_effort_exit(
+                        client.messages.stream(**request_kwargs), "Anthropic stream"
+                    ) as stream:
                         async for event in stream:
                             if event.type == "text":
                                 yield self.to_stream_messages(event.text)
@@ -231,8 +235,6 @@ class ClaudeTool(LLM):
                     )
                     yield self.to_messages(resp)
 
-        except asyncio.CancelledError:
-            raise
         except Exception as exc:
             raise LLMToolException(
                 tool_name=self.name,

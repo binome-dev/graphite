@@ -1,8 +1,12 @@
 # Topic Event Cache
 
-Topic queues store workflow events and track a separate read cursor and committed
-offset for each consumer. `TopicEventQueue` defines the interface;
+Topic queues store a topic's events and track a separate read cursor and
+committed offset for each consumer. `TopicEventQueue` defines the interface;
 `InMemTopicEventQueue` provides the default in-memory implementation.
+
+The queue is for using a topic on its own. A workflow run keeps its topics'
+events itself and stores every step in the event store, which is the only
+durable state a run needs.
 
 ## Overview
 
@@ -35,8 +39,7 @@ The cache maintains two types of offsets per consumer:
 2. **Committed Offset**: Tracks messages that have been fully processed (advanced after processing)
 
 Fetching advances the read cursor; committing records successful processing.
-A failed workflow run recovers uncommitted publications from the event store
-into fresh queues. Reusing a failed queue does not automatically rewind reads.
+Reusing a queue after a failure does not automatically rewind reads.
 
 ## Core Methods
 
@@ -61,7 +64,7 @@ read found nothing, or no unread events fall within the requested offset range.
 `await cache.commit_to(consumer_id, offset)` commits through the given offset and
 returns the highest committed offset. Committing an older offset never rewinds
 the cursor. `await cache.restore_consumer(consumer_id, committed_offset)` restores
-both cursors during recovery without fetching records.
+both cursors without fetching records.
 
 ## Usage Patterns
 

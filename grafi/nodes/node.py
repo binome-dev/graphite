@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import List
 
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -55,18 +56,22 @@ class Node(NodeBase):
                 message="Cannot invoke a node without a tool/command.",
                 invoke_context=invoke_context,
             )
+        consumed_event_ids = [event.event_id for event in node_input]
         # Use the LLM's invoke method to get the response generator
-        async for messages in self._command.invoke(
-            invoke_context,
-            input_data=node_input,
-        ):
-            yield PublishToTopicEvent(
-                publisher_name=self.name,
-                publisher_type=self.type,
-                invoke_context=invoke_context,
-                consumed_event_ids=[event.event_id for event in node_input],
-                data=messages,
+        async with owned_iterator(
+            self._command.invoke(
+                invoke_context,
+                input_data=node_input,
             )
+        ) as stream:
+            async for messages in stream:
+                yield PublishToTopicEvent(
+                    publisher_name=self.name,
+                    publisher_type=self.type,
+                    invoke_context=invoke_context,
+                    consumed_event_ids=consumed_event_ids,
+                    data=messages,
+                )
 
     def to_dict(self) -> dict[str, Any]:
         return {

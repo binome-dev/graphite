@@ -1,4 +1,9 @@
-"""Repeated A never satisfies A AND B; delayed B releases the complete batch."""
+"""Repeated A never satisfies A AND B; delayed B releases the complete batch.
+
+Each publication comes from its own committed step: a step's publications become
+visible to downstream nodes only when the step commits. A source waits until the
+previous source's publication is stored, so the join sees A1 and A2 before B.
+"""
 
 import asyncio
 
@@ -19,66 +24,74 @@ from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from tests_integration.async_execution.support import EchoTool
-from tests_integration.async_execution.support import ReadProbe
+from tests_integration.async_execution.support import assert_steps_ended
 from tests_integration.async_execution.support import drain
 from tests_integration.async_execution.support import input_event
 from tests_integration.async_execution.support import make_node
-from tests_integration.async_execution.support import observed_queue
 from tests_integration.async_execution.support import route_a
 from tests_integration.async_execution.support import route_b
+from tests_integration.async_execution.support import until_stored
 
 
-class StaggeredSource(EchoTool):
-    probe: ReadProbe = Field(exclude=True)
+class GatedSource(EchoTool):
+    """Emits one message once an earlier source's message on a is stored."""
+
     join: EchoTool = Field(exclude=True)
-    send_b: bool
+    content: str
+    after: str | None = None
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
-        yield [Message(role="assistant", content="A1")]
-        await self.probe.wait_started("b", "join", 2)
-        yield [Message(role="assistant", content="A2")]
-        await self.probe.wait_started("b", "join", 3)
-        assert self.join.calls == [], "An AND join ran without B"
-        if self.send_b:
-            yield [Message(role="assistant", content="B1")]
+        if self.after is not None:
+            await until_stored("a", self.after)
+            assert self.join.calls == [], "An AND join ran without B"
+        yield [Message(role="assistant", content=self.content)]
 
 
 async def main() -> None:
     for send_b in (False, True):
-        probe, join = ReadProbe(), EchoTool()
-        a = Topic(name="a", event_queue=observed_queue(probe, "a"))
-        b = Topic(name="b", event_queue=observed_queue(probe, "b"))
-        source = Node(
-            name="source",
-            tool=StaggeredSource(probe=probe, join=join, send_b=send_b),
-            subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
-            publisher_router=PublisherRouter(
-                routes=[
-                    PublishRoute(topic=a, when=route_a),
-                    PublishRoute(topic=b, when=route_b),
-                ]
-            ),
+        join = EchoTool()
+        a, b = Topic(name="a"), Topic(name="b")
+        routes = PublisherRouter(
+            routes=[
+                PublishRoute(topic=a, when=route_a),
+                PublishRoute(topic=b, when=route_b),
+            ]
         )
+        sources = [
+            Node(
+                name=name,
+                tool=GatedSource(join=join, content=content, after=after),
+                subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
+                publisher_router=routes,
+            )
+            for name, content, after in (
+                ("first_a", "A1", None),
+                ("second_a", "A2", "A1"),
+                # Without B, the last source's message matches no route.
+                ("late_b", "B1" if send_b else "unrouted", "A2"),
+            )
+        ]
         worker = make_node(
             "join",
             join,
             SubscriptionBuilder().subscribed_to(a).and_().subscribed_to(b).build(),
             OutputTopic(name="output"),
         )
-        workflow = EventDrivenWorkflow.builder().node(source).node(worker).build()
+        builder = EventDrivenWorkflow.builder()
+        for source in sources:
+            builder.node(source)
+        workflow = builder.node(worker).build()
         async with asyncio.timeout(5):
             outputs = await drain(GrafiRuntime(), workflow, input_event())
         assert outputs == (["A1|A2|B1"] if send_b else [])
         assert join.calls == ([["A1", "A2", "B1"]] if send_b else [])
-        assert ("b", "join") in probe.cancelled
-        probe.assert_readers_closed()
+        assert_steps_ended("first_a", "second_a", "late_b", "join")
         print(f"AND join, delayed B={send_b}: OK")
 
-    probe, tool = ReadProbe(), EchoTool()
-    a = InputTopic(name="a", event_queue=observed_queue(probe, "a"))
-    b = Topic(name="b", event_queue=observed_queue(probe, "b"))
+    tool = EchoTool()
+    a, b = InputTopic(name="a"), Topic(name="b")
     worker = make_node(
         "join",
         tool,
@@ -92,7 +105,7 @@ async def main() -> None:
             input_event("A1"),
         )
     assert outputs == ["A1"] and tool.calls == [["A1"]]
-    probe.assert_readers_closed()
+    assert_steps_ended("join")
     print("OR join with A only: OK")
 
 
