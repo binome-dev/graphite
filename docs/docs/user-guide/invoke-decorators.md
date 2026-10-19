@@ -1,29 +1,16 @@
 # Invoke Decorators
 
-Graphite provides a comprehensive set of decorators for recording execution events, adding distributed tracing, and exposing functions to LLMs. These decorators automatically handle event logging, error tracking, and observability without requiring manual instrumentation.
+Graphite's decorators live in `grafi.common.decorators`:
 
-## Overview
+- **`@llm_function`** exposes a function to an LLM, with a specification built
+  from its signature, type hints and docstring.
+- **The record decorators** (`@record_assistant_invoke`,
+  `@record_workflow_invoke`, `@record_node_invoke`, `@record_tool_invoke`)
+  record a component's events and trace each invocation. Graphite's own
+  components already use them; apply one when you write a component's
+  `invoke()` from scratch.
 
-The decorators are categorized into two main types:
-
-1. **Recording Decorators** - Automatically record events, add tracing spans, and handle errors
-2. **Function Decorators** - Expose functions to LLMs with automatic schema generation
-
-## LLM Function Decorator
-
-### @llm_function
-
-The `@llm_function` decorator exposes methods to Language Learning Models by automatically generating function specifications.
-
-**Location**: `grafi.common.decorators.llm_function`
-
-**Purpose**:
-
-- Extracts function metadata (name, docstring, parameters, type hints)
-- Constructs a `FunctionSpec` object with JSON Schema-compatible parameter descriptions
-- Stores the specification as a `_function_spec` attribute on the decorated function
-
-**Usage**:
+## @llm_function
 
 ```python
 from grafi.common.decorators.llm_function import llm_function
@@ -34,226 +21,94 @@ def calculate_sum(x: int, y: int, precision: float = 0.1) -> float:
     Calculate the sum of two numbers with optional precision.
 
     Args:
-        x (int): The first number to add.
-        y (int): The second number to add.
-        precision (float, optional): Precision level. Defaults to 0.1.
-
-    Returns:
-        float: The sum of x and y.
+        x: The first number to add.
+        y: The second number to add.
+        precision: Precision level.
     """
     return float(x + y)
 ```
 
-**Features**:
+The decorator attaches a `FunctionSpec` as `calculate_sum._function_spec` and
+returns the function unchanged. A `FunctionCallTool` collects the specs of its
+decorated methods and offers them to the LLM.
 
-- Automatically maps Python types to JSON Schema types
-- Extracts parameter descriptions from docstrings
-- Marks parameters without defaults as required
-- Supports type hints for comprehensive schema generation
+- The description is the docstring's summary (and longer text); each
+  parameter's description comes from its `Args` entry.
+- Parameters without a default are required. `self`, `cls`, `ctx`, `context`
+  and parameters starting with `_` are hidden from the LLM. `*args` and
+  `**kwargs` are rejected.
+- The return annotation, if any, becomes the spec's `output_schema`.
 
-**Type Mapping**:
+Type hints map to JSON Schema as follows:
 
-| Python Type | JSON Schema Type |
-|-------------|------------------|
-| `str` | `"string"` |
-| `int` | `"integer"` |
-| `float` | `"number"` |
-| `bool` | `"boolean"` |
-| `list` | `"array"` |
-| `dict` | `"object"` |
-| Other | `"string"` (default) |
+| Python type | JSON Schema |
+|-------------|-------------|
+| `str`, `int`, `float`, `bool`, `None` | `string`, `integer`, `number`, `boolean`, `null` |
+| `list[T]`, `tuple[T, ...]`, `set[T]`, `Sequence[T]` | `array` of `T` |
+| `dict[str, T]`, `Mapping[str, T]` | `object` whose values are `T` |
+| `Optional[T]`, `Union[...]`, `T \| None` | `anyOf` |
+| `Literal[...]`, an `Enum` | the values as `enum` |
+| A dataclass | `object` with its fields, required unless they have a default |
+| `Annotated[T, {...}]` | `T`, with the mapping's keys added (for example `{"minimum": 0}`) |
+| Another class | `object` |
+| `Any`, or anything else | any value (`{}`) |
 
-## Recording Decorators
+## Record decorators
 
-Recording decorators provide automatic event logging, distributed tracing, and error handling for different component types. They come in synchronous and asynchronous variants.
-
-### Assistant Decorators
-
-#### @record_assistant_invoke
-
-**Location**: `grafi.common.decorators.record_assistant_invoke`
-
-Records synchronous assistant invocations with event logging and tracing.
-
-**Features**:
-
-- Records `AssistantInvokeEvent` before execution
-- Creates distributed tracing spans with OpenInference attributes
-- Records `AssistantRespondEvent` on success or `AssistantFailedEvent` on error
-- Captures input/output data as JSON
-
-**Usage**:
-
-```python
-from grafi.common.decorators.record_assistant_invoke import record_assistant_invoke
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from typing import AsyncGenerator
-
-@record_assistant_invoke
-async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-    # Assistant implementation
-    async for output in self.workflow.invoke(input_data):
-        yield output
-```
-
-### Node Decorators
-
-#### @record_node_invoke
-
-**Location**: `grafi.common.decorators.record_node_invoke`
-
-Records synchronous node invocations in event-driven workflows.
-
-**Features**:
-
-- Records `NodeInvokeEvent` with subscription and publication topic information
-- Tracks subscribed topics and publish destinations
-- Captures `ConsumeFromTopicEvent` input data
-- Records success/failure events with comprehensive context
-
-**Usage**:
-
-```python
-from grafi.common.decorators.record_node_invoke import record_node_invoke
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from typing import List, AsyncGenerator
-
-@record_node_invoke
-async def invoke(self, invoke_context: InvokeContext,
-           node_input: List[ConsumeFromTopicEvent]) -> AsyncGenerator[PublishToTopicEvent, None]:
-    # Node processing logic - execute command and yield PublishToTopicEvents
-    async for response in self.command.invoke(invoke_context, node_input):
-        yield PublishToTopicEvent(
-            publisher_name=self.name,
-            publisher_type=self.type,
-            invoke_context=invoke_context,
-            consumed_event_ids=[event.event_id for event in node_input],
-            data=response
-        )
-```
-
-### Tool Decorators
-
-#### @record_tool_invoke
-
-**Location**: `grafi.common.decorators.record_decorators`
-
-Records synchronous tool invocations with event logging and tracing.
-
-**Features**:
-
-- Records `ToolInvokeEvent` before execution
-- Creates tool-specific tracing spans
-- Records `ToolRespondEvent` on success or `ToolFailedEvent` on error
-- Captures tool execution context and results
-
-**Usage**:
+Each record decorator wraps an async generator `invoke()`:
 
 ```python
 from grafi.common.decorators.record_decorators import record_tool_invoke
 
-@record_tool_invoke
-def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
-    # Tool execution logic
-    return tool_results
+class MyTool(Tool):
+    @record_tool_invoke
+    async def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> MsgsAGen:
+        yield [Message(role="assistant", content="done")]
 ```
 
-### Workflow Decorators
+A tool's or node's `invoke()` takes `(invoke_context, input_data)`; an
+assistant's or workflow's takes the input event, which carries the invoke
+context.
 
-#### @record_workflow_invoke
+For each invocation the decorator:
 
-**Location**: `grafi.common.decorators.record_workflow_invoke`
+1. Records the invoke event (`ToolInvokeEvent`, `NodeInvokeEvent`, ...).
+2. Runs the stream in a span named `{name}.invoke` (`{name}.run` for an
+   assistant), passing every item through as it is yielded.
+3. Records the respond event with the output. Streamed chunks are joined into
+   one message. A tool records its messages, and a node its last publication,
+   or `None` when it published nothing. An assistant or a workflow records its
+   output events.
+4. On failure, records the failed event instead, then raises the failure
+   again. The failed event carries structured `error_details`: the error and
+   its cause chain, the failing component, the request's ids, the root cause
+   and an `error_id`. Every layer a failure passes through (tool, node,
+   workflow, assistant) records the same `error_id`. Only the layer closest to
+   the failure logs it, as one line with the ids to look it up.
 
-Records synchronous workflow invocations with comprehensive event logging.
+A failure to store the invoke or respond event raises an
+`EventPersistenceError`. A failure to store the failed event is reported and
+noted on the original failure, which is still the one raised. Closing the
+stream early records neither a respond nor a failed event.
 
-**Features**:
+The span is current only while the component's own code runs, so a caller's
+code between reads is never traced as part of it.
 
-- Records `WorkflowInvokeEvent` before execution
-- Creates workflow-level tracing spans
-- Records `WorkflowRespondEvent` on success or `WorkflowFailedEvent` on error
-- Tracks workflow execution context and results
+### Span attributes
 
-**Usage**:
+| Attributes | Content |
+|------------|---------|
+| `id`, `name`, `type`, `oi_span_type` | The component, plus `model` for an assistant and `subscribed_topics`, `publish_to_topics` for a node |
+| `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id`, `kwargs` | The invoke context |
+| `input`, `output` | The input and the output as JSON |
+| `error`, `error.type`, `error.message`, `error.stack`, `error.details` | The failure, if any; the span's status is then `ERROR` |
 
-```python
-from grafi.common.decorators.record_workflow_invoke import record_workflow_invoke
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from typing import List
+### Environment variables
 
-@record_workflow_invoke
-def invoke(self, input_data: PublishToTopicEvent) -> List[ConsumeFromTopicEvent]:
-    # Workflow orchestration logic
-    # Initialize workflow, execute nodes, return consumed events
-    return output_events
-```
-
-
-## Common Features
-
-### Event Recording
-
-All recording decorators automatically:
-
-- Record invocation events before execution begins
-- Record success events with output data upon completion
-- Record failure events with error details when exceptions occur
-- Capture timing and execution context information
-
-### Distributed Tracing
-
-The decorators integrate with OpenInference tracing standards:
-
-- Create spans with appropriate names (`{component_name}.invoke` or `{component_name}.run`)
-- Set OpenInference span attributes for component identification
-- Capture input/output data as span attributes
-- Record error information in span attributes on failure
-
-### Streaming Support
-
-Async decorators handle streaming responses:
-
-- Preserve async generator behavior for streaming outputs
-- Aggregate streaming content for final result tracking
-- Distinguish between streaming and non-streaming messages
-- Maintain observability without affecting streaming performance
-
-### Error Handling
-
-All decorators provide comprehensive error handling:
-
-- Capture and record exception details in events
-- Add error information to tracing spans
-- Re-raise exceptions to preserve original error behavior
-- Maintain error context for debugging and monitoring
-
-## Span Attributes
-
-The decorators set standardized span attributes:
-
-| Attribute Type | Examples |
-|----------------|----------|
-| **Component ID** | `assistant_id`, `node_id`, `tool_id`, `workflow_id` |
-| **Component Metadata** | `name`, `type`, `model` (for assistants) |
-| **Execution Context** | All fields from `InvokeContext` |
-| **Data** | `input`, `output` (serialized as JSON) |
-| **Topics** (Nodes) | `subscribed_topics`, `publish_to_topics` |
-| **OpenInference** | `openinference.span.kind` |
-| **Errors** | `error` (error message when exceptions occur) |
-
-## Best Practices
-
-1. **Choose the Right Decorator**: Use synchronous decorators for blocking operations and asynchronous decorators for streaming or async operations.
-
-2. **Consistent Application**: Apply decorators consistently across similar component types for uniform observability.
-
-3. **Function Specification**: Use `@llm_function` on methods that should be available to LLMs, ensuring comprehensive docstrings and type hints.
-
-4. **Performance Considerations**: Recording decorators add minimal overhead but consider the impact of JSON serialization for large data structures.
-
-5. **Error Context**: Leverage the automatic error recording for debugging and monitoring failed invocations.
-
-6. **Streaming Behavior**: For async decorators, ensure your async generators yield complete message batches for proper aggregation.
+| Variable | Effect |
+|----------|--------|
+| `GRAFI_SPAN_DISABLE_PAYLOADS` | When true, `input` and `output` are left off spans. |
+| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | The most characters of a payload a span keeps (default 10,000; `0` means no limit). |
+| `GRAFI_ERROR_INCLUDE_TRACEBACK` | When false, failed events carry no traceback. |

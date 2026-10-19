@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from pydantic_core import to_jsonable_python
 
-from grafi.common.decorators.record_base import _TRACEBACK_LOGGED_ATTR
 from grafi.common.decorators.record_base import EventContext
-from grafi.common.decorators.record_base import _traceback_already_logged
+from grafi.common.decorators.record_base import _error_id_for
+from grafi.common.decorators.record_base import _existing_error_id
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.events.component_events import ToolFailedEvent
@@ -240,25 +240,21 @@ class TestSpanErrorEnrichment:
         assert span.status_set_after_end == [False]
 
 
-class TestTracebackDedup:
-    """The full traceback is logged once even after the error is re-wrapped."""
+class TestLoggedOnce:
+    """A failure is logged by the layer closest to it: the one that gives it its
+    id, which outer layers then find, even after it is re-wrapped."""
 
-    def test_flag_survives_rewrapping(self):
+    def test_an_outer_layer_finds_the_inner_layers_id(self):
         inner = ValueError("root boom")
-        # The innermost decorator marks the exception it caught.
-        setattr(inner, _TRACEBACK_LOGGED_ATTR, True)
-
-        # The workflow re-wraps it into a new exception with cause=inner.
+        error_id = _error_id_for(inner)  # The innermost decorator's.
         outer = NodeExecutionError(
             node_name="SearchNode", message="node failed", cause=inner
         )
+        assert _existing_error_id(outer) == error_id
 
-        # An outer decorator must still see that the traceback was already logged.
-        assert _traceback_already_logged(outer) is True
-
-    def test_fresh_chain_not_yet_logged(self):
+    def test_a_fresh_failure_has_no_id_yet(self):
         inner = ValueError("root boom")
         outer = NodeExecutionError(
             node_name="SearchNode", message="node failed", cause=inner
         )
-        assert _traceback_already_logged(outer) is False
+        assert _existing_error_id(outer) is None

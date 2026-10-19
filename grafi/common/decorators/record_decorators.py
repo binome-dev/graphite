@@ -1,18 +1,13 @@
-# mypy: ignore-errors
-"""
-Unified module for all record decorators.
-This replaces 8 separate files with a single, maintainable module.
-"""
+"""The record decorators of assistants, workflows, nodes and tools."""
 
+from typing import Any
+from typing import Iterable
 from typing import List
 from typing import Optional
-from typing import Union
 
 from grafi.common.decorators.record_base import ComponentConfig
 from grafi.common.decorators.record_base import EventContext
 from grafi.common.decorators.record_base import create_async_decorator
-
-# Import event types
 from grafi.common.events.component_events import AssistantFailedEvent
 from grafi.common.events.component_events import AssistantInvokeEvent
 from grafi.common.events.component_events import AssistantRespondEvent
@@ -30,169 +25,104 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.message import Message
-
-# ============================================================================
-# ASSISTANT DECORATORS
-# ============================================================================
+from grafi.common.models.message import Messages
 
 
-def process_async_result(
-    args: List[Union[ConsumeFromTopicEvent]],
-) -> List[Union[ConsumeFromTopicEvent]]:
-    result_content = ""
-    is_streaming = False
-    for event in args:
-        for message in event.data:
-            if message.is_streaming:
-                if message.content is not None and isinstance(message.content, str):
-                    result_content += message.content
-                is_streaming = True
-
-    if is_streaming:
-        streaming_consumed_event = args[-1].model_copy(
-            update={"data": [Message(role="assistant", content=result_content)]},
-            deep=True,
-        )
-        return [streaming_consumed_event]
-
-    return args
+def _context(component: Any, id: str, **extra: Any) -> EventContext:
+    return EventContext(
+        id=id,
+        name=component.name or "",
+        type=component.type or "",
+        oi_span_type=component.oi_span_type.value,
+        **extra,
+    )
 
 
-_assistant_config = ComponentConfig(
-    event_types={
-        "invoke": AssistantInvokeEvent,
-        "respond": AssistantRespondEvent,
-        "failed": AssistantFailedEvent,
-    },
-    extract_metadata=lambda self: EventContext(
-        id=self.assistant_id,
-        name=self.name or "",
-        type=self.type or "",
-        oi_span_type=self.oi_span_type.value,
-        model=getattr(self, "model", ""),
-    ),
-    process_async_result=process_async_result,
-    span_name_suffix="run",
-    isolate_event_writes=True,
-)
-
-# Async assistant decorator
-record_assistant_invoke = create_async_decorator(_assistant_config)
-
-# ============================================================================
-# WORKFLOW DECORATORS
-# ============================================================================
-
-_workflow_config = ComponentConfig(
-    event_types={
-        "invoke": WorkflowInvokeEvent,
-        "respond": WorkflowRespondEvent,
-        "failed": WorkflowFailedEvent,
-    },
-    extract_metadata=lambda self: EventContext(
-        id=self.workflow_id,
-        name=self.name or "",
-        type=self.type or "",
-        oi_span_type=self.oi_span_type.value,
-    ),
-    process_async_result=process_async_result,
-    span_name_suffix="invoke",
-    isolate_event_writes=True,
-)
-
-# Async workflow decorator
-record_workflow_invoke = create_async_decorator(_workflow_config)
-
-
-# ============================================================================
-# NODE DECORATORS
-# ============================================================================
-
-
-def process_node_async_result(
-    args: List[PublishToTopicEvent],
-) -> Optional[PublishToTopicEvent]:
-    """The node's last publication (its streamed chunks joined), or None when
-    it published nothing."""
-    if not args:
+def _joined_stream(batches: Iterable[Messages]) -> Optional[Message]:
+    """The streamed chunks among ``batches`` joined into one message, or None
+    when nothing was streamed."""
+    streamed = [m for messages in batches for m in messages if m.is_streaming]
+    if not streamed:
         return None
-    result_content = ""
-    is_streaming = False
-    for event in args:
-        for message in event.data:
-            if message.is_streaming:
-                if message.content is not None and isinstance(message.content, str):
-                    result_content += message.content
-                is_streaming = True
-
-    if is_streaming:
-        streaming_consumed_event = args[-1].model_copy(
-            update={"data": [Message(role="assistant", content=result_content)]},
-            deep=True,
-        )
-        return streaming_consumed_event
-
-    return args[-1]
+    text = "".join(m.content for m in streamed if isinstance(m.content, str))
+    return Message(role="assistant", content=text)
 
 
-_node_config = ComponentConfig(
-    event_types={
-        "invoke": NodeInvokeEvent,
-        "respond": NodeRespondEvent,
-        "failed": NodeFailedEvent,
-    },
-    extract_metadata=lambda self: EventContext(
-        id=self.node_id,
-        name=self.name or "",
-        type=self.type or "",
-        oi_span_type=self.oi_span_type.value,
-        subscribed_topics=[topic.name for topic in self._subscribed_topics.values()],
-        publish_to_topics=[topic.name for topic in self.publish_to],
-    ),
-    process_async_result=process_node_async_result,
-    span_name_suffix="invoke",
+def _outputs(events: List[ConsumeFromTopicEvent]) -> List[ConsumeFromTopicEvent]:
+    """An assistant's or a workflow's outputs, a stream joined into one."""
+    joined = _joined_stream(event.data for event in events)
+    if joined is None:
+        return events
+    return [events[-1].model_copy(update={"data": [joined]}, deep=True)]
+
+
+def _publication(events: List[PublishToTopicEvent]) -> Optional[PublishToTopicEvent]:
+    """A node's last publication, a stream joined into it, or None when it
+    published nothing."""
+    if not events:
+        return None
+    joined = _joined_stream(event.data for event in events)
+    if joined is None:
+        return events[-1]
+    return events[-1].model_copy(update={"data": [joined]}, deep=True)
+
+
+def _messages(batches: List[Messages]) -> Messages:
+    """A tool's messages, a stream joined into one."""
+    joined = _joined_stream(batches)
+    if joined is None:
+        return [message for messages in batches for message in messages]
+    return [joined]
+
+
+record_assistant_invoke = create_async_decorator(
+    ComponentConfig(
+        invoke_event=AssistantInvokeEvent,
+        respond_event=AssistantRespondEvent,
+        failed_event=AssistantFailedEvent,
+        extract_metadata=lambda self: _context(
+            self, self.assistant_id, model=getattr(self, "model", "")
+        ),
+        process_async_result=_outputs,
+        span_name_suffix="run",
+        isolate_event_writes=True,
+    )
 )
 
-# Async node decorator
-record_node_invoke = create_async_decorator(_node_config)
-
-
-# ============================================================================
-# TOOL DECORATORS
-# ============================================================================
-def process_messages_streaming_result(
-    args: List[List[Message]],
-) -> List[Message]:
-    result_content = ""
-    is_streaming = False
-    for messages in args:
-        for message in messages:
-            if message.is_streaming:
-                if message.content is not None and isinstance(message.content, str):
-                    result_content += message.content
-                is_streaming = True
-
-    if is_streaming:
-        return [Message(role="assistant", content=result_content)]
-    else:  # Non-streaming, return all messages
-        return [msg for messages in args for msg in messages]
-
-
-_tool_config = ComponentConfig(
-    event_types={
-        "invoke": ToolInvokeEvent,
-        "respond": ToolRespondEvent,
-        "failed": ToolFailedEvent,
-    },
-    extract_metadata=lambda self: EventContext(
-        id=self.tool_id,
-        name=self.name or "",
-        type=self.type or "",
-        oi_span_type=self.oi_span_type.value,
-    ),
-    process_async_result=process_messages_streaming_result,
-    span_name_suffix="invoke",
+record_workflow_invoke = create_async_decorator(
+    ComponentConfig(
+        invoke_event=WorkflowInvokeEvent,
+        respond_event=WorkflowRespondEvent,
+        failed_event=WorkflowFailedEvent,
+        extract_metadata=lambda self: _context(self, self.workflow_id),
+        process_async_result=_outputs,
+        isolate_event_writes=True,
+    )
 )
 
-# Async tool decorator
-record_tool_invoke = create_async_decorator(_tool_config)
+record_node_invoke = create_async_decorator(
+    ComponentConfig(
+        invoke_event=NodeInvokeEvent,
+        respond_event=NodeRespondEvent,
+        failed_event=NodeFailedEvent,
+        extract_metadata=lambda self: _context(
+            self,
+            self.node_id,
+            subscribed_topics=[
+                topic.name for topic in self._subscribed_topics.values()
+            ],
+            publish_to_topics=[topic.name for topic in self.publish_to],
+        ),
+        process_async_result=_publication,
+    )
+)
+
+record_tool_invoke = create_async_decorator(
+    ComponentConfig(
+        invoke_event=ToolInvokeEvent,
+        respond_event=ToolRespondEvent,
+        failed_event=ToolFailedEvent,
+        extract_metadata=lambda self: _context(self, self.tool_id),
+        process_async_result=_messages,
+    )
+)
