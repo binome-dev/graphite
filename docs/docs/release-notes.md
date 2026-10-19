@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+Tracing is set up with a single call: `setup_tracing(project_name=...)`. It
+follows OpenTelemetry's standard environment (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`), returns the tracer
+provider, and instruments every installed OpenInference instrumentor, not
+only OpenAI's. `TracingOptions`, `is_local_endpoint_available` and the
+`OTEL_COLLECTOR_ENDPOINT`/`OTEL_COLLECTOR_PORT` variables are gone: pass
+`endpoint="http://host:4317"`, scheme included, or set
+`OTEL_EXPORTER_OTLP_ENDPOINT`. Spans also name the Phoenix project
+(`openinference.project.name`) after `project_name`. The default
+tracer of `ExecutionServices` is OpenTelemetry's global tracer, so grafi's spans
+are exported without passing a tracer; it is a no-op until a provider is set.
+Do not pass `setup_tracing()`'s result as `tracer`: it is now the provider. An
+application with a global tracer provider of its own now exports grafi's
+spans, payloads included; `OPENINFERENCE_HIDE_INPUTS`/`_OUTPUTS` or
+`GRAFI_SPAN_DISABLE_PAYLOADS` keep the payloads off.
+
+Spans name their attributes as OpenInference does:
+- `oi_span_type` becomes `openinference.span.kind`.
+- `input` and `output` become `input.value` and `output.value`, with their
+  mime types.
+- `session.id` holds the conversation.
+- A failure records `error.type`, an `error_id` matching its log line and
+  failed events, and `error.details`, besides OpenTelemetry's exception event
+  and `ERROR` status. These replace the duplicated `error`, `error.message` and
+  `error.stack`.
+
+`OPENINFERENCE_HIDE_INPUTS` and `OPENINFERENCE_HIDE_OUTPUTS` redact grafi's
+spans as they redact LLM spans. `GRAFI_SPAN_DISABLE_PAYLOADS` still works.
+
 `InMemTopicEventQueue.fetch(consumer_id)` now waits indefinitely for new events.
 Previously, direct calls used a one-second default timeout. Pass `timeout=1.0`
 to preserve that behavior, or `timeout=0` for an immediate read. Calls through

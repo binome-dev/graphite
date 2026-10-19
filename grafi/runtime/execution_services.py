@@ -19,12 +19,13 @@ from contextvars import ContextVar
 from contextvars import Token
 from dataclasses import dataclass
 from dataclasses import field
+from functools import partial
 from typing import Iterator
 from typing import Optional
 
 from loguru import logger
-from opentelemetry.trace import NoOpTracer
 from opentelemetry.trace import Tracer
+from opentelemetry.trace import get_tracer
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
@@ -70,13 +71,14 @@ class ExecutionServices:
     object that embeds one) cannot leak a database URL, client, or other
     infrastructure detail into a log or persisted record.
 
-    Note: the default ``event_store`` is in-memory (lost on exit) and the default
-    ``tracer`` is a no-op (spans discarded) -- fine for local/test, but
-    production should pass a durable store and a real tracer explicitly.
+    Note: the default ``event_store`` is in-memory (lost on exit) -- fine for
+    local/test, but production should pass a durable store. The default
+    ``tracer`` is OpenTelemetry's global one: it records once a tracer provider
+    is set, by ``setup_tracing`` or the application, and is a no-op until then.
     """
 
     event_store: EventStore = field(default_factory=EventStoreInMemory, repr=False)
-    tracer: Tracer = field(default_factory=NoOpTracer, repr=False)
+    tracer: Tracer = field(default_factory=partial(get_tracer, "grafi"), repr=False)
     error_reporter: ErrorReporter = field(default_factory=ErrorReporter, repr=False)
 
 

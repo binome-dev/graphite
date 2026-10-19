@@ -156,8 +156,7 @@ class TestSpanErrorEnrichment:
         assert span.ended is True
         # Every error attribute was set while the span was still recording.
         assert span.attr_set_after_end.get("error.type") is False
-        assert span.attr_set_after_end.get("error.message") is False
-        assert span.attr_set_after_end.get("error.stack") is False
+        assert span.attr_set_after_end.get("error_id") is False
         assert span.attr_set_after_end.get("error.details") is False
         # The exception and error status were also recorded before span end.
         assert span.exception_recorded_after_end == [False]

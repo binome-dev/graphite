@@ -96,21 +96,8 @@ stream early records neither a respond nor a failed event, unless closing it
 fails.
 
 The span is current only while the component's own code runs, so a caller's
-code between reads is never traced as part of it.
+code between reads is never traced as part of it. [Tracing](../guide/configuring-integration-with-opentelemetry.md) lists
+its attributes, the settings that shape them, and how to export spans.
 
-### Span attributes
-
-| Attributes | Content |
-|------------|---------|
-| `id`, `name`, `type`, `oi_span_type` | The component, plus `model` for an assistant and `subscribed_topics`, `publish_to_topics` for a node |
-| `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id` | The invoke context |
-| `input`, `output` | The input and the output as JSON |
-| `error`, `error.type`, `error.message`, `error.stack`, `error.details` | The failure, if any; the span's status is then `ERROR` |
-
-### Environment variables
-
-| Variable | Effect |
-|----------|--------|
-| `GRAFI_SPAN_DISABLE_PAYLOADS` | When true, `input`, `output` and `error.details` are left off spans. |
-| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | A payload longer than this many characters is cut short (default 10,000; `0` means no limit). |
-| `GRAFI_ERROR_INCLUDE_TRACEBACK` | When false, failed events carry no traceback. |
+Set `GRAFI_ERROR_INCLUDE_TRACEBACK` to false for failed events to carry no
+traceback.
