@@ -99,6 +99,58 @@ a binding lost on the way then raises, rather than writing to a default store.
 Run the application in one event loop (one `asyncio.run(...)`): a durable
 store's pooled connections belong to the loop that opened them.
 
+## Streaming
+
+A caller that streams an invocation also gets the deltas its tools emit, such
+as an LLM's tokens, as they are emitted, between its outputs:
+
+```python
+from grafi.runtime import Delta
+
+async for item in assistant.invoke(input_event, stream=True):
+    if isinstance(item, Delta):
+        print(item.content, end="", flush=True)  # The text, as it comes.
+    else:
+        ...  # An output event, once its step is stored.
+```
+
+`GrafiRuntime(...).invoke(...)` and `workflow.invoke(...)` take `stream=True`
+too. Without it, an invocation yields its outputs only, and LLMs do not ask
+their providers for a stream.
+
+A `Delta` holds `content`, the text; `node_name`, the node whose step emitted
+it; `step`, that step's number in the run, counted from 1 as steps start, so a
+node's next turn (an agent's answer after its tool calls) starts a new one; and
+`tool_call_id`, the tool call whose function emitted it, if one did. Every LLM
+streams by default (see `is_streaming` in [LLM](tools/llm.md)), so filter by
+`node_name` to show one node's text, such as the final answer's.
+
+Deltas are a side channel: they are never published to a topic or stored, so
+routing and the event log only ever see whole messages, which follow as the
+step's output. An output reaches the caller only once its step is stored. A
+step that fails or is stopped stores nothing, and when its request resumes it
+runs, and streams, again. A workflow that a tool runs inside a step, to call
+another agent, streams only to its own caller.
+
+A tool emits text with `emit_delta(text)`, from its step's tasks or from a
+thread run by `asyncio.to_thread` (a thread started otherwise does not inherit
+the step's context, and its deltas reach no one); `streaming()` says whether
+anyone receives them, so a tool can skip work that only serves a stream. A
+function streams by yielding strings (see [FunctionTool](tools/function.md)
+and [FunctionCallTool](tools/function-call.md)); the deltas a function emits
+while answering a tool call carry the call's id (`deltas_for(tool_call_id)`
+marks them). Outside a workflow, such as in a test that invokes a tool
+directly, collect the deltas with `deltas_to`:
+
+```python
+from grafi.runtime import deltas_to
+
+received = []
+with deltas_to(received.append):
+    async for messages in tool.invoke(invoke_context, input_messages):
+        ...
+```
+
 ## Testing
 
 Give each test services of its own, so tests never share a store through the

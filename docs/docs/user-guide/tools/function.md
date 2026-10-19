@@ -1,6 +1,6 @@
 # FunctionTool
 
-The **FunctionTool** class is a specialized `Tool` designed to invoke custom function-based operations within event-driven workflows. It provides a flexible framework for integrating arbitrary function logic, allowing developers to wrap any callable function and seamlessly integrate it into the workflow system. The tool handles both synchronous and asynchronous function execution while maintaining compatibility with the broader tool interface.
+The **FunctionTool** class is a `Tool` that runs a plain Python function on the messages its node consumed. The function is written like any other: sync or async, it returns the tool's output, or, as a generator, it streams it.
 
 ## Fields
 
@@ -8,7 +8,8 @@ The **FunctionTool** class is a specialized `Tool` designed to invoke custom fun
 |----------------|-------------------------------|---------------------------------------------------------------------------------------|
 | `name`         | `str`                         | Human-readable name identifying the function tool (defaults to `"FunctionTool"`).    |
 | `type`         | `str`                         | Specifies the type of the tool (set to `"FunctionTool"`).                           |
-| `function`     | `Callable[[Messages], OutputType]` | The callable function that processes input messages and returns output data.   |
+| `role`         | `str`                         | The role of the message a result becomes (defaults to `"assistant"`).               |
+| `function`     | `Callable[[Messages], Any]`   | The function: it takes the messages and returns, or streams, the tool's output.     |
 | `oi_span_type` | `OpenInferenceSpanKindValues` | Semantic attribute from OpenInference used for tracing (set to `TOOL`).             |
 
 ## Methods
@@ -16,38 +17,38 @@ The **FunctionTool** class is a specialized `Tool` designed to invoke custom fun
 | Method              | Signature                                                           | Description                                                                                         |
 |---------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> FunctionToolBuilder`                               | Returns a builder instance for constructing FunctionTool objects.                                  |
-| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously invokes the function, supporting both regular and await-able functions.        |
-| `to_messages`       | `(response: OutputType) -> Messages`                               | Converts the function's raw response into standardized `Message` objects with appropriate formatting. |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Runs the function and yields its output, one batch of messages per result. A failure raises `FunctionToolException`, with the original error as its cause. |
 | `to_dict`           | `() -> dict[str, Any]`                                              | Serializes the tool's configuration into a dictionary format for persistence or debugging.         |
 
 ## Usage and Customization
 
-### Function Requirements
+### The function
 
-The `FunctionTool` can wrap any callable that accepts a `Messages` list as input and returns various output types. The function signature must be:
+The function takes the consumed messages:
 
 ```python
-def your_function(messages: Messages) -> OutputType
+def your_function(messages: Messages) -> Any
 ```
 
-Where `OutputType` is defined as `Union[BaseModel, List[BaseModel]]` but the tool also supports additional types through its output handling.
+It may be sync or async, or a sync or async generator. Sync code runs in a worker thread, so a blocking function never stalls the event loop; code that uses the loop, such as `asyncio.Event.set()`, must be async. Sync code cannot be stopped midway: a stop or cancellation drops a call not yet started, and waits for one running to return.
 
-### Output Handling
+### Output
 
-The tool automatically handles different response types in its `to_messages` method:
+What the function returns becomes the tool's output (see `grafi.tools.results`):
 
-- **`BaseModel` instances**: Serialized to JSON using `model_dump_json()`
-- **Lists of `BaseModel` objects**: Converted to JSON arrays using `model_dump()` for each item
-- **String responses**: Used directly as message content
-- **Other types**: Encoded with `json.dumps(..., default=str)` (no pickle)
+- **Messages**: a `Message`, or a list of them, passes as it is.
+- **`None`**: no output; the node publishes nothing.
+- **Anything else**: one message from `role` holding it as text: a string as it is, anything else (a Pydantic model, a dict, a list, a number) as JSON.
 
-### Async Support
+### Streaming
 
-The `invoke` method supports both synchronous and asynchronous functions:
+A generator streams its output. Each string it yields reaches a caller streaming the run as a delta (see [Runtime](../runtime.md#streaming)), and its output is the text it yielded, joined, as one message. If it also yields other values, those are its outputs, each one a result as above, and its text only streams, as progress:
 
-- For regular functions: Executes the function normally
-- For async functions: Automatically detects await-able responses using `inspect.isawaitable()` and awaits them
-- Returns results as an async generator (`MsgsAGen`)
+```python
+async def summarize(messages: Messages):
+    async for token in my_model.stream(messages[-1].content):
+        yield token  # Streamed; the joined text is the tool's output.
+```
 
 ## Builder Pattern
 
@@ -89,8 +90,8 @@ function_tool = (
 )
 ```
 
-## Decorators
+## Command
 
-The `FunctionTool` class uses the `@use_command(Command)` decorator, which enables integration with the command pattern for tool execution within the workflow system.
+`FunctionTool` names no command, so a node runs it through the base `Command`, which passes it the consumed messages as they are (see [Command](../command.md)).
 
 By providing a consistent interface for function execution, the `FunctionTool` enables developers to integrate custom computational logic into event-driven workflows while maintaining clean separation between workflow orchestration and business logic implementation.

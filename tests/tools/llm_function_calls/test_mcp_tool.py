@@ -192,15 +192,12 @@ async def test_invoke_unsupported_content(
 
 
 @pytest.mark.asyncio
-async def test_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
-    tool = MCPTool(connections=dummy_connections)
-
-    class DummyInputMessage:
-        tool_calls = None
-
-    with pytest.raises(ValueError):
-        async for _ in tool.invoke(dummy_invoke_context, [DummyInputMessage()]):
-            pass
+async def test_invoke_without_tool_calls_yields_nothing(
+    dummy_connections, dummy_invoke_context
+):
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
+    message = Message(role="user", content="no calls")
+    assert [m async for m in tool.invoke(dummy_invoke_context, [message])] == []
 
 
 @pytest.mark.asyncio

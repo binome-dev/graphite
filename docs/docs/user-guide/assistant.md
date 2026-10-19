@@ -19,16 +19,24 @@ The `AssistantBase` class provides an abstract foundation for all assistants, de
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from typing import List, AsyncGenerator
+from grafi.runtime import Delta
+from typing import AsyncGenerator, Union
 
 class MyAssistant(AssistantBase):
     def _construct_workflow(self):
         # Implementation required
         pass
 
-    async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        # Implementation required
-        pass
+    async def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        # Implementation required: yield the outputs, and the deltas when
+        # `stream` (pass it on to the workflow).
+        ...
 ```
 
 ### AssistantBase Fields
@@ -48,7 +56,7 @@ Subclasses must implement these abstract methods:
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `_construct_workflow` | `() -> AssistantBase` | Constructs and configures the assistant's workflow |
-| `invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Asynchronous event processing with streaming support |
+| `invoke` | `(PublishToTopicEvent, is_sequential=False, *, stream=False) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]` | Yields the outputs, and, with `stream=True`, the deltas its tools emit |
 
 ### Lifecycle
 
@@ -69,7 +77,7 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `invoke` | `(PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]` | Processes input events asynchronously with streaming support |
+| `invoke` | `(PublishToTopicEvent, is_sequential=False, *, stream=False) -> AsyncGenerator[...]` | Yields the workflow's outputs as their steps are stored, and, with `stream=True`, each `Delta` its tools emit |
 | `to_dict` | `() -> dict[str, Any]` | Serializes the assistant's workflow configuration |
 | `generate_manifest` | `(output_dir: str = ".") -> str` | Generates a JSON manifest file for the assistant |
 
@@ -77,22 +85,37 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 #### invoke()
 
-Asynchronously processes input events with support for streaming responses.
+Runs the workflow on the input and yields its outputs as their steps are stored.
 
 ```python
 @record_assistant_invoke
-async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-    async for output in self.workflow.invoke(input_data):
-        yield output
+async def invoke(self, input_data, is_sequential=False, *, stream=False):
+    async with owned_iterator(
+        self.workflow.invoke(input_data, is_sequential, stream=stream)
+    ) as outputs:
+        async for output in outputs:
+            yield output
 ```
 
 **Parameters**:
 
 - `input_data`: A `PublishToTopicEvent` containing the data to be processed and context information
+- `is_sequential`: Run one step at a time
+- `stream`: Also yield each `Delta` the tools emit, such as an LLM's tokens, as they emit it
 
-**Returns**: Async generator yielding `ConsumeFromTopicEvent` objects
+**Returns**: Async generator yielding `ConsumeFromTopicEvent` objects, and, with `stream=True`, `Delta` objects between them. The return type follows `stream`: without it, only output events.
 
-**Use Cases**: Streaming responses, real-time processing, concurrent operations
+```python
+from grafi.runtime import Delta
+
+async for item in assistant.invoke(input_event, stream=True):
+    if isinstance(item, Delta):
+        print(item.content, end="", flush=True)
+    else:
+        answer = item.data[-1].content
+```
+
+See [Runtime](runtime.md#streaming) for what deltas are, and are not.
 
 #### generate_manifest()
 

@@ -124,7 +124,9 @@ class TestAssistant:
             result_events.append(event)
 
         # Verify
-        mock_assistant.workflow.invoke.assert_called_once_with(input_data, False)
+        mock_assistant.workflow.invoke.assert_called_once_with(
+            input_data, False, stream=False
+        )
         assert len(result_events) == 1
         assert result_events[0].data[0].content == "async workflow response"
         assert result_events[0].data[0].role == "assistant"
@@ -146,7 +148,9 @@ class TestAssistant:
         async for event in mock_assistant.invoke(input_data):
             result_events.append(event)
 
-        mock_assistant.workflow.invoke.assert_called_once_with(input_data, False)
+        mock_assistant.workflow.invoke.assert_called_once_with(
+            input_data, False, stream=False
+        )
         assert len(result_events) == 1
 
     @pytest.mark.asyncio

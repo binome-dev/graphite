@@ -24,6 +24,8 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
+from grafi.runtime import emit_delta
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -32,7 +34,6 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.utils import get_async_output_events
 
 
 class StreamTool(Tool):
@@ -46,7 +47,7 @@ class StreamTool(Tool):
         self.calls += 1
         self.inputs.append([str(message.content) for message in input_data])
         for text in ("one", "two", "three"):
-            yield [Message(role="assistant", content=text, is_streaming=True)]
+            yield [Message(role="assistant", content=text)]
 
     @classmethod
     async def from_dict(cls, data: dict[str, Any]) -> "StreamTool":
@@ -123,18 +124,9 @@ async def test_fanout_stream_history_and_same_request_recovery(
         assert [record.offset for record in chunks] == [0, 1, 2]
         assert [record.offset for record in consumes] == [0, 1, 2]
         assert [record.data[0].content for record in chunks] == ["one", "two", "three"]
-        assert all(record.data[0].is_streaming for record in chunks + consumes)
     for offset in range(3):
         pair = [record for record in publications if record.offset == offset]
         assert pair[0].emission_id == pair[1].emission_id
-
-    # Display aggregation remains explicit and must not rewrite raw history.
-    snapshots = [output.model_dump() for output in outputs]
-    assert [record.data[0].content for record in get_async_output_events(outputs)] == [
-        "onetwothree",
-        "onetwothree",
-    ]
-    assert [output.model_dump() for output in outputs] == snapshots
 
     # Put canonical history in reverse read order, then add a later publication
     # at each destination. Consumption through 2 must not skip publication 3.
@@ -236,7 +228,7 @@ async def test_incomplete_or_conflicting_history_is_not_renumbered(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("termination", ["failure", "stop", "close", "cancel"])
-async def test_unpersisted_stream_output_is_replayed_after_interruption(
+async def test_an_interrupted_step_stores_nothing_and_streams_again_on_resume(
     event_store: EventStore, monkeypatch: pytest.MonkeyPatch, termination: str
 ) -> None:
     tool = StreamTool()
@@ -247,10 +239,11 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
     ) -> MsgsAGen:
         self.calls += 1
         for text in ("one", "two", "three"):
-            yield [Message(role="assistant", content=text, is_streaming=True)]
+            emit_delta(text)
             if self.calls == 1 and text == "two":
                 await release.wait()
                 raise RuntimeError("stream interrupted")
+        yield [Message(role="assistant", content="one two three")]
 
     monkeypatch.setattr(StreamTool, "invoke", invoke)
     input_topic, output_topic = InputTopic(name="input"), OutputTopic(name="out")
@@ -262,11 +255,11 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
     )
     workflow = EventDrivenWorkflow.builder().node(node).build()
     _, _, event = workflow_and_input()
-    engine = workflow.invoke(event)
+    engine = workflow.invoke(event, stream=True)
     try:
         async with asyncio.timeout(3):
-            assert (await anext(engine)).data[0].content == "one"
-            assert (await anext(engine)).data[0].content == "two"
+            assert await anext(engine) == Delta("one", "stream", 1)
+            assert await anext(engine) == Delta("two", "stream", 1)
             if termination == "failure":
                 release.set()
                 with pytest.raises(NodeExecutionError, match="stream interrupted"):
@@ -278,20 +271,20 @@ async def test_unpersisted_stream_output_is_replayed_after_interruption(
             elif termination == "close":
                 await engine.aclose()
             else:
-                # Cancellation injected at a streamed yield still stops the
-                # step and runs the acknowledgement path.
+                # Cancellation injected where the caller got a delta still
+                # stops the step and runs the acknowledgement path.
                 with pytest.raises(asyncio.CancelledError):
                     await engine.athrow(asyncio.CancelledError())
     finally:
         await engine.aclose()
     history = await event_store.get_agent_events("r")
     assert not any(
-        isinstance(record, ConsumeFromTopicEvent) and record.name == "out"
-        for record in history
-    ), "A streamed output cannot be acknowledged before its publication is persisted"
+        isinstance(record, TopicEvent) and record.name == "out" for record in history
+    ), "Deltas are never stored, and the step published nothing"
     async with asyncio.timeout(3):
-        retried = [output async for output in workflow.invoke(event)]
-    assert [output.data[0].content for output in retried] == ["one", "two", "three"]
+        retried = [output async for output in workflow.invoke(event, stream=True)]
+    assert [delta.content for delta in retried[:3]] == ["one", "two", "three"]
+    assert [output.data[0].content for output in retried[3:]] == ["one two three"]
     assert tool.calls == 2
 
 

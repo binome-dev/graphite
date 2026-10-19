@@ -1,3 +1,5 @@
+import asyncio
+import base64
 from typing import AsyncIterator
 from typing import List
 from unittest.mock import AsyncMock
@@ -5,13 +7,25 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
+from google.genai.types import FunctionCall
+from google.genai.types import GenerateContentResponse
+from google.genai.types import Part
 
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
+
+
+def _response(*parts: Part) -> GenerateContentResponse:
+    return GenerateContentResponse.model_validate(
+        {"candidates": [{"content": {"role": "model", "parts": parts}}]}
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -52,10 +66,7 @@ def test_init(gemini_instance):
 async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
-    # Fake GenerateContentResponse object – only `.text` is accessed
-    mock_response = Mock()
-    mock_response.text = "Hello, world!"
-    mock_response.function_calls = None
+    mock_response = _response(Part(text="Hello, world!"))
 
     # Stub client and method - need to mock the async aio interface
     mock_client = MagicMock()
@@ -95,19 +106,13 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
 async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context):
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
-    # TODO: improve this unit tests
-    # Gemini returns text inline even for tool calls; we'll just check param passing
-    mock_response = Mock()
-    mock_response.text = ""  # empty because function call chosen
-    mock_function_call = Mock()
-    mock_function_call.id = "function_call_id"
-    mock_function_call.name = "get_weather"
-    mock_function_call.args = {
-        "location": "London",
-        "unit": "Celsius",
-        "time": "now",
-    }
-    mock_response.function_calls = [mock_function_call]
+    mock_response = _response(
+        Part(
+            function_call=FunctionCall(
+                id="function_call_id", name="get_weather", args={"location": "London"}
+            )
+        )
+    )
 
     mock_client = MagicMock()
     mock_client.aio.aclose = AsyncMock()
@@ -131,12 +136,16 @@ async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context
 
     gemini_instance.add_function_specs(tools)
 
-    async for msg in gemini_instance.invoke(invoke_context, input_data):
-        assert msg
+    [[message]] = [
+        batch async for batch in gemini_instance.invoke(invoke_context, input_data)
+    ]
+    [call] = message.tool_calls
+    assert (call.id, call.function.name) == ("function_call_id", "get_weather")
+    assert call.function.arguments == '{"location": "London"}'
 
-    call_kwargs = mock_client.aio.models.generate_content.call_args[1]
-    # The GenerateContentConfig should contain our tool schema
-    assert call_kwargs is not None
+    config = mock_client.aio.models.generate_content.call_args[1]["config"]
+    [declaration] = config.tools[0].function_declarations
+    assert declaration.name == "get_weather"
 
 
 # --------------------------------------------------------------------------- #
@@ -251,9 +260,7 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
         api_key="test_api_key", model="gemini-3.5-flash", thinking_budget=128
     )
 
-    mock_response = Mock()
-    mock_response.text = "hi"
-    mock_response.function_calls = None
+    mock_response = _response(Part(text="hi"))
 
     mock_client = MagicMock()
     mock_client.aio.aclose = AsyncMock()
@@ -270,62 +277,82 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
     assert cfg.thinking_config.thinking_budget == 128
 
 
-@pytest.mark.asyncio
-async def test_early_close_releases_stream_and_client(
-    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
-) -> None:
+def _streaming(
+    monkeypatch: pytest.MonkeyPatch, chunks: AsyncIterator[GenerateContentResponse]
+) -> MagicMock:
+    """A patched client streaming ``chunks``."""
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
-    closed: List[str] = []
-
-    async def chunks() -> AsyncIterator[Mock]:
-        try:
-            for text in ("a", "b"):
-                chunk = Mock()
-                chunk.text = text
-                yield chunk
-        finally:
-            closed.append("stream")
-
     mock_client = MagicMock()
-    mock_client.aio.aclose = AsyncMock(side_effect=lambda: closed.append("aio"))
-    mock_client.close = Mock(side_effect=lambda: closed.append("client"))
-    mock_client.aio.models.generate_content_stream = AsyncMock(return_value=chunks())
+    mock_client.aio.aclose = AsyncMock()
+    mock_client.aio.models.generate_content_stream = AsyncMock(return_value=chunks)
     monkeypatch.setattr(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
-    tool = GeminiTool(api_key="test_api_key", is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    assert (await anext(stream))[0].content == "a"
-    await stream.aclose()
+    return mock_client
+
+
+async def _cancelled_after_the_first_delta(
+    tool: GeminiTool, invoke_context: InvokeContext
+) -> None:
+    first = asyncio.Event()
+
+    async def call() -> None:
+        with deltas_to(lambda delta: first.set()):
+            async for _ in tool.invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+
+    task = asyncio.create_task(call())
+    async with asyncio.timeout(5):
+        await first.wait()
+        task.cancel()
+        await asyncio.wait({task})
+    assert task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_a_call_cancelled_mid_stream_releases_the_stream_and_client(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    closed: List[str] = []
+
+    async def chunks() -> AsyncIterator[GenerateContentResponse]:
+        try:
+            yield _response(Part(text="a"))
+            await asyncio.Event().wait()
+        finally:
+            closed.append("stream")
+
+    mock_client = _streaming(monkeypatch, chunks())
+    mock_client.aio.aclose.side_effect = lambda: closed.append("aio")
+    mock_client.close = Mock(side_effect=lambda: closed.append("client"))
+    await _cancelled_after_the_first_delta(GeminiTool(api_key="k"), invoke_context)
     assert closed == ["stream", "aio", "client"]
 
 
 @pytest.mark.asyncio
-async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
+async def test_a_stream_failing_to_close_does_not_replace_the_calls_error(
     monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
 ) -> None:
-    import grafi.tools.llms.impl.gemini_tool as gm_module
-
-    async def chunks() -> AsyncIterator[Mock]:
+    async def chunks() -> AsyncIterator[GenerateContentResponse]:
         try:
-            for text in ("a", "b"):
-                chunk = Mock()
-                chunk.text = text
-                yield chunk
+            yield _response(Part(text="a"))
+            yield _response(Part(text="b"))
         finally:
             raise OSError("stream close failed")
 
-    mock_client = MagicMock()
-    mock_client.aio.aclose = AsyncMock()
-    mock_client.aio.models.generate_content_stream = AsyncMock(return_value=chunks())
-    monkeypatch.setattr(
-        gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
-    )
-    tool = GeminiTool(api_key="test_api_key", is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    assert (await anext(stream))[0].content == "a"
-    await stream.aclose()  # Releasing the stream failed; the call did not.
+    def receive(delta: Delta) -> None:
+        raise ValueError("caller gone")
+
+    mock_client = _streaming(monkeypatch, chunks())
+    with deltas_to(receive), pytest.raises(LLMToolException) as raised:
+        async for _ in GeminiTool(api_key="k").invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
+    assert isinstance(raised.value.__cause__, ValueError)
     mock_client.close.assert_called_once()
 
 
@@ -335,9 +362,7 @@ async def test_client_close_failure_does_not_fail_completed_call(
 ) -> None:
     import grafi.tools.llms.impl.gemini_tool as gm_module
 
-    response = Mock()
-    response.text = "done"
-    response.function_calls = None
+    response = _response(Part(text="done"))
     mock_client = MagicMock()
     mock_client.aio.aclose = AsyncMock(side_effect=OSError("close"))
     mock_client.aio.models.generate_content = AsyncMock(return_value=response)
@@ -401,3 +426,131 @@ async def test_a_cancelled_client_close_does_not_replace_an_interrupt(
         ):
             pass
     assert any("CancelledError" in note for note in raised.value.__notes__)
+
+
+def test_history_keeps_function_calls_and_their_named_responses(gemini_instance):
+    call = {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "get_weather", "arguments": '{"city": "Paris"}'},
+    }
+    contents, _, _ = gemini_instance.prepare_api_input(
+        [
+            Message(role="user", content="Weather?"),
+            Message(role="assistant", content="", tool_calls=[call]),
+            Message(role="tool", tool_call_id="call_1", content="sunny"),
+        ]
+    )
+    asked, called, answered = contents
+    assert called.role == "model"
+    assert called.parts[0].function_call.name == "get_weather"
+    assert called.parts[0].function_call.args == {"city": "Paris"}
+    assert answered.role == "user"
+    response = answered.parts[0].function_response
+    assert (response.name, response.response) == ("get_weather", {"result": "sunny"})
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_answer_is_one_message_keeping_its_calls_signatures(
+    monkeypatch, gemini_instance, invoke_context
+):
+    call = FunctionCall(id="call_1", name="get_weather", args={"city": "Paris"})
+
+    async def chunks() -> AsyncIterator[GenerateContentResponse]:
+        yield _response(Part(text="Thinking...", thought=True))
+        yield _response(Part(text="Checking."))
+        yield _response(Part(function_call=call, thought_signature=b"sig"))
+
+    _streaming(monkeypatch, chunks())
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        [[message]] = [
+            batch
+            async for batch in gemini_instance.invoke(
+                invoke_context, [Message(role="user", content="Weather in Paris?")]
+            )
+        ]
+
+    assert received == [Delta("Checking.")]  # Thoughts are not the answer.
+    assert message.content == "Checking."
+    [tool_call] = message.tool_calls
+    assert tool_call.function.name == "get_weather"
+    assert tool_call.function.arguments == '{"city": "Paris"}'
+    # Kept as Gemini's OpenAI-compatible API keeps it, and sent back with the
+    # call, as Gemini 3 requires.
+    assert tool_call.model_extra["extra_content"] == {
+        "google": {"thought_signature": base64.b64encode(b"sig").decode()}
+    }
+    contents, _, _ = gemini_instance.prepare_api_input([message])
+    [text, sent] = contents[0].parts
+    assert (sent.function_call.name, sent.thought_signature) == ("get_weather", b"sig")
+
+
+def test_a_reply_without_text_or_calls_is_empty_not_a_placeholder(gemini_instance):
+    [message] = gemini_instance.to_messages(GenerateContentResponse())
+    assert message.content == "" and message.tool_calls is None
+
+
+def test_a_signature_survives_the_event_store_and_an_unsigned_call_gets_the_skip(
+    gemini_instance,
+):
+    from grafi.common.events.topic_events.publish_to_topic_event import (
+        PublishToTopicEvent,
+    )
+
+    [signed] = gemini_instance.to_messages(
+        _response(
+            Part(
+                function_call=FunctionCall(id="a", name="f", args={}),
+                thought_signature=b"sig",
+            ),
+            Part(function_call=FunctionCall(id="b", name="f", args={})),
+        )
+    )
+    stored = PublishToTopicEvent(
+        invoke_context=InvokeContext(
+            conversation_id="c", invoke_id="i", assistant_request_id="r"
+        ),
+        data=[signed],
+    )
+    [restored] = PublishToTopicEvent.from_dict(stored.to_dict()).data
+    # Another provider's call carries no signature; Gemini 3 needs one on the
+    # first call of each answer, which then gets the documented skip value.
+    unsigned = Message.model_validate(
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "x",
+                    "type": "function",
+                    "function": {"name": "f", "arguments": "{}"},
+                },
+                {
+                    "id": "y",
+                    "type": "function",
+                    "function": {"name": "f", "arguments": "{}"},
+                },
+            ],
+        }
+    )
+    contents, _, _ = gemini_instance.prepare_api_input([restored, unsigned])
+    assert [part.thought_signature for part in contents[0].parts] == [b"sig", None]
+    assert [part.thought_signature for part in contents[1].parts] == [
+        b"skip_thought_signature_validator",
+        None,
+    ]
+
+
+def test_a_blocked_prompt_or_answer_is_a_refusal(gemini_instance):
+    blocked = GenerateContentResponse.model_validate(
+        {"prompt_feedback": {"block_reason": "SAFETY"}}
+    )
+    stopped = GenerateContentResponse.model_validate(
+        {"candidates": [{"finish_reason": "RECITATION"}]}
+    )
+    [message] = gemini_instance.to_messages(blocked)
+    assert message.refusal == "Prompt blocked by Gemini: SAFETY"
+    [message] = gemini_instance.to_messages(stopped)
+    assert message.refusal == "Answer stopped by Gemini: RECITATION"
+    [message] = gemini_instance.to_messages(_response(Part(text="fine")))
+    assert message.refusal is None

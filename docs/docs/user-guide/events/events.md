@@ -154,7 +154,7 @@ Emitted when a node completes processing successfully.
 
 | Field         | Type                             | Description                                                                                  |
 |---------------|----------------------------------|----------------------------------------------------------------------------------------------|
-| `output_data` | `Optional[PublishToTopicEvent]`  | The node's last publication (its streamed chunks joined), or `None` if it published nothing. |
+| `output_data` | `Optional[PublishToTopicEvent]`  | The node's last publication, or `None` if it published nothing. |
 
 ### NodeFailedEvent
 

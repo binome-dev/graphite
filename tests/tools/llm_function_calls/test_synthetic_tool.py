@@ -159,17 +159,16 @@ async def test_invoke_successful(synthetic_tool, invoke_context):
 
 @pytest.mark.asyncio
 async def test_invoke_no_tool_calls(synthetic_tool, invoke_context):
-    """Test that invoke raises ValueError when no tool_calls are present."""
+    """Without tool calls, the tool yields nothing."""
     input_data = [Message(role="assistant", content="No tool calls here")]
 
-    with pytest.raises(ValueError, match="No tool_calls found"):
-        async for msg in synthetic_tool.invoke(invoke_context, input_data):
-            pass
+    outputs = [m async for m in synthetic_tool.invoke(invoke_context, input_data)]
+    assert outputs == []
 
 
 @pytest.mark.asyncio
 async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
-    """Test that invoke skips tool calls with non-matching function names."""
+    """A call to a function the tool lacks is answered with the error."""
     input_data = [
         Message(
             role="assistant",
@@ -190,7 +189,8 @@ async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
     async for msg in synthetic_tool.invoke(invoke_context, input_data):
         result.extend(msg)
 
-    assert len(result) == 0
+    [answer] = result
+    assert answer.content.startswith("Error: LookupError")
 
 
 @pytest.mark.asyncio
@@ -247,17 +247,6 @@ async def test_invoke_multiple_tool_calls(synthetic_tool, invoke_context):
         assert len(result) == 2
         assert result[0].tool_call_id == "call_1"
         assert result[1].tool_call_id == "call_2"
-
-
-def test_to_messages(synthetic_tool):
-    """Test to_messages creates proper Message objects."""
-    response = '{"temperature": 22.5, "conditions": "Sunny", "location": "SF"}'
-    result = synthetic_tool.to_messages(response=response, tool_call_id="call_123")
-
-    assert len(result) == 1
-    assert result[0].role == "tool"
-    assert result[0].content == response
-    assert result[0].tool_call_id == "call_123"
 
 
 def test_to_dict(synthetic_tool):

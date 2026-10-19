@@ -18,6 +18,9 @@ from grafi.common.exceptions.tool_exceptions import FunctionCallException
 from grafi.common.exceptions.workflow_exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime.deltas import Delta
+from grafi.runtime.deltas import deltas_to
+from grafi.runtime.deltas import emit_delta
 from grafi.runtime.execution_services import ErrorReporter
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
@@ -338,3 +341,54 @@ async def test_a_stream_runs_with_the_services_where_it_was_made(bound_services)
 
     assert len(await elsewhere.event_store.get_events()) == 4  # Node and tool.
     assert await bound_services.event_store.get_events() == []
+
+
+class _StreamingTool(_QuietTool):
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        for text in ("Check", "ing."):
+            emit_delta(text)
+        yield [Message(role="assistant", content="Checking.")]
+
+
+@pytest.mark.asyncio
+async def test_a_streaming_tool_records_its_messages_and_not_its_deltas(
+    bound_services,
+):
+    received = []
+    with deltas_to(received.append):
+        async for _ in _StreamingTool().invoke(_CONTEXT, []):
+            pass
+
+    assert [delta.content for delta in received] == ["Check", "ing."]
+    [respond] = [
+        e
+        for e in await bound_services.event_store.get_events()
+        if isinstance(e, ToolRespondEvent)
+    ]
+    [message] = respond.output_data
+    assert message.content == "Checking."
+
+
+class _PassingDeltasOn(_QuietTool):
+    """Like an assistant streaming its run: its stream carries deltas."""
+
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        yield Delta("Check")
+        yield [Message(role="assistant", content="Checking.")]
+
+
+@pytest.mark.asyncio
+async def test_deltas_passing_through_a_recorded_stream_are_not_recorded(
+    bound_services,
+):
+    items = [item async for item in _PassingDeltasOn().invoke(_CONTEXT, [])]
+
+    assert items[0] == Delta("Check")
+    [respond] = [
+        e
+        for e in await bound_services.event_store.get_events()
+        if isinstance(e, ToolRespondEvent)
+    ]
+    assert [message.content for message in respond.output_data] == ["Checking."]

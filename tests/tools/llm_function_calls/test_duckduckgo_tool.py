@@ -123,7 +123,8 @@ async def test_invoke_with_invalid_function_name(duckduckgo_tool):
 
     async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
         result.extend(msg)
-    assert len(result) == 0
+    [answer] = result  # The error, for the LLM.
+    assert answer.content.startswith("Error: LookupError")
 
 
 @pytest.mark.asyncio
@@ -157,6 +158,7 @@ async def test_error_handling(duckduckgo_tool):
 
         from grafi.common.exceptions import FunctionCallException
 
+        duckduckgo_tool.on_error = "raise"
         with pytest.raises(FunctionCallException) as excinfo:
             async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
                 assert msg  # should not reach here

@@ -15,6 +15,7 @@ from pydantic import PrivateAttr
 
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
+from grafi.runtime.deltas import streaming
 from grafi.tools.command import use_command
 from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
@@ -123,6 +124,11 @@ def add_additional_properties(
 
 @use_command(LLMCommand)
 class LLM(Tool):
+    """A tool that calls a language model, and yields its answer as one
+    message. While a caller streams the run, it streams the answer's text too,
+    as the provider produces it (see :mod:`grafi.runtime.deltas`), unless
+    ``is_streaming`` is off."""
+
     system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
     api_key: Optional[str] = Field(
@@ -134,7 +140,8 @@ class LLM(Tool):
     )
     chat_params: Dict[str, Any] = Field(default_factory=dict)
 
-    is_streaming: bool = Field(default=False)
+    # Whether to stream the answer to a caller that streams the run.
+    is_streaming: bool = Field(default=True)
 
     structured_output: bool = Field(
         default=False,
@@ -162,6 +169,11 @@ class LLM(Tool):
     def get_function_specs(self) -> FunctionSpecs:
         """Return the function specifications for this LLM."""
         return self._function_specs.copy()
+
+    def should_stream(self) -> bool:
+        """Whether to ask the provider for a stream: a caller streams the run,
+        and ``is_streaming`` is on."""
+        return self.is_streaming and streaming()
 
     @staticmethod
     def parse_tool_arguments(arguments: Optional[str]) -> Dict[str, Any]:
@@ -294,10 +306,11 @@ class LLMBuilder(ToolBuilder[T_L]):
         return self
 
     def is_streaming(self, is_streaming: bool) -> Self:
-        """Enable or disable streaming responses.
+        """Stream the answer, token by token, to a caller that streams the run
+        (the default), or not.
 
         Args:
-            is_streaming: True to stream responses token-by-token.
+            is_streaming: False to send a streaming caller the whole answer only.
 
         Returns:
             Self for method chaining.

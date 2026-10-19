@@ -617,7 +617,6 @@ output_data:
             arguments: '{"ticker":"TSLA"}'
             name: company_overview
           type: function
-      is_streaming: false
 ```
 You can view this using our internal tool called `grafi-dev` which we will demonstrate in future guides.
 

@@ -19,7 +19,6 @@ The fields of the EventDrivenWorkflow are:
 | `nodes`             | `Dict[str, Node]`                 | Collection of all nodes defined within this workflow, keyed by node name.                             |
 | `_topics`           | `Dict[str, TopicBase]`            | Private dictionary storing all event topics managed by the workflow.                                  |
 | `_topic_nodes`      | `Dict[str, List[str]]`            | Private mapping of topic names to lists of node names subscribed to each topic.                       |
-| `_streamed_topics`  | `Set[str]`                        | Agent output topics whose chunks reach the caller before their step commits.                          |
 | `_active_runs`      | `Dict[int, WorkflowRun]`          | The runs in flight, which `stop()` stops. (The inherited `_stop_requested` flag only records that `stop()` was called; runs do not read it.) |
 
 The workflow is an immutable *definition*. Each `invoke()` runs on its own
@@ -33,10 +32,9 @@ that `stop()` uses.
 |----------------------------------|----------------------------------------------------------------------------------------------|
 | `model_post_init`                | Validates subscriptions, sets up topics and links function-calling nodes after creation.    |
 | `builder`                        | Class method that returns a WorkflowBuilder for fluent workflow construction.               |
-| `_add_topics`                    | Sets up topic subscriptions, node-to-topic mappings and the streamed output topics.         |
-| `_find_streamed_topics`          | Finds the agent output topics that may stream to the caller before their step commits.     |
-| `_handle_function_calling_nodes` | Links function-calling nodes with LLM nodes to share function specifications.               |
-| `invoke`                         | Runs the workflow on a new `WorkflowRun`, streaming its outputs.                             |
+| `_add_topics`                    | Sets up topic subscriptions and node-to-topic mappings.                                     |
+| `_handle_function_calling_nodes` | Links function-calling nodes with LLM nodes to share function specifications, and makes one function-call node on each topic carrying calls answer the calls there naming a function no LLM calling there was offered. |
+| `invoke`                         | Runs the workflow on a new `WorkflowRun`, yielding its outputs as their steps commit, and, with `stream=True`, the deltas its tools emit. |
 | `stop`                           | Stops every run in flight.                                                                   |
 | `to_dict` / `from_dict`          | Serializes the workflow, including nodes and topics, and rebuilds it.                       |
 
@@ -64,7 +62,6 @@ The topic setup process:
 - Extracts topics from node subscription expressions using `extract_topics`
 - Maps topic names to subscribing node names in `_topic_nodes`
 - Registers all topics in the `_topics` dictionary
-- Finds the streamed output topics (`_streamed_topics`)
 - Rejects a topic that overrides a method runs do not call, or that has a custom
   `event_queue` (see [Topic Base](topics/topic_base.md))
 - Validates that required `InputTopic` and `OutputTopic` exist
@@ -72,8 +69,9 @@ The topic setup process:
 For function calling capabilities:
 
 - Identifies nodes using `FunctionCallTool`
-- Links them with LLM nodes that publish to the same topics
+- Links them with LLM nodes that publish to the topics they read (or, for an in-workflow output topic, to a topic paired with it)
 - Enables LLMs to recognize and invoke available function tools
+- On each topic carrying LLM calls, the first function-call node reading it (one answering errors, if any does) also answers, with an error, the calls there naming a function no LLM calling there was offered, so that every call reaching a function-call node gets a result. Such a node belongs to one workflow
 
 ## How a Run Executes
 
@@ -107,11 +105,12 @@ topics, where they can make other nodes ready. No node ever consumes a
 publication that a failure could lose, and topic positions are always
 contiguous. Steps that finish together are committed in the same write.
 
-An agent output topic that only the workflow reads and a single node writes
-streams to the caller as chunks arrive. Other topics, including in-workflow
-output topics for human input, deliver a step's publications together when the
-step commits. A node that should feed another node item by item publishes each
-item from its own invocation, for example by consuming a topic it publishes to.
+Outputs reach the caller the same way: only once their step is stored. A caller
+that streams the run (`invoke(..., stream=True)`) also gets the deltas each step
+emits, such as an LLM's tokens, as they are emitted; deltas are never published
+or stored (see [Runtime](runtime.md#streaming)). A node that should feed another
+node item by item publishes each item from its own invocation, for example by
+consuming a topic it publishes to.
 
 ### Ending a Run
 
@@ -181,10 +180,10 @@ Outputs are delivered at least once:
 - Delivered outputs are **acknowledged** (recorded as consumed by the workflow)
   when the stream closes, so answer a request after closing the stream that
   delivered it.
-- Outputs never handed over, outputs of steps that were not stored, and outputs
-  whose acknowledgement was not stored (the close was cancelled or timed out,
-  or the acknowledgement write failed, so the close raised) are delivered
-  again when the request resumes.
+- Outputs never handed over, and outputs whose acknowledgement was not stored
+  (the close was cancelled or timed out, or the acknowledgement write failed, so
+  the close raised) are delivered again when the request resumes. A step that
+  was not stored delivered nothing; it runs, and streams, again.
 
 ## Restoring Unfinished Workflows
 

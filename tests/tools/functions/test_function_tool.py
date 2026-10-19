@@ -1,4 +1,5 @@
 import json
+import threading
 import uuid
 
 import pytest
@@ -8,6 +9,8 @@ from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.functions.function_tool import FunctionTool
 
 
@@ -141,7 +144,7 @@ async def test_invoke_raises_function_tool_exception(invoke_context):
     with pytest.raises(FunctionToolException) as exc_info:
         async for _ in tool.invoke(invoke_context, input_messages):
             pass
-    assert "Async function execution failed" in str(exc_info.value)
+    assert "Function failed" in str(exc_info.value)
     assert exc_info.value.tool_name == "FunctionTool"
 
 
@@ -210,3 +213,58 @@ async def test_from_dict_roundtrip(function_tool, invoke_context):
         messages.extend(msg)
     assert isinstance(messages[0], Message)
     assert "42" in messages[0].content
+
+
+async def _outputs(tool: FunctionTool, context: InvokeContext) -> list[Messages]:
+    return [batch async for batch in tool.invoke(context, [Message(role="user")])]
+
+
+@pytest.mark.asyncio
+async def test_a_generator_streams_its_text_and_outputs_it_whole(invoke_context):
+    def words(messages: Messages):  # Sync: it runs in a worker thread.
+        yield "Hello, "
+        yield "world"
+
+    received: list[Delta] = []
+    with deltas_to(received.append, "node"):
+        [[message]] = await _outputs(FunctionTool(function=words), invoke_context)
+    assert [delta.content for delta in received] == ["Hello, ", "world"]
+    assert received[0].node_name == "node"
+    assert message.content == "Hello, world"
+
+
+@pytest.mark.asyncio
+async def test_a_generator_yielding_values_outputs_them_and_only_streams_text(
+    invoke_context,
+):
+    async def progress(messages: Messages):
+        yield "working..."
+        yield {"answer": 42}
+
+    received: list[Delta] = []
+    with deltas_to(received.append):
+        [[message]] = await _outputs(FunctionTool(function=progress), invoke_context)
+    assert [delta.content for delta in received] == ["working..."]
+    assert json.loads(message.content) == {"answer": 42}
+
+
+@pytest.mark.asyncio
+async def test_messages_pass_as_they_are_and_none_outputs_nothing(invoke_context):
+    reply = Message(role="tool", content="as is")
+    assert await _outputs(FunctionTool(function=lambda _: reply), invoke_context) == [
+        [reply]
+    ]
+    assert await _outputs(FunctionTool(function=lambda _: None), invoke_context) == []
+
+
+@pytest.mark.asyncio
+async def test_a_sync_function_runs_off_the_event_loop(invoke_context):
+    loop_thread = threading.get_ident()
+    ran_in: list[int] = []
+
+    def blocking(messages: Messages) -> str:
+        ran_in.append(threading.get_ident())
+        return "done"
+
+    [[message]] = await _outputs(FunctionTool(function=blocking), invoke_context)
+    assert message.content == "done" and ran_in != [loop_thread]

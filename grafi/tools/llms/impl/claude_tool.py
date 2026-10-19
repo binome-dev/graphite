@@ -20,6 +20,7 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.runtime.deltas import emit_delta
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -222,19 +223,16 @@ class ClaudeTool(LLM):
             async with best_effort_exit(
                 AsyncAnthropic(api_key=self.api_key), "Anthropic client"
             ) as client:
-                if self.is_streaming:
-                    async with best_effort_exit(
-                        client.messages.stream(**request_kwargs), "Anthropic stream"
-                    ) as stream:
-                        async for event in stream:
-                            if event.type == "text":
-                                yield self.to_stream_messages(event.text)
-                else:
-                    resp: AnthropicMessage = await client.messages.create(
-                        **request_kwargs
-                    )
-                    yield self.to_messages(resp)
-
+                # Always streamed: the SDK refuses a request that may take long
+                # (a large max_tokens) unless it is.
+                async with best_effort_exit(
+                    client.messages.stream(**request_kwargs), "Anthropic stream"
+                ) as stream:
+                    if self.should_stream():
+                        async for text in stream.text_stream:
+                            emit_delta(text)
+                    response = await stream.get_final_message()
+            messages = self.to_messages(response)
         except Exception as exc:
             raise LLMToolException(
                 tool_name=self.name,
@@ -243,15 +241,11 @@ class ClaudeTool(LLM):
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc
+        yield messages
 
     # ------------------------------------------------------------------ #
     # Conversion helpers                                                 #
     # ------------------------------------------------------------------ #
-    def to_stream_messages(self, text: str) -> Messages:
-        if text:
-            return [Message(role="assistant", content=text, is_streaming=True)]
-        return []
-
     def to_messages(self, resp: AnthropicMessage) -> Messages:
         text = ""
         tool_calls = []
@@ -272,10 +266,8 @@ class ClaudeTool(LLM):
         message_args: Dict[str, Any] = {
             "role": "assistant",
             "content": text,
-            "tool_calls": tool_calls,
+            "tool_calls": tool_calls or None,  # No tool call is None, not [].
         }
-        if len(tool_calls) > 0:
-            message_args["content"] = ""
 
         # A refused response (HTTP 200, stop_reason="refusal") carries empty or
         # partial content; surface the reason on the message so callers can react
@@ -321,7 +313,7 @@ class ClaudeTool(LLM):
             .type(data.get("type", "ClaudeTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
+            .is_streaming(data.get("is_streaming", True))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("ANTHROPIC_API_KEY"))
             .model(data.get("model", "claude-haiku-4-5"))

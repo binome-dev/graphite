@@ -200,9 +200,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
                 content=json.dumps({"query": "test query"}),
             )
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert "Search result for query" in results[0]
@@ -239,9 +237,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
             input_message = Message(role="assistant", content="{}")
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert results[0] == "base64data"
@@ -282,9 +278,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
             input_message = Message(role="assistant", content="{}")
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert "[Embedded resource:" in results[0]

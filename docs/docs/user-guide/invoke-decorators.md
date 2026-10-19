@@ -34,9 +34,10 @@ decorated methods and offers them to the LLM.
 
 - The description is the docstring's summary (and longer text); each
   parameter's description comes from its `Args` entry.
-- Parameters without a default are required. `self`, `cls`, `ctx`, `context`
-  and parameters starting with `_` are hidden from the LLM. `*args` and
-  `**kwargs` are rejected.
+- Parameters without a default are required. `self`, `cls`, parameters
+  starting with `_`, and parameters typed `InvokeContext` are hidden from the
+  LLM; a `FunctionCallTool` passes the last ones the request's context. `*args`
+  and `**kwargs` are rejected.
 - The return annotation, unless missing or `Any`, becomes the spec's
   `output_schema`.
 
@@ -78,10 +79,10 @@ For each invocation the decorator:
 1. Records the invoke event (`ToolInvokeEvent`, `NodeInvokeEvent`, ...).
 2. Runs the stream in a span named `{name}.invoke` (`{name}.run` for an
    assistant), passing every item through as it is yielded.
-3. Records the respond event with the output. Streamed chunks are joined into
-   one message. A tool records its messages, and a node its last publication,
-   or `None` when it published nothing. An assistant or a workflow records its
-   output events.
+3. Records the respond event with the output. A tool records its messages,
+   and a node its last publication, or `None` when it published nothing. An
+   assistant or a workflow records its output events. Deltas passing through a
+   streamed assistant or workflow are never recorded.
 4. On failure, records the failed event instead, then raises the failure
    again. The failed event carries structured `error_details`: the error and
    its cause chain, the failing component, the request's ids, the root cause

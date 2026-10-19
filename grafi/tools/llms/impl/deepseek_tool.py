@@ -51,7 +51,7 @@ class DeepseekTool(OpenAICompatibleTool):
             .type(data.get("type", "DeepseekTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
+            .is_streaming(data.get("is_streaming", True))
             .system_message(data.get("system_message", ""))
             .model(data.get("model", "deepseek-chat"))
             .api_key(os.getenv("DEEPSEEK_API_KEY"))

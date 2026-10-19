@@ -7,12 +7,15 @@ from unittest.mock import Mock
 import pytest
 from anthropic import omit
 from anthropic.types.text_block import TextBlock
+from anthropic.types.tool_use_block import ToolUseBlock
 
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
 
 
@@ -49,6 +52,27 @@ def test_init(claude_instance):
     assert claude_instance.max_tokens == 2048
 
 
+class _Answering:
+    """An Anthropic message stream that answers ``response`` whole."""
+
+    def __init__(self, response: Any) -> None:
+        self.response = response
+
+    async def __aenter__(self) -> "_Answering":
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        return None
+
+    @property
+    async def text_stream(self) -> Any:
+        return
+        yield
+
+    async def get_final_message(self) -> Any:
+        return self.response
+
+
 # --------------------------------------------------------------------------- #
 #  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
@@ -63,7 +87,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=fake_response)
+    mock_client.messages.stream = Mock(return_value=_Answering(fake_response))
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -93,7 +117,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     mock_async_anthropic_cls.assert_called_once_with(api_key="test_api_key")
 
     # verify create() called with right kwargs
-    kwargs = mock_client.messages.create.call_args[1]
+    kwargs = mock_client.messages.stream.call_args[1]
     assert kwargs["model"] == "claude-haiku-4-5"
     assert kwargs["max_tokens"] == 2048
     # system prompt must be the top-level `system=` param, NOT a message role
@@ -117,7 +141,7 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=fake_response)
+    mock_client.messages.stream = Mock(return_value=_Answering(fake_response))
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -149,7 +173,7 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
     async for _ in claude_instance.invoke(invoke_context, msgs):
         pass  # Just consume the generator to trigger the API call
 
-    kwargs = mock_client.messages.create.call_args[1]
+    kwargs = mock_client.messages.stream.call_args[1]
     assert kwargs["tools"] is not None
 
 
@@ -164,7 +188,7 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
         raise Exception("Boom")
 
     mock_client = MagicMock()
-    mock_client.messages.create.side_effect = _raise
+    mock_client.messages.stream.side_effect = _raise
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -363,7 +387,9 @@ async def test_client_close_failure_does_not_fail_completed_call(
     fake_block.text = "done"
     fake_block.role = "assistant"
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=Mock(content=[fake_block]))
+    mock_client.messages.stream = Mock(
+        return_value=_Answering(Mock(content=[fake_block]))
+    )
 
     async def mock_aenter(self: Any) -> MagicMock:
         return mock_client
@@ -404,9 +430,15 @@ async def test_stream_close_failure_does_not_fail_the_call(
         async def __aexit__(self, *exc_info: Any) -> None:
             raise OSError("stream close failed")
 
-        async def __aiter__(self) -> Any:
+        @property
+        async def text_stream(self) -> Any:
             for text in ("a", "b"):
-                yield SimpleNamespace(type="text", text=text)
+                yield text
+
+        async def get_final_message(self) -> Any:
+            return SimpleNamespace(
+                content=[TextBlock(type="text", text="ab")], stop_reason="end_turn"
+            )
 
     mock_client = MagicMock()
     mock_client.messages.stream = Mock(return_value=FakeStream())
@@ -423,12 +455,84 @@ async def test_stream_close_failure_does_not_fail_the_call(
     monkeypatch.setattr(
         cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
     )
-    tool = ClaudeTool(api_key="test_api_key", is_streaming=True)
-    result = [
-        message.content
-        async for batch in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
-    assert result == ["a", "b"]
+    tool = ClaudeTool(api_key="test_api_key")
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        result = [
+            message.content
+            async for batch in tool.invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            )
+            for message in batch
+        ]
+    assert [delta.content for delta in received] == ["a", "b"]
+    assert result == ["ab"]
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    from types import SimpleNamespace
+
+    import grafi.tools.llms.impl.claude_tool as cl_module
+
+    class FakeStream:
+        async def __aenter__(self) -> "FakeStream":
+            return self
+
+        async def __aexit__(self, *exc_info: Any) -> None:
+            return None
+
+        @property
+        async def text_stream(self) -> Any:
+            yield "Checking."
+
+        async def get_final_message(self) -> Any:
+            return SimpleNamespace(
+                content=[
+                    TextBlock(type="text", text="Checking."),
+                    ToolUseBlock(
+                        type="tool_use",
+                        id="toolu_1",
+                        name="weather",
+                        input={"city": "Paris"},
+                    ),
+                ],
+                stop_reason="tool_use",
+            )
+
+    client = MagicMock()
+    client.messages.stream = Mock(return_value=FakeStream())
+    anthropic = MagicMock()
+    anthropic.__aenter__ = AsyncMock(return_value=client)
+    anthropic.__aexit__ = AsyncMock(return_value=None)
+    monkeypatch.setattr(cl_module, "AsyncAnthropic", MagicMock(return_value=anthropic))
+
+    tool = ClaudeTool(api_key="test_api_key")
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        batches = [
+            batch
+            async for batch in tool.invoke(
+                invoke_context, [Message(role="user", content="Weather in Paris?")]
+            )
+        ]
+
+    [[call]] = batches
+    assert [delta.content for delta in received] == ["Checking."]
+    assert call.content == "Checking."
+    assert call.tool_calls[0].id == "toolu_1"
+    assert call.tool_calls[0].function.name == "weather"
+    assert call.tool_calls[0].function.arguments == '{"city": "Paris"}'
+
+
+def test_a_reply_without_tool_use_has_no_tool_calls() -> None:
+    from types import SimpleNamespace
+
+    response = SimpleNamespace(
+        content=[TextBlock(type="text", text="Hello")], stop_reason="end_turn"
+    )
+    [message] = ClaudeTool(api_key="k").to_messages(response)  # type: ignore[arg-type]
+    assert message.content == "Hello"
+    assert message.tool_calls is None  # Not [], which routes as a tool call.

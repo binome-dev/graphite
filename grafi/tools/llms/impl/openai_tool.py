@@ -79,7 +79,7 @@ class OpenAITool(OpenAICompatibleTool):
             .type(data.get("type", "OpenAITool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
+            .is_streaming(data.get("is_streaming", True))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("OPENAI_API_KEY"))
             .model(data.get("model", "gpt-4.1-nano"))

@@ -32,11 +32,11 @@ While the platform is designed for maximum flexibility, certain conventions guid
 
 ## Stream Usage
 
-- **Output Only**: Streaming is only relevant for final outputs, letting the LLM emit partial content in real time.
-- **Asynchronous Requirement**: Nodes, workflows, and assistants do not support synchronous streaming. Though the LLM tool may have a synchronous stream function, the system’s architecture uses async flows.
-- **Usage Pattern**: For practical examples, see `stream_assistant`; it shows how to handle partial token streams differently from normal async generators.
+- **Caller's Choice**: The caller decides whether to stream, with `invoke(..., stream=True)`. It then gets the deltas the tools emit, such as an LLM's tokens, between the outputs.
+- **Side Channel**: Deltas are never published to topics or stored. Routing and the event log only see whole messages, so a stream never changes what a workflow does.
+- **Usage Pattern**: For practical examples, see `simple_stream_assistant`; it shows a caller reading deltas and outputs from one stream.
 
-**Rationale**: Maintaining an async-only stream approach for nodes, workflows, and assistants simplifies concurrency, reduces potential race conditions, and provides a consistent development experience.
+**Rationale**: Keeping partial output out of the event log keeps routing decisions and history to whole messages, and keeps the log to a few records per step rather than one per token.
 
 ## LLMFunctionCall
 

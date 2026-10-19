@@ -2,6 +2,108 @@
 
 ## Unreleased
 
+Streaming is the caller's choice, on a side channel:
+- A caller streams with `invoke(..., stream=True)`, on an assistant, a
+  workflow or `GrafiRuntime`, and gets `grafi.runtime.Delta`s (the text, the
+  node, the step's number in the run and, from a function call, the call's id)
+  between the outputs. An overridden `invoke`, of an assistant or a workflow,
+  takes the keyword-only `stream: bool = False` and passes it on; one that does
+  not fails with `TypeError: invoke() got an unexpected keyword argument
+  'stream'`.
+- Deltas are never published or stored. A stream's chunks are no longer
+  events, so a streamed answer is one stored message rather than two records
+  per token, and routing only sees whole messages. Every output reaches the
+  caller once its step is stored. A step that fails mid-stream stores nothing,
+  and streams again when its request resumes.
+- `Message.is_streaming`, `get_async_output_events()` and the workflow's
+  streamed output topics are gone. A tool that yielded `is_streaming` chunks
+  calls `emit_delta(text)` for each piece instead, then yields its whole
+  output; `streaming()` says whether anyone receives them. Where a tool is
+  invoked directly, as in a test, `deltas_to(...)` collects its deltas.
+- Histories stored before hold a stream's chunks as outputs: resuming such a
+  request delivers the unacknowledged ones as they are, one chunk each.
+- `LLM.is_streaming` defaults to `True`, and means: stream to a caller that
+  streams. The provider is asked for a stream only then, and every LLM yields
+  its answer as one message, its text, refusal and tool calls together
+  (OpenAI-compatible tools, Claude, Gemini, Ollama). Structured output from a
+  parse endpoint is never streamed. `to_stream_messages` is gone; a provider
+  of your own checks `should_stream()`. A manifest saved before stores
+  `"is_streaming": false`, the old default: remove it, or set it to `true`, for
+  that LLM to stream.
+
+Tools run plain functions, and answer every tool call:
+- A function given to `FunctionTool` or `FunctionCallTool` may be sync or
+  async, or a generator. Sync code runs in a worker thread (a `FunctionTool`'s
+  ran on the event loop), so a tool's sync functions, which run concurrently,
+  must be thread-safe, and code using the loop, such as `asyncio.Event.set()`,
+  must be async; a sync generator runs in one thread of its own. Sync code
+  cannot be stopped midway: a stop or a cancellation drops a call not yet
+  started, and waits for one running to return, so sync code must not wait
+  for the loop. Each string a generator yields streams as a delta, and its
+  result is that text, joined; if it also yields other values, those are its
+  results.
+- `FunctionTool`: messages a function returns pass as they are (they were
+  encoded as JSON); `None` outputs nothing (it was `"null"`); an async
+  generator's strings make one message (each item was a publication).
+  `to_messages` is gone; `grafi.tools.results.as_messages` converts values.
+- A function-call tool answers each call it is given with exactly one
+  `role="tool"` message, its content text: a string as it is, anything else as
+  JSON. Calls run concurrently. Arguments are validated and coerced against
+  the function's signature, and a parameter typed `InvokeContext` is passed
+  the request's context; parameters named `ctx` or `context` are no longer
+  hidden from the LLM.
+- A failed call (an unknown function, malformed or invalid arguments, an
+  exception) is answered with `Error: <type>: <message>`, so the LLM can
+  recover. Before, it failed the run, or, for an unknown function, went
+  unanswered and could end the run without output. `on_error="raise"`
+  (`.on_error("raise")` on the builder) fails the node with
+  `FunctionCallException` instead.
+- In a workflow, a function-call node passes its tool the unanswered calls to
+  its functions; on each topic carrying calls, the first function-call node
+  reading it (one answering errors, if any does) also answers the calls there
+  naming a function no LLM calling there was offered.
+  `FunctionCallCommand` passes every call not yet answered, not only a
+  message's first.
+- A subclass registers the `@llm_function` methods of its base classes, and an
+  override, decorated or not, is the one called. `.function(...)` on a
+  subclass's builder keeps the class's own methods, and replaces a function of
+  the same name. A plain function is called with the LLM's arguments alone;
+  one whose first parameter is `self` is passed the tool.
+- `MCPTool`, `AgentCallingTool` and `SyntheticTool` override only
+  `async def call_function(invoke_context, name, arguments)`; `to_messages` is
+  gone from function-call tools. `MCPFunctionTool.invoke_mcp_function` returns
+  its text.
+- A tool class's command, set with `@use_command`, is inherited by its
+  subclasses; `TOOL_COMMAND_REGISTRY` is gone.
+
+`has_text_response` is true only for a final answer: text with no tool call.
+Text that came with tool calls was also routed to the output.
+
+Providers:
+- `ClaudeTool` gives a reply without tool use `tool_calls=None`, not `[]`,
+  which routed it as a tool call and could loop a ReAct workflow. It always
+  requests a stream, which the SDK requires for a large `max_tokens`.
+- Gemini sends tool calls and their results as function-call parts; before,
+  it dropped them from the history. It keeps each call's thought signature
+  (in the tool call's `extra_content`, as Gemini's OpenAI-compatible API
+  does) and sends it back, which Gemini 3 requires; a call it did not sign,
+  such as another provider's, is sent with the value Google documents for
+  that. A blocked prompt or answer sets the message's `refusal`.
+- Claude, Gemini and Ollama keep a reply's text beside its tool calls (Claude
+  used to blank it), and Gemini and Ollama no longer put "No content provided"
+  in an empty reply. A key in Ollama's `chat_params` replaces the tool's own,
+  such as `model`, rather than failing, and a tool result names its function.
+- OpenAI-compatible tools send a tool call's standard fields only, whichever
+  provider made it. Their streams tolerate providers that repeat fields in
+  every chunk, keep URL citations (the annotations a message holds, as a
+  whole answer now does too) and report usage (`stream_options` are sent to
+  streams only), and an answer with audio is not streamed. An MCP image no
+  longer overwrites the text before it.
+- An LLM's history puts a call's results in the calls' order, which Ollama,
+  matching results to calls by position, relies on, and holds a message the
+  LLM consumed from several topics once. A node reading a message on several
+  topics answers its calls once.
+
 Invocations run with process default services, as tracing uses OpenTelemetry's
 global provider:
 - Set them once at startup with `set_default_services(ExecutionServices(...))`.
@@ -80,13 +182,8 @@ deduplicated before delivery. Recording the same publication remains idempotent;
 calling `publish_data()` again creates another publication. Older event records
 without `emission_id` still decode with a value of `None`.
 
-Runs now store every streaming publication and consumption record
-with its actual offset. Outputs are acknowledged only once their
-publications are stored. If a producer fails, stops or is
-cancelled mid-stream, its unpersisted preview chunks remain unacknowledged and
-may be delivered again when the input is retried. Stored stream history therefore
-contains more raw records. Use `get_async_output_events()` explicitly for a
-derived text display; its projections must not be persisted as recovery records.
+Runs now store every publication and consumption record with its actual
+offset. Outputs are acknowledged only once their publications are stored.
 
 Recovery restores publications in per-topic offset order, then consumer cursors,
 before determining readiness. Missing or conflicting publication offsets and
@@ -150,12 +247,10 @@ Internal modules and helpers of the old engine are removed:
 `grafi.workflows.impl.utils` the functions `publish_events()` and
 `get_node_input()`.
 
-Agent output topics that only the workflow reads and a single node writes still
-stream to the caller as chunks arrive, so token streaming is unchanged for the
-usual LLM-to-output pipeline. Every other topic, including internal topics,
-output topics written by several nodes and in-workflow output topics, receives a
-step's publications together when that step commits. A human-input request on an
-in-workflow output topic therefore reaches the caller only once it is stored.
+Every topic receives a step's publications together when that step commits, so
+an output, such as a human-input request on an in-workflow output topic,
+reaches the caller only once it is stored; tokens stream as deltas instead (see
+above).
 Resending the same answer event (the same event ID, answering the same
 requests), for example a client retry after a failed attempt, delivers it to the
 waiting node once; any other answer is a new input. Runs of one request must not

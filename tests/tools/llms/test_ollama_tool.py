@@ -1,5 +1,7 @@
+import asyncio
 from typing import Any
 from typing import AsyncIterator
+from typing import List
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -7,11 +9,14 @@ from unittest.mock import Mock
 import pytest
 from ollama import ChatResponse
 
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
 
 
@@ -228,17 +233,18 @@ def test_prepare_api_input_forwards_tool_calls():
 
 
 @pytest.mark.asyncio
-async def test_early_close_releases_stream_and_client(
+async def test_a_call_cancelled_mid_stream_releases_the_stream_and_client(
     invoke_context: InvokeContext, mock_ollama_client: Mock
 ) -> None:
     closed: list[str] = []
+    first = asyncio.Event()
 
     async def chunks() -> AsyncIterator[ChatResponse]:
         try:
-            for text in ("a", "b"):
-                yield ChatResponse.model_validate(
-                    {"message": {"role": "assistant", "content": text}}
-                )
+            yield ChatResponse.model_validate(
+                {"message": {"role": "assistant", "content": "a"}}
+            )
+            await asyncio.Event().wait()
         finally:
             closed.append("stream")
 
@@ -246,16 +252,25 @@ async def test_early_close_releases_stream_and_client(
         return chunks()
 
     mock_ollama_client.return_value.chat = mock_chat
-    tool = OllamaTool(is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    await anext(stream)
-    await stream.aclose()
-    assert closed == ["stream"]
+
+    async def call() -> None:
+        with deltas_to(lambda delta: first.set()):
+            async for _ in OllamaTool().invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+
+    task = asyncio.create_task(call())
+    async with asyncio.timeout(5):
+        await first.wait()
+        task.cancel()
+        await asyncio.wait({task})
+    assert task.cancelled() and closed == ["stream"]
     mock_ollama_client.return_value.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
+async def test_a_stream_failing_to_close_does_not_replace_the_calls_error(
     invoke_context: InvokeContext, mock_ollama_client: Mock
 ) -> None:
     async def chunks() -> AsyncIterator[ChatResponse]:
@@ -270,11 +285,16 @@ async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
     async def mock_chat(*args: Any, **kwargs: Any) -> AsyncIterator[ChatResponse]:
         return chunks()
 
+    def receive(delta: Delta) -> None:
+        raise ValueError("caller gone")
+
     mock_ollama_client.return_value.chat = mock_chat
-    tool = OllamaTool(is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    await anext(stream)
-    await stream.aclose()  # Releasing the stream failed; the call did not.
+    with deltas_to(receive), pytest.raises(LLMToolException) as raised:
+        async for _ in OllamaTool().invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        ):
+            pass
+    assert isinstance(raised.value.__cause__, ValueError)
     mock_ollama_client.return_value.close.assert_awaited_once()
 
 
@@ -298,3 +318,88 @@ async def test_client_close_failure_does_not_fail_completed_call(
         for message in batch
     ]
     assert [message.content for message in result] == ["done"]
+
+
+@pytest.mark.asyncio
+async def test_chat_params_reach_the_client(invoke_context, mock_ollama_client):
+    calls: List[dict] = []
+
+    async def chat(**kwargs: Any) -> ChatResponse:
+        calls.append(kwargs)
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "ok"}}
+        )
+
+    mock_ollama_client.return_value.chat = chat
+    tool = OllamaTool(
+        chat_params={"options": {"temperature": 0}, "keep_alive": "5m", "model": "m2"}
+    )
+    [m async for m in tool.invoke(invoke_context, [Message(role="user", content="Hi")])]
+
+    assert calls[0]["options"] == {"temperature": 0}
+    assert calls[0]["keep_alive"] == "5m"
+    assert calls[0]["model"] == "m2"  # A key chat_params sets replaces the default.
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
+    invoke_context, mock_ollama_client
+):
+    async def chunks() -> Any:
+        yield ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "Checking."}}
+        )
+        yield ChatResponse.model_validate(
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "weather",
+                                "arguments": {"city": "Paris"},
+                            }
+                        }
+                    ],
+                }
+            }
+        )
+
+    async def chat(**kwargs: Any) -> Any:
+        return chunks()
+
+    mock_ollama_client.return_value.chat = chat
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        batches = [
+            batch
+            async for batch in OllamaTool().invoke(
+                invoke_context, [Message(role="user", content="Weather?")]
+            )
+        ]
+
+    [[message]] = batches
+    assert [delta.content for delta in received] == ["Checking."]
+    assert message.content == "Checking."
+    assert message.tool_calls[0].function.name == "weather"
+    assert message.tool_calls[0].function.arguments == '{"city": "Paris"}'
+
+
+def test_a_tool_result_names_the_function_its_call_named():
+    call = {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "weather", "arguments": '{"city": "Paris"}'},
+    }
+    api_messages, _ = OllamaTool().prepare_api_input(
+        [
+            Message(role="assistant", content="", tool_calls=[call]),
+            Message(role="tool", tool_call_id="call_1", content="sunny"),
+        ]
+    )
+    assert api_messages[-1] == {
+        "role": "tool",
+        "content": "sunny",
+        "tool_name": "weather",
+    }

@@ -1,7 +1,8 @@
 """Seeded fuzz of failures and early stops, checking event-sourcing invariants.
 
 Each case runs one request against a small workflow with a fan-in topic (two
-producers), an internal staged topic and a streamed output, in both modes.
+producers), an internal staged topic and an output, in both modes, the caller
+streaming the tools' deltas.
 Tools fail at random and the caller stops early at random; the request is then
 resumed until it completes. After every attempt the stored history must have
 contiguous topic positions and be accepted by recovery; across all attempts
@@ -31,6 +32,8 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
+from grafi.runtime import emit_delta
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicBase
@@ -45,7 +48,7 @@ MAX_ATTEMPTS = 12
 
 
 class FlakyTool(Tool):
-    """Streams a few chunks and fails partway on some attempts."""
+    """Streams and outputs a few pieces, and fails partway on some attempts."""
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
     chunks: int = 2
@@ -60,13 +63,8 @@ class FlakyTool(Tool):
             if self.failures_left and self.rng.random() < 0.5:
                 self.failures_left -= 1
                 raise RuntimeError(f"{self.name} failed")
-            yield [
-                Message(
-                    role="assistant",
-                    content=f"{self.name}-{index}",
-                    is_streaming=True,
-                )
-            ]
+            emit_delta(f"{self.name}-{index}")
+            yield [Message(role="assistant", content=f"{self.name}-{index}")]
 
 
 def make_node(name: str, tool: Tool, source: TopicBase, destination: TopicBase) -> Node:
@@ -92,7 +90,7 @@ def build_workflow(rng: random.Random) -> EventDrivenWorkflow:
         EventDrivenWorkflow.builder()
         .node(make_node("a", tool("a"), source, mid))  # Fan-in on "mid" ...
         .node(make_node("c", tool("c"), source, mid))  # ... from two producers.
-        .node(make_node("b", tool("b"), mid, out))  # Streams to the caller.
+        .node(make_node("b", tool("b"), mid, out))
         .build()
     )
 
@@ -147,14 +145,15 @@ async def test_failures_and_early_stops_keep_history_consistent(
     async with asyncio.timeout(20):
         for attempt in range(MAX_ATTEMPTS):
             stop_after = rng.choice([None, 0, 1, 2])
-            outputs = workflow.invoke(event, sequential)
+            outputs = workflow.invoke(event, sequential, stream=True)
             try:
-                received = 0
+                received = 0  # Outputs and deltas: a stop may land on either.
                 async for output in outputs:
-                    delivered.setdefault((output.name, output.offset), []).append(
-                        attempt
-                    )
                     received += 1
+                    if not isinstance(output, Delta):
+                        delivered.setdefault((output.name, output.offset), []).append(
+                            attempt
+                        )
                     if stop_after is not None and received > stop_after:
                         break
                 else:

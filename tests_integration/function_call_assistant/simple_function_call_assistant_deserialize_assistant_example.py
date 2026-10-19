@@ -61,7 +61,15 @@ async def test_deserialized_assistant() -> None:
     print(output[-1].data[0].content)
     assert output is not None
     assert "12345" in str(output[-1].data[0].content)
-    assert "bad" in str(output[-1].data[0].content)
+    # The function's own words, not the LLM's rewording of them.
+    tool_results = [
+        message.content
+        for event in await event_store.get_events()
+        if isinstance(event, PublishToTopicEvent)
+        for message in event.data
+        if message.role == "tool"
+    ]
+    assert any("bad" in str(result) for result in tool_results)
     print(len(await event_store.get_events()))
     # Same workflow as the freshly-built assistant, so the same event count
     # (see simple_function_call_assistant_multi_functions_example.py).

@@ -43,7 +43,9 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
 from grafi.runtime import GrafiRuntime
+from grafi.runtime import emit_delta
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import SubExpr
@@ -812,19 +814,20 @@ async def test_timeout_around_the_close_bounds_it_when_a_step_ignores_cancel() -
     stopping = asyncio.Event()
 
     async def stubborn(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
+        emit_delta("a")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
             stopping.set()
             await asyncio.Event().wait()  # Ignores the first cancellation.
+        yield reply("never")
 
     definition = workflow(
         node("stubborn", stubborn, InputTopic(name="input"), OutputTopic(name="out"))
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "a"
+        assert await anext(outputs) == Delta("a", "stubborn", 1)
         closing = asyncio.create_task(outputs.aclose())
         await stopping.wait()  # The close waits for a step that will not end.
         closing.cancel()  # A timeout around the close.
@@ -845,17 +848,22 @@ async def test_coordinator_cancelled_from_outside_ends_without_the_close(
     writes = Writes(monkeypatch, event_store)
 
     async def emit(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
         if stage == "running":
+            emit_delta("a")
             await asyncio.Event().wait()
+        yield reply("a")
 
     definition = workflow(
         node("emit", emit, InputTopic(name="input"), OutputTopic(name="out"))
     )
     event = input_event()
-    outputs = definition.invoke(event)
+    outputs = definition.invoke(event, stream=True)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "a"
+        first = await anext(outputs)
+        if stage == "running":  # Streamed by the step, which is still running.
+            assert first == Delta("a", "emit", 1)
+        else:
+            assert not isinstance(first, Delta) and first.data[0].content == "a"
         if stage == "finished":  # Nothing is left to run; the run awaits the close.
             await until(lambda: writes.published("out"))
         [coordinator] = tasks_named(definition.name)
@@ -880,7 +888,7 @@ async def test_coordinator_cancelled_from_outside_while_steps_stop_ends_at_once(
     received, stopping = asyncio.Event(), asyncio.Event()
 
     async def slow_to_stop(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
+        emit_delta("a")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
@@ -898,7 +906,7 @@ async def test_coordinator_cancelled_from_outside_while_steps_stop_ends_at_once(
         node("slow", slow_to_stop, source, OutputTopic(name="out")),
         node("fails", fail, source, Topic(name="side")),
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         received.set()
@@ -1650,7 +1658,7 @@ async def test_a_caller_leaving_early_cancels_each_step_once() -> None:
     counts: list[int] = []
 
     async def waits(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("first")
+        emit_delta("first")
         started.set()
         try:
             await asyncio.Event().wait()
@@ -1664,7 +1672,7 @@ async def test_a_caller_leaving_early_cancels_each_step_once() -> None:
     definition = workflow(
         node("waits", waits, InputTopic(name="input"), OutputTopic(name="out"))
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         await started.wait()
@@ -1721,12 +1729,18 @@ async def test_an_abort_during_a_commit_still_cancels_a_closing_step(
             routes=[PublishRoute(topic=Rejecting(name="mid"))]
         ),
     )
+
+    async def early(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
+        emit_delta("first")
+        emit_delta("second")
+        yield reply("done")
+
     definition = workflow(
-        node("early", emits("first", "second"), source, OutputTopic(name="out")),
+        node("early", early, source, OutputTopic(name="out")),
         node("c", emits("side"), source, Topic(name="side")),
         bad,
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         await until(

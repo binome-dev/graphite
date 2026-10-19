@@ -1577,6 +1577,7 @@ class TestEdgeCasesAndExceptions:
                 FunctionCallTool.builder()
                 .name("ErrorTool")
                 .function(raise_error)
+                .on_error("raise")
                 .build()
             )
             .publish_to(agent_output, when=_is_final_response)
@@ -1794,7 +1795,11 @@ class TestEdgeCasesAndExceptions:
             .name("FuncNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder().name("SomeFunc").function(some_func).build()
+                FunctionCallTool.builder()
+                .name("SomeFunc")
+                .function(some_func)
+                .on_error("raise")
+                .build()
             )
             .publish_to(agent_output, when=_is_final_response)
             .build()
@@ -1968,7 +1973,11 @@ class TestEdgeCasesAndExceptions:
             .name("FailNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder().name("FailTool").function(fail_func).build()
+                FunctionCallTool.builder()
+                .name("FailTool")
+                .function(fail_func)
+                .on_error("raise")
+                .build()
             )
             .publish_to(function_result_topic)
             .build()
@@ -1999,6 +2008,77 @@ class TestEdgeCasesAndExceptions:
 
         # Verify LLM was only called once (workflow stopped after error)
         assert call_count["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_a_failing_function_is_answered_and_the_llm_recovers(
+        self, invoke_context
+    ):
+        """By default a function's error answers its call, so the LLM can go on."""
+        seen: List[Messages] = []
+
+        def mock_llm(messages: List[Message]) -> List[Message]:
+            seen.append(messages)
+            if len(seen) == 1:
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("fail", "fail_func", "{}")],
+                    )
+                ]
+            return [Message(role="assistant", content="Recovered")]
+
+        def fail_func(self) -> str:
+            raise ValueError("flaky")
+
+        agent_input = InputTopic(name="agent_input")
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
+        function_result_topic = Topic(name="function_result")
+        llm_node = (
+            Node.builder()
+            .name("LLMNode")
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input)
+                .or_()
+                .subscribed_to(function_result_topic)
+                .build()
+            )
+            .tool(LLMMockTool(function=mock_llm))
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
+            .build()
+        )
+        function_node = (
+            Node.builder()
+            .name("FlakyNode")
+            .subscribe(function_call_topic)
+            .tool(FunctionCallTool.builder().function(fail_func).build())
+            .publish_to(function_result_topic)
+            .build()
+        )
+        workflow = (
+            EventDrivenWorkflow.builder().node(llm_node).node(function_node).build()
+        )
+        with patch.object(Assistant, "_construct_workflow"):
+            assistant = Assistant(name="RecoveringAgent", workflow=workflow)
+
+        outputs = [
+            output
+            async for output in assistant.invoke(
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    data=[Message(role="user", content="Try")],
+                )
+            )
+        ]
+        assert [output.data[-1].content for output in outputs] == ["Recovered"]
+        [answer] = seen[1]
+        assert (answer.tool_call_id, answer.content) == (
+            "fail",
+            "Error: ValueError: flaky",
+        )
 
     @pytest.mark.asyncio
     async def test_llm_mock_tool_serialization(self):

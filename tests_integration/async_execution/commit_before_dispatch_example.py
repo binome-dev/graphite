@@ -28,10 +28,10 @@ class FlakyStream(EchoTool):
         self, invoke_context: InvokeContext, input_data: Messages
     ) -> MsgsAGen:
         self.calls.append(["call"])
-        yield [Message(role="assistant", content="part-1", is_streaming=True)]
+        yield [Message(role="assistant", content="part-1")]
         if len(self.calls) == 1:
             raise RuntimeError("stream dropped")
-        yield [Message(role="assistant", content="part-2", is_streaming=True)]
+        yield [Message(role="assistant", content="part-2")]
 
 
 async def main() -> None:

@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 from typing import Dict
 from typing import Self
 from typing import TypeVar
+from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -18,6 +19,7 @@ from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.nodes.node_base import NodeBase
+from grafi.runtime.deltas import Delta
 
 
 class Workflow(BaseModel):
@@ -49,9 +51,14 @@ class Workflow(BaseModel):
         self._stop_requested = False
 
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Invokes the workflow with the given initial inputs parallelly."""
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the workflow on ``input_data``, yielding its outputs, and, if
+        ``stream``, the deltas its tools emit as they emit them."""
         yield None  # type: ignore
         raise NotImplementedError
 

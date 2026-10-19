@@ -171,7 +171,8 @@ async def test_invoke_with_invalid_function(google_search_tool):
     result = []
     async for msg in google_search_tool.invoke(invoke_context, bad_call_message):
         result.extend(msg)
-    assert result == []
+    [answer] = result  # The error, for the LLM.
+    assert answer.content.startswith("Error: LookupError")
 
 
 # --------------------------------------------------------------------------- #
@@ -206,6 +207,7 @@ async def test_error_handling(google_search_tool):
 
         from grafi.common.exceptions import FunctionCallException
 
+        google_search_tool.on_error = "raise"
         with pytest.raises(FunctionCallException) as excinfo:
             async for msg in google_search_tool.invoke(
                 invoke_context, message_with_call

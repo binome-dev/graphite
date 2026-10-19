@@ -1,18 +1,18 @@
 import json
 from typing import Any
-from typing import AsyncGenerator
+from typing import Awaitable
 from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import cast
 
-from loguru import logger
 from pydantic import Field
 from pydantic import PrivateAttr
 
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.mcp_connections import Connection
 from grafi.common.models.message import Messages
+from grafi.tools.function_calls.impl.mcp_tool import content_text
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.functions.function_tool import FunctionToolBuilder
 
@@ -23,9 +23,6 @@ except (ImportError, ModuleNotFoundError):
 
 try:
     from mcp.types import CallToolResult
-    from mcp.types import EmbeddedResource
-    from mcp.types import ImageContent
-    from mcp.types import TextContent
     from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `uv add mcp`")
@@ -42,11 +39,8 @@ class MCPFunctionTool(FunctionTool):
 
     mcp_config: Dict[str, Any] = Field(default_factory=dict)
 
-    # MCP yields str chunks that FunctionTool.to_messages wraps. This return
-    # type intentionally differs from the base FunctionTool.function contract
-    # (Callable[..., OutputType]); reconciling the two is tracked for the tools
-    # refactor, so only the base-override mismatch is suppressed below.
-    function: Optional[Callable[[Messages], AsyncGenerator[str, None]]] = Field(  # type: ignore[assignment]
+    # Set by initialize(), to invoke_mcp_function.
+    function: Optional[Callable[[Messages], Awaitable[str]]] = Field(  # type: ignore[assignment]
         default=None
     )
 
@@ -95,6 +89,7 @@ class MCPFunctionTool(FunctionTool):
             )
 
         tool = matching_tools[0]
+        self.function_name = tool.name  # The one called, when none was named.
         self._function_spec = FunctionSpec.model_validate(
             {
                 "name": tool.name,
@@ -103,50 +98,13 @@ class MCPFunctionTool(FunctionTool):
             }
         )
 
-    async def invoke_mcp_function(
-        self,
-        input_data: Messages,
-    ) -> AsyncGenerator[str, None]:
-        """
-        Invoke the MCPFunctionTool with the provided input data.
-
-        Args:
-            input_data (Messages): The sequence of messages, where the last message
-                contains the JSON-encoded arguments for the MCP tool call.
-
-        Returns:
-            AsyncGenerator[Messages, None]: An asynchronous generator yielding the
-                output messages produced by the MCP tool invocation.
-        """
-        input_message = input_data[-1]
-
-        # The last message's content is the JSON-encoded tool-call arguments.
-        kwargs = json.loads(cast(str, input_message.content))
-
-        response_str = ""
-
+    async def invoke_mcp_function(self, input_data: Messages) -> str:
+        """Call the MCP tool with the arguments the last message holds, as
+        JSON, and return its result as text."""
+        kwargs = json.loads(cast(str, input_data[-1].content))
         async with Client(self.mcp_config) as client:
-            logger.info(f"Calling MCP Tool '{self.function_name}' with args: {kwargs}")
-
             result: CallToolResult = await client.call_tool(self.function_name, kwargs)
-
-            # Process the result content
-            for content in result.content:
-                if isinstance(content, TextContent):
-                    response_str += content.text + "\n"
-                elif isinstance(content, ImageContent):
-                    response_str = getattr(content, "data", "")
-
-                elif isinstance(content, EmbeddedResource):
-                    # Handle embedded resources
-                    response_str += (
-                        f"[Embedded resource: {content.resource.model_dump_json()}]\n"
-                    )
-                else:
-                    # Handle other content types
-                    response_str += f"[Unsupported content type: {content.type}]\n"
-
-        yield response_str
+        return content_text(result.content)
 
     def _serialize_function(self) -> None:
         # The MCP callable is reconstructed from mcp_config + function_name on

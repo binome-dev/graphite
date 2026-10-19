@@ -15,8 +15,7 @@ The `Tool` class is the fundamental base class for all tools in the Graphite fra
 
 | Method       | Signature                                                                  | Description                                                                                    |
 |--------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield response messages via async generator.    |
-| `to_messages`| `(response: Any) -> Messages`                                              | Converts tool-specific response data into standardized Message objects.                       |
+| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield its output in batches of messages; the node publishes each batch as one event. |
 | `to_dict`    | `() -> Dict[str, Any]`                                                     | Serializes the tool instance into a dictionary representation.                                |
 
 ## Builder Pattern
@@ -63,14 +62,30 @@ async for message_batch in tool.invoke(invoke_context, input_messages):
 
 ### Message Conversion
 
-All tools must handle conversion between internal data formats and standard Message objects:
+A tool yields `Message` objects. To turn a value into messages the way `FunctionTool` does (messages as they are, `None` as none, anything else as one message holding it as text, JSON unless a string), use `grafi.tools.results.as_messages`:
 
 ```python
-# Convert tool-specific response to Messages
-def to_messages(self, response: Any) -> Messages:
-    # Implementation-specific conversion logic
-    return [Message(role="assistant", content=str(response))]
+from grafi.tools.results import as_messages
+
+yield as_messages(result)
 ```
+
+### Streaming
+
+A tool that produces its output piece by piece, such as an LLM's tokens, can send the pieces to a caller streaming the run with `emit_delta`, then yield the whole output. The pieces are never published or stored; `streaming()` says whether anyone receives them (see [Runtime](../runtime.md#streaming)):
+
+```python
+from grafi.runtime import emit_delta
+
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+    text = []
+    async for token in self.client.stream(input_data):
+        emit_delta(token)
+        text.append(token)
+    yield [Message(role="assistant", content="".join(text))]
+```
+
+Plain functions need no subclass: `FunctionTool` and `FunctionCallTool` take a function, sync or async, that returns its result or, as a generator, streams it.
 
 ## Implementation Requirements
 
@@ -93,11 +108,7 @@ async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> M
     """Asynchronous processing implementation."""
     # Process input_data asynchronously
     result = await self.async_process_data(input_data)
-    yield self.to_messages(result)
-
-def to_messages(self, response: Any) -> Messages:
-    """Convert response to Messages."""
-    return [Message(role="tool", content=response)]
+    yield [Message(role="assistant", content=result)]
 ```
 
 ### 3. Create Builder Class
@@ -293,14 +304,26 @@ class MyTool(Tool):
 
 ### Async Error Handling
 
+Raise a `ToolInvocationError` subclass caused by the error: the tool's and the
+node's failed events record it, and the run fails with it. An error an LLM
+should see and recover from is a function call's, answered by
+[FunctionCallTool](function-call.md) (see its `on_error`).
+
 ```python
+from grafi.common.exceptions import FunctionToolException
+from grafi.tools.results import as_messages
+
 async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     try:
         result = await self.async_process(input_data)
-        yield self.to_messages(result)
     except Exception as e:
-        logger.error(f"Async tool {self.name} failed: {e}")
-        yield [Message(role="assistant", content=f"Error: {str(e)}")]
+        raise FunctionToolException(
+            tool_name=self.name,
+            message=f"Processing failed: {e}",
+            invoke_context=invoke_context,
+            cause=e,
+        ) from e
+    yield as_messages(result)
 ```
 
 ## Testing Tools
@@ -332,10 +355,12 @@ async def test_tool_invoke():
 Tools integrate with Graphite's command system:
 
 ```python
-from grafi.common.models.command import use_command
-from grafi.tools.tool_command import ToolCommand
+from grafi.tools.command import Command, use_command
 
-@use_command(ToolCommand)
+class MyCommand(Command):
+    ...  # How the node prepares the tool's input; see Command.
+
+@use_command(MyCommand)
 class MyTool(Tool):
     # Tool implementation
     pass
@@ -347,7 +372,7 @@ Tools participate in event-driven workflows through:
 
 - **InvokeContext**: Carries workflow context and metadata
 - **Message passing**: Standardized communication via Messages
-- **Async generators**: Support for streaming and real-time processing
+- **Async generators**: A tool yields its output in batches, each one event, and can stream pieces of it to a caller with `emit_delta`
 
 ## Best Practices
 

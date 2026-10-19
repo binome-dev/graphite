@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import List
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,7 +9,9 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import Delta
 from grafi.runtime import current_services
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
@@ -32,16 +35,24 @@ async def test_openrouter_tool_stream() -> None:
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().is_streaming(True).api_key(api_key).build()
 
+    deltas: List[Delta] = []
     content = ""
-    async for msgs in or_tool.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in msgs:
-            assert m.role == "assistant"
-            if isinstance(m.content, str):
-                content += m.content
-                print(m.content + "_", end="", flush=True)
+    with deltas_to(deltas.append):
+        async for msgs in or_tool.invoke(
+            get_invoke_context(),
+            [
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        ):
+            for m in msgs:
+                assert m.role == "assistant"
+                if isinstance(m.content, str):
+                    content += m.content
+    streamed = "".join(delta.content for delta in deltas)
+    print(streamed)
+    assert len(deltas) > 1 and streamed == content  # The text, as it came.
 
     assert content and "Grafi" in content
     assert len(await event_store.get_events()) == 2

@@ -1,9 +1,7 @@
 import inspect
 import json
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
-from typing import List
 
 from openai import OpenAIError
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -11,13 +9,10 @@ from pydantic import BaseModel
 from pydantic import field_validator
 
 from grafi.common.async_lifecycle import best_effort_exit
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
@@ -79,6 +74,8 @@ class SyntheticTool(FunctionCallTool):
         )
 
     def model_post_init(self, _context: Any) -> None:
+        if any(spec.name == self.tool_name for spec in self.function_specs):
+            return  # A copy of a tool already set up.
         if self.input_model:
             # Handle both dict schemas and Pydantic models
             if isinstance(self.input_model, dict):
@@ -120,45 +117,11 @@ class SyntheticTool(FunctionCallTool):
         """
         return SyntheticToolBuilder(cls)
 
-    @record_tool_invoke
-    async def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> AsyncGenerator[Messages, None]:
-        """
-        Invokes the synthetic tool by processing incoming tool calls and generating
-        LLM-based responses for each matching invocation.
-
-        Args:
-            invoke_context (InvokeContext): The context for this invocation.
-            input_data (Messages): A list of incoming messages that may contain tool calls.
-
-        Yields:
-            AsyncGenerator[Messages, None]: A stream of messages representing the
-            responses from the LLM for each valid tool call.
-
-        Raises:
-            ValueError: If no tool_calls are found in the input data.
-        """
-        input_msg = input_data[0]
-        if input_msg.tool_calls is None:
-            raise ValueError("No tool_calls found for SyntheticTool invocation.")
-
-        messages: List[Message] = []
-
-        for tool_call in input_msg.tool_calls:
-            if tool_call.function.name != self.tool_name:
-                continue
-
-            args = json.loads(tool_call.function.arguments)
-            prompt = self._make_prompt(args)
-            response = await self._call_llm(prompt)
-            messages.extend(
-                self.to_messages(response=response, tool_call_id=tool_call.id)
-            )
-
-        yield messages
+    async def call_function(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> str:
+        """Have the LLM produce the tool's output for ``arguments``."""
+        return await self._call_llm(self._make_prompt(arguments))
 
     def _make_prompt(self, user_input: Dict[str, Any]) -> str:
         """Builds the synthetic execution prompt."""

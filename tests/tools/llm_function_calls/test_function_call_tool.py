@@ -139,8 +139,14 @@ async def test_invoke_wrong_function_name(function_instance, invoke_context):
             ],
         )
     ]
-    async for msgs in function_instance.invoke(invoke_context, input_data):
-        assert msgs == []
+    # A call to a function the tool lacks is answered with the error.
+    [answer] = [
+        message
+        async for messages in function_instance.invoke(invoke_context, input_data)
+        for message in messages
+    ]
+    assert answer.tool_call_id == "test_id"
+    assert answer.content.startswith("Error: LookupError: No function 'wrong_func'")
 
 
 def test_to_dict(function_instance):
@@ -201,8 +207,18 @@ async def test_invoke_with_missing_args(function_instance, invoke_context):
             ],
         )
     ]
+    # Answered with the validation error, which the LLM can correct.
+    [answer] = [
+        message
+        async for messages in function_instance.invoke(invoke_context, input_data)
+        for message in messages
+    ]
+    assert answer.content.startswith("Error: ValidationError")
+    assert "arg2" in answer.content
+
     from grafi.common.exceptions import FunctionCallException
 
+    function_instance.on_error = "raise"
     with pytest.raises(FunctionCallException):
         async for msgs in function_instance.invoke(invoke_context, input_data):
             assert msgs  # should not reach here

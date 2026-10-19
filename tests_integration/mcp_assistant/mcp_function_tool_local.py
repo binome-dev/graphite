@@ -132,9 +132,7 @@ async def test_mcp_function_tool_direct_invocation() -> None:
     print(f"Input message: {input_message}")
 
     # Invoke the MCP function
-    results = []
-    async for result in mcp_tool.function([input_message]):
-        results.append(result)
+    results = [await mcp_tool.function([input_message])]
 
     # Verify the response
     assert len(results) == 1
@@ -233,9 +231,7 @@ async def test_mcp_function_tool_serialization_roundtrip() -> None:
         content=json.dumps(input_kwargs),
     )
 
-    results = []
-    async for result in restored_tool.function([input_message]):
-        results.append(result)
+    results = [await restored_tool.function([input_message])]
 
     print(f"Restored tool response: {results[0]}")
     assert "Hello, Restored!" in results[0]

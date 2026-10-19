@@ -2,6 +2,7 @@
 Tests for LLM base class utility functions.
 """
 
+import pytest
 from pydantic import BaseModel
 
 from grafi.common.models.function_spec import FunctionSpec
@@ -432,3 +433,66 @@ class TestLLMSerializeChatParams:
         # chat_params should be serialized
         assert "chat_params" in result
         assert result["chat_params"]["response_format"] == {"name": "Test", "age": 50}
+
+
+@pytest.mark.asyncio
+async def test_tool_results_follow_their_calls_in_the_calls_order() -> None:
+    # Some providers, such as Ollama, match results to calls by position.
+    from grafi.common.events.topic_events.consume_from_topic_event import (
+        ConsumeFromTopicEvent,
+    )
+    from grafi.common.models.invoke_context import InvokeContext
+    from grafi.common.models.message import Message
+    from grafi.tools.llms.impl.openai_tool import OpenAITool
+    from grafi.tools.llms.llm_command import LLMCommand
+
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+    calls = Message.model_validate(
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": f"c{n}",
+                    "type": "function",
+                    "function": {"name": "f", "arguments": "{}"},
+                }
+                for n in (1, 2, 3)
+            ],
+        }
+    )
+    results = [
+        Message(role="tool", tool_call_id=f"c{n}", content=str(n)) for n in (3, 1, 2)
+    ]
+    consumed = [ConsumeFromTopicEvent(invoke_context=context, data=[calls, *results])]
+    messages = await LLMCommand(tool=OpenAITool(api_key="k")).get_tool_input(
+        context, consumed
+    )
+    assert [message.tool_call_id for message in messages] == [None, "c1", "c2", "c3"]
+
+
+@pytest.mark.asyncio
+async def test_a_message_consumed_from_several_topics_is_in_the_history_once() -> None:
+    from grafi.common.events.topic_events.consume_from_topic_event import (
+        ConsumeFromTopicEvent,
+    )
+    from grafi.common.models.invoke_context import InvokeContext
+    from grafi.common.models.message import Message
+    from grafi.tools.llms.impl.openai_tool import OpenAITool
+    from grafi.tools.llms.llm_command import LLMCommand
+
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+    question = Message(role="user", content="?")
+    copies = [
+        ConsumeFromTopicEvent(
+            invoke_context=context, name=name, data=[question.model_copy(deep=True)]
+        )
+        for name in ("t1", "t2")
+    ]
+    messages = await LLMCommand(tool=OpenAITool(api_key="k")).get_tool_input(
+        context, copies
+    )
+    assert [message.message_id for message in messages] == [question.message_id]

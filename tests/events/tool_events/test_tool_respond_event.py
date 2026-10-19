@@ -130,7 +130,6 @@ def tool_respond_event_dict():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 }
             ],
             "output_data": [
@@ -147,7 +146,6 @@ def tool_respond_event_dict():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 },
                 {
                     "name": None,
@@ -162,7 +160,6 @@ def tool_respond_event_dict():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 },
             ],
         },
@@ -204,7 +201,6 @@ def tool_respond_event_dict_message():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 }
             ],
             "output_data": [
@@ -221,7 +217,6 @@ def tool_respond_event_dict_message():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 },
             ],
         },

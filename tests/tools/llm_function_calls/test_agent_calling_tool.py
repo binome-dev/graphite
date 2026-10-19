@@ -118,9 +118,12 @@ async def test_invoke_invalid_function_name(agent_calling_tool):
         )
     ]
 
-    async for msgs in agent_calling_tool.invoke(invoke_context, input_data):
-        for msg in msgs:
-            assert msg.content is None
+    [answer] = [
+        message
+        async for messages in agent_calling_tool.invoke(invoke_context, input_data)
+        for message in messages
+    ]
+    assert answer.content.startswith("Error: LookupError: No function 'wrong_agent'")
 
 
 @pytest.mark.asyncio
@@ -132,18 +135,8 @@ async def test_invoke_none_function_call(agent_calling_tool):
     )
     input_data = [Message(role="assistant")]
 
-    with pytest.raises(ValueError, match="Agent call is None."):
-        async for msg in agent_calling_tool.invoke(invoke_context, input_data):
-            assert msg  # should not reach here
-
-
-def test_to_messages(agent_calling_tool):
-    response = "test response"
-    result = agent_calling_tool.to_messages(response, "test_id")
-
-    assert result[0].role == "tool"
-    assert result[0].content == "test response"
-    assert result[0].tool_call_id == "test_id"
+    outputs = [m async for m in agent_calling_tool.invoke(invoke_context, input_data)]
+    assert outputs == []  # No tool call, no result.
 
 
 def test_to_dict(serializable_agent_tool: AgentCallingTool):

@@ -71,7 +71,6 @@ def tool_failed_event_dict():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 }
             ],
             "error": "error",

@@ -2,6 +2,7 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import Self
 from typing import TypeVar
+from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -15,6 +16,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
+from grafi.runtime.deltas import Delta
 from grafi.workflows.workflow import Workflow
 
 
@@ -50,9 +52,14 @@ class AssistantBase(BaseModel):
         return self
 
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Invoke the assistant's workflow with the provided input data asynchronously."""
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the assistant on ``input_data``, yielding its outputs, and, if
+        ``stream``, the deltas its tools emit as they emit them."""
         # ``yield`` makes this an async generator (matching the concrete
         # subclasses and Workflow.invoke), so callers can ``async for`` over it.
         yield None  # type: ignore

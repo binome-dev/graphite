@@ -98,7 +98,6 @@ def tool_invoke_event_dict():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 }
             ]
         },
@@ -140,7 +139,6 @@ def tool_invoke_event_dict_message():
                     "tools": None,
                     "function_call": None,
                     "tool_calls": None,
-                    "is_streaming": False,
                 }
             ]
         },

@@ -1,13 +1,10 @@
-import json
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
+from typing import Iterable
 from typing import List
 
-from loguru import logger
 from pydantic import Field
 
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import Connection
@@ -31,6 +28,22 @@ try:
     from mcp.types import Tool
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `uv add mcp`")
+
+
+def content_text(contents: Iterable[Any]) -> str:
+    """An MCP result's content as text, a line per item: text as it is, an
+    image as its base64 data, an embedded resource as its JSON."""
+    lines = []
+    for content in contents:
+        if isinstance(content, TextContent):
+            lines.append(content.text)
+        elif isinstance(content, ImageContent):
+            lines.append(content.data)
+        elif isinstance(content, EmbeddedResource):
+            lines.append(f"[Embedded resource: {content.resource.model_dump_json()}]")
+        else:
+            lines.append(f"[Unsupported content type: {content.type}]")
+    return "\n".join(lines)
 
 
 class MCPTool(FunctionCallTool):
@@ -83,65 +96,13 @@ class MCPTool(FunctionCallTool):
 
             self.function_specs.append(FunctionSpec.model_validate(func_spec))
 
-    @record_tool_invoke
-    async def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> AsyncGenerator[Messages, None]:
-        """
-        Invoke the MCPTool with the provided input data.
-
-        Args:
-            invoke_context (InvokeContext): The context for executing the function.
-            input_data (Message): The input data for the function.
-
-        Returns:
-            List[Message]: The output messages from the function invoke.
-        """
-        input_message = input_data[0]
-        if input_message.tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
-
-        messages: List[Message] = []
-
-        for tool_call in input_message.tool_calls:
-            if any(
-                tool_call.function.name == spec.name for spec in self.function_specs
-            ):
-                tool_name = tool_call.function.name
-                kwargs = json.loads(tool_call.function.arguments)
-
-                async with Client(self.mcp_config) as client:
-                    logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
-
-                    result: CallToolResult = await client.call_tool(tool_name, kwargs)
-
-                    # Process the result content
-                    response_str = ""
-                    for content in result.content:
-                        if isinstance(content, TextContent):
-                            response_str += content.text + "\n"
-                        elif isinstance(content, ImageContent):
-                            response_str = getattr(content, "data", "")
-
-                        elif isinstance(content, EmbeddedResource):
-                            # Handle embedded resources
-                            response_str += f"[Embedded resource: {content.resource.model_dump_json()}]\n"
-                        else:
-                            # Handle other content types
-                            response_str += (
-                                f"[Unsupported content type: {content.type}]\n"
-                            )
-
-                    messages.extend(
-                        self.to_messages(
-                            response=response_str, tool_call_id=tool_call.id
-                        )
-                    )
-
-        yield messages
+    async def call_function(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> str:
+        """Call the MCP server's tool ``name``, and return its result as text."""
+        async with Client(self.mcp_config) as client:
+            result: CallToolResult = await client.call_tool(name, arguments)
+        return content_text(result.content)
 
     async def get_prompt(
         self,

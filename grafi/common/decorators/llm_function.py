@@ -27,6 +27,7 @@ from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import JsonSchema
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -39,7 +40,7 @@ _PRIMITIVES = {
     type(None): "null",
 }
 # Parameters the caller supplies, never the LLM.
-_HIDDEN_PARAMETERS = {"self", "cls", "ctx", "context"}
+_HIDDEN_PARAMETERS = {"self", "cls"}
 # Return annotations that describe no output.
 _NO_OUTPUT = (inspect.Signature.empty, Any)
 
@@ -48,10 +49,11 @@ def llm_function(func: Callable[P, R]) -> Callable[P, R]:
     """Expose ``func`` to an LLM: attach the FunctionSpec built from it as
     ``func._function_spec`` and return ``func`` unchanged.
 
-    Parameters named ``self``, ``cls``, ``ctx`` or ``context``, or starting with
-    ``_``, are hidden from the LLM; those without a default are required;
-    ``*args`` and ``**kwargs`` are rejected. Descriptions come from the
-    docstring: its summary for the function, its ``Args`` for parameters.
+    Parameters named ``self`` or ``cls``, starting with ``_``, or typed
+    ``InvokeContext`` (which the request's context is passed to) are hidden
+    from the LLM; those without a default are required; ``*args`` and
+    ``**kwargs`` are rejected. Descriptions come from the docstring: its
+    summary for the function, its ``Args`` for parameters.
     """
     setattr(func, "_function_spec", _function_spec(func))
     return func
@@ -72,7 +74,11 @@ def _function_spec(func: Callable[..., Any]) -> FunctionSpec:
             raise ValueError("Functions with *args are not supported as tools")
         if parameter.kind is inspect.Parameter.VAR_KEYWORD:
             raise ValueError("Functions with **kwargs are not supported as tools")
-        if name in _HIDDEN_PARAMETERS or name.startswith("_"):
+        if (
+            name in _HIDDEN_PARAMETERS
+            or name.startswith("_")
+            or is_invoke_context(hints.get(name))
+        ):
             continue
         schema = _type_to_schema(hints.get(name, Any))
         if description := described.get(name):
@@ -92,6 +98,14 @@ def _function_spec(func: Callable[..., Any]) -> FunctionSpec:
         ),
         output_schema=None if returns in _NO_OUTPUT else _type_to_schema(returns),
     )
+
+
+def is_invoke_context(annotation: Any) -> bool:
+    """Whether a parameter so annotated takes the request's ``InvokeContext``:
+    ``InvokeContext``, or ``Optional[InvokeContext]``."""
+    if get_origin(annotation) in (Union, types.UnionType):
+        return InvokeContext in get_args(annotation)
+    return annotation is InvokeContext
 
 
 def _type_to_schema(annotation: Any) -> JsonSchema:

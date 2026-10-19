@@ -130,3 +130,50 @@ class TestPublisherRouter:
             PublisherRouter.from_dict(
                 data, {"agent_output": TopicBase(name="agent_output")}
             )
+
+
+@pytest.mark.parametrize(("tool_calls", "calls"), [(None, False), ([], False)])
+def test_an_empty_tool_call_list_is_no_tool_call(tool_calls, calls):
+    # [] once routed a reply as a tool call, and could loop a ReAct workflow.
+    from grafi.nodes.conditions import has_no_tool_call
+
+    event = PublishToTopicEvent(
+        invoke_context=InvokeContext(
+            conversation_id="c", invoke_id="i", assistant_request_id="r"
+        ),
+        data=[Message(role="assistant", content="done", tool_calls=tool_calls)],
+    )
+    assert has_tool_call(event) is calls
+    assert has_no_tool_call(event) is not calls
+
+
+def test_an_event_without_messages_calls_no_tool():
+    from grafi.nodes.conditions import has_no_tool_call
+
+    event = PublishToTopicEvent(
+        invoke_context=InvokeContext(
+            conversation_id="c", invoke_id="i", assistant_request_id="r"
+        ),
+        data=[],
+    )
+    assert has_tool_call(event) is False
+    assert has_no_tool_call(event) is True
+
+
+def test_text_leading_up_to_tool_calls_is_not_a_text_response():
+    # Claude, Gemini and Ollama keep the text a model writes before its calls:
+    # routing it as the final answer would end the run before the calls ran.
+    message = _tool_call()
+    message.content = "Checking."
+    event = _publish([message])
+    fc, out = TopicBase(name="function_call"), TopicBase(name="agent_output")
+    router = PublisherRouter(
+        routes=[
+            PublishRoute(topic=fc, when=has_tool_call),
+            PublishRoute(topic=out, when=has_text_response),
+        ]
+    )
+    assert has_tool_call(event) and not has_text_response(event)
+    assert router.select(event) == ["function_call"]
+    assert has_text_response(_publish([Message(role="assistant", content="Done.")]))
+    assert not has_text_response(_publish([]))

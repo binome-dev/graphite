@@ -2,6 +2,9 @@ import json
 import os
 from typing import Any
 from typing import AsyncGenerator
+from typing import Literal
+from typing import Union
+from typing import overload
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -12,6 +15,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.runtime.deltas import Delta
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
@@ -24,28 +28,39 @@ class Assistant(AssistantBase):
         event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
     """
 
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: Literal[False] = False,
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]: ...
+
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
+
     @record_assistant_invoke
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """
-        Process the input data through the LLM workflow, make function calls, and return the generated response.
-        Args:
-            invoke_context (InvokeContext): Context containing invoke information
-            input_data (Messages): List of input messages to be processed
-
-        Returns:
-            Messages: List of generated response messages, sorted by timestamp
-
-        Raises:
-            ValueError: If the OpenAI API key is not provided and not found in environment variables
-        """
-
-        # Invoke the workflow with the input data
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the assistant's workflow on ``input_data``, yielding its outputs
+        as they are committed, and, if ``stream``, each :class:`Delta` its tools
+        emit as they emit it, such as an LLM's tokens."""
         async with owned_iterator(
-            self.workflow.invoke(input_data, is_sequential)
-        ) as stream:
-            async for output in stream:
+            self.workflow.invoke(input_data, is_sequential, stream=stream)
+        ) as outputs:
+            async for output in outputs:
                 yield output
 
     def to_dict(self) -> dict[str, Any]:

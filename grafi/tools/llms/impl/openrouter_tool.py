@@ -62,7 +62,7 @@ class OpenRouterTool(OpenAICompatibleTool):
             .type(data.get("type", "OpenRouterTool"))
             .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
             .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
+            .is_streaming(data.get("is_streaming", True))
             .system_message(data.get("system_message", ""))
             .api_key(os.getenv("OPENROUTER_API_KEY"))
             .model(data.get("model", "openrouter/auto"))

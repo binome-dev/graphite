@@ -24,6 +24,7 @@ import pytest
 from grafi.common.decorators.llm_function import _type_to_schema
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.function_spec import FunctionSpec
+from grafi.common.models.invoke_context import InvokeContext
 
 
 class Color(enum.Enum):
@@ -112,7 +113,7 @@ def test_llm_function_builds_a_spec_from_signature_and_docstring() -> None:
         days: int = 3,
         unit: Optional[Literal["c", "f"]] = None,
         _secret: str = "",
-        ctx: Any = None,
+        context: InvokeContext = None,  # type: ignore[assignment]
     ) -> Dict[str, float]:
         """Get the forecast.
 
