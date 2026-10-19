@@ -6,6 +6,7 @@ import functools
 import os
 import uuid
 from contextlib import AbstractContextManager
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
@@ -282,7 +283,10 @@ def _error_id_for(error: Exception) -> str:
     error_id = _existing_error_id(error)
     if error_id is None:
         error_id = uuid.uuid4().hex[:12]
-        setattr(error, _ERROR_ID_ATTR, error_id)
+        # An exception may refuse new attributes (attrs' frozen ones do); its
+        # outer layers then cannot find the id, and each records its own.
+        with suppress(Exception):
+            setattr(error, _ERROR_ID_ATTR, error_id)
     return error_id
 
 
@@ -359,7 +363,8 @@ def _note_unrecorded_failure(
         f"{type(persist_error).__name__}: {persist_error}",
         "warning",
     )
-    error.add_note(
-        f"[grafi] failed to persist failed-event (error_id={error_id}): "
-        f"{persist_error!r}"
-    )
+    with suppress(Exception):  # A note never replaces the failure it is on.
+        error.add_note(
+            f"[grafi] failed to persist failed-event (error_id={error_id}): "
+            f"{persist_error!r}"
+        )

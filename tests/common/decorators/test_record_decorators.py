@@ -221,6 +221,22 @@ class _QuietTool:
         yield [Message(role="assistant", content="done")]
 
 
+class _FrozenError(Exception):
+    """Refuses new attributes, as attrs' frozen exceptions (jsonschema's) do."""
+
+    def __setattr__(self, name, value) -> None:
+        if not name.startswith("__"):
+            raise AttributeError(f"{name} is frozen")
+        super().__setattr__(name, value)
+
+
+class _FrozenFailureTool(_QuietTool):
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        raise _FrozenError("unresolvable $ref")
+        yield  # pragma: no cover - makes this an async generator
+
+
 @pytest.mark.asyncio
 async def test_a_failure_is_logged_once_and_every_layer_records_its_id():
     store, reporter = EventStoreInMemory(), _CollectingReporter()
@@ -254,3 +270,16 @@ async def test_failing_to_store_a_lifecycle_event_is_the_failure(failing, operat
 
     assert raised.value.operation == operation
     assert isinstance(raised.value.__cause__, ConnectionError)
+
+
+@pytest.mark.asyncio
+async def test_a_failure_refusing_its_error_id_is_still_recorded_and_raised():
+    store, reporter = EventStoreInMemory(), _CollectingReporter()
+    with bind_services(ExecutionServices(event_store=store, error_reporter=reporter)):
+        with pytest.raises(_FrozenError):
+            async for _ in _FrozenFailureTool().invoke(_CONTEXT, []):
+                pass
+
+    events = await store.get_events()
+    assert len(events) == 2 and isinstance(events[-1], ToolFailedEvent)
+    assert [level for level, _ in reporter.reports] == ["error"]
