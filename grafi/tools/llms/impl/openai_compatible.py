@@ -7,7 +7,6 @@ This base centralizes the identical request/response mechanics; concrete
 providers specialize via a few small hooks.
 """
 
-import asyncio
 from typing import Any
 from typing import ClassVar
 from typing import Dict
@@ -29,6 +28,7 @@ from openai.types.chat.chat_completion_message_param import ChatCompletionMessag
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from pydantic import Field
 
+from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -127,7 +127,9 @@ class OpenAICompatibleTool(LLM):
         }
 
         try:
-            async with AsyncClient(**client_kwargs) as client:
+            async with best_effort_exit(
+                AsyncClient(**client_kwargs), f"{self._provider_label} client"
+            ) as client:
                 if self.is_streaming:
                     # ``**call_kwargs`` (Any) defeats overload resolution on
                     # ``stream=True``, so cast the result to the streaming type.
@@ -137,8 +139,11 @@ class OpenAICompatibleTool(LLM):
                             stream=True, **call_kwargs
                         ),
                     )
-                    async for chunk in stream:
-                        yield self.to_stream_messages(chunk)
+                    async with best_effort_exit(
+                        stream, f"{self._provider_label} stream"
+                    ) as chunks:
+                        async for chunk in chunks:
+                            yield self.to_stream_messages(chunk)
                 else:
                     use_parse = self.structured_output and self._supports_beta_parse
                     req_func = (
@@ -151,8 +156,6 @@ class OpenAICompatibleTool(LLM):
                         await req_func(**call_kwargs),
                     )
                     yield self.to_messages(response)
-        except asyncio.CancelledError:
-            raise  # let caller handle
         except OpenAIError as exc:
             raise LLMToolException(
                 tool_name=tool_name,

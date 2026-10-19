@@ -40,9 +40,9 @@ class InMemTopicEventQueue(TopicEventQueue):
         Append a message to the log and return the event with its offset set.
 
         Note: this log is unbounded and retained for the life of the instance
-        (events are never evicted, to support replay/recovery). There is no
-        backpressure; memory grows with the number of published events, so
-        long-lived in-memory workflows should be periodically reset.
+        (events are never evicted). There is no backpressure; memory grows with
+        the number of published events, so a long-lived queue should be reset
+        periodically.
         """
         async with self._cond:
             offset = len(self._records)

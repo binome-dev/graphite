@@ -153,6 +153,8 @@ async def test_invoke_successful(synthetic_tool, invoke_context):
         assert response_data["temperature"] == 22.5
         assert response_data["conditions"] == "Sunny"
         assert response_data["location"] == "San Francisco"
+        # The per-call client is released once the call is done.
+        mock_client.__aexit__.assert_awaited_once()
 
 
 @pytest.mark.asyncio

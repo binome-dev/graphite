@@ -2,12 +2,8 @@
 
 Characterization test for Defect #3 / runtime Gap 00: two ``invoke()`` calls on
 the *same* workflow instance, in flight at the same time, must complete
-independently. Each run owns its own runtime state (topic queues, tracker, ready
-queue, stop flag); they share only the immutable definition.
-
-Before per-invocation isolation this FAILS: the two runs share one tracker and
-one set of topic queues, and ``init_workflow`` resets them, so the second invoke
-drains/resets the first mid-flight (one run yields nothing, or the run hangs).
+independently. Each run keeps its own runtime state (its topics' events, steps
+and stop flag); they share only the immutable definition.
 """
 
 import asyncio
@@ -107,7 +103,7 @@ async def test_stop_does_not_leak_across_concurrent_invokes():
     """Stopping is scoped: one run finishing/stopping must not halt another.
 
     Here both runs simply complete; the assertion is that running them
-    concurrently does not strand either one (a shared stop flag / tracker would).
+    concurrently does not strand either one (a shared stop flag would).
     """
     workflow = _build_workflow()
 

@@ -1,14 +1,12 @@
 """Asserting tests for event-replay recovery (the 'restorability' pillar).
 
-These exercise EventDrivenWorkflow.init_workflow's recovery branch: when the
-event store already has events for an assistant_request_id, the workflow restores
-topic state and resumes instead of starting fresh.
+When the event store already has events for an assistant_request_id, a run
+restores topic state from them and resumes instead of starting fresh.
 """
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -21,7 +19,6 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.workflow_run import WorkflowRun
 
 
 class EchoTool(Tool):
@@ -67,27 +64,11 @@ def _pending_input_event(request_id: str) -> PublishToTopicEvent:
 
 
 @pytest.mark.asyncio
-async def test_count_pending_consumable_reflects_restored_work():
-    """After restoring an unconsumed input, the pending count is non-zero."""
-    workflow, _input_topic, _node_name = _build_workflow()
-    request_id = "recovery-count"
-    event = _pending_input_event(request_id)
-
-    # Per-run state: a fresh run starts with empty queues; restore into the run's
-    # own topic, as WorkflowRun.init would on recovery.
-    run = WorkflowRun(workflow, EventStoreInMemory())
-    await run.topics["agent_input"].restore_topic(event)
-
-    pending = await run._count_pending_consumable()
-    assert pending == 1
-
-
-@pytest.mark.asyncio
 async def test_parallel_recovery_resumes_and_yields_output(event_store):
-    """A resumed parallel run must drain restored work, not quiesce immediately.
+    """A resumed parallel run must run the restored work, not end at once.
 
-    Regression test: before seeding the tracker on recovery, the parallel path
-    declared quiescence before any node ran and yielded nothing.
+    Regression test: the old engine's quiescence tracker, not seeded on
+    recovery, ended a resumed parallel run before any node ran.
     """
     workflow, _input_topic, _node_name = _build_workflow()
     request_id = "recovery-parallel"
@@ -101,7 +82,7 @@ async def test_parallel_recovery_resumes_and_yields_output(event_store):
     ):
         outputs.append(event)
 
-    assert outputs, "resumed parallel workflow yielded no output (immediate quiescence)"
+    assert outputs, "resumed parallel workflow yielded no output (ended at once)"
     assert any(
         msg.content == "resumed response" for event in outputs for msg in event.data
     )

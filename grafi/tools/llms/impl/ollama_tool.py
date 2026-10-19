@@ -1,4 +1,3 @@
-import asyncio
 import json
 import uuid
 from typing import Any
@@ -13,6 +12,8 @@ from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
+from grafi.common.async_lifecycle import best_effort_exit
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
@@ -115,36 +116,37 @@ class OllamaTool(LLM):
         api_messages, api_functions = self.prepare_api_input(input_data)
         # Use Ollama Client to send the request
         client = ollama.AsyncClient(self.api_url)
-        try:
-            if self.is_streaming:
-                stream = await client.chat(
+        # Created per call, so closed per call.
+        async with best_effort_exit(client, "Ollama client"):
+            try:
+                if self.is_streaming:
+                    stream = await client.chat(
+                        model=self.model,
+                        messages=api_messages,
+                        tools=api_functions,
+                        stream=True,
+                    )
+                    async with owned_iterator(
+                        stream, best_effort="Ollama stream"
+                    ) as chunks:
+                        async for chunk in chunks:
+                            yield self.to_stream_messages(chunk)
+                else:
+                    response = await client.chat(
+                        model=self.model, messages=api_messages, tools=api_functions
+                    )
+                    # Return the raw response as a Message object
+                    yield self.to_messages(response)
+            except Exception as e:
+                # The lifecycle decorator emits the authoritative record; raise a
+                # domain error with a stable message and the original cause attached.
+                raise LLMToolException(
+                    tool_name=self.name,
                     model=self.model,
-                    messages=api_messages,
-                    tools=api_functions,
-                    stream=True,
-                )
-                async for chunk in stream:
-                    yield self.to_stream_messages(chunk)
-            else:
-                response = await client.chat(
-                    model=self.model, messages=api_messages, tools=api_functions
-                )
-                # Return the raw response as a Message object
-                yield self.to_messages(response)
-        except asyncio.CancelledError:
-            # Preserve cooperative cancellation instead of re-wrapping it as a
-            # tool error (matches the other LLM tools' cancellation contract).
-            raise
-        except Exception as e:
-            # The lifecycle decorator emits the authoritative record; raise a
-            # domain error with a stable message and the original cause attached.
-            raise LLMToolException(
-                tool_name=self.name,
-                model=self.model,
-                message="Ollama async call failed",
-                invoke_context=invoke_context,
-                cause=e,
-            ) from e
+                    message="Ollama async call failed",
+                    invoke_context=invoke_context,
+                    cause=e,
+                ) from e
 
     def to_stream_messages(self, chunk: ChatResponse | dict[str, Any]) -> Messages:
         """

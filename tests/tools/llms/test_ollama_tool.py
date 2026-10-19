@@ -1,3 +1,7 @@
+from typing import Any
+from typing import AsyncIterator
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
@@ -22,7 +26,14 @@ def invoke_context():
 
 @pytest.fixture
 def mock_ollama_client(monkeypatch):
-    mock = Mock()
+    client = MagicMock()
+    client.close = AsyncMock()
+
+    async def aexit(self: Any, *exc_info: Any) -> None:
+        await client.close()  # As ollama.AsyncClient.__aexit__ does.
+
+    client.__aexit__ = aexit
+    mock = Mock(return_value=client)
     monkeypatch.setattr("ollama.AsyncClient", mock)
     return mock
 
@@ -214,3 +225,76 @@ def test_prepare_api_input_forwards_tool_calls():
     assert assistant_msg["tool_calls"][0]["function"]["arguments"] == {
         "location": "Paris"
     }
+
+
+@pytest.mark.asyncio
+async def test_early_close_releases_stream_and_client(
+    invoke_context: InvokeContext, mock_ollama_client: Mock
+) -> None:
+    closed: list[str] = []
+
+    async def chunks() -> AsyncIterator[ChatResponse]:
+        try:
+            for text in ("a", "b"):
+                yield ChatResponse.model_validate(
+                    {"message": {"role": "assistant", "content": text}}
+                )
+        finally:
+            closed.append("stream")
+
+    async def mock_chat(*args: Any, **kwargs: Any) -> AsyncIterator[ChatResponse]:
+        return chunks()
+
+    mock_ollama_client.return_value.chat = mock_chat
+    tool = OllamaTool(is_streaming=True)
+    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+    await anext(stream)
+    await stream.aclose()
+    assert closed == ["stream"]
+    mock_ollama_client.return_value.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
+    invoke_context: InvokeContext, mock_ollama_client: Mock
+) -> None:
+    async def chunks() -> AsyncIterator[ChatResponse]:
+        try:
+            for text in ("a", "b"):
+                yield ChatResponse.model_validate(
+                    {"message": {"role": "assistant", "content": text}}
+                )
+        finally:
+            raise OSError("stream close failed")
+
+    async def mock_chat(*args: Any, **kwargs: Any) -> AsyncIterator[ChatResponse]:
+        return chunks()
+
+    mock_ollama_client.return_value.chat = mock_chat
+    tool = OllamaTool(is_streaming=True)
+    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+    await anext(stream)
+    await stream.aclose()  # Releasing the stream failed; the call did not.
+    mock_ollama_client.return_value.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_client_close_failure_does_not_fail_completed_call(
+    invoke_context: InvokeContext, mock_ollama_client: Mock
+) -> None:
+    async def mock_chat(*args: Any, **kwargs: Any) -> ChatResponse:
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "done"}}
+        )
+
+    mock_ollama_client.return_value.chat = mock_chat
+    mock_ollama_client.return_value.close = AsyncMock(side_effect=OSError("close"))
+    tool = OllamaTool()
+    result = [
+        message
+        async for batch in tool.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
+        for message in batch
+    ]
+    assert [message.content for message in result] == ["done"]

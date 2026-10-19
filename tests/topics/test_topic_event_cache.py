@@ -19,6 +19,14 @@ class TestTopicEventQueue:
             is None
         )
 
+    @pytest.mark.asyncio
+    async def test_a_backend_need_not_count_unconsumed_events(self) -> None:
+        class Minimal(InMemTopicEventQueue):
+            unconsumed_count = TopicEventQueue.unconsumed_count  # type: ignore
+
+        with pytest.raises(NotImplementedError):
+            await Minimal().unconsumed_count("consumer")
+
     @pytest.fixture
     def cache(self):
         return InMemTopicEventQueue()

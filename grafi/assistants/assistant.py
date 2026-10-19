@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.assistants.assistant_base import AssistantBase
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -41,8 +42,11 @@ class Assistant(AssistantBase):
         """
 
         # Invoke the workflow with the input data
-        async for output in self.workflow.invoke(input_data, is_sequential):
-            yield output
+        async with owned_iterator(
+            self.workflow.invoke(input_data, is_sequential)
+        ) as stream:
+            async for output in stream:
+                yield output
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the workflow to a dictionary."""

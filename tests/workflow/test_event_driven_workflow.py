@@ -3,7 +3,6 @@ import asyncio
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
@@ -17,7 +16,6 @@ from grafi.topics.topic_base import TopicType
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.workflow_run import WorkflowRun
 from grafi.workflows.workflow import WorkflowBuilder
 
 
@@ -271,36 +269,20 @@ class TestEventDrivenWorkflowAsyncInvoke:
             pass
 
     @pytest.mark.asyncio
-    async def test_invoke_with_async_output_queue(self, async_workflow):
-        """Test that invoke uses AsyncOutputQueue."""
-        # The definition owns topology; runtime state (incl. the AsyncOutputQueue)
-        # is created per invocation in WorkflowRun.
-        assert hasattr(async_workflow, "_topics")
-        assert callable(async_workflow.invoke)
+    async def test_invoke_keeps_runtime_state_out_of_the_definition(
+        self, async_workflow: EventDrivenWorkflow
+    ) -> None:
+        """Each invocation keeps its events in its own run: the definition's
+        topics stay empty, and no run stays registered."""
+        from tests_integration.async_execution.support import input_event
 
-
-class TestEventDrivenWorkflowInitialWorkflow:
-    @pytest.fixture
-    def workflow_for_initial_test(self):
-        """Create workflow for initial workflow testing."""
-        input_topic = InputTopic(name="test_input")
-        output_topic = OutputTopic(name="test_output")
-
-        mock_tool = MockTool()
-        node = Node(
-            name="test_node",
-            tool=mock_tool,
-            subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
-        )
-
-        return EventDrivenWorkflow(nodes={"test_node": node})
-
-    def test_init_workflow_method_exists(self, workflow_for_initial_test):
-        """A run's init() restores/seeds workflow state for an invocation."""
-        run = WorkflowRun(workflow_for_initial_test, EventStoreInMemory())
-        assert callable(run.init)
-        assert callable(run.run)
+        async with asyncio.timeout(5):
+            for content in ("a", "b"):
+                outputs = [o async for o in async_workflow.invoke(input_event(content))]
+                assert [o.data[0].content for o in outputs] == ["mock response"]
+        for topic in async_workflow._topics.values():
+            assert not await topic.can_consume("test_node")
+        assert not async_workflow._active_runs
 
 
 class TestEventDrivenWorkflowToDict:
@@ -325,52 +307,6 @@ class TestEventDrivenWorkflowToDict:
         assert isinstance(result["topics"], dict)
         assert "test_input" in result["topics"]
         assert "test_output" in result["topics"]
-
-
-class TestEventDrivenWorkflowAsyncNodeTracker:
-    @pytest.fixture
-    def workflow_with_tracker(self):
-        """Create a workflow to test async node tracker integration."""
-        input_topic = InputTopic(name="test_input")
-        output_topic = OutputTopic(name="test_output")
-
-        mock_tool = MockTool()
-        node = Node(
-            name="test_node",
-            tool=mock_tool,
-            subscribed_expressions=[TopicExpr(topic=input_topic)],
-            publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
-        )
-
-        return EventDrivenWorkflow(nodes={"test_node": node})
-
-    def test_workflow_has_tracker(self, workflow_with_tracker):
-        """Each run owns an AsyncNodeTracker; runs have independent trackers."""
-        from grafi.workflows.impl.async_node_tracker import AsyncNodeTracker
-
-        run = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
-        assert isinstance(run.tracker, AsyncNodeTracker)
-
-        # Independent trackers per run are the basis of invocation isolation.
-        run2 = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
-        assert run.tracker is not run2.tracker
-
-    @pytest.mark.asyncio
-    async def test_run_init_leaves_no_active_nodes(self, workflow_with_tracker):
-        """A fresh run starts idle, and init() seeds work without marking any
-        node active (nodes only become active once they enter processing)."""
-        run = WorkflowRun(workflow_with_tracker, EventStoreInMemory())
-        assert await run.tracker.is_idle()
-
-        invoke_context = InvokeContext(
-            conversation_id="test", invoke_id="test", assistant_request_id="test"
-        )
-        await run.init(
-            PublishToTopicEvent(invoke_context=invoke_context, data=[]),
-            is_sequential=False,
-        )
-
-        assert await run.tracker.is_idle()
 
 
 class TestEventDrivenWorkflowStopFlag:
@@ -500,3 +436,67 @@ class TestEventDrivenWorkflowSerialization:
         finally:
             # Clean up: unregister MockTool
             ToolFactory.unregister_tool_class("MockTool")
+
+
+def test_a_topic_named_twice_in_a_subscription_lists_its_reader_once() -> None:
+    from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+    from grafi.topics.topic_impl.topic import Topic
+
+    a, b = InputTopic(name="a"), Topic(name="b")
+    subscription = (
+        SubscriptionBuilder()
+        .subscribed_to(a)
+        .or_()
+        .subscribed_to(a)
+        .and_()
+        .subscribed_to(b)
+        .build()
+    )
+    node = Node(
+        name="n",
+        tool=MockTool(),
+        subscribed_expressions=[subscription],
+        publisher_router=PublisherRouter(
+            routes=[PublishRoute(topic=OutputTopic(name="out"))]
+        ),
+    )
+    workflow = EventDrivenWorkflow(nodes={"n": node})
+    assert workflow._topic_nodes["a"] == ["n"]
+
+
+def test_a_topic_with_a_custom_event_queue_is_rejected() -> None:
+    from grafi.common.exceptions import WorkflowError
+    from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
+
+    class CustomQueue(InMemTopicEventQueue):
+        pass
+
+    node = Node(
+        name="n",
+        tool=MockTool(),
+        subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
+        publisher_router=PublisherRouter(
+            routes=[
+                PublishRoute(topic=OutputTopic(name="out", event_queue=CustomQueue()))
+            ]
+        ),
+    )
+    with pytest.raises(WorkflowError, match="custom event_queue"):
+        EventDrivenWorkflow(nodes={"n": node})
+
+
+def test_a_node_keyed_by_another_name_is_rejected() -> None:
+    # Regression: a run identifies nodes by name, so a node registered under
+    # another key would be re-queued forever.
+    from grafi.common.exceptions import WorkflowError
+
+    node = Node(
+        name="p",
+        tool=MockTool(),
+        subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
+        publisher_router=PublisherRouter(
+            routes=[PublishRoute(topic=OutputTopic(name="out"))]
+        ),
+    )
+    with pytest.raises(WorkflowError, match="registered under the key 'key'"):
+        EventDrivenWorkflow(nodes={"key": node})

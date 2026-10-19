@@ -10,6 +10,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
@@ -166,12 +167,21 @@ class ReActAgent(Assistant):
         invoke_context: Optional[InvokeContext] = None,
         runtime: Optional[GrafiRuntime] = None,
     ) -> AsyncGenerator[Message, None]:
+        """Stream the messages of each output event.
+
+        Delivery is at least once, event by event (see
+        ``grafi.workflows.impl.workflow_run``): once an event's step is stored
+        and this stream closed, the event is not delivered again on resume, so
+        stopping partway through its messages drops the rest; otherwise the
+        whole event comes again.
+        """
         runtime = runtime or GrafiRuntime()
-        async for output in runtime.invoke(
-            self, self.get_input(question, invoke_context)
-        ):
-            for message in output.data:
-                yield message
+        async with owned_iterator(
+            runtime.invoke(self, self.get_input(question, invoke_context))
+        ) as stream:
+            async for output in stream:
+                for message in output.data:
+                    yield message
 
 
 class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):

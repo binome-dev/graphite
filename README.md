@@ -31,7 +31,7 @@ Key benefits include:
 - Effortless workflow customization for AI agents
 - Clear visibility into agent behavior via event sourcing
 - Reliable fault recovery and state restoration
-- Horizontally scalable: state lives in the event store, so use one workflow instance per in-flight request (see [Configuration & operations](#configuration--operations))
+- Horizontally scalable: state lives in the event store, and one workflow instance serves concurrent requests (see [Configuration & operations](#configuration--operations))
 - End-to-end auditability with persistent event tracking
 - Enables both online and offline data processing by capturing all events in an event store — users can build memory, knowledge bases, analytics, or fine-tuning pipelines on top of it
 
@@ -113,13 +113,19 @@ Graphite simplifies constructing these AI powered workflows, much like building 
 
 ### Concurrency model
 
-An `EventDrivenWorkflow` instance holds per-invocation run state (topic queues, the
-ready-queue, and the quiescence tracker) and resets it at the start of each
-`invoke()`. **Use one workflow/assistant instance per in-flight request** (construct
-it, or deserialize it from the event store, per request). Do not share a single
-instance across concurrent `invoke()` calls. The durable state lives in the
-`EventStore`, so horizontal scaling is achieved by running many stateless
-processes that share one event store (e.g. `EventStorePostgres`).
+An `EventDrivenWorkflow` instance is a shared definition that holds only the
+registry of its runs in flight. Each `invoke()` runs on its own `WorkflowRun`,
+which holds all of that invocation's state, so one instance can serve concurrent
+invocations of different requests.
+
+Runs of one `assistant_request_id` must not overlap; the host ensures this, for
+example with a per-request lock. `workflow.stop()` (and
+`assistant.stop_workflow()`) stops every run of that instance; to stop one
+request alone, close its output stream, or give it an instance of its own.
+
+The durable state lives in the `EventStore`, so horizontal scaling is achieved
+by running many stateless processes that share one event store (e.g.
+`EventStorePostgres`).
 
 ### Security: deserializing workflows
 

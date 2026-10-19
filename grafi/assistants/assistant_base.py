@@ -69,12 +69,8 @@ class AssistantBase(BaseModel):
         }
 
     def stop_workflow(self) -> None:
-        """
-        Stop the current workflow execution.
-        This method allows the assistant to stop an ongoing workflow.
-        For event-driven workflows, cross-thread requests are scheduled and
-        take effect asynchronously when the workflow's event loop runs.
-        """
+        """Stop every run in flight of this assistant's workflow, including
+        other requests' runs; see ``EventDrivenWorkflow.stop()``."""
         if hasattr(self.workflow, "stop"):
             self.workflow.stop()
         else:

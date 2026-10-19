@@ -11,6 +11,7 @@ from typing import Union
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import BaseModel
 
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.callable_ref import deserialize_callable
 from grafi.common.callable_ref import serialize_callable
 from grafi.common.decorators.record_decorators import record_tool_invoke
@@ -51,8 +52,9 @@ class FunctionTool(Tool):
         try:
             response = self.function(input_data)
             if inspect.isasyncgen(response):
-                async for item in response:
-                    yield self.to_messages(response=item)
+                async with owned_iterator(response) as stream:
+                    async for item in stream:
+                        yield self.to_messages(response=item)
                 return
             if inspect.isawaitable(response):
                 response = await response

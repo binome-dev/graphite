@@ -1923,7 +1923,6 @@ class TestEdgeCasesAndExceptions:
     async def test_workflow_stops_on_node_exception(self, invoke_context):
         """
         Test that workflow stops processing when a node raises an exception.
-        This verifies the force_stop fix in _invoke_node.
         """
         call_count = {"count": 0}
 

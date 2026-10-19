@@ -78,24 +78,20 @@ These topics cannot be used for custom topic names to avoid conflicts with syste
 
 ## Message Publishing
 
-The publishing mechanism is abstract and must be implemented by subclasses:
+`publish_data(publish_event)` publishes a source event to the topic and returns
+the enqueued publication. It is built from two steps:
 
-```python
-def publish_data(
-    self,
-    invoke_context: InvokeContext,
-    publisher_name: str,
-    publisher_type: str,
-    data: Messages,
-    consumed_events: List[ConsumeFromTopicEvent],
-) -> PublishToTopicEvent:
-    """
-    Publish data to the topic if it meets the condition.
-    """
-    raise NotImplementedError(
-        "Method 'publish_data' must be implemented in subclasses."
-    )
-```
+- `prepare_publication(publish_event)` copies the event with this topic's name
+  and type, a fresh `event_id`, and the source event's ID in `emission_id`.
+- `add_event(publication)` enqueues it and returns it with its offset set.
+
+A workflow run keeps its topics' events itself and calls only
+`prepare_publication()` (and `to_dict()` to serialize the topic), so building a
+workflow with a topic that overrides any other public `TopicBase` instance method
+(`publish_data()`, `consume()`, `commit()` and the like), or that has a custom
+`event_queue`, raises `WorkflowError`: those are for using a topic on its own.
+To transform or validate a publication, override `prepare_publication()`: it
+runs before anything is stored.
 
 ## Message Consumption
 

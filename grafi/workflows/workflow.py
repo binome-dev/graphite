@@ -36,14 +36,15 @@ class Workflow(BaseModel):
         """
         Stop the workflow execution.
         This method can be called by an assistant to stop the workflow during execution.
+        It records the request in ``_stop_requested``; a subclass stops its runs.
         """
         logger.info("Workflow stop requested")
         self._stop_requested = True
 
     def reset_stop_flag(self) -> None:
         """
-        Reset the stop flag for the workflow.
-        This should be called before starting a new workflow execution.
+        Reset the stop flag for the workflow. (EventDrivenWorkflow stops its runs
+        in flight directly, and its runs do not read this flag.)
         """
         self._stop_requested = False
 

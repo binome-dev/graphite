@@ -1,15 +1,15 @@
-"""Characterization tests for fan-out delivery accounting (Defect #2).
+"""Characterization tests for fan-out delivery (Defect #2).
 
-The quiescence tracker counts outstanding *deliveries* (one per consumer of each
-published event), not publications. Before the fix it counted publications, so a
-single event fanned out to several subscribers was declared quiescent after only
-the first subscriber committed -- silently dropping the rest of the work.
+Every subscriber of a published event must run before the run ends. The old
+quiescence tracker once counted publications rather than deliveries, so a single
+event fanned out to several subscribers was declared quiescent after only the
+first subscriber committed -- silently dropping the rest of the work. A run now
+ends exactly when no step runs and no node is ready.
 """
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -22,7 +22,6 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-from grafi.workflows.impl.workflow_run import WorkflowRun
 
 
 class LabelTool(Tool):
@@ -75,18 +74,6 @@ def _build_fanout_workflow() -> EventDrivenWorkflow:
         publisher_router=PublisherRouter(routes=[PublishRoute(topic=output_topic)]),
     )
     return EventDrivenWorkflow.builder().node(node_a).node(node_b).build()
-
-
-def test_topic_consumers_counts_every_subscriber():
-    """The topology helper reports both subscribers of the fan-out input topic
-    and the workflow itself as the consumer of the output topic."""
-    workflow = _build_fanout_workflow()
-    run = WorkflowRun(workflow, EventStoreInMemory())
-
-    assert set(run._topic_consumers("agent_input")) == {"node_a", "node_b"}
-    assert run._topic_consumers("agent_output") == [workflow.name]
-    # Unknown topic -> no consumers (cannot hang execution).
-    assert run._topic_consumers("does_not_exist") == []
 
 
 @pytest.mark.asyncio

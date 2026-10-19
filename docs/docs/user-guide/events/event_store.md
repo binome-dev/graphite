@@ -20,12 +20,21 @@ All event store implementations inherit from the base `EventStore` class, which 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `record_event` | `(event: Event) -> None` | Record a single event to the store |
-| `record_events` | `(events: List[Event]) -> None` | Record multiple events in batch |
+| `record_events` | `(events: List[Event]) -> None` | Record a batch atomically: all of its events, or none |
 | `clear_events` | `() -> None` | Clear all events from the store |
 | `get_events` | `() -> List[Event]` | Retrieve all events from the store |
 | `get_event` | `(event_id: str) -> Optional[Event]` | Get a specific event by ID |
 | `get_agent_events` | `(assistant_request_id: str) -> List[Event]` | Get events for an assistant request |
 | `get_conversation_events` | `(conversation_id: str) -> List[Event]` | Get events for a conversation |
+
+A workflow stores the consumptions and publications of the steps that finish
+together with one `record_events()` call, and resumes a request from those
+records. A custom store must therefore write each batch atomically (for example
+in one transaction): a batch only partly written leaves a step half stored.
+Recovery may not detect it, and the resumed request then skips that step (its
+output lost) or runs it again (its output delivered twice); if the write left a
+gap in a topic's positions, every resume fails with `WorkflowError`. Both
+built-in stores also skip an event whose `event_id` is already stored.
 
 ### Event Reconstruction
 
@@ -77,9 +86,17 @@ request_events = event_store.get_agent_events("req_123")
 class EventStoreInMemory(EventStore):
     def __init__(self) -> None:
         self.events = []
+        self._event_ids = set()
 
     async def record_event(self, event: Event) -> None:
-        self.events.append(event)
+        await self.record_events([event])
+
+    async def record_events(self, events: Sequence[Event]) -> None:
+        # Nothing awaits in between, so a batch is stored whole.
+        for event in events:
+            if event.event_id not in self._event_ids:
+                self._event_ids.add(event.event_id)
+                self.events.append(event)
 
     async def get_events(self) -> List[Event]:
         return self.events.copy()
@@ -98,7 +115,7 @@ The `EventStorePostgres` provides a production-ready, persistent storage solutio
 ### PostgreSQL Features
 
 - **Persistent Storage**: Data survives application restarts
-- **ACID Compliance**: Full transaction support
+- **ACID Compliance**: Each `record_events()` batch is written in one transaction
 - **Scalability**: Handles large volumes of events
 - **Advanced Querying**: SQL-based filtering and aggregation
 - **JSON Support**: Native JSONB storage for event data

@@ -113,7 +113,9 @@ def bind_services(services: ExecutionServices) -> Iterator[ExecutionServices]:
     Uses ``ContextVar`` set/reset (capture-and-restore), so nested bindings
     restore the previous value on exit. ``asyncio`` tasks created inside the
     block inherit the binding because ``create_task``/``gather`` snapshot the
-    current context.
+    current context. Leave the block in the context that entered it: an async
+    generator binds around each step, not across a ``yield`` (see
+    :meth:`GrafiRuntime.invoke`).
     """
     token: Token[Optional[ExecutionServices]] = _current_services.set(services)
     try:

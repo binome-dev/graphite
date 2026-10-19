@@ -208,8 +208,8 @@ class AssistantEventBase(ComponentEvent):
 def create_component_events(
     base_class: Type[ComponentEvent],
     component_name: str,
-    input_type: Type,
-    output_type: Type,
+    input_type: Any,  # A type, or a typing form such as List[...] or Optional[...].
+    output_type: Any,
     serialize_input_fn: Callable,
     serialize_output_fn: Callable,
     deserialize_input_fn: Callable,

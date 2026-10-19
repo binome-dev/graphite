@@ -2,10 +2,12 @@ from typing import Any
 from typing import AsyncGenerator
 from typing import Dict
 from typing import List
+from typing import Set
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
 
+from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_workflow_invoke
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -17,6 +19,7 @@ from grafi.nodes.node_base import NodeBase
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
+from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_factory import TopicFactory
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -25,6 +28,17 @@ from grafi.workflows.impl.workflow_run import WorkflowRun
 from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
 
+# Instance methods for using a topic on its own: a workflow run calls only
+# prepare_publication() (and serializes the topic), so it would skip an
+# override of any of these.
+_SKIPPED_TOPIC_METHODS = tuple(
+    name
+    for name, value in vars(TopicBase).items()
+    if callable(value)
+    and not name.startswith("_")
+    and name not in {"prepare_publication", "to_dict"}
+)
+
 
 class EventDrivenWorkflow(Workflow):
     """
@@ -32,10 +46,11 @@ class EventDrivenWorkflow(Workflow):
 
     This class is the immutable *definition*: it owns the topology (nodes, topic
     configuration, and the topic→node subscription map) and links function-tool
-    specs onto LLM nodes. It owns no runtime state. Each ``invoke()`` creates a
+    specs onto LLM nodes. Each ``invoke()`` creates a
     :class:`~grafi.workflows.impl.workflow_run.WorkflowRun` that holds all mutable
-    per-invocation state (topic queues, tracker, ready-queue, stop flag), so
-    concurrent invocations of one instance are isolated from each other.
+    per-invocation state (the topics' events, running steps, stop flag), so
+    concurrent invocations of one instance are isolated from each other; the
+    definition only keeps a registry of its runs in flight, which stop() uses.
     """
 
     name: str = "EventDrivenWorkflow"
@@ -45,18 +60,28 @@ class EventDrivenWorkflow(Workflow):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
 
     # Topics known to this workflow (e.g., "agent_input", "agent_stream_output").
-    # This is the definition's topic *template*; each run gets its own copies with
-    # fresh queues.
+    # This is the definition's topic *template*; each run keeps its own events.
     _topics: Dict[str, TopicBase] = PrivateAttr(default_factory=dict)
 
     # Mapping of topic_name -> list of node_names that subscribe to that topic
     _topic_nodes: Dict[str, List[str]] = PrivateAttr(default_factory=dict)
 
+    # Output topics that stream to the caller before their producing step commits.
+    _streamed_topics: Set[str] = PrivateAttr(default_factory=set)
+
     # In-flight runs, keyed by id(run), so stop() can reach them.
     _active_runs: Dict[int, WorkflowRun] = PrivateAttr(default_factory=dict)
 
     def model_post_init(self, _context: Any) -> None:
-        for node in self.nodes.values():
+        for key, node in self.nodes.items():
+            if key != node.name:
+                raise WorkflowError(
+                    message=(
+                        f"Node {node.name!r} is registered under the key {key!r}; "
+                        "a workflow keys each node by its name."
+                    ),
+                    severity="CRITICAL",
+                )
             if not node.subscribed_expressions or not node.subscribed_topics:
                 raise WorkflowError(
                     message=f"Node {node.name!r} requires at least one subscription.",
@@ -66,13 +91,15 @@ class EventDrivenWorkflow(Workflow):
         self._handle_function_calling_nodes()
 
     def stop(self) -> None:
-        """
-        Stop the workflow execution.
+        """Stop every run of this workflow in flight.
 
-        Sets the definition-level stop flag and forwards the stop to every
-        in-flight run so their trackers and node tasks wind down.
-        Cross-thread requests are scheduled and take effect asynchronously
-        when the runs' event loops execute.
+        A run is in flight once its ``invoke()`` is first iterated. Running
+        steps are cancelled, except a step that called stop() itself, which is
+        left to finish unless a later stop comes from outside it. Safe from
+        any thread; the stop takes effect when the run's loop next runs its
+        callbacks. To stop on a signal, use ``loop.add_signal_handler()``: a
+        ``signal.signal()`` handler runs in the context of the step code it
+        interrupts, which is then left to finish.
         """
         super().stop()
         for run in list(self._active_runs.values()):
@@ -86,24 +113,71 @@ class EventDrivenWorkflow(Workflow):
         """
         return WorkflowBuilder(cls)
 
-    def _add_topics(self) -> None:
+    def _find_streamed_topics(self, producers: Dict[str, Set[str]]) -> Set[str]:
+        """Agent output topics whose chunks may reach the caller before commit.
+
+        Only the workflow reads these topics, and a single node writes each of
+        them, so a producer that fails mid-stream cannot leave a gap before a
+        position another producer has already persisted. In-workflow output
+        topics carry requests that a later call answers by event ID, so they
+        reach the caller only once committed. Every other topic is staged until
+        its producing step commits.
         """
-        Construct and return the EventDrivenStreamWorkflow.
-        Sets up topic subscriptions and node-to-topic mappings.
+        return {
+            name
+            for name, topic in self._topics.items()
+            if topic.type == TopicType.AGENT_OUTPUT_TOPIC_TYPE
+            and not self._topic_nodes.get(name)
+            and len(producers.get(name, ())) == 1
+        }
+
+    def _add_topics(self) -> None:
+        """Set up topics, node-to-topic mappings and the streamed output topics.
+
+        Raises WorkflowError for a topic that overrides a method runs do not
+        call (see _SKIPPED_TOPIC_METHODS) or has a custom event_queue, and for
+        a workflow without an agent input or an agent output topic.
         """
 
         # 1) Gather all topics from node subscriptions/publishes
+        producers: Dict[str, Set[str]] = {}
         for node_name, node in self.nodes.items():
             # For each subscription expression, parse out one or more topics
             for expr in node.subscribed_expressions:
                 found_topics = extract_topics(expr)
                 for t in found_topics:
                     self._topics[t.name] = t
-                    self._topic_nodes.setdefault(t.name, []).append(node_name)
+                    readers = self._topic_nodes.setdefault(t.name, [])
+                    if node_name not in readers:  # A topic named more than once.
+                        readers.append(node_name)
 
             # For each publish topic, ensure it's registered
             for topic in node.publish_to:
                 self._topics[topic.name] = topic
+                producers.setdefault(topic.name, set()).add(node_name)
+
+        self._streamed_topics = self._find_streamed_topics(producers)
+
+        for topic in self._topics.values():
+            for method in _SKIPPED_TOPIC_METHODS:
+                if getattr(type(topic), method) is not getattr(TopicBase, method):
+                    raise WorkflowError(
+                        message=(
+                            f"Topic {topic.name!r} overrides {method}(), which "
+                            "workflows do not call; override "
+                            "prepare_publication() instead."
+                        ),
+                        severity="CRITICAL",
+                    )
+            if type(topic.event_queue) is not InMemTopicEventQueue:
+                raise WorkflowError(
+                    message=(
+                        f"Topic {topic.name!r} has a custom event_queue, which "
+                        "workflows do not use: a run keeps its topics' events "
+                        "itself and stores them in the event store."
+                    ),
+                    severity="CRITICAL",
+                )
 
         # 2) Verify there is an agent input topic
         # Check if any topic has the required type
@@ -178,7 +252,6 @@ class EventDrivenWorkflow(Workflow):
                             function_node.tool.get_function_specs()
                         )
 
-    @record_workflow_invoke
     async def invoke(
         self, input_data: PublishToTopicEvent, is_sequential: bool = False
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
@@ -187,15 +260,26 @@ class EventDrivenWorkflow(Workflow):
 
         Each call executes on its own :class:`WorkflowRun`, so the definition
         instance carries no per-invocation state and concurrent invocations are
-        isolated.
+        isolated. The run is registered before anything is awaited, so
+        :meth:`stop` reaches it as soon as iteration has started.
         """
         run = WorkflowRun(self)
         self._active_runs[id(run)] = run
         try:
-            async for event in run.run(input_data, is_sequential):
-                yield event
+            async with owned_iterator(
+                self._recorded_run(input_data, is_sequential, run)
+            ) as stream:
+                async for event in stream:
+                    yield event
         finally:
             self._active_runs.pop(id(run), None)
+
+    @record_workflow_invoke
+    def _recorded_run(
+        self, input_data: PublishToTopicEvent, is_sequential: bool, run: WorkflowRun
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+        """The run's outputs, with the workflow's invoke events recorded."""
+        return run.run(input_data, is_sequential)
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -1,6 +1,10 @@
 # Event-Driven Workflow
 
-The event-driven workflow serves as the dynamic execution layer of Graphite, orchestrating node execution through a publish/subscribe (pub/sub) model. This architecture structures workflows as interconnected nodes that communicate via event queues (topics), enabling asynchronous, scalable, and flexible processing.
+The event-driven workflow is the execution layer of Graphite. Nodes communicate
+through topics with a publish/subscribe model: a node runs when the events on
+its subscribed topics satisfy its subscription, and what it publishes can make
+other nodes ready. Independent nodes run in parallel, every step is recorded in
+the event store, and an unfinished request can be resumed from those records.
 
 ## Fields
 
@@ -15,42 +19,37 @@ The fields of the EventDrivenWorkflow are:
 | `nodes`             | `Dict[str, Node]`                 | Collection of all nodes defined within this workflow, keyed by node name.                             |
 | `_topics`           | `Dict[str, TopicBase]`            | Private dictionary storing all event topics managed by the workflow.                                  |
 | `_topic_nodes`      | `Dict[str, List[str]]`            | Private mapping of topic names to lists of node names subscribed to each topic.                       |
-| `_invoke_queue`     | `deque[Node]`                     | Private queue of nodes that are ready to execute, triggered by event availability.                    |
-| `_tracker`          | `AsyncNodeTracker`                | Tracks active nodes and workflow idle state for proper async termination.                             |
+| `_streamed_topics`  | `Set[str]`                        | Agent output topics whose chunks reach the caller before their step commits.                          |
+| `_active_runs`      | `Dict[int, WorkflowRun]`          | The runs in flight, which `stop()` stops. (The inherited `_stop_requested` flag only records that `stop()` was called; runs do not read it.) |
+
+The workflow is an immutable *definition*. Each `invoke()` runs on its own
+`WorkflowRun`, which holds all of that invocation's state, so concurrent
+invocations of one workflow share no state but the registry of runs in flight
+that `stop()` uses.
 
 ## Methods
 
-The following table summarizes key methods within the EventDrivenWorkflow class, highlighting their role in managing workflow execution, event handling, and node orchestration:
-
-| Method Name               | Description                                                                                                                                               |
-|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `model_post_init`         | Model initialization hook that sets up topics and handles function calling nodes after model creation.                                                  |
-| `builder`                 | Class method that returns a WorkflowBuilder for fluent workflow construction.                                                                            |
-| `_add_topics`             | Sets up topic subscriptions and node-to-topic mappings from node configurations.                                                                         |
-| `_add_topic`              | Registers a topic within the workflow and sets default publish event handlers.                                                                           |
-| `_handle_function_calling_nodes` | Links function calling nodes with LLM nodes to enable function specification sharing.                                                             |
-| `_commit_events`        | Commits processed events to their respective topics, updating consumer offsets.                                                                          |
-| `_get_output_events`      | Retrieves and returns consumed events from agent output and in-workflow output topics.                                                                   |
-| `invoke`                | Asynchronous workflow execution with streaming support and concurrent node processing.                                                                   |
-| `_invoke_node`            | Invokes a single node asynchronously with proper stream handling and error management.                                                                   |
-| `init_workflow`         | Asynchronously initializes workflow state, either restoring from stored events or creating new workflow with input data.                                |
-| `on_event`                | Event handler that responds to topic publish events, evaluates node readiness, and queues nodes for execution.                                          |
-| `to_dict`                 | Serializes the workflow to a dictionary representation including nodes, topics, and topic-node mappings.                                                |
+| Method Name                      | Description                                                                                  |
+|----------------------------------|----------------------------------------------------------------------------------------------|
+| `model_post_init`                | Validates subscriptions, sets up topics and links function-calling nodes after creation.    |
+| `builder`                        | Class method that returns a WorkflowBuilder for fluent workflow construction.               |
+| `_add_topics`                    | Sets up topic subscriptions, node-to-topic mappings and the streamed output topics.         |
+| `_find_streamed_topics`          | Finds the agent output topics that may stream to the caller before their step commits.     |
+| `_handle_function_calling_nodes` | Links function-calling nodes with LLM nodes to share function specifications.               |
+| `invoke`                         | Runs the workflow on a new `WorkflowRun`, streaming its outputs.                             |
+| `stop`                           | Stops every run in flight.                                                                   |
+| `to_dict` / `from_dict`          | Serializes the workflow, including nodes and topics, and rebuilds it.                       |
 
 ## Workflow Execution Flow
 
-The following diagram illustrates the execution flow of a Node within an event-driven workflow:
-
 ```mermaid
 graph TD
-    Start[Start Workflow Execution] --> Init[initial_workflow: Restore or Initialize State]
-    Init --> EventListener[Event Listener: on_event]
-    EventListener --> CheckCriteria[Evaluate Node can_invoke Criteria]
-    CheckCriteria -->|Conditions Met| QueueNode[Add Node to _invoke_queue]
-    QueueNode --> InvokeNode[Execute Next Node in Queue]
-    InvokeNode --> PublishResults[Publish Results via _publish_events]
-    PublishResults --> EventListener
-    EventListener -->|No Pending Nodes| Output[Assistant Output]
+    Start[invoke: create a WorkflowRun] --> Init[Seed the input, or restore from the event store]
+    Init --> Ready[Start a step for each ready node]
+    Ready --> Step[Steps run in parallel]
+    Step --> Commit[Commit finished steps: store their records, then publish]
+    Commit --> Ready
+    Ready -->|No step running and no node ready| Close[End: acknowledge the outputs handed over]
 ```
 
 ## Workflow Initialization
@@ -64,7 +63,10 @@ The topic setup process:
 
 - Extracts topics from node subscription expressions using `extract_topics`
 - Maps topic names to subscribing node names in `_topic_nodes`
-- Registers all topics in the `_topics` dictionary with event handlers
+- Registers all topics in the `_topics` dictionary
+- Finds the streamed output topics (`_streamed_topics`)
+- Rejects a topic that overrides a method runs do not call, or that has a custom
+  `event_queue` (see [Topic Base](topics/topic_base.md))
 - Validates that required `InputTopic` and `OutputTopic` exist
 
 For function calling capabilities:
@@ -73,250 +75,151 @@ For function calling capabilities:
 - Links them with LLM nodes that publish to the same topics
 - Enables LLMs to recognize and invoke available function tools
 
-```mermaid
-graph TD
-    A[Initialize Workflow] --> B[model_post_init]
-    B --> C[_add_topics: Build Topic Graph]
-    B --> D[_handle_function_calling_nodes]
-    C --> E([Extract Topics from Nodes])
-    C --> F([Map Topics to Nodes])
-    C --> G([Register Event Handlers])
-    D --> H([Link Function Tools to LLMs])
-    E --> I([Validate Required Topics])
-    F --> I
-    G --> I
-    H --> I
-    I --> J[Workflow Ready]
-```
+## How a Run Executes
 
-## Node Execution Process
+A `WorkflowRun` executes one invocation with a single coordinator task that
+starts and commits its steps. The run's state changes only in synchronous code
+on the run's event loop, so the run needs no locks for it (one lock guards a
+`stop()` from another thread before the run starts), and nothing polls.
 
-The EventDrivenWorkflow uses asynchronous execution with the `invoke` method, handling node orchestration through async/await patterns.
+### Readiness
 
-### Asynchronous Execution (`invoke`)
+Each topic of the run is a log of the publications made during the run, with a
+read position per consumer. A node is **ready** when the topics it has unread
+events on satisfy its subscription expression, and no step of the node is
+running. The coordinator then takes all of the node's unread events (they become
+the step's input) and starts a task for the step. A node runs one step at a time;
+different nodes run in parallel.
 
-The asynchronous execution model provides sophisticated event-driven processing with proper coordination:
+Subscriptions combine topics with AND and OR:
 
-1. **Workflow Initialization**: Sets up initial state with `init_workflow`
-2. **Concurrent Node Processing**: Spawns individual tasks for each node using `_invoke_node`  
-3. **Output Listening**: Creates listeners for each output topic to capture results
-4. **Event Streaming**: Uses `AsyncOutputQueue` to stream output events as they become available
-5. **Proper Termination**: Coordinates workflow completion using `AsyncNodeTracker`
+- **AND**: the node runs once every topic in the expression has unread events.
+- **OR**: the node runs as soon as any of them has. It receives everything unread
+  on its subscribed topics at that moment, so the other topics' events may arrive
+  in a later step.
 
-#### Key Components
+### Step Commits
 
-- **AsyncNodeTracker**: Manages active node state and quiescence detection
-- **Output Listeners**: Monitor output topics for new events
-- **AsyncOutputQueue**: Streams output-topic events and coordinates with workflow quiescence
-- **Offset Management**: Commits events immediately to prevent duplicates
+A node's invocation is one step. When steps finish, the coordinator commits
+them: their consumption and publication records are written to the event store
+in **one atomic batch**, and only then are their publications appended to their
+topics, where they can make other nodes ready. No node ever consumes a
+publication that a failure could lose, and topic positions are always
+contiguous. Steps that finish together are committed in the same write.
 
-### Event-Driven Node Triggering
+An agent output topic that only the workflow reads and a single node writes
+streams to the caller as chunks arrive. Other topics, including in-workflow
+output topics for human input, deliver a step's publications together when the
+step commits. A node that should feed another node item by item publishes each
+item from its own invocation, for example by consuming a topic it publishes to.
 
-The pub/sub model governs node execution through the `on_event` handler:
+### Ending a Run
 
-1. **Event Reception**: Receives `PublishToTopicEvent` from topics
-2. **Subscriber Identification**: Finds all nodes subscribed to the published topic
-3. **Readiness Check**: Evaluates each node's `can_invoke()` criteria
-4. **Queue Management**: Adds ready nodes to `_invoke_queue` for execution
+A run ends when no step is running and no node is ready. This is exact:
+an `A AND B` subscription whose `B` never arrives simply leaves the node
+unready, and the run ends.
 
-```mermaid
-graph TD
-    A[Event Published] --> B[on_event Handler]
-    B --> C[Find Subscribed Nodes]
-    C --> D{Node can_invoke?}
-    D -->|Yes| E[Add to _invoke_queue]
-    D -->|No| F[Wait for More Events]
-    E --> G[Node Execution]
-    G --> H[Publish Results]
-    H --> A
-    F --> A
-```
+A run also stops early when:
 
-## Input Preparation & Execution Logic
+- **a node fails**: as soon as the failure reaches the run, no new steps start,
+  the other running steps are cancelled at once and awaited, and the failure is
+  raised (`NodeExecutionError`) once the failed step has closed. A node's own
+  failure reaches the run after the node has recorded its failed event; a
+  failure to publish its output (a raising `prepare_publication()`) reaches the
+  run first, and the node then records it as it closes. The first failure to reach the run is raised;
+  later ones become notes on it. An interrupt or exit outranks an ordinary
+  failure. A `KeyboardInterrupt` or `SystemExit` raised by a tool, a store or
+  the engine during a run leaves the event loop once, from the task that raised
+  it, and `asyncio.run()` raises it after cancelling every task to clean up. The
+  run records it as its failure, and its callers get a `WorkflowError` caused by
+  it (or their own `CancelledError`, when cancelled), never the interrupt again.
+  (One raised while an assistant or workflow records its own invoke or respond
+  event reaches the caller as an `EventPersistenceError` caused by it; one
+  raised while it records its failed event is noted on that failure.)
+- **the caller closes the stream or is cancelled**: every running step is
+  cancelled and awaited before the close returns. A timeout around the close
+  cancels the steps again and stops acknowledging outputs; the close still waits
+  for the steps to end, so a step that never stops holds it. Under anyio cancel
+  scopes (for example Starlette's `StreamingResponse` when the client
+  disconnects) a cancelled read is cancelled again during the close, so it
+  closes as a timeout around the close does.
+- **`workflow.stop()`** is called, from any thread. It stops the runs in flight:
+  a run is in flight once its workflow's `invoke()` is first iterated, so a stop
+  before that (for example while an assistant records its invoke event) has no
+  run to stop. A step whose tool calls `stop()` itself (a "finish" tool, say) is
+  left to finish, so its output is delivered and stored. That holds for code
+  carrying the step's context: the step's task, tasks it creates, and threads
+  started with `asyncio.to_thread()`, but not threads from `run_in_executor()` or
+  `threading.Thread`. A `stop()` from anywhere else cancels every running step,
+  including one an earlier stop left to finish. To stop on a signal, install the
+  handler with `loop.add_signal_handler()`: one installed with `signal.signal()`
+  runs in the context of whatever step code it interrupts, which is then left to
+  finish like a step calling `stop()`.
 
-Before executing a node, the workflow's `get_node_input` method collects all relevant events from the node's subscribed topics:
+When a run stops, steps that already finished are still committed, unless the
+close was cancelled or a store write already failed (its outcome is unknown, so
+the run commits no more steps; outputs already stored are still acknowledged).
+A step the run cancelled is never committed, even if it returned (it may have
+cut its work short, or finished its cleanup only): its work runs again when the
+request resumes, so make side effects in tools safe to repeat. An error it raises
+while being cancelled is logged.
 
-1. **Topic Iteration**: Processes each topic in `node._subscribed_topics`
-2. **Event Consumption**: Uses `topic.consume(node.name)` to retrieve available events
-3. **Event Conversion**: Converts topic events to `ConsumeFromTopicEvent` instances
-4. **Input Assembly**: Returns list of consumed events for node execution
+### Sequential Runs
 
-### Subscription Logic Support
+`invoke(input, is_sequential=True)` runs the same engine with one step at a
+time: the first node to become ready runs first. On resume, nodes left ready by
+the stored history run first, in definition order, then those the new input
+makes ready.
 
-The system provides flexible subscription expressions through topic expressions that support complex logic:
+### Acknowledging Outputs
 
-- **AND Logic**: Node executes when ALL subscription conditions are met
-- **OR Logic**: Node executes when ANY subscription condition is met
+Outputs are delivered at least once:
 
-## Async Flow Architecture
-
-The EventDrivenWorkflow implements a sophisticated async architecture that addresses the challenges of coordinating multiple concurrent nodes while ensuring proper workflow termination and data consistency.
-
-### Workflow Components
-
-The async workflow relies on two key components for coordination and output management:
-
-#### AsyncNodeTracker
-
-The `AsyncNodeTracker` manages workflow state and coordination by tracking active nodes, monitoring processing cycles, and detecting idle states. It provides the foundation for proper workflow termination detection.
-
-#### AsyncOutputQueue
-
-The `AsyncOutputQueue` manages the collection and streaming of output events from multiple topics. It coordinates concurrent listeners and provides a unified async iterator interface for consuming events.
-
-For detailed information about these components, see the [Workflow Components documentation](workflow-components.md).
-
-### Component Integration
-
-The async workflow integrates these components to provide robust event streaming:
-
-```python
-# Create output queue with topics and tracker
-output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
-await output_queue.start_listeners()
-
-# Stream events as they arrive
-async for event in output_queue:
-    yield event.data
-```
-
-### Offset Management and Duplicate Prevention
-
-The async workflow implements proper offset management to prevent duplicate data:
-
-```python
-output_queue = AsyncOutputQueue(output_topics, self.name, self._tracker)
-await output_queue.start_listeners()
-async for event in output_queue:
-    consumed_output_event = ConsumeFromTopicEvent(...)
-
-    # Commit BEFORE yielding to prevent duplicate data
-    await self._commit_events(
-        consumer_name=self.name, events=[consumed_output_event]
-    )
-
-    # Now yield the data after committing
-    yield event.data
-```
-
-#### Key Principles
-
-- **Immediate Consumption**: Consumed offset advanced on fetch
-- **Commit Before Yield**: Prevents duplicate data in output stream
-- **Atomic Operations**: Event processing and commitment are coordinated
-
-### Node Lifecycle in Async Mode
-
-Each node runs in its own async task with proper coordination:
-
-```python
-async def _invoke_node(self, invoke_context: InvokeContext, node: Node):
-    buffer: Dict[str, List[TopicEvent]] = {}
-
-    try:
-        while not self._stop_requested:
-            # Wait for node to have sufficient data
-            await wait_node_invoke(node)
-
-            # Signal node is becoming active
-            await self._tracker.enter(node.name)
-
-            try:
-                # Process events and publish results
-                async for msgs in node.invoke(invoke_context, consumed_events):
-                    published_events = await publish_events(...)
-                    # Notify downstream nodes immediately
-                    for event in published_events:
-                        if event.name in self._topic_nodes:
-                            topic = self._topics[event.name]
-                            async with topic.event_cache._cond:
-                                topic.event_cache._cond.notify_all()
-
-                # Commit processed events
-                await self._commit_events(...)
-
-            finally:
-                # Signal node is no longer active
-                await self._tracker.leave(node.name)
-
-    except asyncio.CancelledError:
-        logger.info(f"Node {node.name} was cancelled")
-        raise
-```
-
-#### Node Coordination Features
-
-- **Buffer Management**: Each node maintains its own event buffer
-- **Activity Signaling**: Nodes signal when they become active/inactive
-- **Immediate Notification**: Downstream nodes notified immediately after publishing
-- **Proper Cleanup**: Resources cleaned up on cancellation
-
-### Workflow Termination Logic
-
-The workflow terminates when all conditions are met:
-
-1. **No Active Nodes**: `AsyncNodeTracker` reports idle state
-2. **No Pending Data**: Output topics have no unconsumed data
-3. **No Progress**: Activity count indicates no new processing cycles
-
-```python
-# Check for workflow completion
-if tracker.is_idle() and not topic.can_consume(consumer_name):
-    current_activity = tracker.get_activity_count()
-
-    # If no new activity since last check, we're done
-    if current_activity == last_activity_count:
-        break
-
-    last_activity_count = current_activity
-```
-
-This multi-layered approach ensures that workflows terminate cleanly without missing data or creating race conditions between upstream completion and downstream activation.
-- **Complex Expressions**: Combination of AND/OR operators for advanced logic
-
-**Important Consideration for OR Logic**: When using OR-based subscriptions, nodes are queued as soon as one condition is satisfied. Messages from other subscribed topics in the OR expression may not be available when `get_node_input` executes, potentially causing data inconsistencies. Careful design is recommended when implementing OR-based logic.
-
-### Node Execution Flow
-
-```mermaid
-graph TD
-    A[Node Ready to Execute] --> B[get_node_input]
-    B --> C[Check Subscribed Topics]
-    C --> D[Consume Available Events]
-    D --> E[Convert to ConsumeFromTopicEvent]
-    E --> F[Execute Node]
-    F --> G[Publish Results via _publish_events]
-    G --> H[Trigger on_event for Subscribers]
-```
+- An output counts as **delivered** when it is handed to the caller. A caller
+  that stops after receiving it and closes the stream does not get it again, so
+  a human-input request it received can be answered.
+- Delivered outputs are **acknowledged** (recorded as consumed by the workflow)
+  when the stream closes, so answer a request after closing the stream that
+  delivered it.
+- Outputs never handed over, outputs of steps that were not stored, and outputs
+  whose acknowledgement was not stored (the close was cancelled or timed out,
+  or the acknowledgement write failed, so the close raised) are delivered
+  again when the request resumes.
 
 ## Restoring Unfinished Workflows
 
-A key advantage of this event-driven architecture is its ability to restore and resume unfinished workflows. When `initial_workflow()` is called, the system:
+Invoking a workflow with an `assistant_request_id` that already has events in
+the event store resumes that request:
 
-1. **Event Store Check**: Retrieves stored events for the given `assistant_request_id`
-2. **State Restoration**: If events exist, restores workflow topics and state from stored events
-3. **Fresh Start**: If no events exist, publishes input to `InputTopic` to begin new workflow
-4. **Topic Restoration**: Replays stored `PublishToTopicEvent` and `OutputTopicEvent` to restore topic states
-5. **Node Queue Setup**: Evaluates node readiness and populates `_invoke_queue` appropriately
+1. **Validation**: the stored history must be complete and match the workflow:
+   each topic's positions contiguous, every consumption of a stored
+   publication, and every topic one the workflow defines. Otherwise the run
+   fails with a `WorkflowError` before doing anything.
+2. **Restoration**: the run rebuilds its topics and each consumer's read
+   position from the stored records. Steps that did not commit left no
+   consumption records, so their nodes are ready again and run again.
+3. **Redelivery**: outputs that were not acknowledged are delivered again.
+4. **Answers**: an input that answers in-workflow output events (through
+   `consumed_event_ids`, for example a human's approval) is published to the
+   paired in-workflow input topics. Resending the same answer publishes nothing
+   more. An answer to an output that was never acknowledged (its stream did not
+   close cleanly) matches nothing and is logged; the output is delivered again,
+   to be answered then.
+
+Without stored events, the input is published to the agent input topics and the
+run starts fresh.
+
+A request's history is found by its `assistant_request_id`, so a workflow
+invoked from inside a tool needs an `assistant_request_id` of its own; with the
+caller's, it would take the caller's history for its own. For the same reason,
+runs of one request must not overlap: both would restore the same history and
+write the same positions. Keeping one run per request at a time (for example
+with a per-request lock, across processes too) is up to the host; resend an
+answer once the run that received the request has ended.
 
 ### Benefits of Workflow Restoration
 
 - **Human-in-the-Loop Support**: Workflows can pause while awaiting user input and resume seamlessly
 - **Failure Recovery**: Resume from failure points without restarting entire workflows
-- **Cost Efficiency**: Prevents unnecessary re-execution of previous steps, reducing LLM call costs
-- **State Consistency**: Maintains exact workflow state across interruptions
-
-```mermaid
-graph TD
-    A[initial_workflow Called] --> B{Events Exist for assistant_request_id?}
-    B -->|No| C[Publish Input to InputTopic]
-    B -->|Yes| D[Reset All Topics]
-    D --> E[Restore Events from Event Store]
-    E --> F[Replay PublishToTopicEvent Events]
-    F --> G[Evaluate Node Readiness]
-    G --> H[Populate _invoke_queue]
-    C --> I[Begin Fresh Workflow]
-    H --> I
-```
-
-This restoration mechanism enables robust, fault-tolerant workflows that can handle interruptions gracefully while maintaining consistency and efficiency.
+- **Cost Efficiency**: Committed steps are not executed again, reducing LLM call costs
+- **State Consistency**: Each step is stored atomically, so a resumed run sees exactly the committed state
