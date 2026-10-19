@@ -15,16 +15,20 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Type
 from typing import TypeVar
 from typing import cast
 
+from openinference.semconv.trace import OpenInferenceMimeTypeValues
+from openinference.semconv.trace import SpanAttributes
 from opentelemetry.trace import Span
 from opentelemetry.trace import Status
 from opentelemetry.trace import StatusCode
 from opentelemetry.trace import use_span
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 from pydantic_core import to_json
 
 from grafi.common.async_lifecycle import cancelling
@@ -52,6 +56,9 @@ _ERROR_ID_ATTR = "_grafi_error_id"
 # Deep enough to reach the innermost failure however often it was re-wrapped.
 _MAX_CAUSE_DEPTH = 1000
 _DEFAULT_SPAN_MAX_PAYLOAD_CHARS = 10_000
+_JSON = OpenInferenceMimeTypeValues.JSON.value
+_TEXT = OpenInferenceMimeTypeValues.TEXT.value
+_HIDE_SETTINGS = ("OPENINFERENCE_HIDE_INPUTS", "OPENINFERENCE_HIDE_OUTPUTS")
 
 F = TypeVar("F", bound=Callable[..., AsyncIterator[Any]])
 
@@ -62,7 +69,10 @@ class EventContext(BaseModel):
     id: str = default_id
     name: str = ""
     type: str = ""
-    oi_span_type: str = ""
+    # A span names it as OpenInference does, so tracing backends show the kind.
+    oi_span_type: str = Field(
+        "", serialization_alias=SpanAttributes.OPENINFERENCE_SPAN_KIND
+    )
 
     model_config = ConfigDict(extra="allow")
 
@@ -127,11 +137,21 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
             try:
                 if span.is_recording():
                     # Span attributes hold neither None nor kwargs' free-form dict.
-                    span.set_attributes(metadata.model_dump(exclude_none=True))
+                    span.set_attributes(
+                        metadata.model_dump(by_alias=True, exclude_none=True)
+                    )
                     span.set_attributes(
                         invoke_context.model_dump(exclude={"kwargs"}, exclude_none=True)
                     )
-                    _set_payload(span, "input", input_data)
+                    span.set_attribute(
+                        SpanAttributes.SESSION_ID, invoke_context.conversation_id
+                    )
+                    _set_payload(
+                        span,
+                        SpanAttributes.INPUT_VALUE,
+                        input_data,
+                        SpanAttributes.INPUT_MIME_TYPE,
+                    )
 
                 with _current(span):
                     stream = func(self, *args, **kwargs)
@@ -159,7 +179,12 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
                         yield result
                         results.append(result)
                 output_data = config.process_async_result(results)
-                _set_payload(span, "output", output_data)
+                _set_payload(
+                    span,
+                    SpanAttributes.OUTPUT_VALUE,
+                    output_data,
+                    SpanAttributes.OUTPUT_MIME_TYPE,
+                )
             except Exception as error:
                 # Failing to record a failure never replaces it.
                 try:
@@ -239,32 +264,66 @@ def _current(span: Span) -> AbstractContextManager[Span]:
     )
 
 
-def _set_payload(span: Span, key: str, value: Any) -> None:
-    """Set ``value`` on a recording span as JSON (its repr if JSON cannot hold
-    it), cut to ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit),
-    unless ``GRAFI_SPAN_DISABLE_PAYLOADS`` keeps payloads off spans."""
+def _set_payload(
+    span: Span, key: str, value: Any, mime_type_key: Optional[str] = None
+) -> None:
+    """Set ``value`` on a recording span, and its mime type at
+    ``mime_type_key``. OpenInference's ``OPENINFERENCE_HIDE_INPUTS`` and
+    ``OPENINFERENCE_HIDE_OUTPUTS`` redact it as they do on LLM spans; the older
+    ``GRAFI_SPAN_DISABLE_PAYLOADS`` leaves every payload off."""
     if not span.is_recording() or env_bool("GRAFI_SPAN_DISABLE_PAYLOADS"):
         return
+    redacted = _redactions(*map(os.environ.get, _HIDE_SETTINGS)).get(key)
+    if redacted is not None:
+        span.set_attribute(key, redacted)
+        return
+    text, mime_type = _payload_text(value)
+    span.set_attribute(key, text)
+    if mime_type_key:
+        span.set_attribute(mime_type_key, mime_type)
+
+
+@functools.lru_cache(maxsize=8)
+def _redactions(*settings: Optional[str]) -> Dict[str, str]:
+    """The payloads OpenInference's settings hide, each with its redaction
+    marker, worked out once for each value of those ``settings``."""
+    # Imported only once a span records.
+    from openinference.instrumentation import REDACTED_VALUE
+    from openinference.instrumentation import TraceConfig
+
+    config = TraceConfig()
+    hidden = {
+        SpanAttributes.INPUT_VALUE: config.hide_inputs,
+        SpanAttributes.OUTPUT_VALUE: config.hide_outputs,
+    }
+    return {key: REDACTED_VALUE for key, hide in hidden.items() if hide}
+
+
+def _payload_text(value: Any) -> Tuple[str, str]:
+    """``value`` as JSON, or as text (its repr) if JSON cannot hold it, cut to
+    ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit); and its
+    mime type."""
     try:
-        text = to_json(value, fallback=repr).decode()
+        text, mime_type = to_json(value, fallback=repr).decode(), _JSON
     except ValueError:  # Circular data, a lone surrogate, bytes not UTF-8...
-        text = repr(value)
+        text, mime_type = repr(value), _TEXT
     try:
         limit = max(0, int(os.environ["GRAFI_SPAN_MAX_PAYLOAD_CHARS"]))
     except (KeyError, ValueError):
         limit = _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
     if limit and len(text) > limit:
         text = f"{text[:limit]}...[truncated {len(text) - limit} chars]"
-    span.set_attribute(key, text)
+        mime_type = _TEXT
+    return text, mime_type
 
 
 def _record_span_error(span: Span, error: Exception, details: Dict[str, Any]) -> None:
-    """Record ``error`` on the span, before it ends."""
-    span.set_attribute("error", str(error))
-    span.set_attribute("error.type", details["error_type"])
-    span.set_attribute("error.message", details["message"])
-    if details.get("traceback"):
-        span.set_attribute("error.stack", details["traceback"])
+    """Record ``error`` on the span, before it ends: as OpenTelemetry does, its
+    exception event (with the traceback) and status; then its type, the id its
+    log line and failed events share, and its details."""
+    span.set_attributes(
+        {"error.type": details["error_type"], "error_id": details["error_id"]}
+    )
     without_traceback = {k: v for k, v in details.items() if k != "traceback"}
     _set_payload(span, "error.details", without_traceback)
     span.record_exception(error)

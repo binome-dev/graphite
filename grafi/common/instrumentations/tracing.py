@@ -1,236 +1,87 @@
-"""
-OpenTelemetry tracing configuration for Grafi framework.
+"""Tracing: export spans to an OpenTelemetry (OTLP) collector.
 
-This module provides flexible tracing setup using a generic OpenTelemetry
-(OTLP) endpoint:
-- OTLP: Export spans to any OpenTelemetry-compatible collector
-- Auto: Automatic detection of an available OTLP endpoint
-- In-Memory: Testing without external dependencies
-
-OpenInference is used to automatically instrument OpenAI calls, regardless of
-which OTLP collector the spans are exported to.
+Grafi's components trace themselves through OpenTelemetry's global tracer, with
+attributes named as OpenInference names them; so do the LLM clients of every
+installed OpenInference instrumentor (``openinference-instrumentation-openai``,
+``-anthropic``, ...). ``setup_tracing`` sends all their spans to one collector.
 """
 
 import os
-import socket
-from enum import Enum
+from importlib.metadata import entry_points
+from typing import Dict
+from typing import List
 from typing import Optional
-from typing import Tuple
 
 from loguru import logger
-from openinference.instrumentation.openai import OpenAIInstrumentor
+from openinference.semconv.resource import ResourceAttributes
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import Tracer
-from opentelemetry.trace import get_tracer
+from opentelemetry.trace import ProxyTracerProvider
+from opentelemetry.trace import get_tracer_provider
 from opentelemetry.trace import set_tracer_provider
 
 
-class TracingOptions(Enum):
-    """Available tracing backend options."""
-
-    OTLP = "otlp"  # Export to a generic OpenTelemetry (OTLP) collector
-    AUTO = "auto"  # Auto-detect an available OTLP endpoint
-    IN_MEMORY = "in_memory"  # In-memory tracing for testing
-
-
-def is_local_endpoint_available(host: str, port: int) -> bool:
-    """
-    Check if an OTLP endpoint is reachable.
-
-    Args:
-        host: The hostname or IP address
-        port: The port number
-
-    Returns:
-        True if the endpoint is reachable, False otherwise
-    """
-    try:
-        with socket.create_connection((host, port), timeout=0.1):
-            return True
-    except Exception as e:
-        logger.debug(f"Endpoint check failed for {host}:{port} - {e}")
-        return False
-
-
-def _get_otlp_config(default_endpoint: str, default_port: int) -> Tuple[str, int]:
-    """
-    Retrieve OTLP collector configuration from environment or use defaults.
-
-    Args:
-        default_endpoint: Default endpoint if not in environment
-        default_port: Default port if not in environment
-
-    Returns:
-        Tuple of (endpoint, port)
-    """
-    return (
-        os.getenv("OTEL_COLLECTOR_ENDPOINT", default_endpoint),
-        int(os.getenv("OTEL_COLLECTOR_PORT", str(default_port))),
-    )
-
-
-def _setup_otlp_tracing(
-    endpoint: str,
-    port: int,
-    project_name: str,
-    require_available: bool = True,
-) -> Optional[TracerProvider]:
-    """
-    Configure tracing against a generic OTLP collector.
-
-    Args:
-        endpoint: The OTLP collector endpoint hostname
-        port: The OTLP collector port
-        project_name: The project (service) name for tracing
-        require_available: If True, raise error when endpoint is unavailable
-
-    Returns:
-        TracerProvider if successfully configured, None otherwise
-
-    Raises:
-        ValueError: If require_available=True and endpoint is not available
-    """
-    endpoint_url = f"{endpoint}:{port}"
-
-    # Check endpoint availability if required
-    if require_available and not is_local_endpoint_available(endpoint, port):
-        raise ValueError(
-            f"OTLP endpoint {endpoint_url} is not available. "
-            "Please ensure the collector is running or check the endpoint configuration."
-        )
-
-    # Build a tracer provider tagged with the project/service name
-    resource = Resource.create({"service.name": project_name})
-    tracer_provider = TracerProvider(resource=resource)
-
-    # Configure OTLP exporter
-    span_exporter = OTLPSpanExporter(endpoint=endpoint_url, insecure=True)
-    span_processor = BatchSpanProcessor(span_exporter)
-    tracer_provider.add_span_processor(span_processor)
-
-    logger.info(f"OTLP tracing configured with endpoint: {endpoint_url}")
-
-    # Instrument OpenAI (via OpenInference) and set global tracer
-    OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-    set_tracer_provider(tracer_provider)
-
-    return tracer_provider
-
-
-def _setup_auto_tracing(
-    collector_endpoint: str,
-    collector_port: int,
-    project_name: str,
-) -> Optional[TracerProvider]:
-    """
-    Automatically detect and configure tracing against an OTLP collector.
-
-    Priority order:
-    1. OTLP endpoint (if available)
-    2. In-memory tracing (fallback)
-
-    Args:
-        collector_endpoint: Default collector endpoint
-        collector_port: Default collector port
-        project_name: Project name for tracing
-
-    Returns:
-        TracerProvider if configured, None for in-memory fallback
-    """
-    endpoint, port = _get_otlp_config(collector_endpoint, collector_port)
-
-    logger.info(f"Trying OTLP collector at {endpoint}:{port}")
-
-    if is_local_endpoint_available(endpoint, port):
-        return _setup_otlp_tracing(
-            endpoint, port, project_name, require_available=False
-        )
-
-    # Fallback to in-memory
-    _setup_in_memory_tracing()
-    return None
-
-
-def _setup_in_memory_tracing() -> None:
-    """Configure in-memory tracing for testing or offline use.
-
-    The in-memory exporter is shut down immediately, so spans are effectively
-    discarded -- the "Observability" pillar is inert in this mode. Warn so this
-    is not mistaken for working tracing (e.g. when an OTLP collector was expected
-    under AUTO but none was reachable).
-    """
-    span_exporter = InMemorySpanExporter()
-    span_exporter.shutdown()
-    logger.warning(
-        "Tracing is running in in-memory mode: spans are discarded and NOT "
-        "exported. Configure an OTLP collector (OTEL_COLLECTOR_ENDPOINT/PORT) "
-        "for real observability."
-    )
-
-
 def setup_tracing(
-    tracing_options: TracingOptions = TracingOptions.AUTO,
-    collector_endpoint: str = "localhost",
-    collector_port: int = 4317,
-    project_name: str = "grafi-trace",
-) -> Tracer:
+    project_name: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    headers: Optional[Dict[str, str]] = None,
+    auto_instrument: bool = True,
+) -> TracerProvider:
+    """Export spans in batches to an OTLP collector over gRPC, through a tracer
+    provider set as the global one, and return that provider.
+
+    Each argument not given follows OpenTelemetry's standard environment:
+    ``project_name``, the spans' ``service.name`` and OpenInference project,
+    comes from ``OTEL_SERVICE_NAME``, else is "grafi"; ``endpoint`` from
+    ``OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`` or ``OTEL_EXPORTER_OTLP_ENDPOINT``,
+    else is ``http://localhost:4317`` (``https://`` uses TLS); ``headers``,
+    such as an API key, from ``OTEL_EXPORTER_OTLP_HEADERS``.
+
+    With ``auto_instrument``, every installed OpenInference instrumentor traces
+    its client too. Spans still unexported are flushed when the process exits.
+    A tracer provider already set, by an earlier call or the application, is
+    kept, as OpenTelemetry allows one: it is returned, or, if it is not the
+    SDK's, an idle provider is.
+
+    Example:
+        >>> setup_tracing(project_name="my-agent")
     """
-    Set up distributed tracing with the specified backend.
+    current = get_tracer_provider()
+    if not isinstance(current, ProxyTracerProvider):
+        logger.warning("Tracing: a tracer provider is already set, so it is kept")
+        return current if isinstance(current, TracerProvider) else TracerProvider()
+    name = project_name or os.environ.get("OTEL_SERVICE_NAME") or "grafi"
+    resource = Resource.create(
+        {SERVICE_NAME: name, ResourceAttributes.PROJECT_NAME: name}
+    )
+    provider = TracerProvider(resource=resource)
+    exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    set_tracer_provider(provider)
+    instrumented = _instrument(provider) if auto_instrument else []
+    logger.info(
+        f"Tracing: exporting the spans of '{name}' over OTLP; "
+        f"instrumented: {', '.join(instrumented) or 'none'}"
+    )
+    return provider
 
-    This function configures OpenTelemetry tracing based on the selected option:
-    - OTLP: Exports to a generic OTLP collector (requires running instance)
-    - AUTO: Auto-detects an available OTLP endpoint
-    - IN_MEMORY: Uses in-memory storage (for testing)
 
-    Args:
-        tracing_options: The tracing backend to use
-        collector_endpoint: Default collector endpoint hostname
-        collector_port: Default collector port number
-        project_name: Name for the tracing project
-
-    Returns:
-        Configured OpenTelemetry Tracer instance
-
-    Raises:
-        ValueError: If tracing option is invalid or required endpoint is unavailable
-
-    Examples:
-        >>> # Auto-detect available tracing backend
-        >>> tracer = setup_tracing()
-
-        >>> # Use a generic OTLP collector with a custom endpoint
-        >>> tracer = setup_tracing(
-        ...     TracingOptions.OTLP,
-        ...     collector_endpoint="tracing.example.com",
-        ...     collector_port=4317
-        ... )
-
-        >>> # Use in-memory tracing for tests
-        >>> tracer = setup_tracing(TracingOptions.IN_MEMORY)
-    """
-    if tracing_options == TracingOptions.OTLP:
-        logger.info(f"Trying OTLP tracing at {collector_endpoint}:{collector_port}")
-        endpoint, port = _get_otlp_config(collector_endpoint, collector_port)
-        _setup_otlp_tracing(endpoint, port, project_name, require_available=True)
-
-    elif tracing_options == TracingOptions.AUTO:
-        logger.info(
-            f"Trying auto-detection for tracing at {collector_endpoint}:{collector_port}"
-        )
-        _setup_auto_tracing(collector_endpoint, collector_port, project_name)
-
-    elif tracing_options == TracingOptions.IN_MEMORY:
-        logger.info("Trying in-memory tracing")
-        _setup_in_memory_tracing()
-
-    else:
-        raise ValueError(
-            f"Invalid tracing option: {tracing_options}. "
-            "Choose from: OTLP, AUTO, or IN_MEMORY."
-        )
-
-    return get_tracer(__name__)
+def _instrument(provider: TracerProvider) -> List[str]:
+    """Instrument every installed OpenInference instrumentor, and name those
+    that took. One that fails is skipped: tracing must never stop the
+    application."""
+    instrumented = []
+    for entry_point in entry_points(group="openinference_instrumentor"):
+        try:
+            instrumentor = entry_point.load()()
+            instrumentor.instrument(tracer_provider=provider)
+        except Exception as error:
+            logger.warning(f"Tracing: cannot instrument {entry_point.name}: {error}")
+            continue
+        # False when its client library is not installed.
+        if getattr(instrumentor, "is_instrumented_by_opentelemetry", False):
+            instrumented.append(entry_point.name)
+    return instrumented

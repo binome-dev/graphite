@@ -1,458 +1,108 @@
 # OpenTelemetry Tracing Guide
 
-This document provides guidance on integrating Graphite with any OpenTelemetry
-(OTLP) compatible backend for distributed tracing and observability.
+Graphite traces every invocation with OpenTelemetry. Each run of an assistant,
+workflow, node or tool is a span, nested as they call one another, with its
+attributes named as [OpenInference](https://github.com/Arize-ai/openinference)
+names them. Any OTLP backend can receive these spans (the OpenTelemetry
+Collector, Jaeger, Tempo or a vendor), and OpenInference-aware ones, such as
+Arize Phoenix, also show each span's kind, input and output. Installed
+OpenInference instrumentors trace the calls of LLM clients, and those spans
+are nested inside the tool spans.
 
-## Table of Contents
+## Exporting spans
 
-- [Overview](#overview)
-- [Installation](#installation)
-- [Tracing Options](#tracing-options)
-- [Configuration](#configuration)
-- [Usage Examples](#usage-examples)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
+```python
+from grafi.common.instrumentations.tracing import setup_tracing
 
-## Overview
-
-Graphite emits traces through OpenTelemetry and exports them to a generic OTLP
-collector. This works with any OpenTelemetry-compatible backend (e.g. the
-OpenTelemetry Collector, Jaeger, Tempo, or any vendor that accepts OTLP).
-
-Graphite supports the following modes:
-
-- **OTLP**: Export spans to an OTLP collector (gRPC)
-- **Auto**: Automatic detection of an available OTLP endpoint
-- **In-Memory**: Testing mode without external dependencies
-
-[OpenInference](https://github.com/Arize-ai/openinference) is used to
-automatically instrument LLM calls, regardless of which OTLP collector the
-spans are exported to. The integration automatically captures:
-
-- OpenAI API calls
-- LLM interactions
-- Tool executions
-- Workflow orchestration
-- Node operations
-
-## Installation
-
-### Core Dependencies
-
-Grafi includes the following observability dependencies by default:
-
-```toml
-dependencies = [
-    "openinference-instrumentation-openai>=0.1.41",
-    "opentelemetry-sdk>=1.39.1",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.39.1",
-]
+setup_tracing(project_name="my-agent")
 ```
 
-These are automatically installed when you install Grafi:
+That is all the setup there is. Call it once at startup, before invoking
+assistants. `setup_tracing` sets OpenTelemetry's global tracer provider, which
+Graphite's components trace through (it is the default tracer of
+`ExecutionServices`). It exports their spans in batches to an OTLP collector
+over gRPC. An argument not given follows OpenTelemetry's standard environment:
+
+| Argument | From the environment | Default |
+|----------|----------------------|---------|
+| `project_name`, the spans' `service.name` and Phoenix project | `OTEL_SERVICE_NAME` | `grafi` |
+| `endpoint` | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4317` |
+| `headers`, such as an API key | `OTEL_EXPORTER_OTLP_HEADERS` | none |
+
+Give the endpoint's scheme: `http://` for a plain connection, `https://` for
+TLS. In production, the environment alone can configure tracing:
 
 ```bash
-# Using pip
-pip install grafi
-
-# Using uv
-uv pip install grafi
+export OTEL_SERVICE_NAME="my-agent"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel.example.com:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="api_key=..."
 ```
 
-## Configuration
+With `auto_instrument` (the default), every installed OpenInference
+instrumentor traces its client too:
+- `openinference-instrumentation-openai` comes with Graphite. It also covers
+  DeepSeek and OpenRouter, which use the OpenAI client.
+- To trace other clients, install their instrumentor. For example,
+  `openinference-instrumentation-anthropic` traces Claude.
 
-### Docker Compose
+`setup_tracing` returns the provider, which you can flush (`force_flush()`),
+shut down or add span processors to. Spans not yet exported are flushed when
+the process exits. OpenTelemetry allows one global provider: if one is already
+set, by an earlier call or by your application, `setup_tracing` keeps it and
+returns it.
 
-You can run a local OpenTelemetry Collector (or any OTLP-compatible backend)
-via docker compose. For example, using an OTLP collector that exposes the
-default gRPC port `4317`:
+An application that sets up OpenTelemetry itself needs nothing from Graphite:
+its global tracer provider traces Graphite's components too (its LLM clients
+need instrumenting, as above). To trace a
+runtime to a provider of its own, such as one exporting to memory in a test,
+pass its tracer: `ExecutionServices(tracer=provider.get_tracer("grafi"))`.
 
-```yaml
-version: '3.8'
+### Running a backend locally
 
-services:
-  otel-collector:
-    image: otel/opentelemetry-collector:latest
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    ports:
-      - "4317:4317" # OTLP gRPC
-```
-
-### Environment Variables
-
-Set these environment variables to override the default OTLP collector settings:
+[Arize Phoenix](https://github.com/Arize-ai/phoenix) receives OTLP on port 4317
+and shows the spans at <http://localhost:6006>:
 
 ```bash
-# Optional - defaults to localhost:4317
-export OTEL_COLLECTOR_ENDPOINT="localhost" # collector hostname
-export OTEL_COLLECTOR_PORT="4317"          # collector gRPC port
+docker run -p 6006:6006 -p 4317:4317 arizephoenix/phoenix
 ```
 
-These are also read by the default `Container` tracer, so simply setting them is
-enough for the auto-configured tracer to find your collector.
-
-### Setup Function Parameters
-
-The `setup_tracing()` function accepts the following parameters:
-
-```python
-def setup_tracing(
-    tracing_options: TracingOptions = TracingOptions.AUTO,
-    collector_endpoint: str = "localhost",
-    collector_port: int = 4317,
-    project_name: str = "grafi-trace",
-) -> Tracer:
-```
-
-- **tracing_options**: Backend to use (OTLP, AUTO, IN_MEMORY)
-- **collector_endpoint**: Hostname of the collector (default: "localhost")
-- **collector_port**: Port number of the collector (default: 4317)
-- **project_name**: Name for the tracing project; exported as the `service.name`
-  resource attribute (default: "grafi-trace")
-
-## Tracing Options
-
-Grafi provides three tracing modes through the `TracingOptions` enum:
-
-### 1. OTLP - Generic OpenTelemetry Collector
-
-Export spans to any OTLP-compatible collector:
-
-```python
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-tracer = setup_tracing(
-    tracing_options=TracingOptions.OTLP,
-    collector_endpoint="localhost",
-    collector_port=4317,
-    project_name="my-project",
-)
-```
-
-**When to use:**
-- Production and development deployments
-- Any backend that accepts OTLP (OpenTelemetry Collector, Jaeger, Tempo, etc.)
-- A running collector instance is required
-
-### 2. AUTO - Automatic Detection
-
-Let Grafi automatically detect an available OTLP endpoint:
-
-```python
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-tracer = setup_tracing(
-    tracing_options=TracingOptions.AUTO,
-    collector_endpoint="localhost",
-    collector_port=4317,
-)
-```
-
-**Detection priority:**
-1. OTLP endpoint (from arguments or `OTEL_COLLECTOR_*` env vars), if available
-2. Falls back to in-memory tracing
-
-**When to use:**
-- Development environments with an optional collector
-- CI/CD pipelines
-- Flexible deployment scenarios
-
-### 3. IN_MEMORY - Testing
-
-Use in-memory tracing for tests and offline work:
-
-```python
-tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
-```
-
-**When to use:**
-- Unit and integration tests
-- CI/CD without external dependencies
-- Offline development
-- Minimal overhead scenarios
-
-## Usage Examples
-
-### Example 1: Basic Setup with AUTO Detection
-
-```python
-from grafi.runtime import GrafiRuntime, ExecutionServices
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-# Build a runtime that uses the auto-detected tracer
-tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-
-# Invoke assistants through `runtime`
-```
-
-### Example 2: Export to an OTLP Collector
-
-```python
-from grafi.runtime import GrafiRuntime, ExecutionServices
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-tracer = setup_tracing(
-    tracing_options=TracingOptions.OTLP,
-    collector_endpoint="localhost",
-    collector_port=4317,
-    project_name="my-assistant",
-)
-runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-
-# Invoke assistants through `runtime`
-```
-
-### Example 3: Testing with In-Memory Tracing
-
-```python
-from grafi.runtime import GrafiRuntime, ExecutionServices
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-# Use in-memory tracing for tests
-tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
-runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-
-# Invoke assistants through `runtime` in your test
-```
-
-### Example 4: Complete Assistant with Tracing
-
-```python
-import os
-import uuid
-import asyncio
-from grafi.runtime import GrafiRuntime, ExecutionServices
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-from grafi.common.models.async_result import async_func_wrapper
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from grafi.assistants.assistant_base import AssistantBase
-
-# Setup tracing and build a runtime that uses it
-tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-
-# Reference the event store (the default in-memory store here)
-event_store = runtime.services.event_store
-
-# Create your assistant
-async def main():
-    assistant = (
-        # YourAssistant is an instance of type grafi.assistants.assistant
-        # https://github.com/binome-dev/graphite/blob/main/grafi/assistants/assistant.py
-        YourAssistant.builder()
-        .name("MyAssistant")
-        .api_key(os.getenv("OPENAI_API_KEY"))
-        .build()
-    )
-
-    # Create invoke context
-    invoke_context = InvokeContext(
-        conversation_id="conversation_id",
-        invoke_id=uuid.uuid4().hex,
-        assistant_request_id=uuid.uuid4().hex,
-    )
-
-    # Invoke assistant
-    input_data = PublishToTopicEvent(
-        invoke_context=invoke_context,
-        data=[Message(content="Hello!", role="user")]
-    )
-
-    output = await async_func_wrapper(
-        runtime.invoke(assistant, input_data, is_sequential=True)
-    )
-    print(output)
-
-asyncio.run(main())
-```
-
-## Best Practices
-
-### 1. Environment-Specific Configuration
-
-Use different tracing modes for different environments:
-
-```python
-import os
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-
-env = os.getenv("ENVIRONMENT", "development")
-
-if env in ("production", "staging"):
-    tracing_option = TracingOptions.OTLP
-    endpoint = os.getenv("OTEL_COLLECTOR_ENDPOINT", "localhost")
-elif env == "development":
-    tracing_option = TracingOptions.AUTO
-    endpoint = "localhost"
-else:  # testing
-    tracing_option = TracingOptions.IN_MEMORY
-    endpoint = "localhost"
-
-tracer = setup_tracing(
-    tracing_options=tracing_option,
-    collector_endpoint=endpoint,
-    project_name=f"{env}-assistant",
-)
-```
-
-### 2. Early Initialization
-
-Set up tracing early in your application lifecycle, before creating assistants:
-
-```python
-# Good: Setup tracing first, build the runtime from it
-tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-
-# Then create assistants and invoke them through `runtime`
-assistant = MyAssistant.builder().build()
-```
-
-### 3. Project Naming Conventions
-
-Use descriptive project names to organize traces. The project name is exported
-as the `service.name` resource attribute:
-
-```python
-tracer = setup_tracing(
-    tracing_options=TracingOptions.OTLP,
-    project_name=f"{app_name}-{environment}-{version}",
-)
-```
-
-### 4. Graceful Degradation with AUTO Mode
-
-Use AUTO mode to gracefully degrade when the collector is unavailable:
-
-```python
-# Will automatically fall back to in-memory if no endpoint available
-tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-```
-
-### 5. Testing Isolation
-
-Use IN_MEMORY mode in tests to avoid external dependencies:
-
-```python
-import pytest
-from grafi.common.instrumentations.tracing import TracingOptions, setup_tracing
-from grafi.runtime import bind_services, ExecutionServices
-
-@pytest.fixture(autouse=True)
-def setup_test_tracing():
-    tracer = setup_tracing(tracing_options=TracingOptions.IN_MEMORY)
-    # Bind a scope for the test so component invocations resolve these services.
-    with bind_services(ExecutionServices(tracer=tracer)):
-        yield
-```
+## Spans
+
+| Span | `openinference.span.kind` |
+|------|---------------------------|
+| `{assistant}.run` | `AGENT` |
+| `{workflow}.invoke` | `AGENT` |
+| `{node}.invoke` | `CHAIN` |
+| `{tool}.invoke` | `TOOL`, or `LLM` for an LLM tool |
+
+| Attributes | Content |
+|------------|---------|
+| `id`, `name`, `type` | The component. An assistant adds `model`, and a node adds `subscribed_topics` and `publish_to_topics`. |
+| `session.id`, `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id` | The invoke context. `session.id` holds the conversation; backends group a session's traces by it. |
+| `input.value`, `output.value`, with their `mime_type` | The input and the output, as JSON; as plain text when cut short or when JSON cannot hold them. |
+| `error.type`, `error_id`, `error.details` | A failure. The span's status is then `ERROR`, and an `exception` event holds the traceback. `error_id` is the id in the failure's log line and in its failed events. |
+
+## Settings
+
+| Variable | Effect |
+|----------|--------|
+| `OPENINFERENCE_HIDE_INPUTS`, `OPENINFERENCE_HIDE_OUTPUTS` | When `true`, inputs or outputs are redacted on every span: Graphite's and the LLM clients' alike. A failure's message still shows in its span's status, exception event and `error.details`. OpenInference's other `OPENINFERENCE_HIDE_*` settings refine what LLM spans show. |
+| `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | A payload longer than this many characters is cut short (default 10,000; `0` means no limit). |
+| `GRAFI_SPAN_DISABLE_PAYLOADS` | The older setting. When true, Graphite's spans carry no `input.value`, `output.value` or `error.details`. It does not cover LLM spans. |
 
 ## Troubleshooting
 
-### Issue: "OTLP endpoint is not available"
+- **No spans arrive.** Check the collector's address, scheme included: the
+  exporter logs a warning each time it cannot reach it. Also check that
+  `setup_tracing` runs before the first invocation. If it logged that a tracer
+  provider was already set, spans go wherever that provider sends them.
+- **LLM calls are missing.** The client's OpenInference instrumentor must be
+  installed: `setup_tracing` logs the ones it instrumented.
+- **Spans are in the wrong project.** Pass `project_name`, or set
+  `OTEL_SERVICE_NAME`.
 
-**Symptom**: ValueError when using the OTLP tracing option
+## Resources
 
-**Solution**:
-
-1. Ensure your collector is running:
-   ```bash
-   ➜ docker compose up
-    nc -zv localhost 4317
-
-    Connection to localhost (::1) 4317 port [tcp/*] succeeded!
-   ```
-
-2. Check the endpoint and port are correct:
-   ```python
-   tracer = setup_tracing(
-       tracing_options=TracingOptions.OTLP,
-       collector_endpoint="localhost",
-       collector_port=4317,
-   )
-   ```
-
-3. Use AUTO mode for graceful fallback:
-   ```python
-   tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-   ```
-
-### Issue: Connection timeout with the collector
-
-**Symptom**: Slow startup or timeout errors
-
-**Solution**:
-1. The endpoint check has a 0.1s timeout, which is normal
-2. Use AUTO mode to automatically fall back:
-   ```python
-   tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-   ```
-3. For OTLP mode, ensure the endpoint is reachable:
-   ```bash
-   nc -zv localhost 4317
-   ```
-
-### Issue: OpenAI instrumentation not working
-
-**Symptom**: OpenAI calls not showing in traces
-
-**Solution**:
-1. Ensure OpenAI is instrumented (done automatically by `setup_tracing`)
-2. Build the runtime with your tracer and invoke through it:
-   ```python
-   runtime = GrafiRuntime(ExecutionServices(tracer=tracer))
-   ```
-
-### Issue: Traces showing in wrong project
-
-**Symptom**: Traces appear in an unexpected project / service name
-
-**Solution**:
-Specify the project name explicitly:
-```python
-tracer = setup_tracing(
-    tracing_options=TracingOptions.OTLP,
-    project_name="my-specific-project",
-)
-```
-
-### Debug Logging
-
-Enable debug logging to troubleshoot tracing issues:
-
-```python
-from loguru import logger
-import sys
-
-logger.remove()
-logger.add(sys.stderr, level="DEBUG")
-
-# Now setup tracing
-tracer = setup_tracing(tracing_options=TracingOptions.AUTO)
-```
-
-## Additional Resources
-
-### OpenTelemetry Resources
-- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
-- [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
-- [OpenTelemetry Python SDK](https://opentelemetry-python.readthedocs.io/)
-
-### OpenInference Resources
-- [OpenInference Specification](https://github.com/Arize-ai/openinference)
-
-### Grafi Resources
-- [Graphite Documentation](https://binome-dev.github.io/graphite)
-- [Event-Driven Workflows](https://binome-dev.github.io/graphite/user-guide/event-driven-workflow/)
-- [Graphite GitHub Repository](https://github.com/binome-dev/graphite)
-
-## Support
-
-For issues related to:
-
-- **Graphite tracing integration**: Open an issue on the Grafi repository
-- **OpenTelemetry**: Consult the OpenTelemetry documentation
+- [OpenTelemetry Python](https://opentelemetry-python.readthedocs.io/)
+- [OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)
+- [OpenInference](https://github.com/Arize-ai/openinference)

@@ -142,8 +142,9 @@ export GRAFI_ALLOW_PICKLE_DESERIALIZATION=true   # or call
 
 | Environment variable | Default | Effect |
 | --- | --- | --- |
-| `OTEL_COLLECTOR_ENDPOINT` / `OTEL_COLLECTOR_PORT` | `localhost` / `4317` | OTLP collector for traces. Without a reachable collector, tracing falls back to in-memory mode and spans are **discarded** (a warning is logged). |
-| `GRAFI_SPAN_DISABLE_PAYLOADS` | `false` | When truthy, omit input/output payloads (prompts, tool args, message content) from spans. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME` | `http://localhost:4317`, none, `grafi` | Where `setup_tracing()` exports spans, and as what service. See the [tracing guide](docs/docs/guide/configuring-integration-with-opentelemetry.md). |
+| `OPENINFERENCE_HIDE_INPUTS` / `OPENINFERENCE_HIDE_OUTPUTS` | `false` | When `true`, redact inputs / outputs (prompts, tool args, message content) on every span, LLM spans included. |
+| `GRAFI_SPAN_DISABLE_PAYLOADS` | `false` | The older setting: when truthy, omit payloads from Graphite's own spans. |
 | `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | `10000` | Max characters of a serialized payload attached to a span (`0` = unbounded). |
 | `GRAFI_ERROR_INCLUDE_TRACEBACK` | `true` | When falsy, omit tracebacks from persisted failed-event details. |
 

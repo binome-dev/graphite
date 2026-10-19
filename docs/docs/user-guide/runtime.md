@@ -37,7 +37,7 @@ overridden with a normal keyword:
 from grafi.runtime import ExecutionServices
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 
-# All in-process defaults (in-memory store, no-op tracer, Loguru error reporter).
+# All in-process defaults (in-memory store, global tracer, Loguru error reporter).
 services = ExecutionServices()
 
 # Override only what you need; the rest keep their defaults.
@@ -47,7 +47,7 @@ services = ExecutionServices(event_store=EventStorePostgres(db_url="postgresql:/
 | Field | Default | Notes |
 |-------|---------|-------|
 | `event_store` | `EventStoreInMemory()` | In-memory is lost on exit — pass a durable store in production. |
-| `tracer` | `NoOpTracer()` | Spans are discarded — pass a real tracer for observability. |
+| `tracer` | OpenTelemetry's global tracer | A no-op until a tracer provider is set, by [`setup_tracing`](../guide/configuring-integration-with-opentelemetry.md) or your application. |
 | `error_reporter` | `ErrorReporter()` | Logs one concise line per failure via Loguru. |
 
 It is immutable, exposes no `to_dict`/`model_dump`, and its `repr` hides the
@@ -65,11 +65,10 @@ from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 # Local / tests
 runtime = GrafiRuntime()
 
-# Production: durable store + your tracer
+# Production: a durable store; setup_tracing() exports the spans
 runtime = GrafiRuntime(
     ExecutionServices(
         event_store=EventStorePostgres(db_url="postgresql://user:pass@host/db"),
-        tracer=my_tracer,
     )
 )
 ```
