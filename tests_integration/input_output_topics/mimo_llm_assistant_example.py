@@ -62,9 +62,11 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Greeting Output: {greeting_output}")
     assert len(greeting_output) == 2
 
-    # Cumulative event count after this invoke (greeting path: router + greeting
-    # + merge nodes). The router node content-routes the single input.
-    assert len(await event_store.get_events()) == 25
+    # Greeting path (router, greeting and merge nodes): 16 component events
+    # (invoke and respond for the assistant, the workflow, 3 nodes and their
+    # tools) and 5 publications, each with its consumption. The greeting node
+    # publishes to two topics, so it records two publications.
+    assert len(await event_store.get_events()) == 26
 
     # Test question input
     print("\nTesting question input...")
@@ -85,7 +87,8 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Question Output: {question_output}")
     assert len(question_output) == 2
 
-    assert len(await event_store.get_events()) == 50
+    # Question path: the same shape as the greeting path.
+    assert len(await event_store.get_events()) == 52
 
     # Test mixed input (both greeting and question)
     print("\nTesting mixed input...")
@@ -107,7 +110,9 @@ async def test_mimo_llm_assistant() -> None:
     print(f"Mixed Output: {mixed_output}")
     assert len(mixed_output) == 3
 
-    assert len(await event_store.get_events()) == 83
+    # Both paths (router, greeting, question and merge nodes): 20 component
+    # events and 8 publications, each with its consumption.
+    assert len(await event_store.get_events()) == 88
 
 
 with bind_services(runtime.services):
