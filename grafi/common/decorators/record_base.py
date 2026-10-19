@@ -1,22 +1,23 @@
-"""Base decorator utilities for recording component invoke events and tracing."""
+"""The decorator behind ``record_*_invoke``: it records a component's invoke,
+respond and failed events and traces each invocation in a span."""
 
 import asyncio
 import functools
-import json
 import os
 import uuid
 from contextlib import AbstractContextManager
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
-from typing import Awaitable
+from typing import AsyncIterator
 from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Type
 from typing import TypeVar
-from typing import Union
+from typing import cast
 
 from opentelemetry.trace import Span
 from opentelemetry.trace import Status
@@ -24,7 +25,7 @@ from opentelemetry.trace import StatusCode
 from opentelemetry.trace import use_span
 from pydantic import BaseModel
 from pydantic import ConfigDict
-from pydantic_core import to_jsonable_python
+from pydantic_core import to_json
 
 from grafi.common.async_lifecycle import cancelling
 from grafi.common.async_lifecycle import cleanup_on_exit
@@ -33,275 +34,162 @@ from grafi.common.async_lifecycle import isolated
 from grafi.common.async_lifecycle import unexpected_cancellation
 from grafi.common.env import env_bool
 from grafi.common.events.component_base import ComponentEvent
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.component_base import FailedEvent
+from grafi.common.events.component_base import InvokeEvent
+from grafi.common.events.component_base import RespondEvent
 from grafi.common.exceptions import EventPersistenceError
 from grafi.common.exceptions.serialization import error_message
 from grafi.common.exceptions.serialization import error_to_dict
 from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import current_services
 
-T = TypeVar("T")
-
-# Attribute used to mark an exception whose full traceback has already been
-# logged, so the same root failure is not dumped at every decorator layer.
-_TRACEBACK_LOGGED_ATTR = "_grafi_traceback_logged"
-
-# Attribute carrying the correlation id shared by every layer of one failure, so
-# the wrapped/re-raised exception keeps a stable ``error_id`` across the
-# tool -> node -> workflow -> assistant decorators.
+# The id every layer of one failure (tool, node, workflow, assistant) records,
+# set on the exception by the layer closest to it, which alone logs it.
 _ERROR_ID_ATTR = "_grafi_error_id"
+# Deep enough to reach the innermost failure however often it was re-wrapped.
+_MAX_CAUSE_DEPTH = 1000
+_DEFAULT_SPAN_MAX_PAYLOAD_CHARS = 10_000
+
+F = TypeVar("F", bound=Callable[..., AsyncIterator[Any]])
 
 
 class EventContext(BaseModel):
+    """What a component's events and span record about it."""
+
     id: str = default_id
     name: str = ""
     type: str = ""
     oi_span_type: str = ""
 
-    model_config = ConfigDict(
-        extra="allow"
-    )  # Allow additional fields to be added dynamically
+    model_config = ConfigDict(extra="allow")
 
 
-@dataclass
+@dataclass(frozen=True)
 class ComponentConfig:
-    """Configuration for component-specific behavior."""
+    """How one kind of component is recorded."""
 
-    event_types: Dict[
-        str, Type[ComponentEvent]
-    ]  # Maps 'invoke', 'respond', 'failed' to event classes
-    # Extracts component-specific metadata. Typed as ``Any`` so this common-layer
-    # module does not import the higher-layer component classes (Assistant /
-    # Workflow / Node / Tool) just for an annotation.
+    invoke_event: Type[InvokeEvent]
+    respond_event: Type[RespondEvent]
+    failed_event: Type[FailedEvent]
+    # Typed Any, so this layer need not import the component classes.
     extract_metadata: Callable[[Any], EventContext]
-    process_async_result: Callable[[List], Any]
-    span_name_suffix: str = "invoke"  # Suffix for span name
-    # The component runs in its caller's task (an assistant or a workflow), so
-    # its event writes run in a task of their own: the caller's cancellation
-    # stays the caller's, even when a store reports it as an error.
+    # The output its respond event records, from all its stream yielded.
+    process_async_result: Callable[[List[Any]], Any]
+    span_name_suffix: str = "invoke"
+    # An assistant or a workflow runs in its caller's task, so its event writes
+    # run in a task of their own: the caller's cancellation stays the caller's.
     isolate_event_writes: bool = False
 
 
-_DEFAULT_SPAN_MAX_PAYLOAD_CHARS = 10_000
+def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
+    """A decorator for a component's async generator ``invoke``.
 
-
-def _span_payloads_disabled() -> bool:
-    """Whether input/output payloads should be omitted from spans entirely.
-
-    Set ``GRAFI_SPAN_DISABLE_PAYLOADS`` to a truthy value in environments where
-    prompts / tool args / message content must never reach the tracing backend.
+    It records the invoke event, runs the stream in the component's span, then
+    records the respond event, or, on failure, the failed event with
+    structured details (logged once, by the layer closest to the failure)
+    before raising the failure again.
     """
-    return env_bool("GRAFI_SPAN_DISABLE_PAYLOADS", default=False)
 
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
+            # Resolved once: a later read may resume this generator in another
+            # task, whose context has no services bound.
+            services = current_services()
+            record = functools.partial(
+                _record_event, services, isolate=config.isolate_event_writes
+            )
+            metadata = config.extract_metadata(self)
+            # A tool or a node takes (invoke_context, input); an assistant or a
+            # workflow takes an input event, which carries the context.
+            if isinstance(args[0], InvokeContext):
+                invoke_context, input_data = args[0], args[1]
+            else:
+                input_data = args[0]
+                invoke_context = input_data.invoke_context
+            fields: Dict[str, Any] = dict(
+                id=metadata.id,
+                name=metadata.name,
+                type=metadata.type,
+                input_data=input_data,
+                invoke_context=invoke_context,
+            )
+            await _record_lifecycle_event(
+                record, config.invoke_event(**fields), "invoke", invoke_context
+            )
 
-def _span_max_payload_chars() -> int:
-    """Max characters of a serialized payload to attach to a span (0 = unbounded).
+            span = services.tracer.start_span(
+                f"{metadata.name}.{config.span_name_suffix}"
+            )
+            try:
+                if span.is_recording():
+                    # Span attributes hold neither None nor kwargs' free-form dict.
+                    span.set_attributes(metadata.model_dump(exclude_none=True))
+                    span.set_attributes(
+                        invoke_context.model_dump(exclude={"kwargs"}, exclude_none=True)
+                    )
+                    _set_payload(span, "input", input_data)
 
-    Defaults to 10k characters so a single large prompt/response cannot bloat a
-    span unbounded. Override with ``GRAFI_SPAN_MAX_PAYLOAD_CHARS``.
-    """
-    raw = os.getenv("GRAFI_SPAN_MAX_PAYLOAD_CHARS")
-    if raw is None:
-        return _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        return _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
+                with _current(span):
+                    stream = func(self, *args, **kwargs)
 
+                async def close_stream() -> None:
+                    with _current(span):
+                        await close_iterator(stream)
 
-def _span_payload(value: Any) -> Union[str, None]:
-    """Serialize a value for a span attribute, size-bounded and opt-out-able.
+                results: List[Any] = []
+                async with cleanup_on_exit(close_stream):
+                    while True:
+                        with _current(span):
+                            try:
+                                result = await anext(stream)
+                            except StopAsyncIteration:
+                                break
+                            except asyncio.CancelledError as cancelled:
+                                if cancelling():
+                                    raise
+                                # The component's own, not its task's: a failure.
+                                raise unexpected_cancellation(
+                                    f"{metadata.name} was unexpectedly cancelled",
+                                    cancelled,
+                                )
+                        yield result
+                        results.append(result)
+                output_data = config.process_async_result(results)
+                _set_payload(span, "output", output_data)
+            except Exception as error:
+                # Failing to record a failure never replaces it.
+                try:
+                    first = _existing_error_id(error) is None
+                    details = _build_error_details(error, metadata, invoke_context)
+                    _record_span_error(span, error, details)
+                    if first:
+                        _report_failure(services, error, metadata, details)
+                    failed = config.failed_event(
+                        **fields, error=str(error), error_details=details
+                    )
+                    await record(failed)
+                except Exception as unrecorded:
+                    _note_unrecorded_failure(
+                        services, error, invoke_context, unrecorded
+                    )
+                raise
+            finally:
+                span.end()
 
-    Returns ``None`` when payloads are disabled, so the caller can skip setting
-    the attribute altogether.
-    """
-    if _span_payloads_disabled():
-        return None
-    try:
-        text = json.dumps(value, default=to_jsonable_python)
-    except (TypeError, ValueError):
-        text = repr(value)
-    max_chars = _span_max_payload_chars()
-    if max_chars and len(text) > max_chars:
-        return f"{text[:max_chars]}...[truncated {len(text) - max_chars} chars]"
-    return text
+            await _record_lifecycle_event(
+                record,
+                config.respond_event(**fields, output_data=output_data),
+                "respond",
+                invoke_context,
+            )
 
+        return cast(F, wrapper)
 
-def _include_traceback() -> bool:
-    """Whether to capture tracebacks into structured error details.
-
-    Enabled by default. Set ``GRAFI_ERROR_INCLUDE_TRACEBACK`` to a falsy value
-    (``0``/``false``/``no``/``off``) to omit tracebacks from persisted events,
-    e.g. in production where they may carry sensitive paths or large payloads.
-    """
-    return env_bool("GRAFI_ERROR_INCLUDE_TRACEBACK", default=True)
-
-
-def _error_correlation(exc: Exception) -> tuple[str, BaseException]:
-    """Walk the cause chain once and return ``(error_id, root_cause)``.
-
-    The error id is the one already stashed on any link of the chain (so a
-    re-wrapped outer exception inherits the id minted at the layer closest to the
-    root failure); if the chain has none, mint one and stash it on ``exc`` for
-    the next decorator layer. The root cause is the innermost link.
-    """
-    error_id: Optional[str] = None
-    root: BaseException = exc
-    for link in iter_cause_chain(exc, max_depth=1000):
-        if error_id is None:
-            existing = getattr(link, _ERROR_ID_ATTR, None)
-            if existing:
-                error_id = str(existing)
-        root = link
-    if error_id is None:
-        error_id = uuid.uuid4().hex[:12]
-        try:
-            setattr(exc, _ERROR_ID_ATTR, error_id)
-        except Exception:  # pragma: no cover - builtins generally allow attributes
-            pass
-    return error_id, root
-
-
-def _error_id_for(exc: Exception) -> str:
-    """Return the correlation id for ``exc`` (minting one if the chain has none)."""
-    return _error_correlation(exc)[0]
-
-
-def _build_error_details(
-    exc: Exception, metadata: EventContext, invoke_context: InvokeContext
-) -> Dict[str, Any]:
-    """Build the structured ``error_details`` payload for a failed component.
-
-    One correlated record: the failing component (the "where"), the exception's
-    own type/module/cause chain (the "why"), the request identifiers, the root
-    cause, and a stable ``error_id`` shared across the wrapper chain.
-    """
-    details = error_to_dict(exc, include_traceback=_include_traceback())
-    # One pass over the cause chain yields both the correlation id and the root.
-    error_id, root = _error_correlation(exc)
-    details["error_id"] = error_id
-    # Identify which component failed (the "where").
-    details["component_id"] = metadata.id
-    details["component_name"] = metadata.name
-    details["component_type"] = metadata.type
-    # Correlate to the request.
-    details["conversation_id"] = getattr(invoke_context, "conversation_id", None)
-    details["invoke_id"] = getattr(invoke_context, "invoke_id", None)
-    details["assistant_request_id"] = getattr(
-        invoke_context, "assistant_request_id", None
-    )
-    # The original failure at the bottom of the chain (the "why, ultimately").
-    details["root_error_type"] = type(root).__name__
-    details["root_error_message"] = error_message(root)
-    return details
-
-
-def _record_span_error(
-    span: Any, exc: Exception, error_details: Dict[str, Any]
-) -> None:
-    """Attach structured error information to the active span."""
-    span.set_attribute("error", str(exc))
-    span.set_attribute("error.type", error_details["error_type"])
-    span.set_attribute("error.message", error_details["message"])
-    traceback_str = error_details.get("traceback")
-    if traceback_str:
-        span.set_attribute("error.stack", traceback_str)
-    try:
-        span.set_attribute(
-            "error.details", json.dumps(error_details, default=to_jsonable_python)
-        )
-    except (TypeError, ValueError):
-        pass
-    try:
-        span.record_exception(exc)
-        span.set_status(Status(StatusCode.ERROR, error_details["message"]))
-    except Exception:  # pragma: no cover - defensive; span impls vary
-        pass
-
-
-def _traceback_already_logged(exc: Exception) -> bool:
-    """True if any exception in the cause chain has had its traceback logged."""
-    # Scan generously: each decorator layer marks the exception it sees (below),
-    # so the flag is normally within a few links, but a large bound keeps the
-    # invariant robust for deeply nested agent-calling chains. The cycle guard in
-    # iter_cause_chain prevents runaway traversal.
-    return any(
-        getattr(link, _TRACEBACK_LOGGED_ATTR, False)
-        for link in iter_cause_chain(exc, max_depth=1000)
-    )
-
-
-def _safe_report(
-    services: ExecutionServices, message: str, *, level: str = "error"
-) -> None:
-    """Emit a log line best-effort.
-
-    A misbehaving reporter must never replace the execution failure it is
-    describing, so any exception from ``report`` is swallowed here.
-    """
-    try:
-        services.error_reporter.report(message, level=level)
-    except Exception:  # pragma: no cover - reporters must not raise
-        pass
-
-
-def _report_component_exception(
-    services: ExecutionServices,
-    exc: Exception,
-    metadata: EventContext,
-    error_details: Dict[str, Any],
-) -> None:
-    """Log one concise, id-bearing line for a failure -- once.
-
-    The same failure propagates through the tool -> node -> workflow -> assistant
-    decorators (re-wrapped along the way). Only the layer closest to the failure
-    (the first decorator to catch it) logs; outer layers add nothing. The line
-    carries the conversation/invoke/assistant_request/error ids so the full
-    structured record (cause chain, traceback, component fields) can be pulled
-    from the event store -- the log itself stays minimal and never dumps a
-    traceback.
-    """
-    already_logged = _traceback_already_logged(exc)
-    # Mark this exception (including re-wrapped outer ones) so the next decorator
-    # layer finds the flag within one link of the chain regardless of nesting
-    # depth, keeping emission to a single line.
-    try:
-        setattr(exc, _TRACEBACK_LOGGED_ATTR, True)
-    except Exception:  # pragma: no cover - builtins generally allow attributes
-        pass
-    if already_logged:
-        return
-
-    component_label = metadata.type or "component"
-    _safe_report(
-        services,
-        f"{component_label} '{metadata.name}' failed: "
-        f"{type(exc).__name__}: {error_message(exc)} "
-        f"[error_id={error_details.get('error_id')} "
-        f"conversation_id={error_details.get('conversation_id')} "
-        f"invoke_id={error_details.get('invoke_id')} "
-        f"assistant_request_id={error_details.get('assistant_request_id')}]",
-    )
-
-
-def _current(span: Span) -> AbstractContextManager[Span]:
-    """Make ``span`` current for one step of a component's stream.
-
-    A generator's body runs in the context of whoever iterates it, so a span
-    made current across a ``yield`` would stay current in the reader's context
-    between reads, and for good if the stream were abandoned and closed from
-    another task. Exceptions are recorded on the span by the caller.
-    """
-    return use_span(
-        span, end_on_exit=False, record_exception=False, set_status_on_exception=False
-    )
+    return decorator
 
 
 async def _record_event(
@@ -318,219 +206,168 @@ async def _record_event(
 
 
 async def _record_lifecycle_event(
-    record: Callable[[ComponentEvent], Awaitable[None]],
+    record: Callable[[ComponentEvent], Any],
     event: ComponentEvent,
-    *,
     operation: str,
     invoke_context: InvokeContext,
 ) -> None:
-    """Persist a lifecycle event, translating a store failure into a contextual
-    :class:`EventPersistenceError`.
-
-    Used for invoke/respond events, where no execution error is active yet -- a
-    failure to persist them is itself the primary failure and must surface with
-    operation context rather than a raw backend exception.
-    """
+    """Record an invoke or respond event: failing to is itself the failure,
+    raised as an EventPersistenceError naming the operation."""
     try:
         await record(event)
     except Exception as persist_error:
-        err = EventPersistenceError(
+        error = EventPersistenceError(
             message=f"Failed to persist {operation} event",
             invoke_context=invoke_context,
             cause=persist_error,
         )
         # Captured by serialization's _DOMAIN_FIELDS for a precise diagnostic.
-        err.operation = operation  # type: ignore[attr-defined]
-        raise err from persist_error
+        error.operation = operation  # type: ignore[attr-defined]
+        raise error from persist_error
 
 
-def create_async_decorator(config: ComponentConfig) -> Callable:
+def _current(span: Span) -> AbstractContextManager[Span]:
+    """Make ``span`` current for one step of a component's stream.
+
+    A generator's body runs in the context of whoever iterates it, so a span
+    made current across a ``yield`` would stay current in the reader's context
+    between reads, and for good if the stream were abandoned and closed from
+    another task. Exceptions are recorded on the span by the wrapper.
     """
-    Factory to create asynchronous decorators for different component types.
+    return use_span(
+        span, end_on_exit=False, record_exception=False, set_status_on_exception=False
+    )
 
-    Args:
-        config: Component-specific configuration
 
-    Returns:
-        An async decorator function for the component type
+def _set_payload(span: Span, key: str, value: Any) -> None:
+    """Set ``value`` on a recording span as JSON (its repr if JSON cannot hold
+    it), cut to ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit),
+    unless ``GRAFI_SPAN_DISABLE_PAYLOADS`` keeps payloads off spans."""
+    if not span.is_recording() or env_bool("GRAFI_SPAN_DISABLE_PAYLOADS"):
+        return
+    try:
+        text = to_json(value, fallback=repr).decode()
+    except ValueError:  # Circular data, a lone surrogate, bytes not UTF-8...
+        text = repr(value)
+    try:
+        limit = max(0, int(os.environ["GRAFI_SPAN_MAX_PAYLOAD_CHARS"]))
+    except (KeyError, ValueError):
+        limit = _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
+    if limit and len(text) > limit:
+        text = f"{text[:limit]}...[truncated {len(text) - limit} chars]"
+    span.set_attribute(key, text)
+
+
+def _record_span_error(span: Span, error: Exception, details: Dict[str, Any]) -> None:
+    """Record ``error`` on the span, before it ends."""
+    span.set_attribute("error", str(error))
+    span.set_attribute("error.type", details["error_type"])
+    span.set_attribute("error.message", details["message"])
+    if details.get("traceback"):
+        span.set_attribute("error.stack", details["traceback"])
+    without_traceback = {k: v for k, v in details.items() if k != "traceback"}
+    _set_payload(span, "error.details", without_traceback)
+    span.record_exception(error)
+    span.set_status(Status(StatusCode.ERROR, details["message"]))
+
+
+def _existing_error_id(error: BaseException) -> Optional[str]:
+    """The id an inner layer gave this failure, found along its cause chain."""
+    for link in iter_cause_chain(error, max_depth=_MAX_CAUSE_DEPTH):
+        error_id = getattr(link, _ERROR_ID_ATTR, None)
+        if error_id:
+            return str(error_id)
+    return None
+
+
+def _error_id_for(error: Exception) -> str:
+    """The id every layer records for this failure: an inner layer's, or a new
+    one set on ``error`` for the layers outside it."""
+    error_id = _existing_error_id(error)
+    if error_id is None:
+        error_id = uuid.uuid4().hex[:12]
+        # An exception may refuse new attributes (attrs' frozen ones do); its
+        # outer layers then cannot find the id, and each records its own.
+        with suppress(Exception):
+            setattr(error, _ERROR_ID_ATTR, error_id)
+    return error_id
+
+
+def _build_error_details(
+    error: Exception, metadata: EventContext, invoke_context: InvokeContext
+) -> Dict[str, Any]:
+    """A failed event's structured details: the error and its cause chain, the
+    failing component, the request's ids, the root cause and the error id.
+
+    Tracebacks are included unless ``GRAFI_ERROR_INCLUDE_TRACEBACK`` is falsy.
     """
+    *_, root = iter_cause_chain(error, max_depth=_MAX_CAUSE_DEPTH)
+    return {
+        **error_to_dict(
+            error,
+            include_traceback=env_bool("GRAFI_ERROR_INCLUDE_TRACEBACK", default=True),
+        ),
+        "error_id": _error_id_for(error),
+        "component_id": metadata.id,
+        "component_name": metadata.name,
+        "component_type": metadata.type,
+        "conversation_id": invoke_context.conversation_id,
+        "invoke_id": invoke_context.invoke_id,
+        "assistant_request_id": invoke_context.assistant_request_id,
+        "root_error_type": type(root).__name__,
+        "root_error_message": error_message(root),
+    }
 
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(
-            self: Any,
-            *args: Any,
-            **kwargs: Any,
-        ) -> AsyncGenerator[Union[PublishToTopicEvent, List[Message]], None]:
-            # Resolved once: a later read may resume this generator in another
-            # task, whose context has no services bound.
-            services = current_services()
-            record = functools.partial(
-                _record_event, services, isolate=config.isolate_event_writes
-            )
-            # Extract metadata using component-specific logic
-            metadata = config.extract_metadata(self)
 
-            input_data: Optional[
-                Union[List[ConsumeFromTopicEvent], List[Message], PublishToTopicEvent]
-            ] = None
+def _report(services: ExecutionServices, message: str, level: str) -> None:
+    """Report ``message``; a failing reporter never replaces the failure it
+    describes."""
+    try:
+        services.error_reporter.report(message, level=level)
+    except Exception:  # pragma: no cover - reporters must not raise
+        pass
 
-            if isinstance(args[0], InvokeContext):
-                invoke_context: InvokeContext = args[0]
-                input_data = args[1]
-            else:
-                # Assistant and workflow: args[0] is the input event (Any), which
-                # carries invoke_context. Read it off args[0] directly so mypy
-                # does not widen to the input_data union (which has no such attr).
-                input_data = args[0]
-                invoke_context = args[0].invoke_context
 
-            # Create invoke event. The factory maps each string key to the
-            # matching InvokeEvent/RespondEvent/FailedEvent subclass, so these
-            # per-event kwargs (input_data/output_data/error/...) are correct at
-            # runtime but unprovable to mypy through the Dict value's
-            # ComponentEvent base type -- hence the targeted call-arg ignores.
-            invoke_event = config.event_types["invoke"](  # type: ignore[call-arg]
-                id=metadata.id,
-                name=metadata.name,
-                type=metadata.type,
-                input_data=input_data,
-                invoke_context=invoke_context,
-            )
-            await _record_lifecycle_event(
-                record, invoke_event, operation="invoke", invoke_context=invoke_context
-            )
+def _report_failure(
+    services: ExecutionServices,
+    error: Exception,
+    metadata: EventContext,
+    details: Dict[str, Any],
+) -> None:
+    """One concise line for a failure, with the ids to find its failed events
+    (which hold the cause chain and traceback) in the event store."""
+    _report(
+        services,
+        f"{metadata.type or 'component'} '{metadata.name}' failed: "
+        f"{type(error).__name__}: {error_message(error)} "
+        f"[error_id={details['error_id']} "
+        f"conversation_id={details['conversation_id']} "
+        f"invoke_id={details['invoke_id']} "
+        f"assistant_request_id={details['assistant_request_id']}]",
+        "error",
+    )
 
-            # Execute with tracing
-            output_data = None
-            error_details: Optional[Dict[str, Any]] = None
 
-            try:
-                # Current only while the component's own code runs: see _current.
-                span = services.tracer.start_span(
-                    f"{metadata.name}.{config.span_name_suffix}"
-                )
-                try:
-                    # Set span attributes
-                    for key, value in metadata.model_dump().items():
-                        if value is not None:
-                            span.set_attribute(key, value)
-
-                    span.set_attributes(invoke_context.model_dump())
-
-                    # Set input (size-bounded; omitted if payloads are disabled)
-                    input_payload = _span_payload(input_data)
-                    if input_payload is not None:
-                        span.set_attribute("input", input_payload)
-
-                    # Handle streaming
-                    result_list: List = []
-                    with _current(span):
-                        stream = func(self, *args, **kwargs)
-
-                    async def close_stream() -> None:
-                        with _current(span):
-                            await close_iterator(stream)
-
-                    async with cleanup_on_exit(close_stream):
-                        while True:
-                            with _current(span):
-                                try:
-                                    result = await anext(stream)
-                                except StopAsyncIteration:
-                                    break
-                                except asyncio.CancelledError as cancelled:
-                                    if cancelling():
-                                        raise
-                                    # Raised by the component on its own (its
-                                    # task was not cancelled): its failure.
-                                    raise unexpected_cancellation(
-                                        f"{metadata.name} was unexpectedly cancelled",
-                                        cancelled,
-                                    )
-                            yield result
-                            result_list.append(result)
-
-                    output_data = config.process_async_result(result_list)
-
-                    output_payload = _span_payload(output_data)
-                    if output_payload is not None:
-                        span.set_attribute("output", output_payload)
-                except Exception as e:
-                    # Build structured details once, while the traceback is
-                    # still attached to the exception, and enrich the span
-                    # WHILE it is still recording. Attributes set after the
-                    # span ends are dropped by the backend.
-                    error_details = _build_error_details(e, metadata, invoke_context)
-                    _record_span_error(span, e, error_details)
-                    raise
-                finally:
-                    span.end()
-
-            except Exception as e:
-                # error_details is normally built above, inside the live span.
-                # Rebuild defensively only if the failure happened before the
-                # inner try (e.g. span creation itself).
-                if error_details is None:
-                    error_details = _build_error_details(e, metadata, invoke_context)
-
-                # Log one concise line for this failure -- once, at the layer
-                # closest to it; outer layers add nothing. See
-                # _report_component_exception.
-                _report_component_exception(services, e, metadata, error_details)
-
-                # Record failed event with both the human-readable string (kept
-                # for backward compatibility) and the structured details.
-                failed_event = config.event_types["failed"](  # type: ignore[call-arg]
-                    id=metadata.id,
-                    name=metadata.name,
-                    type=metadata.type,
-                    input_data=input_data,
-                    invoke_context=invoke_context,
-                    error=str(e),
-                    error_details=error_details,
-                )
-                # A failure to persist the failed event must NOT replace the
-                # primary execution error. Report it as a secondary diagnostic
-                # (same error_id), annotate the primary, and re-raise the primary.
-                try:
-                    await record(failed_event)
-                except Exception as persist_error:
-                    error_id = error_details.get("error_id")
-                    arid = error_details.get("assistant_request_id")
-                    _safe_report(
-                        services,
-                        "Secondary failure: failed-event NOT persisted "
-                        f"(error_id={error_id} assistant_request_id={arid}); "
-                        "the failure will not be queryable from the event store: "
-                        f"{type(persist_error).__name__}: {persist_error}",
-                        level="warning",
-                    )
-                    try:
-                        e.add_note(  # Python 3.11+
-                            f"[grafi] failed to persist failed-event "
-                            f"(error_id={error_id}): {persist_error!r}"
-                        )
-                    except Exception:  # pragma: no cover - add_note always present
-                        pass
-                raise
-            else:
-                # Record respond event
-                respond_event = config.event_types["respond"](  # type: ignore[call-arg]
-                    id=metadata.id,
-                    name=metadata.name,
-                    type=metadata.type,
-                    input_data=input_data,
-                    invoke_context=invoke_context,
-                    output_data=output_data,
-                )
-                await _record_lifecycle_event(
-                    record,
-                    respond_event,
-                    operation="respond",
-                    invoke_context=invoke_context,
-                )
-
-        return wrapper
-
-    return decorator
+def _note_unrecorded_failure(
+    services: ExecutionServices,
+    error: Exception,
+    invoke_context: InvokeContext,
+    unrecorded: Exception,
+) -> None:
+    """A failure whose failed event could not be recorded: reported, and noted
+    on the failure, which is still the one raised."""
+    error_id = _existing_error_id(error)
+    _report(
+        services,
+        "Secondary failure: failed-event NOT persisted "
+        f"(error_id={error_id} "
+        f"assistant_request_id={invoke_context.assistant_request_id}); "
+        "the failure will not be queryable from the event store: "
+        f"{type(unrecorded).__name__}: {unrecorded}",
+        "warning",
+    )
+    with suppress(Exception):  # A note never replaces the failure it is on.
+        error.add_note(
+            f"[grafi] failed to persist failed-event (error_id={error_id}): "
+            f"{unrecorded!r}"
+        )
