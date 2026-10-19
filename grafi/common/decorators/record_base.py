@@ -3,18 +3,20 @@ respond and failed events and traces each invocation in a span."""
 
 import asyncio
 import functools
-import json
 import os
 import uuid
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
+from typing import AsyncIterator
 from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Type
+from typing import TypeVar
+from typing import cast
 
 from opentelemetry.trace import Span
 from opentelemetry.trace import Status
@@ -22,7 +24,7 @@ from opentelemetry.trace import StatusCode
 from opentelemetry.trace import use_span
 from pydantic import BaseModel
 from pydantic import ConfigDict
-from pydantic_core import to_jsonable_python
+from pydantic_core import to_json
 
 from grafi.common.async_lifecycle import cancelling
 from grafi.common.async_lifecycle import cleanup_on_exit
@@ -46,7 +48,11 @@ from grafi.runtime.execution_services import current_services
 # The id every layer of one failure (tool, node, workflow, assistant) records,
 # set on the exception by the layer closest to it, which alone logs it.
 _ERROR_ID_ATTR = "_grafi_error_id"
+# Deep enough to reach the innermost failure however often it was re-wrapped.
+_MAX_CAUSE_DEPTH = 1000
 _DEFAULT_SPAN_MAX_PAYLOAD_CHARS = 10_000
+
+F = TypeVar("F", bound=Callable[..., AsyncIterator[Any]])
 
 
 class EventContext(BaseModel):
@@ -77,7 +83,7 @@ class ComponentConfig:
     isolate_event_writes: bool = False
 
 
-def create_async_decorator(config: ComponentConfig) -> Callable:
+def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
     """A decorator for a component's async generator ``invoke``.
 
     It records the invoke event, runs the stream in the component's span, then
@@ -86,7 +92,7 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
     before raising the failure again.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: F) -> F:
         @functools.wraps(func)
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
             # Resolved once: a later read may resume this generator in another
@@ -118,11 +124,13 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 f"{metadata.name}.{config.span_name_suffix}"
             )
             try:
-                for key, value in metadata.model_dump().items():
-                    if value is not None:
-                        span.set_attribute(key, value)
-                span.set_attributes(invoke_context.model_dump())
-                _set_payload(span, "input", input_data)
+                if span.is_recording():
+                    # Span attributes hold neither None nor kwargs' free-form dict.
+                    span.set_attributes(metadata.model_dump(exclude_none=True))
+                    span.set_attributes(
+                        invoke_context.model_dump(exclude={"kwargs"}, exclude_none=True)
+                    )
+                    _set_payload(span, "input", input_data)
 
                 with _current(span):
                     stream = func(self, *args, **kwargs)
@@ -175,14 +183,9 @@ def create_async_decorator(config: ComponentConfig) -> Callable:
                 invoke_context,
             )
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
-
-
-# ---------------------------------------------------------------------- #
-# Events
-# ---------------------------------------------------------------------- #
 
 
 async def _record_event(
@@ -219,11 +222,6 @@ async def _record_lifecycle_event(
         raise error from persist_error
 
 
-# ---------------------------------------------------------------------- #
-# Tracing
-# ---------------------------------------------------------------------- #
-
-
 def _current(span: Span) -> AbstractContextManager[Span]:
     """Make ``span`` current for one step of a component's stream.
 
@@ -238,40 +236,20 @@ def _current(span: Span) -> AbstractContextManager[Span]:
 
 
 def _set_payload(span: Span, key: str, value: Any) -> None:
-    payload = _span_payload(value)
-    if payload is not None:
-        span.set_attribute(key, payload)
-
-
-def _span_payloads_disabled() -> bool:
-    """Whether input and output payloads are kept off spans entirely: set
+    """Set ``value`` on a recording span as JSON, cut to
+    ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000; 0: no limit). Set
     ``GRAFI_SPAN_DISABLE_PAYLOADS`` where prompts, tool arguments or message
     contents must never reach the tracing backend."""
-    return env_bool("GRAFI_SPAN_DISABLE_PAYLOADS", default=False)
-
-
-def _span_max_payload_chars() -> int:
-    """The most characters of a payload a span keeps (0: no limit), from
-    ``GRAFI_SPAN_MAX_PAYLOAD_CHARS`` (default 10,000)."""
+    if not span.is_recording() or env_bool("GRAFI_SPAN_DISABLE_PAYLOADS"):
+        return
+    text = to_json(value, fallback=repr).decode()
     try:
-        return max(0, int(os.environ["GRAFI_SPAN_MAX_PAYLOAD_CHARS"]))
+        limit = max(0, int(os.environ["GRAFI_SPAN_MAX_PAYLOAD_CHARS"]))
     except (KeyError, ValueError):
-        return _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
-
-
-def _span_payload(value: Any) -> Optional[str]:
-    """``value`` as JSON for a span attribute, truncated to the limit; None when
-    payloads are disabled."""
-    if _span_payloads_disabled():
-        return None
-    try:
-        text = json.dumps(value, default=to_jsonable_python)
-    except (TypeError, ValueError):
-        text = repr(value)
-    limit = _span_max_payload_chars()
+        limit = _DEFAULT_SPAN_MAX_PAYLOAD_CHARS
     if limit and len(text) > limit:
-        return f"{text[:limit]}...[truncated {len(text) - limit} chars]"
-    return text
+        text = f"{text[:limit]}...[truncated {len(text) - limit} chars]"
+    span.set_attribute(key, text)
 
 
 def _record_span_error(span: Span, error: Exception, details: Dict[str, Any]) -> None:
@@ -281,27 +259,15 @@ def _record_span_error(span: Span, error: Exception, details: Dict[str, Any]) ->
     span.set_attribute("error.message", details["message"])
     if details.get("traceback"):
         span.set_attribute("error.stack", details["traceback"])
-    try:
-        span.set_attribute(
-            "error.details", json.dumps(details, default=to_jsonable_python)
-        )
-    except (TypeError, ValueError):
-        pass
-    try:
-        span.record_exception(error)
-        span.set_status(Status(StatusCode.ERROR, details["message"]))
-    except Exception:  # pragma: no cover - span implementations vary
-        pass
-
-
-# ---------------------------------------------------------------------- #
-# Failures
-# ---------------------------------------------------------------------- #
+    without_traceback = {k: v for k, v in details.items() if k != "traceback"}
+    _set_payload(span, "error.details", without_traceback)
+    span.record_exception(error)
+    span.set_status(Status(StatusCode.ERROR, details["message"]))
 
 
 def _existing_error_id(error: BaseException) -> Optional[str]:
     """The id an inner layer gave this failure, found along its cause chain."""
-    for link in iter_cause_chain(error, max_depth=1000):
+    for link in iter_cause_chain(error, max_depth=_MAX_CAUSE_DEPTH):
         error_id = getattr(link, _ERROR_ID_ATTR, None)
         if error_id:
             return str(error_id)
@@ -314,10 +280,7 @@ def _error_id_for(error: Exception) -> str:
     error_id = _existing_error_id(error)
     if error_id is None:
         error_id = uuid.uuid4().hex[:12]
-        try:
-            setattr(error, _ERROR_ID_ATTR, error_id)
-        except Exception:  # pragma: no cover - exceptions generally allow it
-            pass
+        setattr(error, _ERROR_ID_ATTR, error_id)
     return error_id
 
 
@@ -329,7 +292,7 @@ def _build_error_details(
 
     Tracebacks are included unless ``GRAFI_ERROR_INCLUDE_TRACEBACK`` is falsy.
     """
-    *_, root = iter_cause_chain(error, max_depth=1000)
+    *_, root = iter_cause_chain(error, max_depth=_MAX_CAUSE_DEPTH)
     return {
         **error_to_dict(
             error,

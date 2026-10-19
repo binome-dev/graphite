@@ -5,19 +5,24 @@ import dataclasses
 import enum
 from typing import Annotated
 from typing import Any
+from typing import Callable
+from typing import DefaultDict
 from typing import Dict
+from typing import Iterable
+from typing import Iterator
 from typing import List
 from typing import Literal
 from typing import Mapping
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
+from typing import TypeVar
 from typing import Union
 
 import pytest
 
-from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.llm_function import _type_to_schema
+from grafi.common.decorators.llm_function import llm_function
 from grafi.common.models.function_spec import FunctionSpec
 
 
@@ -61,8 +66,16 @@ class Opaque:
         (set, {"type": "array", "items": {}}),
         (Sequence[str], {"type": "array", "items": {"type": "string"}}),
         (Tuple[int, ...], {"type": "array", "items": {"type": "integer"}}),
-        (Dict[str, int], {"type": "object", "additionalProperties": {"type": "integer"}}),
+        (Iterable[int], {"type": "array", "items": {"type": "integer"}}),
+        (
+            Dict[str, int],
+            {"type": "object", "additionalProperties": {"type": "integer"}},
+        ),
         (dict, {"type": "object"}),
+        (
+            DefaultDict[str, int],
+            {"type": "object", "additionalProperties": {"type": "integer"}},
+        ),
         (
             Mapping[str, float],
             {"type": "object", "additionalProperties": {"type": "number"}},
@@ -81,7 +94,9 @@ class Opaque:
         ),
         (Color, {"type": "string", "enum": ["red", "blue"]}),
         (Opaque, {"type": "object"}),
-        ("unresolved", {}),
+        (Iterator[int], {}),
+        (Callable[[int], str], {}),
+        (TypeVar("T"), {}),
     ],
 )
 def test_type_to_schema(annotation: Any, schema: Dict[str, Any]) -> None:

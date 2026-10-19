@@ -4,6 +4,7 @@ from typing import Any
 from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import TypeVar
 
 from grafi.common.decorators.record_base import ComponentConfig
 from grafi.common.decorators.record_base import EventContext
@@ -20,17 +21,16 @@ from grafi.common.events.component_events import ToolRespondEvent
 from grafi.common.events.component_events import WorkflowFailedEvent
 from grafi.common.events.component_events import WorkflowInvokeEvent
 from grafi.common.events.component_events import WorkflowRespondEvent
-from grafi.common.events.topic_events.consume_from_topic_event import (
-    ConsumeFromTopicEvent,
-)
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 
+E = TypeVar("E", bound=TopicEvent)
 
-def _context(component: Any, id: str, **extra: Any) -> EventContext:
+
+def _context(component: Any, component_id: str, **extra: Any) -> EventContext:
     return EventContext(
-        id=id,
+        id=component_id,
         name=component.name or "",
         type=component.type or "",
         oi_span_type=component.oi_span_type.value,
@@ -48,23 +48,12 @@ def _joined_stream(batches: Iterable[Messages]) -> Optional[Message]:
     return Message(role="assistant", content=text)
 
 
-def _outputs(events: List[ConsumeFromTopicEvent]) -> List[ConsumeFromTopicEvent]:
-    """An assistant's or a workflow's outputs, a stream joined into one."""
+def _outputs(events: List[E]) -> List[E]:
+    """The events a component yielded, a stream joined into the last of them."""
     joined = _joined_stream(event.data for event in events)
     if joined is None:
         return events
     return [events[-1].model_copy(update={"data": [joined]}, deep=True)]
-
-
-def _publication(events: List[PublishToTopicEvent]) -> Optional[PublishToTopicEvent]:
-    """A node's last publication, a stream joined into it, or None when it
-    published nothing."""
-    if not events:
-        return None
-    joined = _joined_stream(event.data for event in events)
-    if joined is None:
-        return events[-1]
-    return events[-1].model_copy(update={"data": [joined]}, deep=True)
 
 
 def _messages(batches: List[Messages]) -> Messages:
@@ -113,7 +102,8 @@ record_node_invoke = create_async_decorator(
             ],
             publish_to_topics=[topic.name for topic in self.publish_to],
         ),
-        process_async_result=_publication,
+        # A node's last publication, or None when it published nothing.
+        process_async_result=lambda events: _outputs(events)[-1] if events else None,
     )
 )
 

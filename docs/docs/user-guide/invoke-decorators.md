@@ -37,25 +37,26 @@ decorated methods and offers them to the LLM.
 - Parameters without a default are required. `self`, `cls`, `ctx`, `context`
   and parameters starting with `_` are hidden from the LLM. `*args` and
   `**kwargs` are rejected.
-- The return annotation, if any, becomes the spec's `output_schema`.
+- The return annotation, unless missing or `Any`, becomes the spec's
+  `output_schema`.
 
 Type hints map to JSON Schema as follows:
 
 | Python type | JSON Schema |
 |-------------|-------------|
 | `str`, `int`, `float`, `bool`, `None` | `string`, `integer`, `number`, `boolean`, `null` |
-| `list[T]`, `tuple[T, ...]`, `set[T]`, `Sequence[T]` | `array` of `T` |
-| `dict[str, T]`, `Mapping[str, T]` | `object` whose values are `T` |
+| `list[T]`, `tuple[T, ...]`, `set[T]`, `Iterable[T]`, any other collection | `array` of `T` |
+| `dict[str, T]`, `Mapping[str, T]`, any other mapping | `object` whose values are `T` |
 | `Optional[T]`, `Union[...]`, `T \| None` | `anyOf` |
 | `Literal[...]`, an `Enum` | the values as `enum` |
 | A dataclass | `object` with its fields, required unless they have a default |
 | `Annotated[T, {...}]` | `T`, with the mapping's keys added (for example `{"minimum": 0}`) |
 | Another class | `object` |
-| `Any`, or anything else | any value (`{}`) |
+| `Any`, a `TypeVar`, another generic such as `Callable[...]` | any value (`{}`) |
 
 ## Record decorators
 
-Each record decorator wraps an async generator `invoke()`:
+Each record decorator wraps an `invoke()` that returns an async generator:
 
 ```python
 from grafi.common.decorators.record_decorators import record_tool_invoke
@@ -91,7 +92,8 @@ For each invocation the decorator:
 A failure to store the invoke or respond event raises an
 `EventPersistenceError`. A failure to store the failed event is reported and
 noted on the original failure, which is still the one raised. Closing the
-stream early records neither a respond nor a failed event.
+stream early records neither a respond nor a failed event, unless closing it
+fails.
 
 The span is current only while the component's own code runs, so a caller's
 code between reads is never traced as part of it.
@@ -101,7 +103,7 @@ code between reads is never traced as part of it.
 | Attributes | Content |
 |------------|---------|
 | `id`, `name`, `type`, `oi_span_type` | The component, plus `model` for an assistant and `subscribed_topics`, `publish_to_topics` for a node |
-| `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id`, `kwargs` | The invoke context |
+| `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id` | The invoke context |
 | `input`, `output` | The input and the output as JSON |
 | `error`, `error.type`, `error.message`, `error.stack`, `error.details` | The failure, if any; the span's status is then `ERROR` |
 
@@ -109,6 +111,6 @@ code between reads is never traced as part of it.
 
 | Variable | Effect |
 |----------|--------|
-| `GRAFI_SPAN_DISABLE_PAYLOADS` | When true, `input` and `output` are left off spans. |
+| `GRAFI_SPAN_DISABLE_PAYLOADS` | When true, `input`, `output` and `error.details` are left off spans. |
 | `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | The most characters of a payload a span keeps (default 10,000; `0` means no limit). |
 | `GRAFI_ERROR_INCLUDE_TRACEBACK` | When false, failed events carry no traceback. |

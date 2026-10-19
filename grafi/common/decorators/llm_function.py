@@ -1,11 +1,13 @@
 """``@llm_function``: expose a function to an LLM as a FunctionSpec built from
 its signature, type hints and docstring."""
 
-import collections.abc
 import dataclasses
 import enum
 import inspect
 import types
+from collections.abc import Collection
+from collections.abc import Iterable
+from collections.abc import Mapping
 from typing import Annotated
 from typing import Any
 from typing import Callable
@@ -36,12 +38,10 @@ _PRIMITIVES = {
     bool: "boolean",
     type(None): "null",
 }
-_ARRAYS = {list, tuple, set, frozenset, collections.abc.Sequence}
-_MAPPINGS = {dict, collections.abc.Mapping, collections.abc.MutableMapping}
 # Parameters the caller supplies, never the LLM.
 _HIDDEN_PARAMETERS = {"self", "cls", "ctx", "context"}
 # Return annotations that describe no output.
-_NO_OUTPUT = (inspect.Signature.empty, None, Any, ...)
+_NO_OUTPUT = (inspect.Signature.empty, Any)
 
 
 def llm_function(func: Callable[P, R]) -> Callable[P, R]:
@@ -75,8 +75,8 @@ def _function_spec(func: Callable[..., Any]) -> FunctionSpec:
         if name in _HIDDEN_PARAMETERS or name.startswith("_"):
             continue
         schema = _type_to_schema(hints.get(name, Any))
-        if described.get(name):
-            schema.setdefault("description", described[name])
+        if description := described.get(name):
+            schema.setdefault("description", description)
         properties[name] = ParameterSchema(**schema)
         if parameter.default is inspect.Parameter.empty:
             required.append(name)
@@ -101,7 +101,7 @@ def _type_to_schema(annotation: Any) -> JsonSchema:
     if origin is Annotated:
         schema = _type_to_schema(args[0])
         for extra in args[1:]:
-            if isinstance(extra, collections.abc.Mapping):
+            if isinstance(extra, Mapping):
                 schema.update(extra)
         return schema
     if origin is Literal:
@@ -110,20 +110,21 @@ def _type_to_schema(annotation: Any) -> JsonSchema:
         return {"anyOf": [_type_to_schema(arg) for arg in args]}
     container = origin or annotation
     if annotation is Any or not isinstance(container, type):
-        return {}  # Any, a forward reference left as a string, and the like.
+        return {}  # Any, a TypeVar, a NewType and the like.
     if container in _PRIMITIVES:
         return {"type": _PRIMITIVES[container]}
-    if container in _ARRAYS:
-        return {"type": "array", "items": _type_to_schema(args[0]) if args else {}}
-    if container in _MAPPINGS:
-        if len(args) == 2:
-            return {"type": "object", "additionalProperties": _type_to_schema(args[1])}
-        return {"type": "object"}
     if dataclasses.is_dataclass(container):
         return _dataclass_schema(container)
     if issubclass(container, enum.Enum):
         return _enum_schema([member.value for member in container])
-    return {"type": "object"}
+    if issubclass(container, Mapping):
+        if len(args) == 2:
+            return {"type": "object", "additionalProperties": _type_to_schema(args[1])}
+        return {"type": "object"}
+    if issubclass(container, Collection) or container is Iterable:
+        return {"type": "array", "items": _type_to_schema(args[0]) if args else {}}
+    # Another generic, such as a Callable, says nothing JSON can carry.
+    return {} if origin else {"type": "object"}
 
 
 def _enum_schema(values: List[Any]) -> JsonSchema:
