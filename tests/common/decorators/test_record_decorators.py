@@ -283,3 +283,27 @@ async def test_a_failure_refusing_its_error_id_is_still_recorded_and_raised():
     events = await store.get_events()
     assert len(events) == 2 and isinstance(events[-1], ToolFailedEvent)
     assert [level for level, _ in reporter.reports] == ["error"]
+
+
+class _UnprintableError(Exception):
+    def __str__(self) -> str:
+        raise RuntimeError("cannot describe the failure")
+
+
+class _UnprintableFailureTool(_QuietTool):
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        raise _UnprintableError()
+        yield  # pragma: no cover - makes this an async generator
+
+
+@pytest.mark.asyncio
+async def test_failing_to_record_a_failure_never_replaces_it():
+    reporter = _CollectingReporter()
+    with bind_services(ExecutionServices(error_reporter=reporter)):
+        with pytest.raises(_UnprintableError) as raised:
+            async for _ in _UnprintableFailureTool().invoke(_CONTEXT, []):
+                pass
+
+    assert [level for level, _ in reporter.reports] == ["warning"]
+    assert "cannot describe the failure" in raised.value.__notes__[0]

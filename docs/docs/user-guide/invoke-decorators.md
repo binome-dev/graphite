@@ -90,8 +90,8 @@ For each invocation the decorator:
    the failure logs it, as one line with the ids to look it up.
 
 A failure to store the invoke or respond event raises an
-`EventPersistenceError`. A failure to store the failed event is reported and
-noted on the original failure, which is still the one raised. Closing the
+`EventPersistenceError`. A failure to describe or store the failed event is
+reported and noted on the original failure, which is still the one raised. Closing the
 stream early records neither a respond nor a failed event, unless closing it
 fails.
 

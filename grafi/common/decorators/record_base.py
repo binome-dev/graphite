@@ -161,18 +161,21 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
                 output_data = config.process_async_result(results)
                 _set_payload(span, "output", output_data)
             except Exception as error:
-                first = _existing_error_id(error) is None
-                details = _build_error_details(error, metadata, invoke_context)
-                _record_span_error(span, error, details)
-                if first:
-                    _report_failure(services, error, metadata, details)
-                failed = config.failed_event(
-                    **fields, error=str(error), error_details=details
-                )
+                # Failing to record a failure never replaces it.
                 try:
+                    first = _existing_error_id(error) is None
+                    details = _build_error_details(error, metadata, invoke_context)
+                    _record_span_error(span, error, details)
+                    if first:
+                        _report_failure(services, error, metadata, details)
+                    failed = config.failed_event(
+                        **fields, error=str(error), error_details=details
+                    )
                     await record(failed)
-                except Exception as persist_error:
-                    _note_unrecorded_failure(services, error, details, persist_error)
+                except Exception as unrecorded:
+                    _note_unrecorded_failure(
+                        services, error, invoke_context, unrecorded
+                    )
                 raise
             finally:
                 span.end()
@@ -256,7 +259,7 @@ def _set_payload(span: Span, key: str, value: Any) -> None:
 
 
 def _record_span_error(span: Span, error: Exception, details: Dict[str, Any]) -> None:
-    """Record ``error`` on the span, which must still be recording."""
+    """Record ``error`` on the span, before it ends."""
     span.set_attribute("error", str(error))
     span.set_attribute("error.type", details["error_type"])
     span.set_attribute("error.message", details["message"])
@@ -348,23 +351,23 @@ def _report_failure(
 def _note_unrecorded_failure(
     services: ExecutionServices,
     error: Exception,
-    details: Dict[str, Any],
-    persist_error: Exception,
+    invoke_context: InvokeContext,
+    unrecorded: Exception,
 ) -> None:
-    """A failed event that could not be stored: reported, and noted on the
-    failure, which is still the one raised."""
-    error_id = details["error_id"]
+    """A failure whose failed event could not be recorded: reported, and noted
+    on the failure, which is still the one raised."""
+    error_id = _existing_error_id(error)
     _report(
         services,
         "Secondary failure: failed-event NOT persisted "
         f"(error_id={error_id} "
-        f"assistant_request_id={details['assistant_request_id']}); "
+        f"assistant_request_id={invoke_context.assistant_request_id}); "
         "the failure will not be queryable from the event store: "
-        f"{type(persist_error).__name__}: {persist_error}",
+        f"{type(unrecorded).__name__}: {unrecorded}",
         "warning",
     )
     with suppress(Exception):  # A note never replaces the failure it is on.
         error.add_note(
             f"[grafi] failed to persist failed-event (error_id={error_id}): "
-            f"{persist_error!r}"
+            f"{unrecorded!r}"
         )
