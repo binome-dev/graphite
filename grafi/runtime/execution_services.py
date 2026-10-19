@@ -15,20 +15,20 @@ strictly separate.
 
 from __future__ import annotations
 
-import contextlib
 import threading
 from contextvars import ContextVar
 from contextvars import Token
 from dataclasses import dataclass
 from dataclasses import field
 from functools import partial
-from typing import Iterator
+from typing import Any
 from typing import Optional
 
 from loguru import logger
 from opentelemetry.trace import Tracer
 from opentelemetry.trace import get_tracer
 
+from grafi.common.env import env_bool
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 
@@ -62,12 +62,11 @@ class ErrorReporter:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionServices:
-    """Immutable bundle of the live runtime dependencies for one runtime.
+    """Immutable bundle of the live services an invocation runs with.
 
-    Each field has an in-process default, so ``ExecutionServices()`` is a ready
-    dev/test bundle and any field can be overridden with a normal keyword --
-    ``ExecutionServices(event_store=EventStorePostgres(...))``. There is no
-    separate factory; the dataclass *is* the default.
+    Each field has an in-process value by default, so ``ExecutionServices()``
+    is a ready in-process bundle, and any field can be given with a keyword:
+    ``ExecutionServices(event_store=EventStorePostgres(...))``.
 
     The fields are excluded from ``repr`` so a stray ``repr(services)`` (or an
     object that embeds one) cannot leak a database URL, client, or other
@@ -83,6 +82,17 @@ class ExecutionServices:
     tracer: Tracer = field(default_factory=partial(get_tracer, "grafi"), repr=False)
     error_reporter: ErrorReporter = field(default_factory=ErrorReporter, repr=False)
 
+    async def aclose(self) -> None:
+        """Release what the services hold, such as the event store's pool, at
+        shutdown. Spans are flushed by the tracer provider, at exit."""
+        await self.event_store.aclose()
+
+    async def __aenter__(self) -> ExecutionServices:
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        await self.aclose()
+
 
 # The services bound for the current invocation, if any.
 _current_services: ContextVar[Optional[ExecutionServices]] = ContextVar(
@@ -95,7 +105,8 @@ _default_lock = threading.Lock()
 def current_services() -> ExecutionServices:
     """The services bound for the current invocation, else the process default:
     those given to :func:`set_default_services`, or, from first use, in-process
-    ones with an in-memory event store."""
+    ones with an in-memory event store, unless ``GRAFI_STRICT_SERVICES`` makes
+    that raise ``RuntimeError``."""
     return _current_services.get() or _default_services or _create_default()
 
 
@@ -104,40 +115,58 @@ def set_default_services(services: ExecutionServices) -> None:
     others runs with. Call it once at startup, before the first invocation."""
     global _default_services
     with _default_lock:
-        if _default_services is not None:
-            logger.warning(
-                "set_default_services replaced earlier default services: set "
-                "them once, at startup"
-            )
-        _default_services = services
+        replaced, _default_services = _default_services is not None, services
+    if replaced:  # Logged without the lock: a log sink may read the services.
+        logger.warning(
+            "set_default_services replaced earlier default services: set them "
+            "once, at startup"
+        )
 
 
 def _create_default() -> ExecutionServices:
     global _default_services
     with _default_lock:
-        if _default_services is None:
-            logger.warning(
-                "grafi keeps events in memory, where they are lost on exit: call "
-                "grafi.runtime.set_default_services(...) at startup with a "
-                "durable event store."
+        if _default_services is not None:
+            return _default_services
+        if env_bool("GRAFI_STRICT_SERVICES"):
+            raise RuntimeError(
+                "No services set, and GRAFI_STRICT_SERVICES forbids in-memory "
+                "ones: call grafi.runtime.set_default_services(...) at startup."
             )
-            _default_services = ExecutionServices()
-        return _default_services
+        _default_services = created = ExecutionServices()
+    # Logged without the lock: a log sink may read the services.
+    logger.warning(
+        "grafi keeps events in memory, where they are lost on exit: call "
+        "grafi.runtime.set_default_services(...) at startup with a durable "
+        "event store."
+    )
+    return created
 
 
-@contextlib.contextmanager
-def bind_services(services: ExecutionServices) -> Iterator[ExecutionServices]:
-    """Bind ``services`` to the request scope for the duration of the block.
+class bind_services:
+    """Bind ``services`` to the invocations started in the block.
 
     Uses ``ContextVar`` set/reset (capture-and-restore), so nested bindings
     restore the previous value on exit. ``asyncio`` tasks created inside the
     block inherit the binding because ``create_task``/``gather`` snapshot the
     current context. Leave the block in the context that entered it: an async
     generator binds around each step, not across a ``yield`` (see
-    :meth:`GrafiRuntime.invoke`).
+    :meth:`GrafiRuntime.invoke`). A plain class, as streams enter it per step.
     """
-    token: Token[Optional[ExecutionServices]] = _current_services.set(services)
-    try:
-        yield services
-    finally:
-        _current_services.reset(token)
+
+    __slots__ = ("_services", "_token")
+
+    def __init__(self, services: ExecutionServices) -> None:
+        self._services = services
+        self._token: Optional[Token[Optional[ExecutionServices]]] = None
+
+    def __enter__(self) -> ExecutionServices:
+        if self._token is not None:
+            raise RuntimeError("This binding is already entered")
+        self._token = _current_services.set(self._services)
+        return self._services
+
+    def __exit__(self, *exc_info: Any) -> None:
+        token, self._token = self._token, None
+        if token is not None:
+            _current_services.reset(token)

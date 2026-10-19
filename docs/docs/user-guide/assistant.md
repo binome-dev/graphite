@@ -123,7 +123,6 @@ The `AssistantBaseBuilder` provides a fluent interface for constructing assistan
 | `oi_span_type` | `OpenInferenceSpanKindValues` | Sets the OpenInference span type for tracing |
 | `name` | `str` | Sets the assistant's name |
 | `type` | `str` | Sets the assistant's type category |
-| `event_store` | `EventStore` | Registers an event store for event recording |
 
 ### Usage Example
 

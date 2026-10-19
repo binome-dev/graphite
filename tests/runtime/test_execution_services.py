@@ -2,6 +2,8 @@
 
 import contextvars
 import dataclasses
+import threading
+from types import SimpleNamespace
 
 import pytest
 from opentelemetry.trace import NoOpTracer
@@ -49,6 +51,7 @@ class TestProcessDefault:
     @pytest.fixture(autouse=True)
     def _no_default_yet(self, monkeypatch):
         monkeypatch.setattr(execution_services, "_default_services", None)
+        monkeypatch.delenv("GRAFI_STRICT_SERVICES", raising=False)
 
     @staticmethod
     def _unbound() -> ExecutionServices:
@@ -69,8 +72,70 @@ class TestProcessDefault:
         assert current_services() is bound_services
         assert bound_services is not self._unbound()
 
+    def test_a_log_sink_reading_the_services_does_not_deadlock(self, monkeypatch):
+        # The creation warning reaches log sinks, which may read the services:
+        # it must not be logged while the default's lock is held.
+        monkeypatch.setattr(execution_services, "_default_lock", threading.Lock())
+        reads_services = SimpleNamespace(
+            warning=lambda *args: contextvars.Context().run(current_services)
+        )
+        monkeypatch.setattr(execution_services, "logger", reads_services)
+
+        thread = threading.Thread(target=self._unbound, daemon=True)
+        thread.start()
+        thread.join(timeout=5)
+        assert not thread.is_alive(), "creating the default deadlocked"
+
+    def test_strict_mode_refuses_in_memory_services(self, monkeypatch):
+        monkeypatch.setenv("GRAFI_STRICT_SERVICES", "true")
+        with pytest.raises(RuntimeError, match="set_default_services"):
+            self._unbound()
+
+    def test_strict_mode_accepts_services_set_at_startup(self, monkeypatch):
+        monkeypatch.setenv("GRAFI_STRICT_SERVICES", "true")
+        services = ExecutionServices()
+        set_default_services(services)
+        assert self._unbound() is services
+
+
+class _ClosingStore(EventStoreInMemory):
+    closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class TestLifecycle:
+    @pytest.mark.asyncio
+    async def test_aclose_closes_the_event_store(self):
+        store = _ClosingStore()
+        await ExecutionServices(event_store=store).aclose()
+        assert store.closed
+
+    @pytest.mark.asyncio
+    async def test_leaving_an_async_with_closes_the_event_store(self):
+        store = _ClosingStore()
+        async with ExecutionServices(event_store=store) as services:
+            assert services.event_store is store and not store.closed
+        assert store.closed
+
+    @pytest.mark.asyncio
+    async def test_leaving_on_an_error_still_closes_the_event_store(self):
+        store = _ClosingStore()
+        with pytest.raises(ValueError):
+            async with ExecutionServices(event_store=store):
+                raise ValueError("the application failed")
+        assert store.closed
+
 
 class TestBinding:
+    def test_one_binding_cannot_be_entered_twice_at_once(self, bound_services):
+        binding = bind_services(ExecutionServices())
+        with binding:
+            with pytest.raises(RuntimeError):
+                with binding:
+                    pass
+        assert current_services() is bound_services
 
     def test_bind_makes_services_current(self):
         services = _services()

@@ -241,7 +241,7 @@ class FinanceAssistant(Assistant):
         response_str = ""
         async for output in self.invoke(input_event):
             # Handle different content types
-            if output and len(output) > 0:
+            if output.data:
                 content = output.data[0].content
                 if isinstance(content, str):
                     response_str += content
@@ -266,7 +266,7 @@ Now that we have created the class for the assistance, we have to instantiate it
 # main.py
 import asyncio
 
-def main():
+async def main():
     system_message = os.getenv("OPENAI_SYSTEM_MESSAGE")
     api_key = os.getenv("OPENAI_API_KEY")
     model = os.getenv("OPENAI_MODEL")
@@ -312,7 +312,7 @@ def create_finance_assistant(
 
     return builder.build()
 
-def main():
+async def main():
 
     system_message = os.getenv("OPENAI_SYSTEM_MESSAGE")
     api_key = os.getenv("OPENAI_API_KEY")

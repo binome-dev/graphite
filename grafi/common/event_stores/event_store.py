@@ -53,6 +53,9 @@ class EventStore(ABC):
     @abstractmethod
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]: ...
 
+    async def aclose(self) -> None:
+        """Release what the store holds, such as a connection pool."""
+
     def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
         """Decode a stored event dict into an :class:`Event` via the codec.
 

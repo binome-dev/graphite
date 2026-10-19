@@ -23,7 +23,21 @@ async for event in assistant.invoke(input_event):
 During development, skip the setup: the first invocation creates in-process
 services, with an in-memory event store, and logs once that its events are
 lost on exit. That store keeps every event until then, so a long-running
-service sets a durable one.
+service sets a durable one. To make sure production never falls back to it,
+set `GRAFI_STRICT_SERVICES=true`: an invocation with no services set or bound
+then raises instead.
+
+At shutdown, close the services: `await services.aclose()` releases what they
+hold, such as the event store's connection pool. Or use them as a context:
+
+```python
+async with ExecutionServices(event_store=EventStorePostgres(db_url=...)) as services:
+    set_default_services(services)
+    await serve()  # The application's lifetime.
+```
+
+Spans need nothing at shutdown: the tracer provider flushes them when the
+process exits normally.
 
 ## `ExecutionServices`
 
@@ -44,7 +58,9 @@ line cannot leak a database URL.
 ## Which services an invocation uses
 
 Components read the services through `current_services()`, so no `invoke()`
-signature carries them. It returns, in order:
+signature carries them. Each layer reads them when it is invoked, so an
+invocation runs with the services current where `invoke()` was called, wherever
+its stream is then read. They are, in order:
 
 1. The services bound for the invocation, by `bind_services(...)` or a
    `GrafiRuntime` with services of its own.
@@ -76,7 +92,27 @@ A binding holds in the context that made it, and in the `asyncio` tasks
 started there, which copy their context: an invocation's coordinator and step
 tasks inherit it. Work handed to a thread with `run_in_executor()` or
 `threading.Thread` must bind the services again; `asyncio.to_thread()` copies
-the context, so it needs nothing.
+the context, so it needs nothing. A server that binds services per tenant
+should leave the process default unset and set `GRAFI_STRICT_SERVICES=true`:
+a binding lost on the way then raises, rather than writing to a default store.
+
+Run the application in one event loop (one `asyncio.run(...)`): a durable
+store's pooled connections belong to the loop that opened them.
+
+## Testing
+
+Give each test services of its own, so tests never share a store through the
+process default:
+
+```python
+import pytest
+from grafi.runtime import ExecutionServices, bind_services
+
+@pytest.fixture(autouse=True)
+def services():
+    with bind_services(ExecutionServices()) as services:
+        yield services
+```
 
 ## Custom error reporting
 

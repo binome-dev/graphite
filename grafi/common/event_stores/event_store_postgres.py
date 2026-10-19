@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
@@ -13,6 +14,7 @@ from grafi.common.events.event import Event
 from grafi.common.exceptions import EventPersistenceError
 
 try:
+    import asyncpg  # noqa: F401 - the driver the engine loads.
     from sqlalchemy import Column
     from sqlalchemy import DateTime
     from sqlalchemy import Integer
@@ -89,24 +91,50 @@ class EventStorePostgres(EventStore):
             self.async_engine, class_=AsyncSession, expire_on_commit=False
         )
         self._table_ready = False
+        self._table_creation: Optional[asyncio.Task[None]] = None
 
     async def initialize(self) -> None:
         """Create the events table unless it exists. The first use does so; call
-        it at startup to fail fast if the database is unreachable."""
+        it at startup to fail fast if the database is unreachable.
+
+        Concurrent callers share one attempt, and its outcome, holding no
+        pooled connection while they wait; the next call retries a failed one.
+        An attempt belongs to its event loop.
+        """
+        loop = asyncio.get_running_loop()
+        creation = self._table_creation
+        if (
+            creation is None
+            or creation.get_loop() is not loop
+            or (creation.done() and (creation.cancelled() or creation.exception()))
+        ):
+            creation = self._table_creation = loop.create_task(self._create_table())
+            # Its error is retrieved even if every caller was cancelled.
+            creation.add_done_callback(
+                lambda task: task.cancelled() or task.exception()
+            )
         try:
-            async with self.async_engine.begin() as connection:
-                # Serializes creators, in this process or others starting alike.
-                await connection.execute(
-                    text("SELECT pg_advisory_xact_lock(:key)"), {"key": _TABLE_LOCK}
-                )
-                await connection.run_sync(Base.metadata.create_all)
-        except Exception as e:
+            # Shielded: a caller cancelled does not cancel the others' attempt.
+            await asyncio.shield(creation)
+        except Exception as e:  # Each caller's own error, of the shared cause.
             raise self._persistence_error(
                 "Failed to reach the database or create the events table",
                 "initialize",
                 e,
             ) from e
+
+    async def _create_table(self) -> None:
+        async with self.async_engine.begin() as connection:
+            # Serializes table creation across processes.
+            await connection.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"), {"key": _TABLE_LOCK}
+            )
+            await connection.run_sync(Base.metadata.create_all)
         self._table_ready = True
+
+    async def aclose(self) -> None:
+        """Close the connection pool."""
+        await self.async_engine.dispose()
 
     @asynccontextmanager
     async def _session(self) -> AsyncIterator[AsyncSession]:

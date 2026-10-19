@@ -11,6 +11,7 @@ import pytest
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.runtime import execution_services
 from grafi.runtime.execution_services import ExecutionServices
+from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
 from grafi.runtime.runtime import GrafiRuntime
 
@@ -38,9 +39,18 @@ class TestRuntimeWithoutServices:
     def test_it_runs_with_the_bound_services(self, bound_services):
         assert GrafiRuntime().services is bound_services
 
+    @pytest.mark.asyncio
+    async def test_it_resolves_them_where_invoke_is_called(self, bound_services):
+        elsewhere = ExecutionServices()
+        with bind_services(elsewhere):
+            stream = GrafiRuntime().invoke(_ProbeAssistant(), None)
+        [(direct, in_task)] = [item async for item in stream]
+        assert direct is elsewhere and in_task is elsewhere
+
     def test_outside_a_binding_runtimes_share_the_process_default(self, monkeypatch):
         # As ReActAgent.run() does each turn, so the conversation's events stay.
         monkeypatch.setattr(execution_services, "_default_services", None)
+        monkeypatch.delenv("GRAFI_STRICT_SERVICES", raising=False)
         first, second = contextvars.Context().run(
             lambda: (GrafiRuntime().services, GrafiRuntime().services)
         )

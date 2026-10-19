@@ -90,9 +90,10 @@ if not api_key:
 model = os.getenv("OPENAI_MODEL", "gpt-4o")
 system_message = os.getenv("OPENAI_SYSTEM_MESSAGE", "You are a helpful assistant.")
 
+conversation_id = uuid.uuid4().hex
 invoke_context = InvokeContext(
     user_id=uuid.uuid4().hex,
-    conversation_id=uuid.uuid4().hex,
+    conversation_id=conversation_id,
     invoke_id=uuid.uuid4().hex,
     assistant_request_id=uuid.uuid4().hex
 )

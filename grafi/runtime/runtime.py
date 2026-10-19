@@ -38,13 +38,14 @@ class GrafiRuntime:
     def services(self) -> ExecutionServices:
         return self._services or current_services()
 
-    async def invoke(
+    def invoke(
         self,
         assistant: "AssistantBase",
         input_data: PublishToTopicEvent,
         is_sequential: bool = False,
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Stream the assistant's output with this runtime's services bound.
+        """Stream the assistant's output with this runtime's services, resolved
+        where ``invoke`` is called.
 
         The services are bound around each read and the close (and inherited by
         tasks the stream starts), never in the caller's context between reads.
@@ -53,20 +54,27 @@ class GrafiRuntime:
         garbage collected, or at loop shutdown, which closes it together with
         the generators it reads and can log errors.
         """
-        # A generator's body runs in the context of whoever iterates it, so
-        # the services are bound around each step rather than across a yield.
         services = self.services
-        stream = assistant.invoke(input_data, is_sequential)
+        with bind_services(services):
+            stream = assistant.invoke(input_data, is_sequential)
+        return _bound(services, stream)
 
-        async def close() -> None:
+
+async def _bound(
+    services: ExecutionServices, stream: AsyncGenerator[ConsumeFromTopicEvent, None]
+) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    """``stream`` with ``services`` bound around each step: a generator's body
+    runs in the context of whoever iterates it, so not across a yield."""
+
+    async def close() -> None:
+        with bind_services(services):
+            await close_iterator(stream)
+
+    async with cleanup_on_exit(close):
+        while True:
             with bind_services(services):
-                await close_iterator(stream)
-
-        async with cleanup_on_exit(close):
-            while True:
-                with bind_services(services):
-                    try:
-                        event = await anext(stream)
-                    except StopAsyncIteration:
-                        return
-                yield event
+                try:
+                    event = await anext(stream)
+                except StopAsyncIteration:
+                    return
+            yield event

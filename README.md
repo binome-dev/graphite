@@ -166,6 +166,7 @@ export GRAFI_ALLOW_PICKLE_DESERIALIZATION=true   # or call
 | `GRAFI_SPAN_DISABLE_PAYLOADS` | `false` | The older setting: when truthy, omit payloads from Graphite's own spans. |
 | `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | `10000` | Max characters of a serialized payload attached to a span (`0` = unbounded). |
 | `GRAFI_ERROR_INCLUDE_TRACEBACK` | `true` | When falsy, omit tracebacks from persisted failed-event details. |
+| `GRAFI_STRICT_SERVICES` | `false` | When truthy, an invocation with no services set by `set_default_services(...)` or bound raises, instead of falling back to in-memory ones. |
 
 > Tracing and event payloads can contain prompts, tool arguments, and message
 > content. Use the controls above (and review your collector/database access) when
