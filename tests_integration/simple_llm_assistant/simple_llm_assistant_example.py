@@ -73,7 +73,10 @@ async def test_simple_llm_assistant() -> None:
         print(output)
         assert output is not None
         assert "Grafi" in str(output.data[0].content)
-        assert len(await event_store.get_events()) == 24
+
+    # The workflow and the assistant record their respond events once the stream
+    # has ended, so count them after the loop, not while reading it.
+    assert len(await event_store.get_events()) == 24
 
 
 with bind_services(runtime.services):

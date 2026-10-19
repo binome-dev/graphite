@@ -43,6 +43,7 @@ async def test_simple_llm_assistant() -> None:
     await event_store.clear_events()
 
     content = ""
+    chunks = 0
 
     async for event in assistant.invoke(
         PublishToTopicEvent(
@@ -54,6 +55,7 @@ async def test_simple_llm_assistant() -> None:
             ],
         )
     ):
+        chunks += 1
         for message in event.data:
             assert message.role == "assistant"
             if message.content is not None:
@@ -66,7 +68,10 @@ async def test_simple_llm_assistant() -> None:
 
     events = await event_store.get_events()
     print(f"Total events: {len(events)}")
-    assert len(events) == 12
+    # 8 component events (invoke and respond for the assistant, the workflow,
+    # the node and its tool), then a publication and its consumption for the
+    # input and for every streamed chunk.
+    assert len(events) == 8 + 2 * (1 + chunks)
 
     # Save events to local json file
     # import json
