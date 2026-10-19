@@ -1,22 +1,24 @@
-"""Grafi execution runtime: explicit, request-scoped dependency injection.
+"""The services invocations run with: the event store, the tracer and the error
+reporter.
 
-Application startup constructs an :class:`ExecutionServices` and a
-:class:`GrafiRuntime`, then invokes assistants through ``runtime.invoke(...)``.
-The runtime binds the services to a request-scoped ``ContextVar``; components
-resolve them via :func:`current_services` without any change to ``invoke``
-signatures.
+Every invocation runs with the process default services, which
+:func:`set_default_services` sets once at startup (in-process ones until then),
+unless :func:`bind_services` or a :class:`GrafiRuntime` gives it others.
+Components read them through :func:`current_services`.
 """
 
 from grafi.runtime.execution_services import ErrorReporter
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
+from grafi.runtime.execution_services import set_default_services
 from grafi.runtime.runtime import GrafiRuntime
 
 __all__ = [
     "ExecutionServices",
     "ErrorReporter",
     "GrafiRuntime",
-    "current_services",
     "bind_services",
+    "current_services",
+    "set_default_services",
 ]

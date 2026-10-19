@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+Invocations run with process default services, as tracing uses OpenTelemetry's
+global provider:
+- Set them once at startup with `set_default_services(ExecutionServices(...))`.
+  Until then, the first invocation creates in-process ones (an in-memory event
+  store) and logs once that their events are lost on exit.
+- `assistant.invoke(...)` works without `GrafiRuntime` or `bind_services`. Those
+  still give one invocation other services, such as a tenant's store.
+- `current_services()` no longer raises outside a binding, unless
+  `GRAFI_STRICT_SERVICES` is set, which forbids the in-memory fallback.
+- `ExecutionServices.aclose()` (or `async with ExecutionServices(...)`) closes
+  the services at shutdown; `EventStore.aclose()` releases a store's resources,
+  such as `EventStorePostgres`'s connection pool.
+- `GrafiRuntime()` without services runs with the current services, no longer
+  with new in-process ones. So `ReActAgent.run()` keeps a conversation's
+  history across turns again. For a store of its own, as `GrafiRuntime()` gave
+  before, pass `GrafiRuntime(ExecutionServices())`.
+- An invocation uses the services current where `invoke()` is called, in every
+  layer, wherever its stream is read.
+
+`ReActAgent.run()` without an invoke context continues a conversation of the
+agent's own; before, every agent in a process shared one conversation id, the
+module constant `grafi.agents.react_agent.CONVERSATION_ID`, now removed. A
+server sharing an agent between users must pass an `InvokeContext` per user or
+session: otherwise their turns share one history, prompts included.
+
+`EventStorePostgres` connects lazily: constructing it does no I/O, and its
+first use creates the `events` table, under an advisory lock, so processes
+starting together do not race. It uses only the asyncpg driver; install it
+with `pip install 'grafi[postgres]'`. psycopg2 is no longer needed, and the
+sync `engine` attribute is gone (`async_engine` remains). A failure to reach
+the database or create the table, from `initialize()` or the first use, is an
+`EventPersistenceError`. `pool_timeout` now applies to the connection pool.
+
 Tracing is set up with a single call: `setup_tracing(project_name=...)`. It
 follows OpenTelemetry's standard environment (`OTEL_EXPORTER_OTLP_ENDPOINT`,
 `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`), returns the tracer

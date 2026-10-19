@@ -41,6 +41,7 @@ class Session:
 def store_with(session: Session) -> EventStorePostgres:
     store = EventStorePostgres.__new__(EventStorePostgres)  # No database.
     store.AsyncSession = lambda: session  # type: ignore[assignment]
+    store._table_ready = True
     return store
 
 

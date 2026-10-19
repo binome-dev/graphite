@@ -46,7 +46,7 @@ import uuid
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
 
-def main():
+async def main():
     user_input = "What is the capital of the United Kingdom"
 
     invoke_context = InvokeContext(
@@ -85,8 +85,8 @@ The node subscribes to the `agent_input_topic` (the root topic in Graphite), use
 ```python linenums="27"
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 
 
 agent_input_topic = InputTopic(name="agent_input_topic")
@@ -128,30 +128,26 @@ workflow = (
 
 ### 5. Workflow Execution
 
-With the `EventDrivenWorkflow` object created, we can invoke it by passing our `invoke_context` and a `List[Message]`. The workflow will execute and return the results, which we can then print. Save this complete code as `main.py`.
+With the `EventDrivenWorkflow` object created, we can invoke it with an input event carrying our `invoke_context` and `message`. The workflow streams its output events, whose messages we print. Save this complete code as `main.py`.
 
 ```python linenums="54"
-# Bind a runtime scope so the workflow's components can resolve their services
-# (event store / tracer / error reporter). ExecutionServices() uses in-process
-# defaults; pass a durable store/tracer in production.
-from grafi.runtime import bind_services, ExecutionServices
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
-with bind_services(ExecutionServices()):
-    async for result in workflow.invoke(
-        invoke_context,
-        [message]
-    ):
-        for output_message in result:
-            print("Output message:", output_message.content)
+input_event = PublishToTopicEvent(invoke_context=invoke_context, data=[message])
+async for event in workflow.invoke(input_event):
+    for output_message in event.data:
+        print("Output message:", output_message.content)
 ```
 
 ### 6. Entry Point
 
 Finally, add the standard Python entry point to run the main function when the script is executed directly.
 
-```python linenums="62"
+```python linenums="60"
+import asyncio
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 ```
 
 ## Running the Code

@@ -8,8 +8,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
 from grafi.tools.tool_factory import ToolFactory
 from grafi.topics.topic_types import TopicType
@@ -17,8 +16,7 @@ from grafi.topics.topic_types import TopicType
 # --------------------------------------------------------------------------- #
 #  Shared helpers / fixtures                                                  #
 # --------------------------------------------------------------------------- #
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 api_key = os.getenv(
     "ANTHROPIC_API_KEY",
     "",
@@ -222,15 +220,9 @@ async def test_claude_tool_with_chat_param_serialization() -> None:
 #  Run directly                              #
 # --------------------------------------------------------------------------- #
 
-with bind_services(runtime.services):
-    asyncio.run(test_claude_tool_with_chat_param())
-with bind_services(runtime.services):
-    asyncio.run(test_claude_tool_stream())
-with bind_services(runtime.services):
-    asyncio.run(test_claude_tool_async())
-with bind_services(runtime.services):
-    asyncio.run(test_llm_stream_node_claude())
-with bind_services(runtime.services):
-    asyncio.run(test_claude_tool_serialization())
-with bind_services(runtime.services):
-    asyncio.run(test_claude_tool_with_chat_param_serialization())
+asyncio.run(test_claude_tool_with_chat_param())
+asyncio.run(test_claude_tool_stream())
+asyncio.run(test_claude_tool_async())
+asyncio.run(test_llm_stream_node_claude())
+asyncio.run(test_claude_tool_serialization())
+asyncio.run(test_claude_tool_with_chat_param_serialization())

@@ -83,11 +83,13 @@ graph TD;
 ```
 
 ```python
+import asyncio
+
 from grafi.agents.react_agent import create_react_agent
 
 react_agent = create_react_agent()
 
-output = react_agent.run("What is agent framework called Graphite?")
+output = asyncio.run(react_agent.run("What is agent framework called Graphite?"))
 
 print(output)
 ```
@@ -110,6 +112,23 @@ For a typical business problem (e.g., purchasing a property), there’s usually 
 Graphite simplifies constructing these AI powered workflows, much like building with LEGO bricks. It offers businesses a straightforward way to automate complex tasks while integrating seamlessly into existing software development life cycles.
 
 ## Configuration & operations
+
+### Event store and tracing
+
+Set both once at startup; every invocation then uses them. Without this, events
+stay in memory and spans are not exported.
+
+```python
+from grafi.common.event_stores.event_store_postgres import EventStorePostgres  # pip install 'grafi[postgres]'
+from grafi.common.instrumentations.tracing import setup_tracing
+from grafi.runtime import ExecutionServices, set_default_services
+
+set_default_services(ExecutionServices(event_store=EventStorePostgres(db_url="postgresql://...")))
+setup_tracing(project_name="my-agent")
+```
+
+See [Runtime & Services](docs/docs/user-guide/runtime.md) and the
+[tracing guide](docs/docs/guide/configuring-integration-with-opentelemetry.md).
 
 ### Concurrency model
 
@@ -147,6 +166,7 @@ export GRAFI_ALLOW_PICKLE_DESERIALIZATION=true   # or call
 | `GRAFI_SPAN_DISABLE_PAYLOADS` | `false` | The older setting: when truthy, omit payloads from Graphite's own spans. |
 | `GRAFI_SPAN_MAX_PAYLOAD_CHARS` | `10000` | Max characters of a serialized payload attached to a span (`0` = unbounded). |
 | `GRAFI_ERROR_INCLUDE_TRACEBACK` | `true` | When falsy, omit tracebacks from persisted failed-event details. |
+| `GRAFI_STRICT_SERVICES` | `false` | When truthy, an invocation with no services set by `set_default_services(...)` or bound raises, instead of falling back to in-memory ones. |
 
 > Tracing and event payloads can contain prompts, tool arguments, and message
 > content. Use the controls above (and review your collector/database access) when

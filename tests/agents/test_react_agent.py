@@ -152,3 +152,23 @@ class TestReActAgentIntegration:
         assert agent1.name != agent2.name
         assert agent1.api_key != agent2.api_key
         assert agent1 is not agent2
+
+
+class TestConversation:
+    """run() without an invoke context continues the agent's own conversation:
+    its turns share history, which no other agent sees."""
+
+    def test_an_agents_turns_share_one_conversation(self):
+        agent = ReActAgent.builder().api_key("test").build()
+        first = agent.get_input("hello").invoke_context
+        second = agent.get_input("again").invoke_context
+        assert first.conversation_id == second.conversation_id
+        assert first.invoke_id != second.invoke_id
+
+    def test_each_agent_has_a_conversation_of_its_own(self):
+        one = ReActAgent.builder().api_key("test").build()
+        other = ReActAgent.builder().api_key("test").build()
+        assert (
+            one.get_input("hi").invoke_context.conversation_id
+            != other.get_input("hi").invoke_context.conversation_id
+        )

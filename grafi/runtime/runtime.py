@@ -1,10 +1,8 @@
-"""The execution runtime: composition root and invocation entry point.
+"""``GrafiRuntime``: run an assistant with a given set of services.
 
-``GrafiRuntime`` owns an :class:`ExecutionServices` and is the public way to run
-an assistant. ``invoke`` binds those services to the request scope and then
-drives the assistant's *unchanged* call chain; components resolve infrastructure
-through :func:`current_services`, so no ``invoke`` signature carries a
-``services`` parameter.
+Its ``invoke`` binds the services to the invocation and drives the assistant's
+unchanged call chain; components read them through :func:`current_services`,
+so no ``invoke`` signature carries a ``services`` parameter.
 """
 
 from __future__ import annotations
@@ -21,33 +19,33 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
+from grafi.runtime.execution_services import current_services
 
 if TYPE_CHECKING:
     from grafi.assistants.assistant_base import AssistantBase
 
 
 class GrafiRuntime:
-    """Holds runtime dependencies and runs assistants under a bound scope.
-
-    ``GrafiRuntime()`` uses the in-process :class:`ExecutionServices` defaults
-    (dev/test); production passes its own bundle, e.g.
-    ``GrafiRuntime(ExecutionServices(event_store=EventStorePostgres(...)))``.
+    """Runs assistants with its own services, such as a tenant's store:
+    ``GrafiRuntime(ExecutionServices(event_store=...))``. ``GrafiRuntime()`` runs
+    them with the current services: those bound, else the process default.
     """
 
     def __init__(self, services: Optional[ExecutionServices] = None) -> None:
-        self._services = services if services is not None else ExecutionServices()
+        self._services = services
 
     @property
     def services(self) -> ExecutionServices:
-        return self._services
+        return self._services or current_services()
 
-    async def invoke(
+    def invoke(
         self,
         assistant: "AssistantBase",
         input_data: PublishToTopicEvent,
         is_sequential: bool = False,
     ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Stream the assistant's output with this runtime's services bound.
+        """Stream the assistant's output with this runtime's services, resolved
+        where ``invoke`` is called.
 
         The services are bound around each read and the close (and inherited by
         tasks the stream starts), never in the caller's context between reads.
@@ -56,19 +54,27 @@ class GrafiRuntime:
         garbage collected, or at loop shutdown, which closes it together with
         the generators it reads and can log errors.
         """
-        # A generator's body runs in the context of whoever iterates it, so
-        # the services are bound around each step rather than across a yield.
-        stream = assistant.invoke(input_data, is_sequential)
+        services = self.services
+        with bind_services(services):
+            stream = assistant.invoke(input_data, is_sequential)
+        return _bound(services, stream)
 
-        async def close() -> None:
-            with bind_services(self._services):
-                await close_iterator(stream)
 
-        async with cleanup_on_exit(close):
-            while True:
-                with bind_services(self._services):
-                    try:
-                        event = await anext(stream)
-                    except StopAsyncIteration:
-                        return
-                yield event
+async def _bound(
+    services: ExecutionServices, stream: AsyncGenerator[ConsumeFromTopicEvent, None]
+) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    """``stream`` with ``services`` bound around each step: a generator's body
+    runs in the context of whoever iterates it, so not across a yield."""
+
+    async def close() -> None:
+        with bind_services(services):
+            await close_iterator(stream)
+
+    async with cleanup_on_exit(close):
+        while True:
+            with bind_services(services):
+                try:
+                    event = await anext(stream)
+                except StopAsyncIteration:
+                    return
+            yield event

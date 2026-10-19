@@ -48,6 +48,7 @@ from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.runtime.execution_services import ExecutionServices
+from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
 
 # The id every layer of one failure (tool, node, workflow, assistant) records,
@@ -105,10 +106,15 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
 
     def decorator(func: F) -> F:
         @functools.wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
-            # Resolved once: a later read may resume this generator in another
-            # task, whose context has no services bound.
-            services = current_services()
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
+            # Resolved at the call, and bound around every step: every layer of
+            # an invocation runs with the services where it was invoked,
+            # wherever, and in whichever task, its stream is read.
+            return recorded(current_services(), self, *args, **kwargs)
+
+        async def recorded(
+            services: ExecutionServices, self: Any, *args: Any, **kwargs: Any
+        ) -> AsyncGenerator:
             record = functools.partial(
                 _record_event, services, isolate=config.isolate_event_writes
             )
@@ -153,17 +159,17 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
                         SpanAttributes.INPUT_MIME_TYPE,
                     )
 
-                with _current(span):
+                with bind_services(services), _current(span):
                     stream = func(self, *args, **kwargs)
 
                 async def close_stream() -> None:
-                    with _current(span):
+                    with bind_services(services), _current(span):
                         await close_iterator(stream)
 
                 results: List[Any] = []
                 async with cleanup_on_exit(close_stream):
                     while True:
-                        with _current(span):
+                        with bind_services(services), _current(span):
                             try:
                                 result = await anext(stream)
                             except StopAsyncIteration:
@@ -252,10 +258,11 @@ async def _record_lifecycle_event(
 
 
 def _current(span: Span) -> AbstractContextManager[Span]:
-    """Make ``span`` current for one step of a component's stream.
+    """Make ``span`` current for one step of a component's stream, as its
+    services are bound for it.
 
-    A generator's body runs in the context of whoever iterates it, so a span
-    made current across a ``yield`` would stay current in the reader's context
+    A generator's body runs in the context of whoever iterates it, so neither
+    may be set across a ``yield``: it would stay set in the reader's context
     between reads, and for good if the stream were abandoned and closed from
     another task. Exceptions are recorded on the span by the wrapper.
     """

@@ -22,8 +22,6 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
-from grafi.runtime.execution_services import ExecutionServices
-from grafi.runtime.execution_services import bind_services
 from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -273,5 +271,4 @@ async def run_all_tests() -> None:
 
 
 if __name__ == "__main__":
-    with bind_services(ExecutionServices()):
-        asyncio.run(run_all_tests())
+    asyncio.run(run_all_tests())

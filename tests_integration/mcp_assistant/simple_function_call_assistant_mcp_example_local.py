@@ -6,8 +6,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StdioConnection
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
@@ -15,8 +14,7 @@ from tests_integration.function_call_assistant.simple_function_call_assistant im
 
 # Known issue: running on windows may cause asyncio error, due to the way subprocesses are handled. This is a known issue with the mcp library.
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -68,5 +66,4 @@ async def test_simple_function_call_assistant_with_mcp() -> None:
     assert len(await event_store.get_events()) == 24
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_simple_function_call_assistant_with_mcp())
+asyncio.run(test_simple_function_call_assistant_with_mcp())

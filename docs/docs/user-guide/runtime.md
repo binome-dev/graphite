@@ -1,173 +1,142 @@
-# Runtime & Dependency Injection
+# Runtime & Services
 
-Graphite uses explicit, **request-scoped dependency injection** for the live
-services an invocation needs — the event store, the tracer, and the error
-reporter. The application constructs these once at startup, hands them to a
-`GrafiRuntime`, and invokes assistants through it. There is no process-global
-service locator.
-
-> **Migration note.** Earlier versions used a global `container` singleton
-> (`container.register_event_store(...)`, `container.event_store`). That has been
-> removed. Construct a `GrafiRuntime` (or `GrafiRuntime()` for in-process
-> defaults) and invoke through it. See [Migrating from the container](#migrating-from-the-container).
-
-## Overview
-
-| Concept | What it is |
-|---------|------------|
-| `ExecutionServices` | An immutable bundle of the three runtime dependencies (`event_store`, `tracer`, `error_reporter`). Not serializable. |
-| `GrafiRuntime` | The composition root. Owns one `ExecutionServices` and exposes `invoke(...)`. |
-| `current_services()` | Resolves the services bound for the current invocation (used inside the framework). |
-| `bind_services(...)` | Context manager that binds an `ExecutionServices` to the current scope. |
-
-The two halves are kept strictly separate:
-
-- **Request metadata** (`InvokeContext`: conversation/invoke/assistant-request ids)
-  is serializable and is persisted into every event.
-- **Runtime services** (`ExecutionServices`) are live infrastructure and are
-  **never** serialized into an event, a manifest, or an `InvokeContext`.
-
-## `ExecutionServices`
-
-`ExecutionServices` is a frozen dataclass. Every field has an in-process default,
-so `ExecutionServices()` is a ready dev/test bundle, and any field can be
-overridden with a normal keyword:
+Every invocation runs with three live services: an event store, a tracer and
+an error reporter. You set them once at startup, as you set up tracing, and
+then build and run assistants like any other object:
 
 ```python
-from grafi.runtime import ExecutionServices
+from grafi.runtime import ExecutionServices, set_default_services
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
+from grafi.common.instrumentations.tracing import setup_tracing
 
-# All in-process defaults (in-memory store, global tracer, Loguru error reporter).
-services = ExecutionServices()
-
-# Override only what you need; the rest keep their defaults.
-services = ExecutionServices(event_store=EventStorePostgres(db_url="postgresql://..."))
-```
-
-| Field | Default | Notes |
-|-------|---------|-------|
-| `event_store` | `EventStoreInMemory()` | In-memory is lost on exit — pass a durable store in production. |
-| `tracer` | OpenTelemetry's global tracer | A no-op until a tracer provider is set, by [`setup_tracing`](../guide/configuring-integration-with-opentelemetry.md) or your application. |
-| `error_reporter` | `ErrorReporter()` | Logs one concise line per failure via Loguru. |
-
-It is immutable, exposes no `to_dict`/`model_dump`, and its `repr` hides the
-dependencies so a stray log line can't leak a database URL.
-
-## `GrafiRuntime`
-
-`GrafiRuntime` owns an `ExecutionServices` and is the way to run an assistant.
-`GrafiRuntime()` uses the defaults; production passes its own bundle:
-
-```python
-from grafi.runtime import GrafiRuntime, ExecutionServices
-from grafi.common.event_stores.event_store_postgres import EventStorePostgres
-
-# Local / tests
-runtime = GrafiRuntime()
-
-# Production: a durable store; setup_tracing() exports the spans
-runtime = GrafiRuntime(
-    ExecutionServices(
-        event_store=EventStorePostgres(db_url="postgresql://user:pass@host/db"),
-    )
+# At startup: a durable event store, and spans exported over OTLP.
+set_default_services(
+    ExecutionServices(event_store=EventStorePostgres(db_url="postgresql://user:pass@host/db"))
 )
-```
+setup_tracing(project_name="my-agent")
 
-### Running an assistant
-
-```python
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-
-input_data = PublishToTopicEvent(invoke_context=invoke_context, data=messages)
-
-async for event in runtime.invoke(assistant, input_data):
+# Anywhere after: run an assistant.
+async for event in assistant.invoke(input_event):
     print(event)
 ```
 
-`runtime.invoke(...)` binds its services while the assistant's stream runs
-(each read, and its close) and in the tasks it starts; components resolve them
-through `current_services()`. Your own code between reads keeps its own
-binding: to call a component there, use `bind_services(runtime.services)`. **No `invoke()` signature
-carries a `services` parameter** — tools, nodes, and commands are unchanged.
+During development, skip the setup: the first invocation creates in-process
+services, with an in-memory event store, and logs once that its events are
+lost on exit. That store keeps every event until then, so a long-running
+service sets a durable one. To make sure production never falls back to it,
+set `GRAFI_STRICT_SERVICES=true`: an invocation with no services set or bound
+then raises instead.
 
-Reuse one runtime across calls when you want shared conversation history (a
-shared event store):
-
-```python
-runtime = GrafiRuntime(ExecutionServices(event_store=shared_store))
-await consume(runtime.invoke(assistant, first_turn))
-await consume(runtime.invoke(assistant, second_turn))   # sees the first turn's history
-```
-
-### Running an agent
-
-`ReActAgent.run()` / `a_run()` run through a runtime too. By default they create
-an in-process runtime; pass `runtime=` to share a store/tracer:
+At shutdown, close the services: `await services.aclose()` releases what they
+hold, such as the event store's connection pool. Or use them as a context:
 
 ```python
-agent = create_react_agent()
-
-answer = await agent.run("What is Graphite?")                 # default runtime
-answer = await agent.run("...", runtime=production_runtime)    # shared/durable
+async with ExecutionServices(event_store=EventStorePostgres(db_url=...)) as services:
+    set_default_services(services)
+    await serve()  # The application's lifetime.
 ```
 
-## Binding a scope directly
+Spans need nothing at shutdown: the tracer provider flushes them when the
+process exits normally.
 
-The public entry point is `runtime.invoke(...)`. If you call a component's
-`invoke(...)` directly (tests, advanced use), wrap it in `bind_services(...)`
-so `current_services()` resolves:
+## `ExecutionServices`
+
+A frozen dataclass of the three services. Each field has a default, so pass
+only what you need:
+
+| Field | Default | Notes |
+|-------|---------|-------|
+| `event_store` | `EventStoreInMemory()` | Lost on exit. Pass a durable store, such as `EventStorePostgres`, in production. |
+| `tracer` | OpenTelemetry's global tracer | A no-op until a tracer provider is set, by [`setup_tracing`](../guide/configuring-integration-with-opentelemetry.md) or your application. |
+| `error_reporter` | `ErrorReporter()` | Logs one concise line per failure via Loguru. |
+
+Services are live infrastructure, kept apart from request metadata: the
+serializable `InvokeContext` goes into every event, while `ExecutionServices`
+has no serialization at all. Its `repr` hides the services, so a stray log
+line cannot leak a database URL.
+
+## Which services an invocation uses
+
+Components read the services through `current_services()`, so no `invoke()`
+signature carries them. Each layer reads them when it is invoked, so an
+invocation runs with the services current where `invoke()` was called, wherever
+its stream is then read. They are, in order:
+
+1. The services bound for the invocation, by `bind_services(...)` or a
+   `GrafiRuntime` with services of its own.
+2. Otherwise, the process default: the services given to
+   `set_default_services(...)`, else in-process ones created on first use.
+
+Most applications only ever set the default. Bind other services where one
+process serves several stores, such as one per tenant:
 
 ```python
-from grafi.runtime import bind_services, ExecutionServices
+from grafi.runtime import ExecutionServices, GrafiRuntime, bind_services
 
-with bind_services(ExecutionServices(event_store=store)):
-    async for event in assistant.invoke(input_data):
-        ...
+tenant = ExecutionServices(event_store=tenant_store)
+
+async for event in GrafiRuntime(tenant).invoke(assistant, input_event):
+    ...
+
+with bind_services(tenant):  # The same, for any component called inside.
+    ...
 ```
 
-Outside any bound scope, `current_services()` raises a clear `RuntimeError`
-rather than silently constructing a default — so a forgotten runtime fails loudly.
+`GrafiRuntime()` without services runs with the current ones. That is how
+`ReActAgent.run()` runs by default, so successive turns share one event store
+and see each other's history. Without an invoke context, each agent continues
+a conversation of its own; a server passes an `InvokeContext` per user or
+session.
 
-### How propagation works
+A binding holds in the context that made it, and in the `asyncio` tasks
+started there, which copy their context: an invocation's coordinator and step
+tasks inherit it. Work handed to a thread with `run_in_executor()` or
+`threading.Thread` must bind the services again; `asyncio.to_thread()` copies
+the context, so it needs nothing. A server that binds services per tenant
+should leave the process default unset and set `GRAFI_STRICT_SERVICES=true`:
+a binding lost on the way then raises, rather than writing to a default store.
 
-`bind_services` sets a `ContextVar` for the block. Because `asyncio` tasks copy
-the current context when created, the run's coordinator and every step task
-spawned during the invocation inherit the binding automatically.
-Concurrent invocations run as separate tasks, so each gets its own services with
-no cross-talk — genuine per-invocation isolation. (This relies on `asyncio`
-context propagation; Graphite uses no thread offloads. Code that hands work to a
-thread does not get the context, except through `asyncio.to_thread()`, which
-copies it: code run with `run_in_executor()` or `threading.Thread` must re-bind
-the services explicitly.)
+Run the application in one event loop (one `asyncio.run(...)`): a durable
+store's pooled connections belong to the loop that opened them.
+
+## Testing
+
+Give each test services of its own, so tests never share a store through the
+process default:
+
+```python
+import pytest
+from grafi.runtime import ExecutionServices, bind_services
+
+@pytest.fixture(autouse=True)
+def services():
+    with bind_services(ExecutionServices()) as services:
+        yield services
+```
 
 ## Custom error reporting
 
-`ErrorReporter` logs one concise, id-bearing line per failure (the full
-structured record — cause chain, traceback, component fields — is persisted to
-the event store, so the log only points at it). Subclass it to route errors
-elsewhere; it must not raise:
+`ErrorReporter` logs one concise, id-bearing line per failure. The full record
+(cause chain, traceback, component fields) is in the event store, and the log
+line points to it. Subclass it to route errors elsewhere; `report` must not
+raise:
 
 ```python
-from grafi.runtime import ErrorReporter, ExecutionServices, GrafiRuntime
+from grafi.runtime import ErrorReporter, ExecutionServices, set_default_services
 
 class SentryErrorReporter(ErrorReporter):
     def report(self, message: str, *, level: str = "error") -> None:
-        super().report(message, level=level)  # keep the log line
+        super().report(message, level=level)  # Keep the log line.
         sentry_sdk.capture_message(message, level=level)
 
-runtime = GrafiRuntime(ExecutionServices(error_reporter=SentryErrorReporter()))
+set_default_services(ExecutionServices(error_reporter=SentryErrorReporter()))
 ```
 
-## Migrating from the container
+## Migrating
 
-| Old (`container`) | New |
-|-------------------|-----|
-| `container.register_event_store(store)` | `GrafiRuntime(ExecutionServices(event_store=store))` |
-| `container.register_tracer(tracer)` | `GrafiRuntime(ExecutionServices(tracer=tracer))` |
-| `container.event_store` (inside the framework) | `current_services().event_store` |
-| `assistant.invoke(input)` | `runtime.invoke(assistant, input)` |
-| `AssistantBaseBuilder.event_store(...)` | removed — pass via `ExecutionServices` |
-
-`SingletonMeta`, `Container`, the global `container`, `register_event_store`,
-`register_tracer`, and the assistant builder's `event_store(...)` are all
-removed.
+| Before | Now |
+|--------|-----|
+| `container.register_event_store(store)` | `set_default_services(ExecutionServices(event_store=store))` |
+| `container.register_tracer(tracer)` | `setup_tracing(...)`, or `ExecutionServices(tracer=tracer)` |
+| `container.event_store` | `current_services().event_store` |
+| `with bind_services(runtime.services):` around a whole program | Nothing: the process default applies |

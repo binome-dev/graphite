@@ -350,13 +350,9 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import StreamableHttpConnection
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime, ExecutionServices
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
 from assistant import StockAssistant
-
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
 
 async def create_assistant():
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -395,12 +391,12 @@ async def main():
     input_data = [Message(role="user", content=question)]
 
     publish_event = PublishToTopicEvent(
-        invoke_context=execution_context, data=input_messages
+        invoke_context=invoke_context, data=input_data
     )
 
-    async for response in runtime.invoke(assistant, publish_event):
+    async for response in assistant.invoke(publish_event):
         print("Assistant output:")
-        for output in response:
+        for output in response.data:
             print(output.content)
 
     return assistant
@@ -533,8 +529,7 @@ Topics can have conditions attached to them to trigger them, in the case of `Inp
 When you call the assistant's `invoke()` method from `main.py`
 
 ```python
-
-async for output in assistant.invoke(invoke_context, input_data):
+async for output in assistant.invoke(publish_event):
 ```
 
 The `input_data` gets published on the assistants `InputTopic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/0b6b666b6f0e122ac970f437ee24f5d87c30a81a/grafi/workflows/impl/event_driven_workflow.py#L681-L687) but we are outlying it here so you can follow the flow of data.
@@ -640,7 +635,7 @@ This is the reason why when we declare the topic `mcp_tool_call_topic` we add a 
 
 You now have the capability to route to MCP server of your choosing and under whichever condition you want. In our case since we are only doing company overviews, whenever we ask.
 
-```python
+```text
 question = "What is the overview of the company Tesla?"
 
 Assistant output:
@@ -657,7 +652,7 @@ Assistant output:
 It will be routed to our MCP Server, but if we ask it about something not related to company overviews it will respond with OpenAI training data.
 
 
-```python
+```text
 question = "When was the last crusade?"
 
 Assistant output:

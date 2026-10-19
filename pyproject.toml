@@ -19,6 +19,12 @@ dependencies = [
     "anyio>=4.14.0",
 ]
 
+[project.optional-dependencies]
+postgres = [
+    "asyncpg>=0.31.0",
+    "sqlalchemy[asyncio]>=2.0.51",
+]
+
 [dependency-groups]
 dev = [
     "anthropic>=0.109.2",
@@ -37,13 +43,12 @@ dev = [
     "mypy>=2.1.0",
     "ollama>=0.6.2",
     "pre-commit>=4.6.0",
-    "psycopg2-binary>=2.9.12",
     "asyncpg>=0.31.0",
     "pycountry>=26.2.16",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.15.17",
-    "sqlalchemy>=2.0.51",
+    "sqlalchemy[asyncio]>=2.0.51",
     "tavily-python>=0.7.26",
 ]
 docs = [

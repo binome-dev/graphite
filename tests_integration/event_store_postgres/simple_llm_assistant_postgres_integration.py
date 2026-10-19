@@ -4,17 +4,13 @@ import asyncio
 import os
 import uuid
 
-from opentelemetry.trace import NoOpTracer
-
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import ErrorReporter
-from grafi.runtime.execution_services import ExecutionServices
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import ExecutionServices
+from grafi.runtime import set_default_services
 from tests_integration.event_store_postgres.simple_llm_assistant import (
     SimpleLLMAssistant,
 )
@@ -42,14 +38,9 @@ postgres_event_store = EventStorePostgres(
     db_url="postgresql://user:password@localhost:5432/grafi_test_db",
 )
 
-runtime = GrafiRuntime(
-    ExecutionServices(
-        event_store=postgres_event_store,
-        tracer=NoOpTracer(),
-        error_reporter=ErrorReporter(),
-    )
-)
-event_store = runtime.services.event_store
+# Every invocation in this process records its events in Postgres.
+set_default_services(ExecutionServices(event_store=postgres_event_store))
+event_store = postgres_event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -119,5 +110,4 @@ async def test_simple_llm_assistant() -> None:
     assert len(await event_store.get_conversation_events(conversation_id)) == 24
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_simple_llm_assistant())
+asyncio.run(test_simple_llm_assistant())

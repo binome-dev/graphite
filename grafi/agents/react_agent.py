@@ -7,6 +7,7 @@ from typing import Self
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
+from pydantic import PrivateAttr
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
@@ -38,8 +39,6 @@ selecting search tool if necessary.
 Response in a concise and clear manner, ensuring that your answers are accurate and relevant to the user's query.
 """
 
-CONVERSATION_ID = uuid.uuid4().hex
-
 
 class ReActAgent(Assistant):
     oi_span_type: OpenInferenceSpanKindValues = Field(
@@ -58,6 +57,9 @@ class ReActAgent(Assistant):
         .build()
     )
     model: str = Field(default="gpt-4o-mini")
+    # The conversation run() continues when given no invoke context: this
+    # agent's own. A server passes an InvokeContext per user or session.
+    _conversation_id: str = PrivateAttr(default_factory=lambda: uuid.uuid4().hex)
 
     @classmethod
     def builder(cls) -> "ReActAgentBuilder":
@@ -127,7 +129,7 @@ class ReActAgent(Assistant):
                 "Creating new InvokeContext with default conversation id for ReActAgent"
             )
             invoke_context = InvokeContext(
-                conversation_id=CONVERSATION_ID,
+                conversation_id=self._conversation_id,
                 invoke_id=uuid.uuid4().hex,
                 assistant_request_id=uuid.uuid4().hex,
             )
@@ -151,9 +153,8 @@ class ReActAgent(Assistant):
         invoke_context: Optional[InvokeContext] = None,
         runtime: Optional[GrafiRuntime] = None,
     ) -> str:
-        # Run through the runtime, which binds the services scope. Pass a shared
-        # ``runtime`` to reuse a store/tracer across calls; otherwise a default
-        # in-process runtime is used for this call.
+        # Without a runtime, the current services: the process default unless
+        # others are bound. Every turn of a conversation then shares its store.
         runtime = runtime or GrafiRuntime()
         output = await async_func_wrapper(
             runtime.invoke(self, self.get_input(question, invoke_context))

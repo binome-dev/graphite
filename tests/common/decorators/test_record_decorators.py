@@ -306,3 +306,35 @@ async def test_failing_to_record_a_failure_never_replaces_it():
 
     assert [level for level, _ in reporter.reports] == ["warning"]
     assert "cannot describe the failure" in raised.value.__notes__[0]
+
+
+class _QuietNode:
+    """Node-shaped: runs the quiet tool inside its own invocation."""
+
+    node_id = "quiet-node"
+    name = "QuietNode"
+    type = "Node"
+    oi_span_type = SimpleNamespace(value="CHAIN")
+    _subscribed_topics: dict = {}
+    publish_to: list = []
+
+    @record_node_invoke
+    async def invoke(self, invoke_context, input_data):
+        async for _ in _QuietTool().invoke(invoke_context, []):
+            pass
+        return
+        yield  # pragma: no cover - makes this an async generator
+
+
+@pytest.mark.asyncio
+async def test_a_stream_runs_with_the_services_where_it_was_made(bound_services):
+    # Made under one binding, read under another, as a web framework may read a
+    # returned stream: every layer records where the stream was made.
+    elsewhere = ExecutionServices()
+    with bind_services(elsewhere):
+        stream = _QuietNode().invoke(_CONTEXT, [])
+    async for _ in stream:
+        pass
+
+    assert len(await elsewhere.event_store.get_events()) == 4  # Node and tool.
+    assert await bound_services.event_store.get_events() == []

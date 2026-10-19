@@ -11,8 +11,7 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.runtime import GrafiRuntime
-from grafi.runtime.execution_services import bind_services
+from grafi.runtime import current_services
 from grafi.tools.function_calls.impl.synthetic_tool import SyntheticTool
 from tests_integration.function_call_assistant.simple_function_call_assistant import (
     SimpleFunctionCallAssistant,
@@ -70,8 +69,7 @@ SYNTHETIC_WEATHER_SYSTEM_PROMPT = """You are a helpful weather assistant with ac
     today=datetime.now().strftime("%Y-%m-%d")
 )
 
-runtime = GrafiRuntime()
-event_store = runtime.services.event_store
+event_store = current_services().event_store
 
 api_key = os.getenv("OPENAI_API_KEY", "")
 
@@ -130,5 +128,4 @@ async def test_simple_function_call_assistant_with_synthetic_weather_tool() -> N
     assert len(await event_store.get_events()) == 24
 
 
-with bind_services(runtime.services):
-    asyncio.run(test_simple_function_call_assistant_with_synthetic_weather_tool())
+asyncio.run(test_simple_function_call_assistant_with_synthetic_weather_tool())
