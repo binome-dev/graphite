@@ -11,7 +11,7 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `name`             | Descriptive identifier (defaults to `"FunctionCallTool"`).                                       |
 | `type`             | Tool type (defaults to `"FunctionCallTool"`).                                                    |
 | `function_specs`   | List of `FunctionSpec` objects describing registered functions and their parameters.          |
-| `functions`        | Dictionary mapping function names to their callable implementations.                           |
+| `functions`        | Dictionary mapping function names to their callable implementations. A tool saves only the functions its class does not define, by import path; its `@llm_function` methods load with its class. |
 | `on_error`         | `"return"` (default) answers a failed call with its error; `"raise"` fails the node with `FunctionCallException` instead. |
 | `oi_span_type`     | Semantic tracing attribute (`TOOL`) for observability.                                        |
 
@@ -24,7 +24,7 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `get_function_specs` | Retrieves detailed metadata about registered functions (including parameter info), enabling structured LLM-based function calls. |
 | `invoke`          | Answers every tool call in its input messages, concurrently, and yields one batch: one `role="tool"` message per call, in the calls' order. |
 | `call_function`   | `async`: calls one function with the LLM's arguments, validated against its signature, and returns what it returns, a value or a generator; a sync function runs in a worker thread. Override it to call functions elsewhere, as the MCP, agent-calling and synthetic tools do. |
-| `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
+| `model_dump(mode="json")` | Saves the tool as data: its class, and the functions given to it, by import path; its `function_specs` follow from its functions. See [Manifests](../manifests.md). |
 
 ## LLM Function Decorator
 
@@ -153,7 +153,7 @@ class WeatherMock(FunctionCallTool):
 |-----------------|------------------------------------------------------------------------------------------------------------------|
 | `name`          | Descriptive identifier for the tool (default: `"TavilyTool"`).                                                   |
 | `type`          | Tool type indicator (default: `"TavilyTool"`).                                                                   |
-| `client`        | Instance of the `TavilyClient` used for performing search queries.                                               |
+| `api_key`       | Tavily API key (defaults to the `TAVILY_API_KEY` environment variable; saved as `{"env": "TAVILY_API_KEY"}`). The `client` property creates the `TavilyClient` with it when first used. |
 | `search_depth`  | Defines the search mode (either `"basic"` or `"advanced"`) for Tavily.                                           |
 | `max_tokens`    | Limits the total size (in tokens) of the returned JSON string, preventing overly large responses.                |
 
@@ -161,8 +161,7 @@ class WeatherMock(FunctionCallTool):
 
 ```python
 tavily_tool = (
-    TavilyTool.builder()
-    .api_key("YOUR_API_KEY")
+    TavilyTool.builder()  # The key is read from TAVILY_API_KEY.
     .search_depth("advanced")
     .max_tokens(6000)
     .build()
@@ -255,11 +254,11 @@ google_tool = (
 |---------------------|---------------------------------------------------------------------------------|
 | `name`              | Tool identifier (default: `"MCPTool"`).                                        |
 | `type`              | Tool type (default: `"MCPTool"`).                                              |
-| `mcp_config`        | Configuration dictionary for MCP server connections.                           |
+| `mcp_config`        | Configuration dictionary for MCP server connections. A header or environment variable that holds a secret refers to a variable, as `"Bearer ${GITHUB_TOKEN}"`, expanded when connecting. |
 | `resources`         | List of available MCP resources.                                               |
 | `prompts`           | List of available MCP prompts.                                                 |
 
-This tool automatically discovers available functions from connected MCP servers and makes them available for LLM function calling.
+This tool automatically discovers available functions from connected MCP servers and makes them available for LLM function calling. It is saved with them, so loading it does not connect.
 
 ## Agent Calling Tool
 
@@ -274,7 +273,7 @@ This tool automatically discovers available functions from connected MCP servers
 | `agent_name`          | Name of the agent to call; also used as the tool's name.                                                            |
 | `agent_description`    | High-level explanation of what the agent does, used to generate function specs.                                    |
 | `argument_description` | Describes the argument required (e.g., `prompt`) for the agent call.                                               |
-| `agent_call`          | A callable that takes `(invoke_context, Message)` and returns a dictionary (e.g., `{"content": ...}`).           |
+| `agent_call`          | A callable that takes `(invoke_context, Message)` and returns a dictionary (e.g., `{"content": ...}`). Saved by import path. |
 | `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
 
 **Methods**:
@@ -283,7 +282,6 @@ This tool automatically discovers available functions from connected MCP servers
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `get_function_specs` | Returns the function specification (name, description, parameters) for the agent call.                                                                                                                  |
 | `call_function` | Passes the call's `prompt` to `agent_call`, and returns the `content` of its answer; `invoke`, inherited from `FunctionCallTool`, makes it a tool message. |
-| `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
 
 **Workflow Example**:
 
@@ -311,10 +309,10 @@ By integrating `AgentCallingTool` into your event-driven workflow, you can build
 | `type`                | Tool type indicator, defaults to `"SyntheticTool"`.                                                                 |
 | `tool_name`           | Name used for function registration and LLM tool calls.                                                             |
 | `description`         | Explanation of what synthetic data this tool generates.                                                             |
-| `input_model`         | Pydantic `BaseModel` class or JSON schema dict defining expected input structure.                                   |
-| `output_model`        | Pydantic `BaseModel` class or JSON schema dict defining generated output structure.                                 |
+| `input_model`         | Pydantic `BaseModel` class (saved by import path) or JSON schema dict defining expected input structure.            |
+| `output_model`        | Pydantic `BaseModel` class (saved by import path) or JSON schema dict defining generated output structure.          |
 | `model`               | OpenAI model to use for data generation (e.g., `"gpt-4o-mini"`).                                                    |
-| `openai_api_key`      | API key for OpenAI authentication.                                                                                  |
+| `openai_api_key`      | API key for OpenAI authentication (defaults to the `OPENAI_API_KEY` environment variable; saved as a reference to it). |
 | `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
 
 **Methods**:
@@ -324,7 +322,6 @@ By integrating `AgentCallingTool` into your event-driven workflow, you can build
 | `get_function_specs` | Returns the function specification (name, description, input schema) for the synthetic. tool                                                                                                                  |
 | `call_function` | Generates the tool's output for a call's arguments with an LLM, as schema-compliant JSON; `invoke`, inherited from `FunctionCallTool`, makes it a tool message. |
 | `ensure_strict_schema`   | Static method that recursively adds `additionalProperties: false` to JSON schemas for OpenAI strict mode compatibility.                                                                                                                 |
-| `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
 
 **Workflow Example**:
 

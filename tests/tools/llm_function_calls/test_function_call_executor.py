@@ -351,7 +351,17 @@ async def test_the_builder_adds_functions_beside_the_classs_own():
         tool, [_calls(("a", "forecast", {"city": "Lyon"}), ("b", "extra", {}))]
     )
     assert (forecast.content, added.content) == ("sunny in Lyon", "extra")
-    assert list(tool.to_dict()["functions"]) == ["extra"]
+    # Saved: the function added, by reference; the class's own load with it.
+    data = tool.model_dump(mode="json")
+    assert data["functions"] == {"extra": {"ref": f"{__name__}:extra"}}
+    restored = FunctionCallTool.model_validate(data)
+    assert type(restored) is WeatherTool
+    assert restored.functions == {
+        "forecast": WeatherTool.forecast,
+        "report": WeatherTool.report,
+        "extra": extra,
+    }
+    assert restored.function_specs == tool.function_specs
 
 
 def test_an_agent_calling_tool_rebuilt_from_its_fields_keeps_one_spec():
@@ -645,7 +655,9 @@ async def test_the_builder_replaces_a_function_of_the_same_name():
         return f"rain in {city}"
 
     tool = WeatherTool.builder().function(forecast).build()
-    assert [spec.name for spec in tool.function_specs] == ["report", "forecast"]
-    assert tool.function_specs[1].description == "Tomorrow's weather, from elsewhere."
+    # In the class's place, offered once, with the new function's spec.
+    assert [spec.name for spec in tool.function_specs] == ["forecast", "report"]
+    assert tool.function_specs[0].description == "Tomorrow's weather, from elsewhere."
+    assert tool.functions["forecast"] is forecast
     [result] = await _results(tool, [_calls(("a", "forecast", {"city": "Rome"}))])
     assert result.content == "rain in Rome"

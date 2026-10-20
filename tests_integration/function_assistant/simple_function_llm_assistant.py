@@ -1,13 +1,17 @@
-import os
 from typing import Callable
 from typing import Optional
 from typing import Self
+from typing import Type
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import BaseModel
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.callable_ref import CallableRef
+from grafi.common.manifest import ModelRef
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -17,7 +21,7 @@ from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
-OutputType = type
+OutputType = Type[BaseModel]
 
 
 class SimpleFunctionLLMAssistant(Assistant):
@@ -41,10 +45,11 @@ class SimpleFunctionLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleFunctionLLMAssistant")
     type: str = Field(default="SimpleFunctionLLMAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     model: str = Field(default="gpt-4o-mini")
-    output_format: OutputType
-    function: Callable
+    # Saved by import path, so a manifest loads them back.
+    output_format: ModelRef[OutputType]
+    function: CallableRef
 
     @classmethod
     def builder(cls) -> "SimpleFunctionLLMAssistantBuilder":

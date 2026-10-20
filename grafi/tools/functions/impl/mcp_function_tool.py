@@ -11,6 +11,8 @@ from pydantic import PrivateAttr
 
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.mcp_connections import Connection
+from grafi.common.models.mcp_connections import MCPConfig
+from grafi.common.models.mcp_connections import with_env
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.impl.mcp_tool import content_text
 from grafi.tools.functions.function_tool import FunctionTool
@@ -29,24 +31,33 @@ except (ImportError, ModuleNotFoundError):
 
 
 class MCPFunctionTool(FunctionTool):
-    """
-    MCPFunctionTool extends FunctionTool to provide functionality using the MCP API.
+    """A tool that calls one tool of an MCP server, with the arguments the last
+    message holds, as JSON.
+
+    Building one (``await MCPFunctionTool.builder()...build()``) checks the
+    server has the tool, and, when no ``function_name`` is given, takes its
+    first. It is saved with its server and tool, so loading one does not
+    connect. A secret in ``mcp_config`` is given as a reference to an
+    environment variable, ``"${VAR}"`` (see
+    :mod:`grafi.common.models.mcp_connections`).
     """
 
-    # Class attributes for MCPFunctionTool configuration and behavior
     name: str = "MCPFunctionTool"
     type: str = "MCPFunctionTool"
 
-    mcp_config: Dict[str, Any] = Field(default_factory=dict)
+    mcp_config: MCPConfig = Field(default_factory=dict)
 
-    # Set by initialize(), to invoke_mcp_function.
+    # Always invoke_mcp_function, so never saved.
     function: Optional[Callable[[Messages], Awaitable[str]]] = Field(  # type: ignore[assignment]
-        default=None
+        default=None, exclude=True, repr=False
     )
 
     function_name: str = Field(default="")
 
     _function_spec: Optional[FunctionSpec] = PrivateAttr(default=None)
+
+    def model_post_init(self, _context: Any) -> None:
+        self.function = self.invoke_mcp_function
 
     @classmethod
     async def initialize(cls, **kwargs: Any) -> "MCPFunctionTool":
@@ -54,7 +65,6 @@ class MCPFunctionTool(FunctionTool):
         Initialize the MCPFunctionTool with the given keyword arguments.
         """
         mcp_tool = cls(**kwargs)
-        mcp_tool.function = mcp_tool.invoke_mcp_function
         await mcp_tool._get_function_spec()
 
         return mcp_tool
@@ -72,7 +82,7 @@ class MCPFunctionTool(FunctionTool):
 
         all_tools: list[Tool] = []
 
-        async with Client(self.mcp_config) as client:
+        async with Client(with_env(self.mcp_config)) as client:
             all_tools.extend(await client.list_tools())
 
         matching_tools = [
@@ -102,48 +112,9 @@ class MCPFunctionTool(FunctionTool):
         """Call the MCP tool with the arguments the last message holds, as
         JSON, and return its result as text."""
         kwargs = json.loads(cast(str, input_data[-1].content))
-        async with Client(self.mcp_config) as client:
+        async with Client(with_env(self.mcp_config)) as client:
             result: CallToolResult = await client.call_tool(self.function_name, kwargs)
         return content_text(result.content)
-
-    def _serialize_function(self) -> None:
-        # The MCP callable is reconstructed from mcp_config + function_name on
-        # load, so it is not serialized into the manifest.
-        return None
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "mcp_config": self.mcp_config,
-            "function_name": self.function_name,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "MCPFunctionTool":
-        """
-        Create an MCPFunctionTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the MCPFunctionTool.
-
-        Returns:
-            MCPFunctionTool: An MCPFunctionTool instance created from the dictionary.
-
-        Note:
-            This method cannot fully reconstruct the MCP connections.
-            The tool needs to be re-initialized with proper MCP configuration.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            await cls.builder()
-            .name(data.get("name", "MCPFunctionTool"))
-            .type(data.get("type", "MCPFunctionTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .connections(data.get("mcp_config", {}).get("mcpServers", {}))
-            .function_name(data.get("function_name", ""))
-            .build()
-        )
 
 
 class MCPFunctionToolBuilder(FunctionToolBuilder[MCPFunctionTool]):

@@ -94,7 +94,7 @@ async def test_react_assistant() -> None:
 
     # assistant.generate_manifest()
 
-    # events_data = [event.to_dict() for event in event_store.get_events()]
+    # events_data = [default_event_codec.encode(event) for event in event_store.get_events()]
     # with open("events.json", "w") as f:
     #     json.dump(events_data, f, indent=4)
     # print(f"Saved  events to events.json")

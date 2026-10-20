@@ -1,168 +1,232 @@
 {
-    "assistant_id": "969dc890586048808c9ef074d942a104",
+  "apiVersion": "grafi/v2",
+  "kind": "Assistant",
+  "spec": {
+    "class": "tests_integration.function_call_assistant.simple_function_call_assistant:SimpleFunctionCallAssistant",
+    "assistant_id": "98a8dbfd10524c8db8f29554b060e066",
     "name": "MCPAssistant",
     "type": "SimpleFunctionCallAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "63f890924e6a4bc7ac60046f5d3185e5",
-        "name": "simple_function_call_workflow",
-        "type": "EventDrivenWorkflow",
-        "oi_span_type": "AGENT",
-        "nodes": {
-            "OpenAIInputNode": {
-                "class": "Node",
-                "node_id": "f05c99f76739498e821d5ccb24b096c4",
-                "name": "OpenAIInputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "5d8c3e3a1f094c99afff43d5e562c58a",
-                    "name": "UserInputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "agent_input_topic"
-                    }
-                ],
-                "publish_to": [
-                    "function_call_topic",
-                    "agent_output_topic"
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                }
+      "class": "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow",
+      "oi_span_type": "AGENT",
+      "workflow_id": "c4698049d286415ba2fa27ca72b61ed8",
+      "name": "simple_function_call_workflow",
+      "type": "EventDrivenWorkflow",
+      "nodes": {
+        "OpenAIInputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "06d74dc8f77e4839a852557854e96575",
+          "name": "OpenAIInputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "421fb660089c4ee4a1eaabebba06ed47",
+            "name": "UserInputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "FunctionCallNode": {
-                "class": "Node",
-                "node_id": "4eff51ad47344a38a434c605bf630556",
-                "name": "FunctionCallNode",
-                "type": "FunctionCallNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "MCPTool",
-                    "base_class": "FunctionCallTool",
-                    "tool_id": "8924fa0f628440e3b0f0376df723d896",
-                    "name": "MCPTool",
-                    "type": "MCPTool",
-                    "oi_span_type": "TOOL",
-                    "function_specs": [
-                        {
-                            "name": "hello",
-                            "description": "",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "description": ""
-                                    }
-                                },
-                                "required": [
-                                    "name"
-                                ]
-                            }
-                        }
-                    ],
-                    "functions": {},
-                    "mcp_config": {
-                        "mcpServers": {
-                            "hello": {
-                                "url": "http://localhost:8000/mcp/",
-                                "transport": "http"
-                            }
-                        }
-                    },
-                    "resources": [],
-                    "prompts": []
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_call_topic"
-                    }
-                ],
-                "publish_to": [
-                    "function_result_topic"
-                ],
-                "command": {
-                    "class": "FunctionCallCommand"
-                }
-            },
-            "OpenAIOutputNode": {
-                "class": "Node",
-                "node_id": "1180fdcf4be24754b078e243dd679ab1",
-                "name": "OpenAIOutputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "afc13c92e09840cab9739a53f6e0fff9",
-                    "name": "UserOutputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_result_topic"
-                    }
-                ],
-                "publish_to": [
-                    "agent_output_topic"
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                }
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "agent_input_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_call_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_tool_call"
+                }
+              },
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         },
-        "topics": {
-            "agent_input_topic": {
-                "name": "agent_input_topic",
-                "type": "AgentInputTopic",
-                "condition": {
-                    "base64": "gAWVGgIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEtHQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UaAx1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoGn2UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "lambda _: True"
+        "FunctionCallNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "5df6b36a69194c748813e11219755f54",
+          "name": "FunctionCallNode",
+          "type": "FunctionCallNode",
+          "tool": {
+            "class": "grafi.tools.function_calls.impl.mcp_tool:MCPTool",
+            "tool_id": "0e2639d16a8d4574ab532dc50e8db166",
+            "name": "MCPTool",
+            "type": "MCPTool",
+            "oi_span_type": "TOOL",
+            "function_specs": [
+              {
+                "name": "hello",
+                "description": "",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "description": "",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ]
+                },
+                "output_schema": null
+              }
+            ],
+            "functions": {},
+            "on_error": "return",
+            "mcp_config": {
+              "mcpServers": {
+                "hello": {
+                  "url": "http://localhost:8000/mcp/",
+                  "transport": "http"
                 }
+              }
             },
-            "function_call_topic": {
-                "name": "function_call_topic",
-                "type": "Topic",
-                "condition": {
-                    "base64": "gAWVGgIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEtHQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UaAx1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoGn2UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "lambda _: True"
-                }
-            },
-            "agent_output_topic": {
-                "name": "agent_output_topic",
-                "type": "AgentOutputTopic",
-                "condition": {
-                    "base64": "gAWVGgIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEtHQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UaAx1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoGn2UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "lambda _: True"
-                }
-            },
-            "function_result_topic": {
-                "name": "function_result_topic",
-                "type": "Topic",
-                "condition": {
-                    "base64": "gAWVGgIAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASwFLAEsDQwSXAHkBlE6IhpQpjAFflIWUjDgvVXNlcnMvZ3VhbnlpbGkvY29kZS9ncmFwaGl0ZS9ncmFmaS90b3BpY3MvdG9waWNfYmFzZS5weZSMCDxsYW1iZGE+lIwSVG9waWNCYXNlLjxsYW1iZGE+lEtHQwSAAMh0lEMAlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UjAxncmFmaS50b3BpY3OUjAhfX25hbWVfX5SMF2dyYWZpLnRvcGljcy50b3BpY19iYXNllIwIX19maWxlX1+UaAx1Tk5OdJRSlGgAjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoGn2UfZQoaBaMCDxsYW1iZGE+lIwMX19xdWFsbmFtZV9flIwSVG9waWNCYXNlLjxsYW1iZGE+lIwPX19hbm5vdGF0aW9uc19flH2UjA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoF4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu",
-                    "code": "lambda _: True"
-                }
+            "resources": [],
+            "prompts": []
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_call_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_result_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
+        },
+        "OpenAIOutputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "dfc26269e1a04464b21d84b0d82b2aaf",
+          "name": "OpenAIOutputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "d276533333e247efa5f782907a8e3384",
+            "name": "UserOutputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
+            },
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_result_topic"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         }
+      },
+      "topics": {
+        "agent_input_topic": {
+          "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+          "name": "agent_input_topic",
+          "type": "AgentInputTopic"
+        },
+        "function_call_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_call_topic",
+          "type": "Topic"
+        },
+        "agent_output_topic": {
+          "class": "grafi.topics.topic_impl.output_topic:OutputTopic",
+          "name": "agent_output_topic",
+          "type": "AgentOutputTopic"
+        },
+        "function_result_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_result_topic",
+          "type": "Topic"
+        }
+      }
+    },
+    "api_key": {
+      "env": "OPENAI_API_KEY"
+    },
+    "model": "gpt-4o-mini",
+    "function_call_llm_system_message": null,
+    "summary_llm_system_message": null,
+    "function_tool": {
+      "class": "grafi.tools.function_calls.impl.mcp_tool:MCPTool",
+      "tool_id": "0e2639d16a8d4574ab532dc50e8db166",
+      "name": "MCPTool",
+      "type": "MCPTool",
+      "oi_span_type": "TOOL",
+      "function_specs": [
+        {
+          "name": "hello",
+          "description": "",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "output_schema": null
+        }
+      ],
+      "functions": {},
+      "on_error": "return",
+      "mcp_config": {
+        "mcpServers": {
+          "hello": {
+            "url": "http://localhost:8000/mcp/",
+            "transport": "http"
+          }
+        }
+      },
+      "resources": [],
+      "prompts": []
     }
+  }
 }

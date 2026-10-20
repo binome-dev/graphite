@@ -1,144 +1,124 @@
 {
-    "assistant_id": "3021271ac2274273bdfdb01b22af71e4",
+  "apiVersion": "grafi/v2",
+  "kind": "Assistant",
+  "spec": {
+    "class": "tests_integration.function_assistant.simple_function_llm_assistant:SimpleFunctionLLMAssistant",
+    "assistant_id": "90685c18bc9c4b2fb4aab13e4f81fcf9",
     "name": "SimpleFunctionLLMAssistant",
     "type": "SimpleFunctionLLMAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "e57e3599783c43d6accaa7103da875f9",
-        "name": "simple_function_call_workflow",
-        "type": "EventDrivenWorkflow",
-        "oi_span_type": "AGENT",
-        "nodes": {
-            "OpenAIInputNode": {
-                "class": "Node",
-                "node_id": "29c3bf8a06534d0988b73071378aaf7e",
-                "name": "OpenAIInputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "a211d85494ff4878a50b16d0fbd7faa8",
-                    "name": "UserInputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {
-                        "response_format": {
-                            "type": "json_schema",
-                            "json_schema": {
-                                "name": "UserForm",
-                                "strict": true,
-                                "schema": {
-                                    "description": "A simple user form model for demonstration purposes.",
-                                    "properties": {
-                                        "first_name": {
-                                            "title": "First Name",
-                                            "type": "string"
-                                        },
-                                        "last_name": {
-                                            "title": "Last Name",
-                                            "type": "string"
-                                        },
-                                        "location": {
-                                            "title": "Location",
-                                            "type": "string"
-                                        },
-                                        "gender": {
-                                            "title": "Gender",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "required": [
-                                        "first_name",
-                                        "last_name",
-                                        "location",
-                                        "gender"
-                                    ],
-                                    "title": "UserForm",
-                                    "type": "object",
-                                    "additionalProperties": false
-                                }
-                            }
-                        }
-                    },
-                    "is_streaming": false,
-                    "structured_output": true
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "agent_input_topic"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "function_call_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+      "class": "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow",
+      "oi_span_type": "AGENT",
+      "workflow_id": "b67fb893c1534c23a7844241e6bb46f4",
+      "name": "simple_function_call_workflow",
+      "type": "EventDrivenWorkflow",
+      "nodes": {
+        "OpenAIInputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "ac9601e618f04f219b254d1bc3d43d53",
+          "name": "OpenAIInputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "d82bb05dd5bd425c92af497cc588cf7d",
+            "name": "UserInputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "FunctionCallNode": {
-                "class": "Node",
-                "node_id": "992a38dff1b64e9e8970d20bdfeb961f",
-                "name": "FunctionCallNode",
-                "type": "FunctionCallNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "FunctionTool",
-                    "base_class": "FunctionTool",
-                    "tool_id": "acf0c954e68c40b3bd3eafd07850b9f8",
-                    "name": "FunctionTool",
-                    "type": "FunctionTool",
-                    "oi_span_type": "TOOL",
-                    "role": "assistant",
-                    "function": {
-                        "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:print_user_form"
-                    }
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_call_topic"
-                    }
-                ],
-                "command": {
-                    "class": "Command"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+            "model": "gpt-4o-mini",
+            "chat_params": {
+              "response_format": {
+                "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:UserForm"
+              }
+            },
+            "is_streaming": true,
+            "structured_output": true,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "agent_input_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_call_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
         },
-        "topics": {
-            "agent_input_topic": {
-                "name": "agent_input_topic",
-                "type": "AgentInputTopic"
-            },
-            "function_call_topic": {
-                "name": "function_call_topic",
-                "type": "Topic"
-            },
-            "agent_output_topic": {
-                "name": "agent_output_topic",
-                "type": "AgentOutputTopic"
+        "FunctionCallNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "b1e5880341b9448e92efee5785de6338",
+          "name": "FunctionCallNode",
+          "type": "FunctionCallNode",
+          "tool": {
+            "class": "grafi.tools.functions.function_tool:FunctionTool",
+            "tool_id": "0792dc07b4de415e945706a67aacf9b0",
+            "name": "FunctionTool",
+            "type": "FunctionTool",
+            "oi_span_type": "TOOL",
+            "role": "assistant",
+            "function": {
+              "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:print_user_form"
             }
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_call_topic"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
         }
+      },
+      "topics": {
+        "agent_input_topic": {
+          "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+          "name": "agent_input_topic",
+          "type": "AgentInputTopic"
+        },
+        "function_call_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_call_topic",
+          "type": "Topic"
+        },
+        "agent_output_topic": {
+          "class": "grafi.topics.topic_impl.output_topic:OutputTopic",
+          "name": "agent_output_topic",
+          "type": "AgentOutputTopic"
+        }
+      }
+    },
+    "api_key": {
+      "env": "OPENAI_API_KEY"
+    },
+    "model": "gpt-4o-mini",
+    "output_format": {
+      "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:UserForm"
+    },
+    "function": {
+      "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:print_user_form"
     }
+  }
 }

@@ -8,6 +8,7 @@ import pytest
 from anthropic import omit
 from anthropic.types.text_block import TextBlock
 from anthropic.types.tool_use_block import ToolUseBlock
+from pydantic_core import PydanticSerializationError
 
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
@@ -17,6 +18,7 @@ from grafi.common.models.message import Message
 from grafi.runtime import Delta
 from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
+from grafi.tools.tool import Tool
 
 
 # --------------------------------------------------------------------------- #
@@ -272,64 +274,98 @@ def test_prepare_api_input_tool_call_linkage(claude_instance):
 
 
 # --------------------------------------------------------------------------- #
-#  to_dict                                                                     #
+#  Saving and loading                                                          #
 # --------------------------------------------------------------------------- #
-def test_to_dict(claude_instance):
-    d = claude_instance.to_dict()
-    assert d["name"] == "ClaudeTool"
-    assert d["type"] == "ClaudeTool"
-    assert d["api_key"] == "****************"
-    assert d["model"] == "claude-haiku-4-5"
+CLAUDE_TOOL = "grafi.tools.llms.impl.claude_tool:ClaudeTool"
 
 
-# --------------------------------------------------------------------------- #
-#  from_dict                                                                   #
-# --------------------------------------------------------------------------- #
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "ClaudeTool",
-        "tool_id": "test-id",
+@pytest.fixture
+def saved_claude(monkeypatch: pytest.MonkeyPatch) -> ClaudeTool:
+    """A ClaudeTool with every field set, its key from ANTHROPIC_API_KEY."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test_api_key")
+    return ClaudeTool(
+        name="TestClaude",
+        system_message="You are helpful",
+        api_key="test_api_key",
+        model="claude-sonnet-4-5",
+        max_tokens=2048,
+        thinking={"type": "enabled", "budget_tokens": 1024},
+        effort="high",
+        chat_params={"temperature": 0.7},
+        is_streaming=False,
+    )
+
+
+def test_dump_names_the_class_and_saves_the_key_as_its_variable(saved_claude):
+    assert saved_claude.model_dump(mode="json") == {
+        "class": CLAUDE_TOOL,
+        "tool_id": saved_claude.tool_id,
         "name": "TestClaude",
         "type": "ClaudeTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "claude-haiku-4-5",
-        "max_tokens": 2048,
+        "api_key": {"env": "ANTHROPIC_API_KEY"},
+        "model": "claude-sonnet-4-5",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
         "structured_output": False,
+        "max_tokens": 2048,
+        "thinking": {"type": "enabled", "budget_tokens": 1024},
+        "effort": "high",
     }
 
-    tool = await ClaudeTool.from_dict(data)
+
+def test_round_trip(saved_claude):
+    data = saved_claude.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is ClaudeTool
+    assert restored.tool_id == saved_claude.tool_id
+    assert restored.api_key == "test_api_key"  # Read from ANTHROPIC_API_KEY.
+    assert restored.max_tokens == 2048
+    assert restored.thinking == {"type": "enabled", "budget_tokens": 1024}
+    assert restored.effort == "high"
+    assert restored == saved_claude
+    assert restored.model_dump(mode="json") == data
+
+
+def test_load_from_a_manifest_naming_the_class():
+    data = {
+        "class": CLAUDE_TOOL,
+        "tool_id": "test-id",
+        "name": "TestClaude",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "claude-haiku-4-5",
+        "max_tokens": 2048,
+        "thinking": {"type": "adaptive"},
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+    }
+
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, ClaudeTool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestClaude"
     assert tool.model == "claude-haiku-4-5"
     assert tool.max_tokens == 2048
+    assert tool.thinking == {"type": "adaptive"}
+    assert tool.effort is None
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
     assert tool.is_streaming is False
-    assert tool.structured_output is False
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip(claude_instance):
-    """Test that serialization and deserialization are consistent."""
-    # Serialize to dict
-    data = claude_instance.to_dict()
+def test_a_key_not_from_its_variable_is_never_saved(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "the_env_key")
+    tool = ClaudeTool(api_key="another_key")
 
-    # Deserialize back
-    restored = await ClaudeTool.from_dict(data)
-
-    # Verify key properties match
-    assert restored.name == claude_instance.name
-    assert restored.model == claude_instance.model
-    assert restored.max_tokens == claude_instance.max_tokens
-    assert restored.system_message == claude_instance.system_message
-    assert restored.chat_params == claude_instance.chat_params
-    assert restored.is_streaming == claude_instance.is_streaming
+    with pytest.raises(
+        PydanticSerializationError, match="ManifestError: .*ClaudeTool.api_key"
+    ):
+        tool.model_dump(mode="json")
 
 
 # --------------------------------------------------------------------------- #

@@ -4,6 +4,9 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import field_validator
+from pydantic_core import PydanticSerializationError
+from pydantic_core import to_json
 
 
 class InvokeContext(BaseModel):
@@ -31,3 +34,17 @@ class InvokeContext(BaseModel):
         default_factory=dict,
         description="Additional keyword arguments and context for the workflow",
     )
+
+    @field_validator("kwargs")
+    @classmethod
+    def _storable(cls, kwargs: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Each value must be one JSON can hold, as the events storing this
+        context do: a datetime is stored as its ISO text, an object refused."""
+        for key, value in (kwargs or {}).items():
+            try:
+                to_json(value)
+            except PydanticSerializationError as error:
+                raise ValueError(
+                    f"kwargs[{key!r}] cannot be stored with the events: {error}"
+                ) from error
+        return kwargs

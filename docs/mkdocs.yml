@@ -73,6 +73,7 @@ nav:
       - Event Graph: user-guide/events/event_graph.md
     - Infrastructure:
       - Runtime & Services: user-guide/runtime.md
+      - Manifests: user-guide/manifests.md
       - Models: user-guide/models.md
       - Builder Pattern: user-guide/builder-pattern.md
       - Invoke Decorators: user-guide/invoke-decorators.md

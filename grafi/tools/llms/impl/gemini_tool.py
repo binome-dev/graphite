@@ -7,7 +7,6 @@ Docs & examples:  https://ai.google.dev/gemini-api  :contentReference[oaicite:0]
 
 import base64
 import json
-import os
 import uuid
 from typing import Any
 from typing import Dict
@@ -22,6 +21,7 @@ from grafi.common.async_lifecycle import cleanup_on_exit
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -64,7 +64,7 @@ class GeminiTool(LLM):
 
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
+    api_key: Optional[str] = env_secret("GEMINI_API_KEY")
     # Capable current Gemini tier; use "gemini-3.1-flash-lite" for lower cost or
     # "gemini-3.1-pro-preview" for the hardest tasks.
     model: str = Field(default="gemini-3.5-flash")
@@ -94,7 +94,9 @@ class GeminiTool(LLM):
         Initialise a *stateless* client.  The Google SDK uses a lightweight
         Client object; it's fine to create one per request.
         """
-        return genai.Client(api_key=self.api_key)
+        # Without a key, the SDK reads Google's own (GOOGLE_API_KEY), or uses
+        # Vertex AI's credentials, as configured in the environment.
+        return genai.Client(api_key=self.api_key or None)
 
     def prepare_api_input(
         self, input_data: Messages
@@ -289,47 +291,6 @@ class GeminiTool(LLM):
                 "refusal": refusal,
                 "tool_calls": tool_calls or None,
             }
-        )
-
-    # --------------------------------------------------------------------- #
-    # Serialisation helper (do **not** expose real key)
-    # --------------------------------------------------------------------- #
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
-            "thinking_budget": self.thinking_budget,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "GeminiTool":
-        """
-        Create a GeminiTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the GeminiTool.
-
-        Returns:
-            GeminiTool: A GeminiTool instance created from the dictionary.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        # GeminiTool uses the same fields as base LLM
-        return (
-            cls.builder()
-            .name(data.get("name", "GeminiTool"))
-            .type(data.get("type", "GeminiTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", True))
-            .system_message(data.get("system_message", ""))
-            .api_key(os.getenv("GEMINI_API_KEY"))
-            .model(data.get("model", "gemini-3.5-flash"))
-            .thinking_budget(data.get("thinking_budget"))
-            .build()
         )
 
 

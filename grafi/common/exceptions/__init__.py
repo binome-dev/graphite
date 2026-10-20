@@ -15,6 +15,10 @@ from grafi.common.exceptions.event_exceptions import (
     TopicPublicationError,
     TopicSubscriptionError,
 )
+from grafi.common.exceptions.manifest_exceptions import (
+    ManifestError,
+    UntrustedImportError,
+)
 from grafi.common.exceptions.tool_exceptions import (
     FunctionCallException,
     FunctionToolException,
@@ -45,6 +49,9 @@ __all__ = [
     "TopicError",
     "TopicSubscriptionError",
     "TopicPublicationError",
+    # Manifest errors
+    "ManifestError",
+    "UntrustedImportError",
     # Domain-specific errors
     "DuplicateNodeError",
 ]

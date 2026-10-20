@@ -40,10 +40,6 @@ class MarkerTool(Tool):
             Message(role="assistant", content=f"out:{invoke_context.conversation_id}")
         ]
 
-    @classmethod
-    async def from_dict(cls, data):  # pragma: no cover - not exercised here
-        return cls(oi_span_type=OpenInferenceSpanKindValues.TOOL)
-
 
 def _build_workflow() -> EventDrivenWorkflow:
     input_topic = InputTopic(name="agent_input")

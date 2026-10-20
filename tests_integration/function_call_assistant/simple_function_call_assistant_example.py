@@ -99,7 +99,7 @@ async def test_simple_function_call_assistant() -> None:
     # events = event_store.get_events()
     # for event in events:
     #     try:
-    #         print(json.dumps(event.to_dict(), indent=4))
+    #         print(json.dumps(default_event_codec.encode(event), indent=4))
     #     except Exception as e:
     #         print(e)
     #         print(event)

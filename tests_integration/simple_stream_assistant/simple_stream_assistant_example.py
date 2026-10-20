@@ -77,7 +77,7 @@ async def test_simple_llm_assistant() -> None:
     # Save events to local json file
     # import json
 
-    # events_data = [event.to_dict() for event in events]
+    # events_data = [default_event_codec.encode(event) for event in events]
     # with open("events.json", "w") as f:
     #     json.dump(events_data, f, indent=4)
     # print(f"Saved {len(events)} events to events.json")

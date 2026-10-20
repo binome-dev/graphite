@@ -79,7 +79,7 @@ async def test_simple_llm_assistant_async() -> None:
     # Output events to JSON file
     # events = event_store.get_events()
     # with open("events_output.json", "w") as f:
-    #     json.dump([event.to_dict() for event in events], f, indent=4, default=str)
+    #     json.dump([default_event_codec.encode(event) for event in events], f, indent=4, default=str)
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) == 24
 

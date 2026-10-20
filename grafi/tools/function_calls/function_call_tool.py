@@ -16,12 +16,13 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import SerializerFunctionWrapHandler
+from pydantic import field_serializer
 from pydantic import validate_call
 
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.async_lifecycle import wait_all
-from grafi.common.callable_ref import deserialize_callable
-from grafi.common.callable_ref import serialize_callable
+from grafi.common.callable_ref import CallableRef
 from grafi.common.decorators.llm_function import is_invoke_context
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.decorators.record_decorators import record_tool_invoke
@@ -59,12 +60,17 @@ class FunctionCallTool(Tool):
     threads, so a tool's sync functions must be safe to run at the same time.
     Arguments are validated against the function's signature, and a parameter
     typed ``InvokeContext`` is passed the request's context.
+
+    It is saved with the functions its class does not define, by reference
+    (see :mod:`grafi.common.callable_ref`); what it offers follows from them.
     """
 
     name: str = "FunctionCallTool"
     type: str = "FunctionCallTool"
-    function_specs: FunctionSpecs = Field(default_factory=list)
-    functions: Dict[str, Callable] = Field(default_factory=dict)
+    # What the LLM is offered: each function's, made from it, named as it is
+    # keyed. A subclass offering what it has no function for adds its own.
+    function_specs: FunctionSpecs = Field(default_factory=list, exclude=True)
+    functions: Dict[str, CallableRef] = Field(default_factory=dict)
     # "raise" fails the call's node instead of answering the LLM with the error.
     on_error: Literal["return", "raise"] = "return"
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
@@ -92,8 +98,25 @@ class FunctionCallTool(Tool):
                 if isinstance(spec, FunctionSpec):
                     methods[spec.name] = attr
         cls._methods = methods
-        cls.functions = dict(methods)
-        cls.function_specs = [method._function_spec for method in methods.values()]
+
+    @field_serializer("functions", mode="wrap")
+    def _save_functions(
+        self, functions: Dict[str, Callable], handler: SerializerFunctionWrapHandler
+    ) -> Any:
+        """The functions the class does not define, which load with it."""
+        methods = type(self)._methods
+        return handler({n: f for n, f in functions.items() if f is not methods.get(n)})
+
+    def model_post_init(self, _context: Any) -> None:
+        self.functions = {**type(self)._methods, **self.functions}
+        own = {}  # Each function's spec, named as it is keyed, in its place.
+        for name, function in self.functions.items():
+            spec = _spec(function)
+            own[name] = (
+                spec if spec.name == name else spec.model_copy(update={"name": name})
+            )
+        given = [spec for spec in self.function_specs if spec.name not in own]
+        self.function_specs = [*own.values(), *given]
 
     def get_function_specs(self) -> FunctionSpecs:
         """The specifications of the functions offered to the LLM."""
@@ -171,63 +194,18 @@ class FunctionCallTool(Tool):
         result = call(**arguments)
         return await result if inspect.isawaitable(result) else result
 
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
 
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-
-        # Functions discovered from @llm_function-decorated methods are intrinsic
-        # to the class and re-registered automatically on from_dict (see
-        # __init_subclass__), so they are NOT serialized. Only standalone
-        # functions added via the builder are serialized (as references).
-        serialized_functions = {
-            name: serialize_callable(function)
-            for name, function in self.functions.items()
-            if function is not type(self)._methods.get(name)
-        }
-
-        return {
-            **super().to_dict(),
-            "base_class": "FunctionCallTool",
-            "function_specs": [spec.model_dump() for spec in self.function_specs],
-            "functions": serialized_functions,
-            "on_error": self.on_error,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "FunctionCallTool":
-        """
-        Create a FunctionCallTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the FunctionCallTool.
-
-        Returns:
-            FunctionCallTool: A FunctionCallTool instance created from the dictionary.
-
-        Note:
-            Each function is reconstructed (without pickle) from its import
-            reference or CallableComponent config. See
-            :mod:`grafi.common.callable_ref`.
-        """
-        function_call_tool_builder = (
-            cls.builder()
-            .name(data.get("name", "FunctionCallTool"))
-            .type(data.get("type", "FunctionCallTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .on_error(data.get("on_error", "return"))
+def _spec(function: Callable) -> FunctionSpec:
+    """The ``@llm_function`` specification of ``function``, made if need be."""
+    spec = getattr(function, "_function_spec", None)
+    if isinstance(spec, FunctionSpec):
+        return spec
+    if not inspect.isfunction(function):
+        raise TypeError(
+            f"A function-call tool calls functions, not {type(function).__name__}: "
+            "give it a function, or an @llm_function method of the tool's class."
         )
-
-        for func_name, func_serialized in data.get("functions", {}).items():
-            func = deserialize_callable(
-                func_serialized, context=f"function '{func_name}'"
-            )
-            function_call_tool_builder.function(func)
-
-        return function_call_tool_builder.build()
+    return llm_function(function)._function_spec  # type: ignore[attr-defined]
 
 
 @functools.lru_cache(maxsize=1024)
@@ -255,11 +233,10 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
     """
 
     def function(self, function: Callable) -> Self:
-        """Add a function that can be called by the LLM.
-
-        If the function is not already decorated with @llm_function,
-        it will be automatically wrapped. It may be sync or async, or a
-        generator; one whose first parameter is ``self`` is passed this tool.
+        """Add a function that can be called by the LLM, under the name of its
+        ``@llm_function`` specification, made if it has none; it replaces one
+        of the same name. It may be sync or async, or a generator; one whose
+        first parameter is ``self`` is passed this tool.
 
         Args:
             function: A callable to expose as a tool function.
@@ -267,16 +244,7 @@ class FunctionCallToolBuilder(ToolBuilder[T_F]):
         Returns:
             Self for method chaining.
         """
-        if not hasattr(function, "_function_spec"):
-            function = llm_function(function)
-        spec: FunctionSpec = function._function_spec  # type: ignore[attr-defined]
-        methods = self._cls._methods  # Kept beside the functions added.
-        functions = self.kwargs.setdefault("functions", dict(methods))
-        specs = self.kwargs.setdefault(
-            "function_specs", [method._function_spec for method in methods.values()]
-        )
-        functions[spec.name] = function  # Replacing one of the same name.
-        specs[:] = [*(other for other in specs if other.name != spec.name), spec]
+        self.kwargs.setdefault("functions", {})[_spec(function).name] = function
         return self
 
     def on_error(self, on_error: Literal["return", "raise"]) -> Self:

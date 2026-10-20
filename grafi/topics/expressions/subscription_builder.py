@@ -6,6 +6,7 @@ from pydantic import ConfigDict
 from grafi.topics.expressions.topic_expression import CombinedExpr
 from grafi.topics.expressions.topic_expression import LogicalOp
 from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import Subscription
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_base import TopicBase
 
@@ -19,7 +20,7 @@ class SubscriptionBuilder(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    root_expr: Optional[SubExpr] = None
+    root_expr: Optional[Subscription] = None
     pending_op: Optional[LogicalOp] = None
 
     def subscribed_to(self, topic: TopicBase) -> "SubscriptionBuilder":

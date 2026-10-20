@@ -1,11 +1,16 @@
 from enum import Enum
+from typing import Annotated
 from typing import Any
-from typing import Dict
 from typing import List
+from typing import Union
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Discriminator
+from pydantic import Tag
 
 from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_base import TopicRef
 
 
 class LogicalOp(Enum):
@@ -16,61 +21,38 @@ class LogicalOp(Enum):
 class SubExpr(BaseModel):
     """Base class for subscription expressions."""
 
-    def to_dict(self) -> dict[str, Any]:
-        raise NotImplementedError
+    # A key it does not have is refused, so a misspelt one is not ignored.
+    model_config = ConfigDict(extra="forbid")
 
 
 class TopicExpr(SubExpr):
-    """Represents a single subscribed Topic by name."""
+    """A subscribed topic, saved by its name."""
 
-    topic: TopicBase
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"topic": self.topic.name}
-
-    @classmethod
-    async def from_dict(
-        cls, data: dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "TopicExpr":
-        topic_name = data["topic"]
-        if topic_name in topics:
-            return cls(topic=topics[topic_name])
-        raise ValueError(f"Topic with name {topic_name} not found in provided topics.")
+    topic: TopicRef
 
 
 class CombinedExpr(SubExpr):
     """Represents (left_expr op right_expr)."""
 
     op: LogicalOp
-    left: SubExpr
-    right: SubExpr
+    left: "Subscription"
+    right: "Subscription"
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "op": self.op.value,
-            "left": self.left.to_dict(),
-            "right": self.right.to_dict(),
-        }
 
-    @classmethod
-    async def from_dict(
-        cls, data: dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "CombinedExpr":
-        op = LogicalOp(data["op"])
-        left_data = data["left"]
-        right_data = data["right"]
+def _expression_kind(value: Any) -> str:
+    if isinstance(value, SubExpr):
+        return "topic" if isinstance(value, TopicExpr) else "combined"
+    return "topic" if isinstance(value, dict) and "topic" in value else "combined"
 
-        if "topic" in left_data:
-            left_expr = await TopicExpr.from_dict(left_data, topics)
-        else:
-            left_expr = await CombinedExpr.from_dict(left_data, topics)
 
-        if "topic" in right_data:
-            right_expr = await TopicExpr.from_dict(right_data, topics)
-        else:
-            right_expr = await CombinedExpr.from_dict(right_data, topics)
+# A subscription expression: a topic, saved as {"topic": name}, or two
+# expressions combined, saved as {"op": "AND", "left": ..., "right": ...}.
+Subscription = Annotated[
+    Union[Annotated[TopicExpr, Tag("topic")], Annotated[CombinedExpr, Tag("combined")]],
+    Discriminator(_expression_kind),
+]
 
-        return cls(op=op, left=left_expr, right=right_expr)
+CombinedExpr.model_rebuild()
 
 
 def evaluate_subscription(expr: SubExpr, topics_with_new_msgs: List[str]) -> bool:

@@ -45,9 +45,6 @@ class MockTool(Tool):
         self.invoked += 1
         yield self.fn(input_data)
 
-    def to_dict(self):
-        return {"name": self.name, "type": self.type}
-
 
 def _ctx() -> InvokeContext:
     return InvokeContext(

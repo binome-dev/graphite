@@ -24,7 +24,7 @@
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]` | Adapts Message objects to Ollama API format, including function specifications. |
 | `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Calls the Ollama API and yields its answer as one message, streaming its text while a caller streams the run. |
 | `to_messages`       | `(response: ChatResponse) -> Messages`                            | Converts a complete response from Ollama's API into Message objects.                               |
-| `to_dict`           | `() -> dict[str, Any]`                                             | Provides a dictionary representation of the OllamaTool configuration.                              |
+| `model_dump(mode="json")` | `() -> dict[str, Any]`                                       | Saves the tool as data. See [Manifests](../manifests.md).                                         |
 
 ## How It Works
 

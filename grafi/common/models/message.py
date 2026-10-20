@@ -2,7 +2,6 @@ import time
 from typing import Any
 from typing import AsyncGenerator
 from typing import Dict
-from typing import Iterable
 from typing import List
 from typing import Optional
 from typing import Union
@@ -52,7 +51,7 @@ class Message(BaseModel):
     """
     role: ChatCompletionRole
     tool_call_id: Optional[str] = None
-    tools: Optional[Iterable[ChatCompletionToolParam]] = None
+    tools: Optional[List[ChatCompletionToolParam]] = None
     function_call: Optional[FunctionCall] = None
     """Deprecated and replaced by `tool_calls`.
 

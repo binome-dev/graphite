@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from typing import Self
 
@@ -8,6 +7,7 @@ from pydantic import Field
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -51,7 +51,7 @@ class KycAssistant(Assistant):
     )
     name: str = Field(default="KycAssistant")
     type: str = Field(default="KycAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     model: str = Field(default="gpt-4o-mini")
     user_info_extract_system_message: Optional[str] = Field(default=None)
     action_llm_system_message: Optional[str] = Field(default=None)

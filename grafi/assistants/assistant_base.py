@@ -1,35 +1,42 @@
 from typing import Any
 from typing import AsyncGenerator
+from typing import ClassVar
+from typing import Optional
 from typing import Self
 from typing import TypeVar
 from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import Component
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.runtime.deltas import Delta
 from grafi.workflows.workflow import Workflow
 
 
-class AssistantBase(BaseModel):
+class AssistantBase(Component):
     """
     An abstract base class for assistants that use language models to process input and generate responses.
 
+    An assistant builds its workflow with ``_construct_workflow()``, unless it
+    is given one, as when it is loaded from a manifest, which holds it. Fields
+    an assistant only builds its workflow from are best ``Field(exclude=True)``:
+    the saved workflow is what loads, and editing them in a manifest would
+    change nothing.
+
     Attributes:
         name (str): The name of the assistant
-        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
+        workflow (Workflow): The workflow the assistant runs.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    manifest_kind: ClassVar[Optional[str]] = "Assistant"
 
     assistant_id: str = default_id
     name: str = Field(default="Assistant")
@@ -38,10 +45,11 @@ class AssistantBase(BaseModel):
         default=OpenInferenceSpanKindValues.AGENT
     )
 
-    workflow: Workflow = Workflow()
+    workflow: Workflow = Field(default_factory=Workflow)
 
     def model_post_init(self, _context: Any) -> None:
-        self._construct_workflow()
+        if "workflow" not in self.model_fields_set:
+            self._construct_workflow()
 
     def _construct_workflow(self) -> "AssistantBase":
         """Construct the workflow for the assistant.
@@ -65,16 +73,6 @@ class AssistantBase(BaseModel):
         yield None  # type: ignore
         raise NotImplementedError("Subclasses must implement 'invoke'.")
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the assistant to a dictionary representation."""
-        return {
-            "assistant_id": self.assistant_id,
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "workflow": self.workflow.to_dict(),
-        }
-
     def stop_workflow(self) -> None:
         """Stop every run in flight of this assistant's workflow, including
         other requests' runs; see ``EventDrivenWorkflow.stop()``."""
@@ -85,20 +83,6 @@ class AssistantBase(BaseModel):
             logger.warning(
                 f"Workflow {self.workflow.__class__.__name__} does not support stop method"
             )
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "AssistantBase":
-        """
-        Create an Assistant instance from a dictionary representation.
-
-        Args:
-            data (dict): A dictionary containing the assistant's attributes.
-        Returns:
-            Assistant: An instance of the Assistant class.
-        Raises:
-            NotImplementedError: If the method is not implemented by a subclass.
-        """
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
 
 
 T_A = TypeVar("T_A", bound=AssistantBase)

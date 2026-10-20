@@ -1,53 +1,54 @@
 import pytest
 
 from grafi.common.events.component_events import AssistantFailedEvent
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from grafi.topics.topic_types import TopicType
+from grafi.common.events.event_codec import default_event_codec
+from tests.events.event_fixtures import INVOKE_CONTEXT_JSON
+from tests.events.event_fixtures import INVOKE_CONTEXT_V1
+from tests.events.event_fixtures import TIMESTAMP
+from tests.events.event_fixtures import TIMESTAMP_JSON
+from tests.events.event_fixtures import invoke_context
+from tests.events.event_fixtures import request
+from tests.events.event_fixtures import request_json
+from tests.events.event_fixtures import request_v1
+from tests.events.event_fixtures import round_trip
+from tests.events.event_fixtures import stored
 
 
 @pytest.fixture
-def assistant_failed_event():
+def assistant_failed_event() -> AssistantFailedEvent:
     return AssistantFailedEvent(
         event_id="test_id",
-        event_type="AssistantFailed",
-        timestamp="2009-02-13T23:31:30+00:00",
+        timestamp=TIMESTAMP,
         id="test_id",
         name="test_assistant",
         type="test_type",
-        input_data=PublishToTopicEvent(
-            event_id="test_id",
-            timestamp="2009-02-13T23:31:30+00:00",
-            invoke_context=InvokeContext(
-                conversation_id="conversation_id",
-                invoke_id="invoke_id",
-                assistant_request_id="assistant_request_id",
-            ),
-            name="test_output_topic",
-            type=TopicType.AGENT_OUTPUT_TOPIC_TYPE,
-            publisher_name="test_assistant",
-            publisher_type="test_type",
-            data=[
-                Message(
-                    message_id="ea72df51439b42e4a43b217c9bca63f5",
-                    timestamp=1737138526189505000,
-                    role="user",
-                    content="Hello, my name is Grafi, how are you doing?",
-                )
-            ],
-        ),
+        invoke_context=invoke_context(),
+        input_data=request(),
         error="error",
-        invoke_context=InvokeContext(
-            conversation_id="conversation_id",
-            invoke_id="invoke_id",
-            assistant_request_id="assistant_request_id",
-        ),
     )
 
 
 @pytest.fixture
-def assistant_failed_event_dict():
+def assistant_failed_event_json() -> dict:
+    return {
+        "event_id": "test_id",
+        "event_version": 2,
+        "invoke_context": INVOKE_CONTEXT_JSON,
+        "event_type": "AssistantFailed",
+        "timestamp": TIMESTAMP_JSON,
+        "id": "test_id",
+        "name": "test_assistant",
+        "type": "test_type",
+        "model": None,
+        "input_data": request_json(),
+        "error": "error",
+        "error_details": None,
+    }
+
+
+@pytest.fixture
+def assistant_failed_event_v1() -> dict:
+    """The event as version 1 stored it (AssistantFailedEvent.to_dict)."""
     return {
         "event_id": "test_id",
         "event_version": "1.0",
@@ -58,51 +59,34 @@ def assistant_failed_event_dict():
             "id": "test_id",
             "name": "test_assistant",
             "type": "test_type",
-            "invoke_context": {
-                "conversation_id": "conversation_id",
-                "invoke_id": "invoke_id",
-                "assistant_request_id": "assistant_request_id",
-                "user_id": "",
-                "kwargs": {},
-            },
+            "invoke_context": INVOKE_CONTEXT_V1,
         },
         "data": {
-            "input_data": {
-                "event_context": {
-                    "consumed_event_ids": [],
-                    "publisher_name": "test_assistant",
-                    "publisher_type": "test_type",
-                    "name": "test_output_topic",
-                    "type": "AgentOutputTopic",
-                    "offset": -1,
-                    "invoke_context": {
-                        "conversation_id": "conversation_id",
-                        "invoke_id": "invoke_id",
-                        "assistant_request_id": "assistant_request_id",
-                        "user_id": "",
-                        "kwargs": {},
-                    },
-                },
-                "event_id": "test_id",
-                "event_version": "1.0",
-                "assistant_request_id": "assistant_request_id",
-                "event_type": "PublishToTopic",
-                "timestamp": "2009-02-13T23:31:30+00:00",
-                "data": '[{"name": null, "message_id": "ea72df51439b42e4a43b217c9bca63f5", "timestamp": 1737138526189505000, "content": "Hello, my name is Grafi, how are you doing?", "refusal": null, "annotations": null, "audio": null, "role": "user", "tool_call_id": null, "tools": null, "function_call": null, "tool_calls": null}]',
-            },
+            "input_data": request_v1(),
             "error": "error",
         },
     }
 
 
-def test_assistant_failed_event_dict(
-    assistant_failed_event, assistant_failed_event_dict
+def test_assistant_failed_event_encodes_flat_json(
+    assistant_failed_event, assistant_failed_event_json
 ):
-    assert assistant_failed_event.to_dict() == assistant_failed_event_dict
-
-
-def test_assistant_failed_event(assistant_failed_event_dict, assistant_failed_event):
     assert (
-        AssistantFailedEvent.from_dict(assistant_failed_event_dict)
-        == assistant_failed_event
+        default_event_codec.encode(assistant_failed_event)
+        == assistant_failed_event_json
     )
+    assert stored(assistant_failed_event) == assistant_failed_event_json
+
+
+def test_assistant_failed_event_round_trip(assistant_failed_event):
+    decoded = round_trip(assistant_failed_event)
+    assert type(decoded) is AssistantFailedEvent
+    assert decoded == assistant_failed_event
+
+
+def test_assistant_failed_event_decodes_version_1(
+    assistant_failed_event_v1, assistant_failed_event
+):
+    decoded = default_event_codec.decode(assistant_failed_event_v1)
+    assert type(decoded) is AssistantFailedEvent
+    assert decoded == assistant_failed_event

@@ -1,10 +1,11 @@
-import os
-from typing import Callable
+from typing import Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.callable_ref import CallableRef
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
@@ -23,16 +24,16 @@ class SimpleMultiLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleMultiLLMAssistant")
     type: str = Field(default="SimpleMultiLLMAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
+    api_key: Optional[str] = env_secret("OPENROUTER_API_KEY")
     model_openai: str = Field(default="openai/gpt-4o-mini")
     model_deepseek: str = Field(default="deepseek/deepseek-chat-v3-0324:free")
     model_gemini: str = Field(default="google/gemini-2.0-flash-001")
     model_qwen: str = Field(default="qwen/qwen3-235b-a22b")
-    openai_function: Callable
-    deepseek_function: Callable
-    gemini_function: Callable
-    qwen_function: Callable
-    human_request_process_function: Callable
+    openai_function: CallableRef
+    deepseek_function: CallableRef
+    gemini_function: CallableRef
+    qwen_function: CallableRef
+    human_request_process_function: CallableRef
 
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")

@@ -10,9 +10,9 @@ An LLM yields its answer as one message: its text, its refusal, if any, and its 
 |--------------------|-------------------------------|-------------------------------------------------------------------------------------------------------|
 | `system_message`   | `Optional[str]`               | Optional system message to include in API calls (defaults to `None`).                                |
 | `oi_span_type`     | `OpenInferenceSpanKindValues` | Semantic attribute for tracing (set to `LLM` for observability).                                     |
-| `api_key`          | `Optional[str]`               | API key for the LLM service (defaults to `None`).                                                    |
+| `api_key`          | `Optional[str]`               | API key for the LLM service, declared with `env_secret`: each provider reads it from its variable, such as `OPENAI_API_KEY`, and saves it as `{"env": "OPENAI_API_KEY"}`, never as its value (the base class has no variable, and defaults to `None`). |
 | `model`            | `str`                         | The name of the LLM model to use (e.g., `'gpt-4o-mini'`, defaults to empty string).                 |
-| `chat_params`      | `Dict[str, Any]`              | Additional chat completion parameters specific to the LLM provider (defaults to empty dict).         |
+| `chat_params`      | `Dict[str, Any]`              | Additional chat completion parameters specific to the LLM provider (defaults to empty dict). A pydantic model class in it, such as a `response_format`, is saved by import path. |
 | `is_streaming`     | `bool`                        | Whether to stream the answer, token by token, to a caller that streams the run (defaults to `True`). The provider is asked for a stream only then. |
 | `structured_output`| `bool`                        | Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text, defaults to `False`). |
 | `_function_specs`  | `FunctionSpecs` (private)     | Private attribute storing function specifications for function calling capabilities.                  |
@@ -24,7 +24,7 @@ An LLM yields its answer as one message: its text, its refusal, if any, and its 
 | `add_function_specs` | `(function_spec: FunctionSpecs) -> None`      | Adds function specifications to the LLM for function calling capabilities.                  |
 | `get_function_specs` | `() -> FunctionSpecs`                         | Returns a copy of the function specifications currently registered with the LLM.            |
 | `prepare_api_input`  | `(input_data: Messages) -> Any`               | Abstract method that must be implemented by subclasses to prepare API input data.           |
-| `to_dict`            | `() -> dict[str, Any]`                        | Serializes the LLM configuration into a dictionary format.                                  |
+| `model_dump(mode="json")` | `() -> dict[str, Any]`                   | Saves the LLM as data. See [Manifests](../manifests.md).                                    |
 
 ## Builder Pattern
 
@@ -175,7 +175,7 @@ The LLM base class integrates with OpenInference for observability:
 
 - **Span Type**: All LLM tools use `OpenInferenceSpanKindValues.LLM` for consistent tracing
 - **Command Integration**: Uses `@use_command(LLMCommand)` for workflow integration
-- **Serialization**: `to_dict()` method provides structured representation for logging and debugging
+- **Serialization**: `model_dump(mode="json")` saves the LLM as data, its key as a reference to its environment variable (see [Manifests](../manifests.md))
 
 ## Implementation Requirements
 

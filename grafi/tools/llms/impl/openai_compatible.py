@@ -7,6 +7,7 @@ This base centralizes the identical request/response mechanics; concrete
 providers specialize via a few small hooks.
 """
 
+import os
 from typing import Any
 from typing import ClassVar
 from typing import Dict
@@ -52,6 +53,11 @@ class OpenAICompatibleTool(LLM):
     # standard chat-completions API (e.g. OpenRouter) set this False and rely on
     # ``response_format`` in ``chat_params`` via the normal ``create`` call.
     _supports_beta_parse: ClassVar[bool] = True
+
+    # Whether the OpenAI SDK may add the headers it makes from OpenAI's own
+    # settings (OPENAI_ORG_ID, OPENAI_PROJECT_ID, OPENAI_CUSTOM_HEADERS): only
+    # for OpenAI, so another provider's base_url never receives them.
+    _openai_settings: ClassVar[bool] = False
 
     # Optional endpoint override (``None`` uses the SDK's default OpenAI base).
     base_url: Optional[str] = Field(default=None)
@@ -109,9 +115,21 @@ class OpenAICompatibleTool(LLM):
     ) -> MsgsAGen:
         api_messages, api_tools = self.prepare_api_input(input_data)
 
-        client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
+        key = self.required_api_key()
+        client_kwargs: Dict[str, Any] = {"api_key": key}
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
+        if not self._openai_settings:
+            if not self.base_url:  # Else the SDK would read OPENAI_BASE_URL.
+                raise LLMToolException(
+                    tool_name=self.name or self._provider_label,
+                    model=self.model,
+                    message=f"{type(self).__name__} has no base_url.",
+                )
+            client_kwargs["default_headers"] = {
+                **_without_openai_settings(),
+                "Authorization": f"Bearer {key}",  # Whatever they named.
+            }
 
         # ``name`` is Optional on the base Tool; concrete providers always set it,
         # but fall back to the provider label so the error always has a name.
@@ -269,17 +287,14 @@ class OpenAICompatibleTool(LLM):
             for call in calls
         ]
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize the tool, including base_url when a provider sets one.
 
-        OpenAI (no base_url) omits the key, matching its prior manifest shape;
-        DeepSeek/OpenRouter inherit base_url serialization here instead of
-        repeating it.
-        """
-        data = super().to_dict()
-        if self.base_url:
-            data["base_url"] = self.base_url
-        return data
+def _without_openai_settings() -> Dict[str, Omit]:
+    """Headers that leave out those the OpenAI SDK makes from OpenAI's
+    environment variables."""
+    custom = os.environ.get("OPENAI_CUSTOM_HEADERS", "")
+    names = [line.split(":")[0].strip() for line in custom.split("\n") if ":" in line]
+    leave_out = ["OpenAI-Organization", "OpenAI-Project", *names]
+    return {name: Omit() for name in leave_out}
 
 
 T_OAC = TypeVar("T_OAC", bound=OpenAICompatibleTool)

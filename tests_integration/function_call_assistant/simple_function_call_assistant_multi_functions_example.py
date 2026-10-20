@@ -115,8 +115,7 @@ async def test_simple_function_call_assistant() -> None:
     # assistant.generate_manifest()
 
 
-# Guard top-level execution so this module can be imported (e.g. to resolve and
-# register the LocalInfoMock tool class when deserializing the manifest) without
-# running the agent.
+# Guard top-level execution so this module can be imported (e.g. when loading
+# the manifest imports the LocalInfoMock tool class) without running the agent.
 if __name__ == "__main__":
     asyncio.run(test_simple_function_call_assistant())

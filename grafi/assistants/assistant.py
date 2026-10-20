@@ -1,12 +1,10 @@
 import json
+import re
 import os
-from typing import Any
 from typing import AsyncGenerator
 from typing import Literal
 from typing import Union
 from typing import overload
-
-from openinference.semconv.trace import OpenInferenceSpanKindValues
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.async_lifecycle import owned_iterator
@@ -15,8 +13,8 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import ManifestError
 from grafi.runtime.deltas import Delta
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 class Assistant(AssistantBase):
@@ -63,57 +61,24 @@ class Assistant(AssistantBase):
             async for output in outputs:
                 yield output
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the workflow to a dictionary."""
-        return {
-            **super().to_dict(),
-        }
-
     def generate_manifest(self, output_dir: str = ".") -> str:
-        """
-        Generate a manifest file for the assistant.
-
-        Args:
-            output_dir (str): Directory where the manifest file will be saved
-
-        Returns:
-            str: Path to the generated manifest file
-        """
-        manifest_seed = self.to_dict()
-
-        # Add dependencies between node and topics
-        manifest_dict = manifest_seed
-
+        """Write the assistant's manifest (see ``to_manifest()``) to
+        ``<name>_manifest.json`` in ``output_dir``, and return its path. Load
+        it back with ``Assistant.from_manifest(path)``."""
+        if not re.fullmatch(r"\w[\w .-]*", self.name) or ".." in self.name:
+            raise ManifestError(
+                f"The assistant's name {self.name!r} names its manifest's file, "
+                "so it holds no path."
+            )
+        text = json.dumps(self.to_manifest(), indent=2) + "\n"
         output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
-        with open(output_path, "w") as f:
-            f.write(json.dumps(manifest_dict, indent=4))
-
+        # Written beside it, then moved over it, so a failure leaves it whole.
+        partial = f"{output_path}.{os.getpid()}.tmp"
+        try:
+            with open(partial, "w") as f:
+                f.write(text)
+            os.replace(partial, output_path)
+        finally:
+            if os.path.exists(partial):
+                os.remove(partial)
         return output_path
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "Assistant":
-        """
-        Load an assistant from a manifest dictionary.
-
-        Args:
-            manifest_dict (dict[str, Any]): Dictionary containing the assistant manifest
-
-        Returns:
-            Assistant: The deserialized assistant instance
-
-        Raises:
-            NotImplementedError: Subclasses must implement this method
-        """
-
-        # Create a new instance
-        instance = cls.model_construct()
-        instance.name = data.get("name", "Assistant")
-        instance.type = data.get("type", "assistant")
-        instance.oi_span_type = OpenInferenceSpanKindValues(
-            data.get("oi_span_type", "AGENT")
-        )
-        instance.workflow = await EventDrivenWorkflow.from_dict(
-            data.get("workflow", {})
-        )
-
-        return instance

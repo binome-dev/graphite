@@ -27,10 +27,6 @@ class EchoTool(Tool):
     async def invoke(self, invoke_context, input_data):
         yield [Message(role="assistant", content="resumed response")]
 
-    @classmethod
-    async def from_dict(cls, data):  # pragma: no cover - not exercised here
-        return cls(oi_span_type=OpenInferenceSpanKindValues.TOOL)
-
 
 def _build_workflow() -> tuple[EventDrivenWorkflow, InputTopic, str]:
     input_topic = InputTopic(name="agent_input")

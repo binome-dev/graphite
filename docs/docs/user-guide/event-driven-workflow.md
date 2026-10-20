@@ -36,7 +36,7 @@ that `stop()` uses.
 | `_handle_function_calling_nodes` | Links function-calling nodes with LLM nodes to share function specifications, and makes one function-call node on each topic carrying calls answer the calls there naming a function no LLM calling there was offered. |
 | `invoke`                         | Runs the workflow on a new `WorkflowRun`, yielding its outputs as their steps commit, and, with `stream=True`, the deltas its tools emit. |
 | `stop`                           | Stops every run in flight.                                                                   |
-| `to_dict` / `from_dict`          | Serializes the workflow, including nodes and topics, and rebuilds it.                       |
+| `model_dump(mode="json")` / `model_validate` | Saves the workflow, with its nodes and topics, as data, and loads it back. See [Manifests](manifests.md). |
 
 ## Workflow Execution Flow
 

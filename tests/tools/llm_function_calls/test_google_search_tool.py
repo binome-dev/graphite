@@ -2,10 +2,12 @@ import json
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.google_search_tool import GoogleSearchTool
+from grafi.tools.tool import Tool
 
 
 # --------------------------------------------------------------------------- #
@@ -217,16 +219,18 @@ async def test_error_handling(google_search_tool):
 
 
 # --------------------------------------------------------------------------- #
-#  from_dict
+#  Saving and loading
 # --------------------------------------------------------------------------- #
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
+GOOGLE_SEARCH_TOOL = (
+    "grafi.tools.function_calls.impl.google_search_tool:GoogleSearchTool"
+)
+
+
+def test_load_from_a_manifest_naming_the_class():
     data = {
-        "class": "GoogleSearchTool",
+        "class": GOOGLE_SEARCH_TOOL,
         "tool_id": "test-id",
-        "name": "TestGoogleSearch",
-        "type": "GoogleSearchTool",
+        "name": "TestGoogleSearchTool",
         "oi_span_type": "TOOL",
         "fixed_max_results": 5,
         "fixed_language": "en",
@@ -235,37 +239,52 @@ async def test_from_dict():
         "timeout": 15,
     }
 
-    tool = await GoogleSearchTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, GoogleSearchTool)
-    assert tool.name == "TestGoogleSearch"
+    assert tool.tool_id == "test-id"
+    assert tool.name == "TestGoogleSearchTool"
     assert tool.fixed_max_results == 5
     assert tool.fixed_language == "en"
     assert tool.headers == {"User-Agent": "test"}
     assert tool.proxy == "http://proxy.test"
     assert tool.timeout == 15
+    # Its search function is the class's, not saved, so loaded with it.
+    assert tool.functions == {"google_search": GoogleSearchTool.google_search}
+    assert [spec.name for spec in tool.function_specs] == ["google_search"]
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip():
-    """Test that serialization and deserialization are consistent."""
+def test_round_trip():
     original = (
         GoogleSearchTool.builder()
         .name("TestGoogle")
         .fixed_max_results(3)
         .fixed_language("en")
         .headers({"User-Agent": "test"})
+        .proxy("http://proxy.test")
+        .timeout(20)
         .build()
     )
+    data = original.model_dump(mode="json")
+    assert data["class"] == GOOGLE_SEARCH_TOOL
+    assert data["functions"] == {}
+    # What it offers follows from its search method, so it is not saved.
+    assert "function_specs" not in data
 
-    # Serialize to dict
-    data = original.to_dict()
+    restored = Tool.model_validate(data)
 
-    # Deserialize back
-    restored = await GoogleSearchTool.from_dict(data)
-
-    # Verify key properties match
-    assert restored.name == original.name
-    assert restored.fixed_max_results == original.fixed_max_results
-    assert restored.fixed_language == original.fixed_language
-    assert restored.headers == original.headers
+    assert type(restored) is GoogleSearchTool
+    assert restored.tool_id == original.tool_id
+    assert restored.fixed_max_results == 3
+    assert restored.fixed_language == "en"
+    assert restored.headers == {"User-Agent": "test"}
+    assert restored.proxy == "http://proxy.test"
+    assert restored.timeout == 20
+    assert restored.functions == {"google_search": GoogleSearchTool.google_search}
+    assert restored.function_specs == original.function_specs
+    assert [spec.name for spec in restored.function_specs] == ["google_search"]
+    assert restored == original
+    assert restored.model_dump(mode="json") == data
+    # Every field it saves is one it loads: a misspelt one is refused.
+    with pytest.raises(ValidationError, match="language"):
+        Tool.model_validate({**data, "language": "fr"})

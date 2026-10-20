@@ -60,7 +60,7 @@ Subclasses must implement these abstract methods:
 
 ### Lifecycle
 
-The `AssistantBase` automatically calls `_construct_workflow()` during initialization via `model_post_init()`, ensuring the workflow is properly configured before the assistant is used.
+The `AssistantBase` automatically calls `_construct_workflow()` during initialization via `model_post_init()`, ensuring the workflow is properly configured before the assistant is used. An assistant given a workflow, as one loaded from a manifest is, keeps it instead.
 
 ## Assistant Class
 
@@ -70,16 +70,16 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 
 - **Automatic Event Recording**: Uses `@record_assistant_invoke` decorator
 - **Workflow Delegation**: Delegates all processing to the configured workflow
-- **Manifest Generation**: Supports generating configuration manifests
-- **Serialization**: Provides dictionary serialization capabilities
+- **Manifests**: Saves the assistant, with its workflow and its own saved fields, as a manifest, and loads it back with that workflow (see [Manifests](manifests.md))
 
 ### Assistant Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `invoke` | `(PublishToTopicEvent, is_sequential=False, *, stream=False) -> AsyncGenerator[...]` | Yields the workflow's outputs as their steps are stored, and, with `stream=True`, each `Delta` its tools emit |
-| `to_dict` | `() -> dict[str, Any]` | Serializes the assistant's workflow configuration |
-| `generate_manifest` | `(output_dir: str = ".") -> str` | Generates a JSON manifest file for the assistant |
+| `to_manifest` | `() -> dict[str, Any]` | The assistant's manifest: `{"apiVersion": "grafi/v2", "kind": "Assistant", "spec": ...}` |
+| `generate_manifest` | `(output_dir: str = ".") -> str` | Writes the manifest to `<name>_manifest.json` in `output_dir` |
+| `from_manifest` | `classmethod (manifest: dict \| str \| Path, *, env=(), legacy_classes=None, context=None) -> Assistant` | Loads an assistant from a manifest, a dict or a JSON file's path |
 
 ### Method Details
 
@@ -117,23 +117,25 @@ async for item in assistant.invoke(input_event, stream=True):
 
 See [Runtime](runtime.md#streaming) for what deltas are, and are not.
 
-#### generate_manifest()
+#### generate_manifest() and from_manifest()
 
-Creates a JSON manifest file containing the assistant's configuration.
+`generate_manifest()` writes the assistant's manifest, `to_manifest()`, as JSON
+to `<name>_manifest.json` in `output_dir` (default: the current directory), and
+returns the file's path. `Assistant.from_manifest()` loads it back, as the
+assistant class it names, with the workflow it holds:
 
 ```python
-def generate_manifest(self, output_dir: str = ".") -> str:
-    manifest_dict = self.to_dict()
-    output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
-    # Writes JSON file
-    return output_path
+from grafi.assistants.assistant import Assistant
+from grafi.common.import_ref import trust_modules
+
+path = assistant.generate_manifest("manifests")
+
+trust_modules("my_app")  # The modules defining your assistant, tools and functions.
+assistant = Assistant.from_manifest(path)
 ```
 
-**Parameters**:
-
-- `output_dir`: Directory for the manifest file (default: current directory)
-
-**Returns**: Path to the generated manifest file
+A manifest holds no secret: an API key is saved as the name of the environment
+variable it is read from. See [Manifests](manifests.md).
 
 ## AssistantBaseBuilder Class
 

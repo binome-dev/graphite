@@ -146,16 +146,24 @@ The durable state lives in the `EventStore`, so horizontal scaling is achieved
 by running many stateless processes that share one event store (e.g.
 `EventStorePostgres`).
 
-### Security: deserializing workflows
+### Security: loading manifests
 
-Topic conditions and user functions are serialized with `cloudpickle`. Loading
-them executes embedded code, so deserialization of workflow/topic/tool manifests
-is **disabled by default**. Enable it only for data from a trusted source:
+A manifest (`assistant.generate_manifest()`, `Assistant.from_manifest(path)`)
+is JSON with no code in it: it names classes and functions by import path, and
+loading imports them only from trusted modules, grafi's and those you name:
 
-```bash
-export GRAFI_ALLOW_PICKLE_DESERIALIZATION=true   # or call
-# grafi.common.pickle_guard.set_pickle_deserialization_allowed(True)
+```python
+from grafi.common.import_ref import trust_modules
+
+trust_modules("my_app")  # at startup, before loading a manifest
 ```
+
+A manifest never holds a secret's value: an API key is saved as the name of
+the environment variable it is read from, `{"env": "OPENAI_API_KEY"}`, and
+`from_manifest` lets a manifest read no other variable unless you name it
+(`env=[...]`). A manifest still chooses the endpoints its components call, such
+as an LLM's `base_url`: load manifests from sources you trust with the secrets
+they use. See the [manifests guide](docs/docs/user-guide/manifests.md).
 
 ### Observability & data-handling controls
 

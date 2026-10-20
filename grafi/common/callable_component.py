@@ -1,11 +1,10 @@
-"""A Pydantic base for callable logic that serializes as configuration data.
+"""A component that is a callable, saved as its configuration.
 
-A workflow callable that needs configuration (rather than just being a named
-function referenced by import path) is modeled as a ``CallableComponent``:
-subclass it, declare the configuration as Pydantic fields, and implement
-:meth:`__call__`. The *behavior* lives in your subclass (ordinary, reviewable
-Python in your codebase); the *manifest* carries only a reference to the class
-plus its validated field values.
+A callable that needs configuration (rather than just being a named function,
+referenced by import path) is a ``CallableComponent``: subclass it, declare the
+configuration as fields, and implement :meth:`__call__`. The *behavior* lives in
+your subclass (ordinary, reviewable Python in your codebase); the *manifest*
+holds only its class and fields, as any component's.
 
 Example::
 
@@ -17,37 +16,30 @@ Example::
             value = getattr(event.data[-1], self.field, 0)
             return value >= self.minimum
 
-A ``ThresholdCondition(field="score", minimum=0.8)`` round-trips as::
+A ``ThresholdCondition(field="score", minimum=0.8)`` is saved as::
 
-    {"component": "my_app.conditions:ThresholdCondition",
-     "config": {"field": "score", "minimum": 0.8}}
+    {"class": "my_app.conditions:ThresholdCondition",
+     "field": "score", "minimum": 0.8}
 
-No pickle, no embedded code: deserialization re-imports the class and re-validates
-the config, so a tampered manifest can at most construct a declared component
-with declared fields -- never execute arbitrary code.
+No pickle, no embedded code: loading re-imports the class, from a trusted
+module, and validates its fields, so a tampered manifest can at most build a
+declared component with declared fields -- never execute arbitrary code.
 """
 
 from abc import ABC
 from abc import abstractmethod
 from typing import Any
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
+from grafi.common.manifest import Component
 
 
-class CallableComponent(BaseModel, ABC):
-    """Base class for configurable, JSON-serializable callables.
-
-    Subclasses declare configuration as fields and implement :meth:`__call__`.
-    Instances are serialized by :mod:`grafi.common.callable_ref` as a class
-    reference plus config, with no pickle.
+class CallableComponent(Component, ABC):
+    """Base class for configurable callables, saved as components.
 
     :meth:`__call__` is abstract, so a subclass that forgets it (or the base
     itself) cannot be instantiated -- the contract is enforced when the component
     is built (e.g. as a manifest loads) rather than failing later at call time.
     """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @abstractmethod
     def __call__(self, *args: Any, **kwargs: Any) -> Any:

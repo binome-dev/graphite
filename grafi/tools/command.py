@@ -1,4 +1,3 @@
-from typing import Any
 from typing import Callable
 from typing import List
 from typing import Type
@@ -48,9 +47,6 @@ class Command(BaseModel):
         input_data: List[ConsumeFromTopicEvent],
     ) -> Messages:
         return [message for event in input_data for message in event.data]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"class": self.__class__.__name__}
 
 
 def use_command(command_class: Type[Command]) -> Callable:

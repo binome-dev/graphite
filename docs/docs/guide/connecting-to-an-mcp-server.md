@@ -167,7 +167,6 @@ Just like before we create an assistant that will act as an interface to be call
 
 ```python
 # assistant.py
-import os
 from typing import Optional
 from typing import Self
 
@@ -176,6 +175,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import env_secret
 from grafi.topics.input_topic import InputTopic
 from grafi.topics.output_topic import OutputTopic
 from grafi.topics.subscription_builder import SubscriptionBuilder
@@ -207,7 +207,8 @@ class StockAssistant(Assistant):
     )
     name: str = Field(default="StockAssistant")
     type: str = Field(default="StockAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    # Read from OPENAI_API_KEY, and saved in a manifest as a reference to it.
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     model: str = Field(default="gpt-4o-mini")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)

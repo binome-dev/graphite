@@ -7,9 +7,6 @@ from grafi.topics.topic_base import TopicBaseBuilder
 class Topic(TopicBase):
     """
     Represents a topic in a message queue system.
-
-    Serialization (``to_dict``/``from_dict``) is inherited from
-    :class:`~grafi.topics.topic_base.TopicBase`.
     """
 
     @classmethod

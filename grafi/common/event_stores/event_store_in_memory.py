@@ -1,5 +1,6 @@
 """Module for storing and managing events."""
 
+import json
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -17,16 +18,21 @@ class EventStoreInMemory(EventStore):
     already been stored (e.g. on a retry or workflow replay) is a no-op, matching
     the Postgres store's ``ON CONFLICT DO NOTHING`` semantics. Events are returned
     in insertion order, which is the stable, causal order recovery relies on.
+
+    With ``strict``, it keeps each event as a durable store does: encoded as
+    JSON, and decoded back, so an event that a durable store could not record,
+    or not read back as it was, fails here too, as in tests.
     """
 
     # Instance state is created in __init__; no mutable class-level default.
     events: List[Event]
     _event_ids: Set[str]
 
-    def __init__(self) -> None:
+    def __init__(self, *, strict: bool = False) -> None:
         """Initialize the event store."""
         self.events = []
         self._event_ids = set()
+        self.strict = strict
 
     async def record_event(self, event: Event) -> None:
         """Record an event to the store (idempotent on event_id)."""
@@ -34,11 +40,17 @@ class EventStoreInMemory(EventStore):
 
     async def record_events(self, events: Sequence[Event]) -> None:
         """Record events to the store (idempotent on event_id)."""
+        if self.strict:  # All encoded first, so a batch is all or nothing.
+            events = [self._stored(event) for event in events]
         for event in events:
             if event.event_id in self._event_ids:
                 continue
             self._event_ids.add(event.event_id)
             self.events.append(event)
+
+    def _stored(self, event: Event) -> Event:
+        """``event`` as a durable store gives it back."""
+        return self.codec.decode(json.loads(json.dumps(self.codec.encode(event))))
 
     async def clear_events(self) -> None:
         """Clear all events."""

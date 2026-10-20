@@ -14,6 +14,7 @@ from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -40,6 +41,7 @@ class OllamaTool(LLM):
 
     name: str = Field(default="OllamaTool")
     type: str = Field(default="OllamaTool")
+    api_key: Optional[str] = env_secret("OLLAMA_API_KEY")
     api_url: str = Field(default="http://localhost:11434")
     model: str = Field(default="qwen3")
 
@@ -124,7 +126,9 @@ class OllamaTool(LLM):
             "tools": api_functions,
             **self.chat_params,
         }
-        client = ollama.AsyncClient(self.api_url)
+        # Its own key, if any: the SDK would read OLLAMA_API_KEY otherwise.
+        headers = {"authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        client = ollama.AsyncClient(self.api_url, headers=headers)
         # Created per call, so closed per call.
         async with best_effort_exit(client, "Ollama client"):
             try:
@@ -179,38 +183,6 @@ class OllamaTool(LLM):
         ]
         return Message.model_validate(
             {"role": "assistant", "content": text, "tool_calls": tool_calls or None}
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "api_url": self.api_url,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "OllamaTool":
-        """
-        Create an OllamaTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the OllamaTool.
-
-        Returns:
-            OllamaTool: An OllamaTool instance created from the dictionary.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "OllamaTool"))
-            .type(data.get("type", "OllamaTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", True))
-            .system_message(data.get("system_message", ""))
-            .api_url(data.get("api_url", "http://localhost:11434"))
-            .model(data.get("model", "qwen3"))
-            .build()
         )
 
 

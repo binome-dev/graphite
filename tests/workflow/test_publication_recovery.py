@@ -1,7 +1,6 @@
 """Canonical publication IDs and offsets survive parallel and sequential runs."""
 
 import asyncio
-from typing import Any
 from typing import Sequence
 
 import pytest
@@ -48,10 +47,6 @@ class StreamTool(Tool):
         self.inputs.append([str(message.content) for message in input_data])
         for text in ("one", "two", "three"):
             yield [Message(role="assistant", content=text)]
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "StreamTool":
-        return cls()
 
 
 def workflow_and_input() -> tuple[EventDrivenWorkflow, StreamTool, PublishToTopicEvent]:

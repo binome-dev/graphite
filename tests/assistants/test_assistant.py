@@ -1,22 +1,72 @@
 import json
 import os
+from pathlib import Path
+from typing import ClassVar
+from typing import List
 from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import ValidationError
 
 from grafi.assistants.assistant import Assistant
+from grafi.assistants.assistant_base import AssistantBase
+from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import WorkflowError
+from grafi.common.manifest import ManifestError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.nodes.node_base import PublisherRouter
-from grafi.nodes.node_base import PublishRoute
+from grafi.nodes.node import Node
+from grafi.tools.tool import Tool
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_types import TopicType
+from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from grafi.workflows.workflow import Workflow
+
+
+class EchoTool(Tool):
+    """A tool answering with its reply, a field saved with it."""
+
+    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    reply: str = "echo"
+
+    async def invoke(self, invoke_context, input_data):
+        yield [Message(role="assistant", content=self.reply)]
+
+
+def _echo_workflow(reply: str = "echo") -> EventDrivenWorkflow:
+    """agent_input -> echo_node -> agent_output."""
+    input_topic = InputTopic(name="agent_input")
+    output_topic = OutputTopic(name="agent_output")
+    node = (
+        Node.builder()
+        .name("echo_node")
+        .tool(EchoTool(name="echo", reply=reply))
+        .subscribe(input_topic)
+        .publish_to(output_topic)
+        .build()
+    )
+    return EventDrivenWorkflow.builder().name("echo_workflow").node(node).build()
+
+
+class RecordingAssistant(Assistant):
+    """An assistant building its workflow in code, recording each build, with a
+    field of its own."""
+
+    builds: ClassVar[List[str]] = []
+
+    greeting: str = "hello"
+
+    def _construct_workflow(self) -> "RecordingAssistant":
+        type(self).builds.append(self.name)
+        self.workflow = _echo_workflow(reply=self.greeting)
+        return self
 
 
 class TestAssistant:
@@ -46,7 +96,6 @@ class TestAssistant:
             )
 
         mock_workflow.invoke.return_value = mock_invoke()
-        mock_workflow.to_dict.return_value = {"workflow": "data"}
         return mock_workflow
 
     @pytest.fixture
@@ -61,6 +110,17 @@ class TestAssistant:
                 workflow=mock_workflow,
             )
             return assistant
+
+    @pytest.fixture
+    def assistant(self):
+        """An assistant with a real workflow, which a manifest can hold."""
+        return Assistant(
+            assistant_id="test_id",
+            name="test_assistant",
+            type="test_type",
+            oi_span_type=OpenInferenceSpanKindValues.AGENT,
+            workflow=_echo_workflow(),
+        )
 
     @pytest.fixture
     def input_messages(self):
@@ -103,6 +163,15 @@ class TestAssistant:
         with patch.object(Assistant, "_construct_workflow") as mock_construct:
             Assistant()
             mock_construct.assert_called_once()
+
+    def test_given_workflow_is_not_constructed(self):
+        """An assistant given its workflow keeps it, without building one."""
+        with patch.object(Assistant, "_construct_workflow") as mock_construct:
+            workflow = _echo_workflow()
+            assistant = Assistant(workflow=workflow)
+
+            mock_construct.assert_not_called()
+            assert assistant.workflow is workflow
 
     # Test Async Invoke Method
     @pytest.mark.asyncio
@@ -218,37 +287,48 @@ class TestAssistant:
             async for _ in mock_assistant.invoke(input_data):
                 pass
 
-    # Test to_dict Method
-    def test_to_dict_success(self, mock_assistant):
-        """Test successful to_dict method."""
-        result = mock_assistant.to_dict()
+    # Test to_manifest Method
+    def test_to_manifest_success(self, assistant):
+        """The manifest wraps the assistant's JSON in the grafi/v2 envelope."""
+        result = assistant.to_manifest()
 
-        assert result == {
-            "assistant_id": "test_id",
-            "name": "test_assistant",
-            "oi_span_type": "AGENT",
-            "type": "test_type",
-            "workflow": {
-                "workflow": "data",
-            },
-        }
-        mock_assistant.workflow.to_dict.assert_called_once()
-
-    def test_to_dict_workflow_exception_propagated(self, mock_assistant):
-        """Test that workflow to_dict exceptions are propagated."""
-        mock_assistant.workflow.to_dict.side_effect = RuntimeError(
-            "Serialization error"
+        assert set(result) == {"apiVersion", "kind", "spec"}
+        assert result["apiVersion"] == "grafi/v2"
+        assert result["kind"] == "Assistant"
+        spec = result["spec"]
+        assert spec == assistant.model_dump(mode="json")
+        assert spec["class"] == "grafi.assistants.assistant:Assistant"
+        assert spec["assistant_id"] == "test_id"
+        assert spec["name"] == "test_assistant"
+        assert spec["type"] == "test_type"
+        assert spec["oi_span_type"] == "AGENT"
+        # The workflow is saved, with its topics and nodes
+        workflow = spec["workflow"]
+        assert workflow["class"] == (
+            "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow"
         )
+        assert workflow["workflow_id"] == assistant.workflow.workflow_id
+        assert set(workflow["topics"]) == {"agent_input", "agent_output"}
+        assert workflow["nodes"]["echo_node"]["tool"]["class"] == (
+            f"{__name__}:EchoTool"
+        )
+        # The manifest is plain JSON
+        assert json.loads(json.dumps(result)) == result
 
-        with pytest.raises(RuntimeError, match="Serialization error"):
-            mock_assistant.to_dict()
+    def test_to_manifest_serialization_error_propagated(self, assistant):
+        """A workflow that cannot be saved fails loudly."""
+        node = assistant.workflow.nodes["echo_node"]
+        node.publisher_router.routes[0].when = lambda event: True
+
+        with pytest.raises(CallableSerializationError, match="without pickle"):
+            assistant.to_manifest()
 
     # Test generate_manifest Method
-    def test_generate_manifest_success(self, mock_assistant, tmp_path):
+    def test_generate_manifest_success(self, assistant, tmp_path):
         """Test successful manifest generation."""
         output_dir = str(tmp_path)
 
-        result_path = mock_assistant.generate_manifest(output_dir)
+        result_path = assistant.generate_manifest(output_dir)
 
         # Verify the method returns the path to the generated manifest.
         expected_path = os.path.join(output_dir, "test_assistant_manifest.json")
@@ -260,47 +340,26 @@ class TestAssistant:
         with open(expected_path, "r") as f:
             manifest_data = json.load(f)
 
-        assert manifest_data == {
-            "assistant_id": "test_id",
-            "name": "test_assistant",
-            "oi_span_type": "AGENT",
-            "type": "test_type",
-            "workflow": {
-                "workflow": "data",
-            },
-        }
-        mock_assistant.workflow.to_dict.assert_called()
+        assert manifest_data == assistant.to_manifest()
 
-    def test_generate_manifest_with_default_directory(self, mock_assistant):
+    def test_generate_manifest_with_default_directory(
+        self, assistant, tmp_path, monkeypatch
+    ):
         """Test manifest generation with default directory."""
-        with patch("builtins.open", create=True) as mock_open:
-            with patch("json.dumps", return_value='{"workflow": "data"}') as mock_dumps:
-                mock_assistant.generate_manifest()
+        monkeypatch.chdir(tmp_path)
 
-                # Verify file was opened with correct path
-                expected_path = os.path.join(".", "test_assistant_manifest.json")
-                mock_open.assert_called_once_with(expected_path, "w")
+        result_path = assistant.generate_manifest()
 
-                # Verify JSON serialization
-                mock_dumps.assert_called_once_with(
-                    {
-                        "assistant_id": "test_id",
-                        "name": "test_assistant",
-                        "oi_span_type": "AGENT",
-                        "type": "test_type",
-                        "workflow": {
-                            "workflow": "data",
-                        },
-                    },
-                    indent=4,
-                )
+        assert result_path == os.path.join(".", "test_assistant_manifest.json")
+        manifest_file = tmp_path / "test_assistant_manifest.json"
+        assert json.loads(manifest_file.read_text()) == assistant.to_manifest()
 
-    def test_generate_manifest_custom_directory(self, mock_assistant, tmp_path):
+    def test_generate_manifest_custom_directory(self, assistant, tmp_path):
         """Test manifest generation with custom directory."""
         custom_dir = tmp_path / "custom"
         custom_dir.mkdir()
 
-        mock_assistant.generate_manifest(str(custom_dir))
+        assistant.generate_manifest(str(custom_dir))
 
         expected_path = custom_dir / "test_assistant_manifest.json"
         assert expected_path.exists()
@@ -308,15 +367,8 @@ class TestAssistant:
         with open(expected_path, "r") as f:
             manifest_data = json.load(f)
 
-        assert manifest_data == {
-            "assistant_id": "test_id",
-            "name": "test_assistant",
-            "oi_span_type": "AGENT",
-            "type": "test_type",
-            "workflow": {
-                "workflow": "data",
-            },
-        }
+        assert manifest_data["kind"] == "Assistant"
+        assert manifest_data["spec"]["assistant_id"] == "test_id"
 
     @pytest.mark.asyncio
     async def test_eight_node_dag_workflow(self):
@@ -563,19 +615,59 @@ class TestAssistant:
         expected_output = "ABCDABCEABCFGH"
         assert result_events[0].data[0].content == expected_output
 
-    def test_generate_manifest_file_write_error(self, mock_assistant):
-        """Test manifest generation with file write error."""
-        with patch("builtins.open", side_effect=IOError("Permission denied")):
-            with pytest.raises(IOError, match="Permission denied"):
-                mock_assistant.generate_manifest()
+    @pytest.mark.parametrize(
+        "name", ["../escaped", "nested/name", "..", "a..b", "C:evil", "a\\b"]
+    )
+    def test_a_name_holding_a_path_is_never_a_manifests_file(
+        self, assistant, tmp_path, name
+    ):
+        assistant.name = name
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
 
-    def test_generate_manifest_json_serialization_error(self, mock_assistant):
-        """Test manifest generation with JSON serialization error."""
-        # Make to_dict return something that can't be serialized
-        mock_assistant.workflow.to_dict.return_value = {"key": object()}
+        with pytest.raises(ManifestError, match="so it holds no path"):
+            assistant.generate_manifest(str(output_dir))
 
-        with pytest.raises(TypeError):
-            mock_assistant.generate_manifest()
+        assert list(tmp_path.rglob("*")) == [output_dir]
+
+    def test_generate_manifest_file_write_error(self, assistant, tmp_path):
+        """Test manifest generation into a directory that does not exist."""
+        with pytest.raises(FileNotFoundError):
+            assistant.generate_manifest(str(tmp_path / "missing"))
+
+    def test_failed_save_keeps_the_previous_manifest(self, assistant, tmp_path):
+        """A save that fails leaves the manifest already written whole."""
+        path = assistant.generate_manifest(str(tmp_path))
+        saved = Path(path).read_text()
+        node = assistant.workflow.nodes["echo_node"]
+        node.publisher_router.routes[0].when = lambda event: True
+
+        with pytest.raises(CallableSerializationError):
+            assistant.generate_manifest(str(tmp_path))
+
+        assert Path(path).read_text() == saved
+        assert list(tmp_path.iterdir()) == [Path(path)]
+
+    def test_a_failed_write_leaves_no_temporary_file(
+        self, assistant, tmp_path, monkeypatch
+    ):
+        def fail(*args):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(os, "replace", fail)
+
+        with pytest.raises(OSError, match="disk full"):
+            assistant.generate_manifest(str(tmp_path))
+
+        assert list(tmp_path.iterdir()) == []
+
+    def test_generate_manifest_serialization_error(self, assistant, tmp_path):
+        """Test manifest generation with a workflow that cannot be saved."""
+        node = assistant.workflow.nodes["echo_node"]
+        node.publisher_router.routes[0].when = lambda event: True
+
+        with pytest.raises(CallableSerializationError, match="without pickle"):
+            assistant.generate_manifest(str(tmp_path))
 
     @pytest.mark.asyncio
     async def test_full_async_workflow_integration(
@@ -604,185 +696,286 @@ class TestAssistant:
             with pytest.raises(Exception):  # This should fail during validation
                 Assistant(workflow=None)
 
-    def test_assistant_name_affects_manifest_filename(self, mock_workflow, tmp_path):
+    def test_assistant_name_affects_manifest_filename(self, tmp_path):
         """Test that assistant name affects manifest filename."""
-        with patch.object(Assistant, "_construct_workflow"):
-            assistant = Assistant(name="special_assistant_name", workflow=mock_workflow)
+        assistant = Assistant(name="special_assistant_name", workflow=_echo_workflow())
 
-            assistant.generate_manifest(str(tmp_path))
+        assistant.generate_manifest(str(tmp_path))
 
-            expected_file = tmp_path / "special_assistant_name_manifest.json"
-            assert expected_file.exists()
+        expected_file = tmp_path / "special_assistant_name_manifest.json"
+        assert expected_file.exists()
 
-    # Test from_dict Method
+
+class TestAssistantFromManifest:
+    """``Assistant.from_manifest`` restores an assistant, with its saved
+    workflow, from a manifest file or dict."""
+
+    @pytest.fixture(autouse=True)
+    def no_builds(self):
+        RecordingAssistant.builds.clear()
+        yield
+        RecordingAssistant.builds.clear()
+
+    @pytest.fixture
+    def original(self) -> RecordingAssistant:
+        assistant = RecordingAssistant(
+            assistant_id="recording_id",
+            name="recording_assistant",
+            type="recording_type",
+            oi_span_type=OpenInferenceSpanKindValues.CHAIN,
+            greeting="hi there",
+        )
+        assert RecordingAssistant.builds == ["recording_assistant"]
+        return assistant
+
+    def _check_restored(
+        self, restored: AssistantBase, original: RecordingAssistant
+    ) -> None:
+        assert type(restored) is RecordingAssistant
+        assert restored.assistant_id == "recording_id"
+        assert restored.name == "recording_assistant"
+        assert restored.type == "recording_type"
+        assert restored.oi_span_type == OpenInferenceSpanKindValues.CHAIN
+        # The subclass's own field survives
+        assert restored.greeting == "hi there"
+        # The workflow is the saved one, not one built again
+        assert RecordingAssistant.builds == ["recording_assistant"]
+        workflow = restored.workflow
+        assert isinstance(workflow, EventDrivenWorkflow)
+        assert workflow is not original.workflow
+        assert workflow.workflow_id == original.workflow.workflow_id
+        assert workflow.name == "echo_workflow"
+        node = workflow.nodes["echo_node"]
+        assert node.node_id == original.workflow.nodes["echo_node"].node_id
+        assert type(node.tool) is EchoTool
+        assert node.tool.reply == "hi there"
+        assert node.subscribed_topics == [workflow._topics["agent_input"]]
+        assert node.publish_to == [workflow._topics["agent_output"]]
+
+    def test_from_manifest_file(self, original: RecordingAssistant, tmp_path):
+        path = original.generate_manifest(str(tmp_path))
+
+        restored = Assistant.from_manifest(path)
+
+        self._check_restored(restored, original)
+
+    def test_from_manifest_path_object(self, original: RecordingAssistant, tmp_path):
+        path = original.generate_manifest(str(tmp_path))
+
+        restored = RecordingAssistant.from_manifest(tmp_path / os.path.basename(path))
+
+        self._check_restored(restored, original)
+
+    def test_from_manifest_dict(self, original: RecordingAssistant):
+        restored = Assistant.from_manifest(original.to_manifest())
+
+        self._check_restored(restored, original)
+
+    def test_round_trip_is_stable(self, original: RecordingAssistant, tmp_path):
+        manifest = original.to_manifest()
+
+        restored = Assistant.from_manifest(manifest)
+
+        assert restored.to_manifest() == manifest
+        path = restored.generate_manifest(str(tmp_path))
+        assert json.loads(open(path).read()) == manifest
+        assert Assistant.from_manifest(path).to_manifest() == manifest
+
+    def test_model_validate_also_skips_construction(self, original: RecordingAssistant):
+        restored = AssistantBase.model_validate(original.model_dump(mode="json"))
+
+        self._check_restored(restored, original)
+
     @pytest.mark.asyncio
-    async def test_from_dict_basic(self):
-        """Test basic deserialization from dictionary."""
-        from grafi.nodes.node import Node
-        from grafi.tools.tool import Tool
-        from grafi.tools.tool_factory import ToolFactory
-        from grafi.topics.expressions.topic_expression import TopicExpr
-        from grafi.topics.topic_impl.input_topic import InputTopic
-        from grafi.topics.topic_impl.output_topic import OutputTopic
-        from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+    async def test_restored_assistant_runs(self, original: RecordingAssistant):
+        restored = Assistant.from_manifest(original.to_manifest())
+        input_data = PublishToTopicEvent(
+            invoke_context=InvokeContext(
+                conversation_id="conversation",
+                invoke_id="invoke",
+                assistant_request_id="restored_request",
+            ),
+            data=[Message(role="user", content="hello")],
+        )
 
-        # Create a simple mock tool for testing
-        class SimpleMockTool(Tool):
-            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+        outputs = [event async for event in restored.invoke(input_data)]
 
-            async def invoke(self, invoke_context, input_data):
-                yield [Message(role="assistant", content="mock response")]
+        assert [event.data[0].content for event in outputs] == ["hi there"]
 
-            @classmethod
-            async def from_dict(cls, data):
-                return cls(
-                    tool_id=data.get("tool_id", "default-id"),
-                    name=data.get("name", "SimpleMockTool"),
-                    type=data.get("type", "SimpleMockTool"),
-                    oi_span_type=data.get(
-                        "oi_span_type", OpenInferenceSpanKindValues.TOOL
+    def test_manifest_of_another_kind_fails(self, original: RecordingAssistant):
+        """A manifest saying it holds another kind is refused."""
+        manifest = {**original.to_manifest(), "kind": "Workflow"}
+
+        with pytest.raises(
+            ManifestError,
+            match="The manifest's kind is 'Workflow', but its spec is of kind "
+            "'Assistant'.",
+        ):
+            Assistant.from_manifest(manifest)
+        # Checked before anything is built.
+        assert RecordingAssistant.builds == ["recording_assistant"]
+
+    def test_manifest_without_a_kind_fails(self, original: RecordingAssistant):
+        manifest = original.to_manifest()
+        del manifest["kind"]
+
+        with pytest.raises(ManifestError, match="The manifest's kind is None"):
+            Assistant.from_manifest(manifest)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            ("workflow",),
+            ("workflow", "nodes", "echo_node"),
+            ("workflow", "nodes", "echo_node", "tool"),
+            ("workflow", "topics", "agent_input"),
+        ],
+    )
+    def test_every_component_of_a_manifest_names_its_class(
+        self, original: RecordingAssistant, path
+    ):
+        manifest = original.to_manifest()
+        component = manifest["spec"]
+        for key in path:
+            component = component[key]
+        del component["class"]
+
+        with pytest.raises(ManifestError, match='names its class, as "class"'):
+            Assistant.from_manifest(manifest)
+
+    def test_python_dump_round_trips(self, original: RecordingAssistant):
+        """A python-mode dump holds values, classes themselves among them, and
+        loads back in this process, keeping the workflow."""
+        data = original.model_dump()
+
+        assert data["class"] is RecordingAssistant
+        assert data["workflow"]["class"] is EventDrivenWorkflow
+        assert data["workflow"]["nodes"]["echo_node"]["tool"]["class"] is EchoTool
+
+        restored = AssistantBase.model_validate(data)
+
+        self._check_restored(restored, original)
+        assert restored.model_dump() == data
+        assert restored.to_manifest() == original.to_manifest()
+
+    def test_workflow_manifest_is_not_an_assistant(self, original: RecordingAssistant):
+        """A workflow's manifest does not load as an assistant."""
+        manifest = original.workflow.to_manifest()
+        assert manifest["kind"] == "Workflow"
+
+        with pytest.raises(ManifestError, match="is not a subclass of Assistant"):
+            Assistant.from_manifest(manifest)
+
+    def test_unsupported_version_fails(self, original: RecordingAssistant):
+        manifest = {**original.to_manifest(), "apiVersion": "grafi/v9"}
+
+        with pytest.raises(ManifestError, match="Unsupported manifest version"):
+            Assistant.from_manifest(manifest)
+
+    def test_spec_without_class_fails(self, original: RecordingAssistant):
+        manifest = original.to_manifest()
+        del manifest["spec"]["class"]
+
+        with pytest.raises(ManifestError, match="with its class"):
+            Assistant.from_manifest(manifest)
+
+    def test_workflow_needs_its_topics(self, original: RecordingAssistant):
+        """A manifest without a workflow's topics cannot restore its nodes."""
+        manifest = original.to_manifest()
+        del manifest["spec"]["workflow"]["topics"]
+
+        with pytest.raises(ValidationError, match="Unknown topic 'agent_input'"):
+            Assistant.from_manifest(manifest)
+
+    def test_workflow_without_input_and_output_topics_fails(self):
+        """A manifest's workflow is checked as one built in code is."""
+        manifest = {
+            "apiVersion": "grafi/v2",
+            "kind": "Assistant",
+            "spec": {
+                "class": "grafi.assistants.assistant:Assistant",
+                "workflow": {
+                    "class": (
+                        "grafi.workflows.impl.event_driven_workflow:"
+                        "EventDrivenWorkflow"
                     ),
-                )
+                    "nodes": {},
+                    "topics": {},
+                },
+            },
+        }
 
-        # Register the mock tool
-        ToolFactory.register_tool_class("SimpleMockTool", SimpleMockTool)
+        with pytest.raises(WorkflowError, match="agent_input_topic"):
+            Assistant.from_manifest(manifest)
 
-        try:
-            # Create a complete workflow
-            input_topic = InputTopic(name="test_input")
-            output_topic = OutputTopic(name="test_output")
-            mock_tool = SimpleMockTool()
-            node = Node(
-                name="test_node",
-                tool=mock_tool,
-                subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publisher_router=PublisherRouter(
-                    routes=[PublishRoute(topic=output_topic)]
-                ),
-            )
-            workflow = EventDrivenWorkflow(nodes={"test_node": node})
-
-            # Create an assistant with the workflow
-            with patch.object(Assistant, "_construct_workflow"):
-                original = Assistant(
-                    assistant_id="test_id",
-                    name="test_assistant",
-                    type="test_type",
-                    oi_span_type=OpenInferenceSpanKindValues.AGENT,
-                    workflow=workflow,
-                )
-
-            # Serialize to dict
-            data = original.to_dict()
-
-            # Deserialize back
-            restored = await Assistant.from_dict(data)
-
-            # Verify key properties match
-            assert isinstance(restored, Assistant)
-            assert restored.name == "test_assistant"
-            assert restored.type == "test_type"
-            assert restored.oi_span_type == OpenInferenceSpanKindValues.AGENT
-            assert restored.workflow is not None
-            assert isinstance(restored.workflow, EventDrivenWorkflow)
-        finally:
-            # Clean up
-            ToolFactory.unregister_tool_class("SimpleMockTool")
-
-    @pytest.mark.asyncio
-    async def test_from_dict_roundtrip(self):
-        """Test serialization and deserialization roundtrip."""
-        from grafi.nodes.node import Node
-        from grafi.tools.tool import Tool
-        from grafi.tools.tool_factory import ToolFactory
-        from grafi.topics.expressions.topic_expression import TopicExpr
-        from grafi.topics.topic_impl.input_topic import InputTopic
-        from grafi.topics.topic_impl.output_topic import OutputTopic
-        from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
-
-        # Create a simple mock tool for testing
-        class RoundtripMockTool(Tool):
-            oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-
-            async def invoke(self, invoke_context, input_data):
-                yield [Message(role="assistant", content="roundtrip response")]
-
-            @classmethod
-            async def from_dict(cls, data):
-                return cls(
-                    tool_id=data.get("tool_id", "default-id"),
-                    name=data.get("name", "RoundtripMockTool"),
-                    type=data.get("type", "RoundtripMockTool"),
-                    oi_span_type=data.get(
-                        "oi_span_type", OpenInferenceSpanKindValues.TOOL
-                    ),
-                )
-
-        # Register the mock tool
-        ToolFactory.register_tool_class("RoundtripMockTool", RoundtripMockTool)
-
-        try:
-            # Create a complete workflow
-            input_topic = InputTopic(name="roundtrip_input")
-            output_topic = OutputTopic(name="roundtrip_output")
-            mock_tool = RoundtripMockTool()
-            node = Node(
-                name="roundtrip_node",
-                tool=mock_tool,
-                subscribed_expressions=[TopicExpr(topic=input_topic)],
-                publisher_router=PublisherRouter(
-                    routes=[PublishRoute(topic=output_topic)]
-                ),
-            )
-            workflow = EventDrivenWorkflow(nodes={"roundtrip_node": node})
-
-            # Create an assistant with the workflow
-            with patch.object(Assistant, "_construct_workflow"):
-                original = Assistant(
-                    assistant_id="roundtrip_id",
-                    name="roundtrip_assistant",
-                    type="roundtrip_type",
-                    oi_span_type=OpenInferenceSpanKindValues.CHAIN,
-                    workflow=workflow,
-                )
-
-            # Serialize to dict
-            data = original.to_dict()
-
-            # Deserialize back
-            restored = await Assistant.from_dict(data)
-
-            # Verify structure matches
-            assert isinstance(restored, Assistant)
-            assert restored.name == original.name
-            assert restored.type == original.type
-            assert restored.oi_span_type == original.oi_span_type
-            assert isinstance(restored.workflow, EventDrivenWorkflow)
-
-            # Verify workflow structure
-            assert len(restored.workflow.nodes) == len(original.workflow.nodes)
-            assert "roundtrip_node" in restored.workflow.nodes
-            assert "roundtrip_input" in restored.workflow._topics
-            assert "roundtrip_output" in restored.workflow._topics
-        finally:
-            # Clean up
-            ToolFactory.unregister_tool_class("RoundtripMockTool")
-
-    @pytest.mark.asyncio
-    async def test_from_dict_with_defaults(self):
-        """Test from_dict with missing fields uses defaults."""
-
-        # Minimal data with only workflow
-        data = {
+    def test_legacy_manifest_is_upgraded(self):
+        """A manifest saved by the former to_dict(), without an apiVersion,
+        loads, its own tool classes named with legacy_classes."""
+        legacy = {
+            "assistant_id": "legacy_id",
+            "name": "legacy_assistant",
+            "type": "assistant",
+            "oi_span_type": "AGENT",
             "workflow": {
+                "workflow_id": "legacy_workflow_id",
                 "name": "EventDrivenWorkflow",
                 "type": "EventDrivenWorkflow",
                 "oi_span_type": "AGENT",
-                "nodes": {},
-                "topics": {},
-            }
+                "topics": {
+                    "agent_input": {"name": "agent_input", "type": "AgentInputTopic"},
+                    "agent_output": {
+                        "name": "agent_output",
+                        "type": "AgentOutputTopic",
+                    },
+                },
+                "nodes": {
+                    "echo_node": {
+                        "class": "Node",
+                        "node_id": "legacy_node_id",
+                        "name": "echo_node",
+                        "type": "Node",
+                        "tool": {
+                            "class": "EchoTool",
+                            "base_class": "Tool",
+                            "tool_id": "legacy_tool_id",
+                            "name": "echo",
+                            "type": "EchoTool",
+                            "oi_span_type": "TOOL",
+                        },
+                        "oi_span_type": "CHAIN",
+                        "subscribed_expressions": [{"topic": "agent_input"}],
+                        "publish_to": ["agent_output"],
+                        "command": {"class": "Command"},
+                    }
+                },
+            },
         }
 
-        # This should fail because EventDrivenWorkflow needs input/output topics
-        with pytest.raises(Exception):  # Will raise WorkflowError
-            await Assistant.from_dict(data)
+        with pytest.raises(ManifestError, match="Unknown tool class 'EchoTool'"):
+            Assistant.from_manifest(legacy)
+
+        restored = Assistant.from_manifest(
+            legacy, legacy_classes={"EchoTool": EchoTool}
+        )
+
+        assert type(restored) is Assistant
+        assert restored.assistant_id == "legacy_id"
+        workflow = restored.workflow
+        assert isinstance(workflow, EventDrivenWorkflow)
+        assert workflow.workflow_id == "legacy_workflow_id"
+        node = workflow.nodes["echo_node"]
+        assert node.node_id == "legacy_node_id"
+        assert type(node.tool) is EchoTool
+        assert node.tool.tool_id == "legacy_tool_id"
+        assert node.publish_to == [workflow._topics["agent_output"]]
+        assert type(workflow._topics["agent_input"]) is InputTopic
+
+        # Loaded through a subclass, it is one, with the saved workflow.
+        recording = RecordingAssistant.from_manifest(
+            legacy, legacy_classes={"EchoTool": EchoTool}
+        )
+
+        assert type(recording) is RecordingAssistant
+        assert recording.assistant_id == "legacy_id"
+        assert recording.workflow.workflow_id == "legacy_workflow_id"
+        assert RecordingAssistant.builds == []

@@ -1,3 +1,5 @@
+from contextlib import AbstractContextManager
+from contextlib import nullcontext
 from typing import Any
 from typing import AsyncGenerator
 from typing import Dict
@@ -10,6 +12,7 @@ from typing import overload
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import PrivateAttr
+from pydantic import computed_field
 
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_workflow_invoke
@@ -18,7 +21,7 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import WorkflowError
-from grafi.nodes.node import Node
+from grafi.common.manifest import ManifestError
 from grafi.nodes.node_base import NodeBase
 from grafi.runtime.deltas import Delta
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
@@ -27,7 +30,7 @@ from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_factory import TopicFactory
+from grafi.topics.topic_base import loading_topics
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.workflow_run import WorkflowRun
@@ -35,14 +38,13 @@ from grafi.workflows.workflow import Workflow
 from grafi.workflows.workflow import WorkflowBuilder
 
 # Instance methods for using a topic on its own: a workflow run calls only
-# prepare_publication() (and serializes the topic), so it would skip an
-# override of any of these.
+# prepare_publication(), so it would skip an override of any of these.
 _SKIPPED_TOPIC_METHODS = tuple(
     name
     for name, value in vars(TopicBase).items()
     if callable(value)
-    and not name.startswith("_")
-    and name not in {"prepare_publication", "to_dict"}
+    and not name.startswith(("_", "model_"))
+    and name != "prepare_publication"
 )
 
 
@@ -57,6 +59,8 @@ class EventDrivenWorkflow(Workflow):
     per-invocation state (the topics' events, running steps, stop flag), so
     concurrent invocations of one instance are isolated from each other; the
     definition only keeps a registry of its runs in flight, which stop() uses.
+
+    It is saved with its topics, which its nodes name.
     """
 
     name: str = "EventDrivenWorkflow"
@@ -92,6 +96,28 @@ class EventDrivenWorkflow(Workflow):
                 )
         self._add_topics()
         self._handle_function_calling_nodes()
+
+    @computed_field(repr=False)  # type: ignore[prop-decorator]
+    @property
+    def topics(self) -> Dict[str, TopicBase]:
+        """The workflow's topics, by name: those its nodes subscribe and
+        publish to."""
+        return dict(self._topics)
+
+    @classmethod
+    def _loading(
+        cls, data: Dict[str, Any], context: Any
+    ) -> AbstractContextManager[object]:
+        if "topics" not in data:
+            return nullcontext()
+        topics = {
+            name: TopicBase.model_validate(topic, context=context)
+            for name, topic in data.pop("topics").items()
+        }
+        for name, topic in topics.items():
+            if topic.name != name:
+                raise ManifestError(f"The topic {topic.name!r} is keyed as {name!r}.")
+        return loading_topics(topics)
 
     def stop(self) -> None:
         """Stop every run of this workflow in flight.
@@ -287,36 +313,3 @@ class EventDrivenWorkflow(Workflow):
     ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
         """The run's outputs, with the workflow's invoke events recorded."""
         return run.run(input_data, is_sequential, stream=stream)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "topics": {name: topic.to_dict() for name, topic in self._topics.items()},
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "EventDrivenWorkflow":
-        """
-        Create a EventDrivenWorkflow instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the EventDrivenWorkflow.
-        """
-        workflow_builder = (
-            cls.builder()
-            .name(data["name"])
-            .type(data["type"])
-            .oi_span_type(
-                OpenInferenceSpanKindValues(data.get("oi_span_type", "AGENT"))
-            )
-        )
-        topics: Dict[str, TopicBase] = {}
-        for topic_dict in data.get("topics", {}).values():
-            topic = await TopicFactory.from_dict(topic_dict)
-            topics[topic.name] = topic
-
-        for node_dict in data.get("nodes", {}).values():
-            node = await Node.from_dict(node_dict, topics)
-            workflow_builder = workflow_builder.node(node)
-
-        return workflow_builder.build()

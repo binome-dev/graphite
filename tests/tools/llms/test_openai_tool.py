@@ -10,6 +10,7 @@ from openai.types.chat import ChatCompletion
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel
+from pydantic_core import PydanticSerializationError
 
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.models.function_spec import FunctionSpec
@@ -21,6 +22,7 @@ from grafi.runtime import Delta
 from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.openai_adapter import to_openai_tool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.tools.tool import Tool
 
 
 @pytest.fixture
@@ -187,35 +189,83 @@ async def test_invoke_api_error(openai_instance, invoke_context):
             pass
 
 
-def test_to_dict(openai_instance):
-    result = openai_instance.to_dict()
-    assert result["name"] == "OpenAITool"
-    assert result["type"] == "OpenAITool"
-    assert result["api_key"] == "****************"
-    assert result["model"] == "gpt-4.1-nano"
-    assert result["system_message"] == "dummy system message"
-    assert result["oi_span_type"] == "LLM"
+OPENAI_TOOL = "grafi.tools.llms.impl.openai_tool:OpenAITool"
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "OpenAITool",
-        "tool_id": "test-id",
+@pytest.fixture
+def saved_openai(monkeypatch: pytest.MonkeyPatch) -> OpenAITool:
+    """An OpenAITool with every field set, its key from OPENAI_API_KEY."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test_api_key")
+    return OpenAITool(
+        name="TestOpenAI",
+        system_message="You are helpful",
+        api_key="test_api_key",
+        model="gpt-5-mini",
+        base_url="https://proxy.example/v1",
+        reasoning_effort="medium",
+        verbosity="high",
+        chat_params={"temperature": 0.7},
+        is_streaming=False,
+    )
+
+
+def test_dump_names_the_class_and_saves_the_key_as_its_variable(saved_openai):
+    assert saved_openai.model_dump(mode="json") == {
+        "class": OPENAI_TOOL,
+        "tool_id": saved_openai.tool_id,
         "name": "TestOpenAI",
         "type": "OpenAITool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "api_key": {"env": "OPENAI_API_KEY"},
+        "model": "gpt-5-mini",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+        "base_url": "https://proxy.example/v1",
+        "reasoning_effort": "medium",
+        "verbosity": "high",
+    }
+    # Not in the repr. A python-mode dump holds values, the key's too, and
+    # names the class itself: it round-trips in this process.
+    assert "test_api_key" not in repr(saved_openai)
+    python_dump = saved_openai.model_dump()
+    assert python_dump["class"] is OpenAITool
+    assert python_dump["api_key"] == "test_api_key"
+    assert OpenAITool.model_validate(python_dump) == saved_openai
+
+
+def test_round_trip(saved_openai):
+    data = saved_openai.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is OpenAITool
+    assert restored.tool_id == saved_openai.tool_id
+    assert restored.api_key == "test_api_key"  # Read from OPENAI_API_KEY.
+    assert restored.base_url == "https://proxy.example/v1"
+    assert restored.reasoning_effort == "medium"
+    assert restored.verbosity == "high"
+    assert restored == saved_openai
+    assert restored.model_dump(mode="json") == data
+
+
+def test_load_from_a_manifest_naming_the_class():
+    data = {
+        "class": OPENAI_TOOL,
+        "tool_id": "test-id",
+        "name": "TestOpenAI",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
         "model": "gpt-4.1-nano",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
-        "structured_output": False,
     }
 
-    tool = await OpenAITool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, OpenAITool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestOpenAI"
     assert tool.model == "gpt-4.1-nano"
     assert tool.system_message == "You are helpful"
@@ -224,21 +274,29 @@ async def test_from_dict():
     assert tool.structured_output is False
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip(openai_instance):
-    """Test that serialization and deserialization are consistent."""
-    # Serialize to dict
-    data = openai_instance.to_dict()
+def test_a_key_read_from_another_variable_is_saved_as_that_variable(monkeypatch):
+    monkeypatch.setenv("TEAM_OPENAI_KEY", "team_key")
 
-    # Deserialize back
-    restored = await OpenAITool.from_dict(data)
+    tool = Tool.model_validate(
+        {"class": OPENAI_TOOL, "api_key": {"env": "TEAM_OPENAI_KEY"}}
+    )
 
-    # Verify key properties match
-    assert restored.name == openai_instance.name
-    assert restored.model == openai_instance.model
-    assert restored.system_message == openai_instance.system_message
-    assert restored.chat_params == openai_instance.chat_params
-    assert restored.is_streaming == openai_instance.is_streaming
+    assert tool.api_key == "team_key"
+    assert tool.model_dump(mode="json")["api_key"] == {"env": "TEAM_OPENAI_KEY"}
+
+
+@pytest.mark.parametrize("env_key", ["the_env_key", None])
+def test_a_key_not_from_its_variable_is_never_saved(monkeypatch, env_key):
+    if env_key is None:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("OPENAI_API_KEY", env_key)
+    tool = OpenAITool(api_key="another_key")
+
+    with pytest.raises(
+        PydanticSerializationError, match="ManifestError: .*OpenAITool.api_key"
+    ):
+        tool.model_dump(mode="json")
 
 
 # --------------------------------------------------------------------------- #
@@ -257,9 +315,9 @@ def test_extra_create_kwargs_empty_by_default():
     assert tool._extra_create_kwargs() == {}
 
 
-@pytest.mark.asyncio
-async def test_reasoning_verbosity_roundtrip():
+def test_reasoning_verbosity_roundtrip():
     data = {
+        "class": OPENAI_TOOL,
         "name": "TestOpenAI",
         "type": "OpenAITool",
         "oi_span_type": "LLM",
@@ -267,11 +325,11 @@ async def test_reasoning_verbosity_roundtrip():
         "reasoning_effort": "medium",
         "verbosity": "high",
     }
-    tool = await OpenAITool.from_dict(data)
+    tool = Tool.model_validate(data)
     assert tool.reasoning_effort == "medium"
     assert tool.verbosity == "high"
-    assert tool.to_dict()["reasoning_effort"] == "medium"
-    assert tool.to_dict()["verbosity"] == "high"
+    assert tool.model_dump(mode="json")["reasoning_effort"] == "medium"
+    assert tool.model_dump(mode="json")["verbosity"] == "high"
 
 
 def test_prepare_api_input(openai_instance):

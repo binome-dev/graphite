@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 from typing import AsyncIterator
 from typing import List
 from unittest.mock import AsyncMock
@@ -10,7 +11,9 @@ import pytest
 from google.genai.types import FunctionCall
 from google.genai.types import GenerateContentResponse
 from google.genai.types import Part
+from pydantic_core import PydanticSerializationError
 
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
@@ -20,6 +23,7 @@ from grafi.common.models.message import Message
 from grafi.runtime import Delta
 from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
+from grafi.tools.tool import Tool
 
 
 def _response(*parts: Part) -> GenerateContentResponse:
@@ -196,57 +200,87 @@ def test_prepare_api_input(gemini_instance):
 
 
 # --------------------------------------------------------------------------- #
-#  to_dict()                                                                   #
+#  Saving and loading                                                          #
 # --------------------------------------------------------------------------- #
-def test_to_dict(gemini_instance):
-    d = gemini_instance.to_dict()
-    assert d["name"] == "GeminiTool"
-    assert d["type"] == "GeminiTool"
-    assert d["api_key"] == "****************"
-    assert d["model"] == "gemini-3.5-flash"
+GEMINI_TOOL = "grafi.tools.llms.impl.gemini_tool:GeminiTool"
 
 
-# --------------------------------------------------------------------------- #
-#  from_dict()                                                                 #
-# --------------------------------------------------------------------------- #
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "GeminiTool",
-        "tool_id": "test-id",
+@pytest.fixture
+def saved_gemini(monkeypatch: pytest.MonkeyPatch) -> GeminiTool:
+    """A GeminiTool with every field set, its key from GEMINI_API_KEY."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test_api_key")
+    return GeminiTool(
+        name="TestGemini",
+        system_message="You are helpful",
+        api_key="test_api_key",
+        model="gemini-3.5-pro",
+        thinking_budget=128,
+        chat_params={"temperature": 0.7},
+        is_streaming=False,
+    )
+
+
+def test_dump_names_the_class_and_saves_the_key_as_its_variable(saved_gemini):
+    assert saved_gemini.model_dump(mode="json") == {
+        "class": GEMINI_TOOL,
+        "tool_id": saved_gemini.tool_id,
         "name": "TestGemini",
         "type": "GeminiTool",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "api_key": {"env": "GEMINI_API_KEY"},
+        "model": "gemini-3.5-pro",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+        "thinking_budget": 128,
+    }
+
+
+def test_round_trip(saved_gemini):
+    data = saved_gemini.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is GeminiTool
+    assert restored.tool_id == saved_gemini.tool_id
+    assert restored.api_key == "test_api_key"  # Read from GEMINI_API_KEY.
+    assert restored.thinking_budget == 128
+    assert restored == saved_gemini
+    assert restored.model_dump(mode="json") == data
+
+
+def test_load_from_a_manifest_naming_the_class():
+    data = {
+        "class": GEMINI_TOOL,
+        "tool_id": "test-id",
+        "name": "TestGemini",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
         "model": "gemini-3.5-flash",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
-        "structured_output": False,
     }
 
-    tool = await GeminiTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, GeminiTool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestGemini"
     assert tool.model == "gemini-3.5-flash"
+    assert tool.thinking_budget is None
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip(gemini_instance):
-    """Test that serialization and deserialization are consistent."""
-    # Serialize to dict
-    data = gemini_instance.to_dict()
+def test_a_key_not_from_its_variable_is_never_saved(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "the_env_key")
+    tool = GeminiTool(api_key="another_key")
 
-    # Deserialize back
-    restored = await GeminiTool.from_dict(data)
-
-    # Verify key properties match
-    assert restored.name == gemini_instance.name
-    assert restored.model == gemini_instance.model
-    assert restored.system_message == gemini_instance.system_message
+    with pytest.raises(
+        PydanticSerializationError, match="ManifestError: .*GeminiTool.api_key"
+    ):
+        tool.model_dump(mode="json")
 
 
 # --------------------------------------------------------------------------- #
@@ -513,7 +547,8 @@ def test_a_signature_survives_the_event_store_and_an_unsigned_call_gets_the_skip
         ),
         data=[signed],
     )
-    [restored] = PublishToTopicEvent.from_dict(stored.to_dict()).data
+    encoded = json.loads(json.dumps(default_event_codec.encode(stored)))
+    [restored] = default_event_codec.decode(encoded).data
     # Another provider's call carries no signature; Gemini 3 needs one on the
     # first call of each answer, which then gets the documented skip value.
     unsigned = Message.model_validate(

@@ -1,12 +1,10 @@
 """
 Simplified event base classes with clear hierarchy.
+
 Reduces code duplication and provides consistent patterns for all events.
 """
 
-from abc import ABC
-from abc import abstractmethod
 from typing import Any
-from typing import Callable
 from typing import Dict
 from typing import Generic
 from typing import List
@@ -20,38 +18,21 @@ from pydantic import Field
 from grafi.common.events.event import Event
 from grafi.common.events.event import EventType
 from grafi.common.models.default_id import default_id
-from grafi.common.models.invoke_context import InvokeContext
 
 # ============================================================================
 # COMPONENT EVENT BASE
 # ============================================================================
 
 
-class ComponentEvent(Event, ABC):
+class ComponentEvent(Event):
     """
-    Base class for all component-related events (Node, Tool, Workflow, Assistant).
-    Provides common component event_context fields.
+    Base class for all component-related events (Node, Tool, Workflow, Assistant):
+    the component's id, name and type.
     """
 
     id: str = default_id
     name: str
     type: str
-
-    def component_dict(self) -> Dict[str, Any]:
-        """Get component event_context as dict."""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "type": self.type,
-            "invoke_context": self.invoke_context.model_dump(),
-        }
-
-    def to_dict_base(self) -> Dict[str, Any]:
-        """Base dict for component events."""
-        return {
-            **self.event_dict(),
-            "event_context": self.component_dict(),
-        }
 
 
 # ============================================================================
@@ -62,100 +43,26 @@ T_Input = TypeVar("T_Input")
 T_Output = TypeVar("T_Output")
 
 
-class InvokeEvent(ComponentEvent, Generic[T_Input], ABC):
+class InvokeEvent(ComponentEvent, Generic[T_Input]):
     """Base class for all invoke events."""
 
     input_data: T_Input
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **self.to_dict_base(),
-            "data": {
-                "input_data": self._serialize_input(self.input_data),
-            },
-        }
 
-    @abstractmethod
-    def _serialize_input(self, data: T_Input) -> Any:
-        """Serialize input data to dict/json."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def _deserialize_input(cls, data: Any) -> T_Input:
-        """Deserialize input data from dict/json."""
-        pass
-
-
-class RespondEvent(ComponentEvent, Generic[T_Input, T_Output], ABC):
+class RespondEvent(ComponentEvent, Generic[T_Input, T_Output]):
     """Base class for all respond events."""
 
     input_data: T_Input
     output_data: T_Output
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **self.to_dict_base(),
-            "data": {
-                "input_data": self._serialize_input(self.input_data),
-                "output_data": self._serialize_output(self.output_data),
-            },
-        }
 
-    @abstractmethod
-    def _serialize_input(self, data: T_Input) -> Any:
-        """Serialize input data to dict/json."""
-        pass
-
-    @abstractmethod
-    def _serialize_output(self, data: T_Output) -> Any:
-        """Serialize output data to dict/json."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def _deserialize_input(cls, data: Any) -> T_Input:
-        """Deserialize input data from dict/json."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def _deserialize_output(cls, data: Any) -> T_Output:
-        """Deserialize output data from dict/json."""
-        pass
-
-
-class FailedEvent(ComponentEvent, Generic[T_Input], ABC):
-    """Base class for all failed events."""
+class FailedEvent(ComponentEvent, Generic[T_Input]):
+    """Base class for all failed events: the error, as text, and its structured
+    details when they were captured."""
 
     input_data: T_Input
-    error: Any
+    error: str
     error_details: Optional[Dict[str, Any]] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        data: Dict[str, Any] = {
-            "input_data": self._serialize_input(self.input_data),
-            "error": str(self.error),
-        }
-        # Additive, backward-compatible: only present when structured details
-        # were captured, so existing stored events and tests keep a stable shape.
-        if self.error_details is not None:
-            data["error_details"] = self.error_details
-        return {
-            **self.to_dict_base(),
-            "data": data,
-        }
-
-    @abstractmethod
-    def _serialize_input(self, data: T_Input) -> Any:
-        """Serialize input data to dict/json."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def _deserialize_input(cls, data: Any) -> T_Input:
-        """Deserialize input data from dict/json."""
-        pass
 
 
 # ============================================================================
@@ -168,16 +75,6 @@ class NodeEventBase(ComponentEvent):
 
     subscribed_topics: List[str] = Field(default_factory=list)
     publish_to_topics: List[str] = Field(default_factory=list)
-
-    def component_dict(self) -> Dict[str, Any]:
-        base = super().component_dict()
-        base.update(
-            {
-                "subscribed_topics": self.subscribed_topics,
-                "publish_to_topics": self.publish_to_topics,
-            }
-        )
-        return base
 
 
 class ToolEventBase(ComponentEvent):
@@ -193,12 +90,6 @@ class AssistantEventBase(ComponentEvent):
 
     model: Optional[str] = None
 
-    def component_dict(self) -> Dict[str, Any]:
-        base = super().component_dict()
-        if self.model:
-            base["model"] = self.model
-        return base
-
 
 # ============================================================================
 # FACTORY FUNCTIONS FOR CREATING TYPED EVENTS
@@ -210,119 +101,30 @@ def create_component_events(
     component_name: str,
     input_type: Any,  # A type, or a typing form such as List[...] or Optional[...].
     output_type: Any,
-    serialize_input_fn: Callable,
-    serialize_output_fn: Callable,
-    deserialize_input_fn: Callable,
-    deserialize_output_fn: Callable,
+    module: str = __name__,
 ) -> Tuple[Type[InvokeEvent], Type[RespondEvent], Type[FailedEvent]]:
     """
     Factory to create a set of Invoke, Respond, and Failed events for a component.
+    Each class fixes its ``event_type``, and belongs to ``module``, where it is
+    defined.
 
     Returns:
         Tuple of (InvokeEvent, RespondEvent, FailedEvent) classes
     """
 
-    class ComponentInvokeEvent(InvokeEvent[input_type], base_class):  # type: ignore
-        event_type: EventType = EventType[f"{component_name.upper()}_INVOKE"]
+    def event_class(lifecycle: str, base: Type[ComponentEvent]) -> Any:
+        event_type = EventType[f"{component_name.upper()}_{lifecycle}"]
+        name = f"{event_type.value}Event"  # Such as NodeInvokeEvent.
+        namespace = {
+            "__annotations__": {"event_type": EventType},
+            "__module__": module,
+            "__qualname__": name,
+            "event_type": event_type,
+        }
+        return type(name, (base, base_class), namespace)
 
-        def _serialize_input(self, data: Any) -> Any:
-            return serialize_input_fn(data)
-
-        @classmethod
-        def _deserialize_input(cls, data: Any) -> Any:
-            return deserialize_input_fn(data)
-
-        @classmethod
-        def from_dict(cls, data: Dict[str, Any]) -> "ComponentInvokeEvent":
-            base_fields = cls.event_base(data)
-            event_context = data["event_context"]
-            return cls(
-                **base_fields,
-                invoke_context=InvokeContext.model_validate(
-                    event_context["invoke_context"]
-                ),
-                id=event_context["id"],
-                name=event_context["name"],
-                type=event_context["type"],
-                input_data=cls._deserialize_input(data["data"]["input_data"]),
-                **{
-                    k: v
-                    for k, v in event_context.items()
-                    if k
-                    not in ["id", "name", "type", "invoke_context", "component_type"]
-                },
-            )
-
-    class ComponentRespondEvent(RespondEvent[input_type, output_type], base_class):  # type: ignore
-        event_type: EventType = EventType[f"{component_name.upper()}_RESPOND"]
-
-        def _serialize_input(self, data: Any) -> Any:
-            return serialize_input_fn(data)
-
-        def _serialize_output(self, data: Any) -> Any:
-            return serialize_output_fn(data)
-
-        @classmethod
-        def _deserialize_input(cls, data: Any) -> Any:
-            return deserialize_input_fn(data)
-
-        @classmethod
-        def _deserialize_output(cls, data: Any) -> Any:
-            return deserialize_output_fn(data)
-
-        @classmethod
-        def from_dict(cls, data: Dict[str, Any]) -> "ComponentRespondEvent":
-            base_fields = cls.event_base(data)
-            event_context = data["event_context"]
-            return cls(
-                **base_fields,
-                invoke_context=InvokeContext.model_validate(
-                    event_context["invoke_context"]
-                ),
-                id=event_context["id"],
-                name=event_context["name"],
-                type=event_context["type"],
-                input_data=cls._deserialize_input(data["data"]["input_data"]),
-                output_data=cls._deserialize_output(data["data"]["output_data"]),
-                **{
-                    k: v
-                    for k, v in event_context.items()
-                    if k
-                    not in ["id", "name", "type", "invoke_context", "component_type"]
-                },
-            )
-
-    class ComponentFailedEvent(FailedEvent[input_type], base_class):  # type: ignore
-        event_type: EventType = EventType[f"{component_name.upper()}_FAILED"]
-
-        def _serialize_input(self, data: Any) -> Any:
-            return serialize_input_fn(data)
-
-        @classmethod
-        def _deserialize_input(cls, data: Any) -> Any:
-            return deserialize_input_fn(data)
-
-        @classmethod
-        def from_dict(cls, data: Dict[str, Any]) -> "ComponentFailedEvent":
-            base_fields = cls.event_base(data)
-            event_context = data["event_context"]
-            return cls(
-                **base_fields,
-                invoke_context=InvokeContext.model_validate(
-                    event_context["invoke_context"]
-                ),
-                id=event_context["id"],
-                name=event_context["name"],
-                type=event_context["type"],
-                input_data=cls._deserialize_input(data["data"]["input_data"]),
-                error=data["data"]["error"],
-                error_details=data["data"].get("error_details"),
-                **{
-                    k: v
-                    for k, v in event_context.items()
-                    if k
-                    not in ["id", "name", "type", "invoke_context", "component_type"]
-                },
-            )
-
-    return ComponentInvokeEvent, ComponentRespondEvent, ComponentFailedEvent
+    return (
+        event_class("INVOKE", InvokeEvent[input_type]),
+        event_class("RESPOND", RespondEvent[input_type, output_type]),
+        event_class("FAILED", FailedEvent[input_type]),
+    )

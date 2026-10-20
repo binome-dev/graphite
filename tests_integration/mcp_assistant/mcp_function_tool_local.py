@@ -212,12 +212,13 @@ async def test_mcp_function_tool_serialization_roundtrip() -> None:
         .build()
     )
 
-    # Serialize to dict
-    tool_dict = original_tool.to_dict()
-    print(f"Serialized tool: {json.dumps(tool_dict, indent=2, default=str)}")
+    # Save it as data: its server and the name of its tool
+    tool_dict = original_tool.model_dump(mode="json")
+    print(f"Serialized tool: {json.dumps(tool_dict, indent=2)}")
 
-    # Deserialize from dict
-    restored_tool = await MCPFunctionTool.from_dict(tool_dict)
+    # Load it back, which does not connect to the server
+    restored_tool = MCPFunctionTool.model_validate(tool_dict)
+    assert restored_tool.model_dump(mode="json") == tool_dict
 
     assert restored_tool.name == original_tool.name
     assert restored_tool.function_name == original_tool.function_name

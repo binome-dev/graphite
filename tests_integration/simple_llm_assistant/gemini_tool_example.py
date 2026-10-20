@@ -13,7 +13,7 @@ from grafi.runtime import Delta
 from grafi.runtime import current_services
 from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
-from grafi.tools.tool_factory import ToolFactory
+from grafi.tools.tool import Tool
 from grafi.topics.topic_types import TopicType
 
 event_store = current_services().event_store
@@ -155,13 +155,16 @@ async def test_gemini_tool_serialization() -> None:
     # Create original tool
     original_tool = GeminiTool.builder().api_key(api_key).build()
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
     print(f"Serialized: {serialized}")
+    assert serialized["api_key"] == {"env": "GEMINI_API_KEY"}
 
-    # Deserialize back using ToolFactory
-    ToolFactory.register_tool_class("GeminiTool", GeminiTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, GeminiTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works correctly
     content = ""
@@ -195,12 +198,15 @@ async def test_gemini_tool_with_chat_param_serialization() -> None:
         GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
     )
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
+    assert serialized["api_key"] == {"env": "GEMINI_API_KEY"}
 
-    # Deserialize back
-    ToolFactory.register_tool_class("GeminiTool", GeminiTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, GeminiTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
     async for messages in restored_tool.invoke(

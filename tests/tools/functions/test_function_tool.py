@@ -1,17 +1,25 @@
 import json
 import threading
 import uuid
+from typing import Optional
 
 import pytest
 from pydantic import BaseModel
+from pydantic_core import PydanticSerializationError
 
+from grafi.common.callable_component import CallableComponent
+from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.exceptions import FunctionToolException
+from grafi.common.import_ref import UntrustedImportError
+from grafi.common.manifest import ManifestError
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.runtime import Delta
 from grafi.runtime import deltas_to
 from grafi.tools.functions.function_tool import FunctionTool
+from grafi.tools.tool import Tool
 
 
 class DummyOutput(BaseModel):
@@ -160,59 +168,169 @@ def test_builder_with_custom_role():
     assert tool.name == "CustomTool"
 
 
-def test_to_dict(function_tool):
-    d = function_tool.to_dict()
-    assert d["name"] == "FunctionTool"
-    assert d["type"] == "FunctionTool"
-    assert d["role"] == "assistant"
-    assert d["base_class"] == "FunctionTool"
-    # A module-level function serializes as an import reference, not a pickle blob.
-    assert "function" in d
-    assert d["function"] == {"ref": f"{dummy_function.__module__}:dummy_function"}
+FUNCTION_TOOL = "grafi.tools.functions.function_tool:FunctionTool"
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from a dictionary with a function reference."""
+def test_dump(function_tool):
+    d = function_tool.model_dump(mode="json")
+    assert d == {
+        "class": FUNCTION_TOOL,
+        "tool_id": function_tool.tool_id,
+        "name": "FunctionTool",
+        "type": "FunctionTool",
+        "oi_span_type": "TOOL",
+        "role": "assistant",
+        # A module-level function serializes as an import reference, not a
+        # pickle blob.
+        "function": {"ref": f"{__name__}:dummy_function"},
+    }
+    # A python-mode dump keeps the function itself.
+    assert function_tool.model_dump()["function"] is dummy_function
+
+
+def test_load_from_a_manifest_naming_the_class():
+    """Test loading from a dictionary with a function reference."""
     data = {
-        "class": "FunctionTool",
+        "class": FUNCTION_TOOL,
         "tool_id": "test-id",
         "name": "TestFunction",
-        "type": "FunctionTool",
         "oi_span_type": "TOOL",
         "role": "tool",
         "function": {"ref": f"{__name__}:dummy_function"},
     }
 
-    tool = await FunctionTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, FunctionTool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestFunction"
     assert tool.role == "tool"
     assert tool.function is dummy_function
 
 
 @pytest.mark.asyncio
-async def test_from_dict_roundtrip(function_tool, invoke_context):
-    """Test that serialization and deserialization are consistent."""
-    # Serialize to dict
-    data = function_tool.to_dict()
+async def test_round_trip(invoke_context):
+    original = (
+        FunctionTool.builder()
+        .name("Generator")
+        .role("tool")
+        .function(async_generator_function)
+        .build()
+    )
+    data = original.model_dump(mode="json")
 
-    # Deserialize back
-    restored = await FunctionTool.from_dict(data)
+    restored = Tool.model_validate(data)
 
-    # Verify key properties match
-    assert restored.name == function_tool.name
-    assert restored.role == function_tool.role
-    assert restored.function is not None
+    assert type(restored) is FunctionTool
+    assert restored.tool_id == original.tool_id
+    assert restored.name == "Generator"
+    assert restored.role == "tool"
+    assert restored.function is async_generator_function
+    assert restored == original
+    assert restored.model_dump(mode="json") == data
+    # The function still works.
+    outputs = await _outputs(restored, invoke_context)
+    assert [[m.content for m in batch] for batch in outputs] == [
+        ['{"value":0}'],
+        ['{"value":1}'],
+        ['{"value":2}'],
+    ]
 
-    # Verify the function still works
-    input_messages = [Message(role="user", content="test")]
-    messages = []
-    async for msg in restored.invoke(invoke_context, input_messages):
-        messages.extend(msg)
-    assert isinstance(messages[0], Message)
-    assert "42" in messages[0].content
+
+def test_a_function_that_cannot_be_referenced_is_not_saved():
+    tool = FunctionTool.builder().function(lambda messages: "hi").build()
+
+    with pytest.raises(PydanticSerializationError, match="Cannot serialize callable"):
+        tool.model_dump(mode="json")
+
+
+def test_a_function_from_an_untrusted_module_is_not_loaded():
+    data = {"class": FUNCTION_TOOL, "function": {"ref": "os:getcwd"}}
+
+    with pytest.raises(UntrustedImportError):
+        Tool.model_validate(data)
+
+
+def test_a_function_that_is_not_found_is_not_loaded():
+    data = {"class": FUNCTION_TOOL, "function": {"ref": f"{__name__}:no_such"}}
+
+    with pytest.raises(CallableSerializationError, match="Cannot import"):
+        Tool.model_validate(data)
+
+
+class Greeter(CallableComponent):
+    """A function configured by its fields, one of them a secret."""
+
+    greeting: str = "hello"
+    token: Optional[str] = env_secret("GREETER_TOKEN")
+
+    def __call__(self, messages: Messages) -> str:
+        return f"{self.greeting}, {len(messages)}"
+
+
+@pytest.mark.asyncio
+async def test_a_callable_component_is_saved_as_its_class_and_fields(
+    monkeypatch, invoke_context
+):
+    monkeypatch.setenv("GREETER_TOKEN", "the-token")
+    original = FunctionTool.builder().function(Greeter(greeting="hi")).build()
+
+    data = original.model_dump(mode="json")
+
+    assert data["function"] == {
+        "class": f"{__name__}:Greeter",
+        "greeting": "hi",
+        "token": {"env": "GREETER_TOKEN"},
+    }
+    assert "the-token" not in json.dumps(data)
+    restored = Tool.model_validate(data)
+    assert type(restored.function) is Greeter
+    assert restored.function.greeting == "hi"
+    assert restored.function.token == "the-token"
+    assert restored == original
+    outputs = await _outputs(restored, invoke_context)
+    assert [[m.content for m in batch] for batch in outputs] == [["hi, 1"]]
+
+
+def test_a_callable_component_saved_before_grafi_v2_loads():
+    data = {
+        "class": FUNCTION_TOOL,
+        "function": {
+            "component": f"{__name__}:Greeter",
+            "config": {"greeting": "hey"},
+        },
+    }
+
+    tool = Tool.model_validate(data)
+
+    assert type(tool.function) is Greeter
+    assert tool.function.greeting == "hey"
+    assert tool.model_dump(mode="json")["function"]["class"] == f"{__name__}:Greeter"
+
+
+def test_a_callable_component_holding_a_secret_is_never_saved(monkeypatch):
+    monkeypatch.setenv("GREETER_TOKEN", "the-token")
+    tool = FunctionTool.builder().function(Greeter(token="another")).build()
+
+    with pytest.raises(ManifestError, match="Greeter.token"):
+        tool.to_manifest()
+
+
+def test_a_function_named_by_a_bare_string_is_not_loaded():
+    data = {"class": FUNCTION_TOOL, "function": f"{__name__}:dummy_function"}
+
+    with pytest.raises(CallableSerializationError, match='saved as {"ref"'):
+        Tool.model_validate(data)
+
+
+def test_a_grafi_function_that_is_not_a_condition_is_not_loaded():
+    data = {
+        "class": FUNCTION_TOOL,
+        "function": {"ref": "grafi.common.manifest:import_path"},
+    }
+
+    with pytest.raises(UntrustedImportError, match="grafi.nodes.conditions"):
+        Tool.model_validate(data)
 
 
 async def _outputs(tool: FunctionTool, context: InvokeContext) -> list[Messages]:

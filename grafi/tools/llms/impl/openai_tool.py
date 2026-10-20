@@ -1,4 +1,3 @@
-import os
 from typing import Any
 from typing import ClassVar
 from typing import Dict
@@ -7,6 +6,7 @@ from typing import Self
 
 from pydantic import Field
 
+from grafi.common.manifest import env_secret
 from grafi.tools.llms.impl.openai_compatible import OpenAICompatibleTool
 from grafi.tools.llms.impl.openai_compatible import OpenAICompatibleToolBuilder
 
@@ -24,7 +24,7 @@ class OpenAITool(OpenAICompatibleTool):
 
     name: str = Field(default="OpenAITool")
     type: str = Field(default="OpenAITool")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     # Default to the lowest-cost current chat model. Upgrade to "gpt-4.1-mini"/
     # "gpt-4.1" for harder tasks. For reasoning models (e.g. "gpt-5", "gpt-5-mini",
     # "o4-mini") set `reasoning_effort` and prefer `max_completion_tokens` over
@@ -46,6 +46,7 @@ class OpenAITool(OpenAICompatibleTool):
     )
 
     _provider_label: ClassVar[str] = "OpenAI"
+    _openai_settings: ClassVar[bool] = True
 
     @classmethod
     def builder(cls) -> "OpenAIToolBuilder":
@@ -60,33 +61,6 @@ class OpenAITool(OpenAICompatibleTool):
         if self.verbosity is not None:
             extra["verbosity"] = self.verbosity
         return extra
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "reasoning_effort": self.reasoning_effort,
-            "verbosity": self.verbosity,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "OpenAITool":
-        """Create an OpenAITool instance from a dictionary representation."""
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "OpenAITool"))
-            .type(data.get("type", "OpenAITool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", True))
-            .system_message(data.get("system_message", ""))
-            .api_key(os.getenv("OPENAI_API_KEY"))
-            .model(data.get("model", "gpt-4.1-nano"))
-            .reasoning_effort(data.get("reasoning_effort"))
-            .verbosity(data.get("verbosity"))
-            .build()
-        )
 
 
 class OpenAIToolBuilder(OpenAICompatibleToolBuilder[OpenAITool]):

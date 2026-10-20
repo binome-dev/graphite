@@ -9,7 +9,7 @@ The **FunctionTool** class is a `Tool` that runs a plain Python function on the 
 | `name`         | `str`                         | Human-readable name identifying the function tool (defaults to `"FunctionTool"`).    |
 | `type`         | `str`                         | Specifies the type of the tool (set to `"FunctionTool"`).                           |
 | `role`         | `str`                         | The role of the message a result becomes (defaults to `"assistant"`).               |
-| `function`     | `Callable[[Messages], Any]`   | The function: it takes the messages and returns, or streams, the tool's output.     |
+| `function`     | `CallableRef`                 | The function: it takes the messages and returns, or streams, the tool's output. Saved by import path, so it is a module-level function (or a `CallableComponent`). |
 | `oi_span_type` | `OpenInferenceSpanKindValues` | Semantic attribute from OpenInference used for tracing (set to `TOOL`).             |
 
 ## Methods
@@ -18,7 +18,7 @@ The **FunctionTool** class is a `Tool` that runs a plain Python function on the 
 |---------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> FunctionToolBuilder`                               | Returns a builder instance for constructing FunctionTool objects.                                  |
 | `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Runs the function and yields its output, one batch of messages per result. A failure raises `FunctionToolException`, with the original error as its cause. |
-| `to_dict`           | `() -> dict[str, Any]`                                              | Serializes the tool's configuration into a dictionary format for persistence or debugging.         |
+| `model_dump(mode="json")` | `() -> dict[str, Any]`                                        | Saves the tool as data, its function as `{"ref": "module:qualname"}`; a lambda or a nested function cannot be saved. See [Manifests](../manifests.md). |
 
 ## Usage and Customization
 

@@ -3,7 +3,6 @@ ClaudeTool - Anthropic Claude implementation of grafi.tools.llms.llm.LLM
 """
 
 import json
-import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -16,6 +15,7 @@ from pydantic import Field
 from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
@@ -46,9 +46,7 @@ class ClaudeTool(LLM):
 
     name: str = Field(default="ClaudeTool")
     type: str = Field(default="ClaudeTool")
-    api_key: Optional[str] = Field(
-        default_factory=lambda: os.getenv("ANTHROPIC_API_KEY")
-    )
+    api_key: Optional[str] = env_secret("ANTHROPIC_API_KEY")
     # Anthropic recommends not lowballing max_tokens; this is an upper bound, not
     # a cost floor (you pay for what is generated). Opus 4.x supports up to 128K
     # when streaming — raise this if you stream long outputs.
@@ -280,48 +278,6 @@ class ClaudeTool(LLM):
             )
 
         return [Message.model_validate(message_args)]
-
-    # ------------------------------------------------------------------ #
-    # Serialisation                                                      #
-    # ------------------------------------------------------------------ #
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "max_tokens": self.max_tokens,
-            "thinking": self.thinking,
-            "effort": self.effort,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "ClaudeTool":
-        """
-        Create a ClaudeTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the ClaudeTool.
-
-        Returns:
-            ClaudeTool: A ClaudeTool instance created from the dictionary.
-        """
-        # Create base instance from parent and add ClaudeTool-specific fields
-
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "ClaudeTool"))
-            .type(data.get("type", "ClaudeTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", True))
-            .system_message(data.get("system_message", ""))
-            .api_key(os.getenv("ANTHROPIC_API_KEY"))
-            .model(data.get("model", "claude-haiku-4-5"))
-            .max_tokens(data.get("max_tokens", 16384))
-            .thinking(data.get("thinking"))
-            .effort(data.get("effort"))
-            .build()
-        )
 
 
 class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):

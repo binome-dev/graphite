@@ -1,14 +1,32 @@
 """
-Tests for LLM base class utility functions.
+Tests for the LLM base class: function specs, and how chat_params are saved.
 """
+
+import json
+import re
+from typing import Optional
+from typing import Type
+from unittest.mock import Mock
 
 import pytest
 from pydantic import BaseModel
+from pydantic_core import PydanticSerializationError
 
+from openai import Omit
+
+from grafi.common.exceptions import LLMToolException
+from grafi.common.import_ref import UntrustedImportError
+from grafi.common.manifest import ManifestError
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message
+from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
+from grafi.tools.llms.impl.gemini_tool import GeminiTool
+from grafi.tools.llms.impl.openai_tool import OpenAITool
+from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.llms.llm import LLM
-from grafi.tools.llms.llm import add_additional_properties
+from grafi.tools.tool import Tool
 
 
 def _spec(name: str) -> FunctionSpec:
@@ -59,380 +77,308 @@ class NestedModel(BaseModel):
     active: bool
 
 
-class TestAddAdditionalProperties:
-    """Test suite for add_additional_properties function."""
+class TestChatParamsSaving:
+    """A pydantic model class in chat_params, such as a ``response_format``, is
+    saved as its import path and loaded back as the same class."""
 
-    def test_add_additional_properties_simple_object(self):
-        """Test adding additionalProperties to a simple object schema."""
-        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-
-        result = add_additional_properties(schema)
-
-        assert result["additionalProperties"] is False
-        assert result["type"] == "object"
-        assert "properties" in result
-
-    def test_add_additional_properties_nested_objects(self):
-        """Test adding additionalProperties to nested object schemas."""
-        schema = {
-            "type": "object",
-            "properties": {
-                "user": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
-                }
-            },
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["additionalProperties"] is False
-        assert result["properties"]["user"]["additionalProperties"] is False
-
-    def test_add_additional_properties_with_defs(self):
-        """Test adding additionalProperties to schemas with $defs."""
-        schema = {
-            "type": "object",
-            "properties": {"ref_field": {"$ref": "#/$defs/SubSchema"}},
-            "$defs": {
-                "SubSchema": {
-                    "type": "object",
-                    "properties": {"value": {"type": "integer"}},
-                }
-            },
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["additionalProperties"] is False
-        assert result["$defs"]["SubSchema"]["additionalProperties"] is False
-
-    def test_add_additional_properties_only_when_missing_true(self):
-        """Test that existing additionalProperties is not overwritten when only_when_missing=True."""
-        schema = {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "additionalProperties": True,
-        }
-
-        result = add_additional_properties(schema, False, only_when_missing=True)
-
-        # Should keep existing value
-        assert result["additionalProperties"] is True
-
-    def test_add_additional_properties_only_when_missing_false(self):
-        """Test that existing additionalProperties is overwritten when only_when_missing=False."""
-        schema = {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "additionalProperties": True,
-        }
-
-        result = add_additional_properties(schema, False, only_when_missing=False)
-
-        # Should overwrite with new value
-        assert result["additionalProperties"] is False
-
-    def test_add_additional_properties_skip_unevaluated_properties(self):
-        """Test that additionalProperties is not added when unevaluatedProperties is present."""
-        schema = {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "unevaluatedProperties": False,
-        }
-
-        result = add_additional_properties(
-            schema, False, skip_when_unevaluated_present=True
+    def test_a_response_format_class_is_saved_as_its_import_path(self):
+        llm = LLM(
+            model="test-model",
+            chat_params={"response_format": SampleModel, "temperature": 0.7},
         )
 
-        # Should not add additionalProperties when unevaluatedProperties exists
-        assert "additionalProperties" not in result
-        assert result["unevaluatedProperties"] is False
+        data = llm.model_dump(mode="json")
 
-    def test_add_additional_properties_with_unevaluated_skip_false(self):
-        """Test that additionalProperties is added even when unevaluatedProperties present if skip=False."""
-        schema = {
-            "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "unevaluatedProperties": False,
-        }
-
-        result = add_additional_properties(
-            schema, False, skip_when_unevaluated_present=False
-        )
-
-        # Should add additionalProperties even with unevaluatedProperties
-        assert result["additionalProperties"] is False
-        assert result["unevaluatedProperties"] is False
-
-    def test_add_additional_properties_with_custom_value(self):
-        """Test adding custom value for additionalProperties."""
-        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-
-        result = add_additional_properties(schema, {"type": "string"})
-
-        assert result["additionalProperties"] == {"type": "string"}
-
-    def test_add_additional_properties_allof(self):
-        """Test adding additionalProperties to allOf schemas."""
-        schema = {
-            "allOf": [
-                {"type": "object", "properties": {"name": {"type": "string"}}},
-                {"type": "object", "properties": {"age": {"type": "integer"}}},
-            ]
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["allOf"][0]["additionalProperties"] is False
-        assert result["allOf"][1]["additionalProperties"] is False
-
-    def test_add_additional_properties_anyof(self):
-        """Test adding additionalProperties to anyOf schemas."""
-        schema = {
-            "anyOf": [
-                {"type": "object", "properties": {"name": {"type": "string"}}},
-                {"type": "string"},
-            ]
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["anyOf"][0]["additionalProperties"] is False
-        # Second schema is not an object, should remain unchanged
-        assert "additionalProperties" not in result["anyOf"][1]
-
-    def test_add_additional_properties_oneof(self):
-        """Test adding additionalProperties to oneOf schemas."""
-        schema = {
-            "oneOf": [
-                {"type": "object", "properties": {"id": {"type": "integer"}}},
-                {"type": "object", "properties": {"uuid": {"type": "string"}}},
-            ]
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["oneOf"][0]["additionalProperties"] is False
-        assert result["oneOf"][1]["additionalProperties"] is False
-
-    def test_add_additional_properties_does_not_modify_original(self):
-        """Test that the original schema is not modified."""
-        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-
-        result = add_additional_properties(schema)
-
-        # Original schema should be unchanged
-        assert "additionalProperties" not in schema
-        assert result is not schema
-        assert result != schema
-
-    def test_add_additional_properties_with_pattern_properties(self):
-        """Test adding additionalProperties with patternProperties."""
-        schema = {
-            "type": "object",
-            "patternProperties": {"^S_": {"type": "string"}},
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["additionalProperties"] is False
-
-    def test_add_additional_properties_items_schema(self):
-        """Test adding additionalProperties with items containing objects."""
-        schema = {
-            "type": "array",
-            "items": {"type": "object", "properties": {"name": {"type": "string"}}},
-        }
-
-        result = add_additional_properties(schema)
-
-        # Should add to the object inside items
-        assert result["items"]["additionalProperties"] is False
-
-    def test_add_additional_properties_prefix_items(self):
-        """Test adding additionalProperties with prefixItems."""
-        schema = {
-            "type": "array",
-            "prefixItems": [
-                {"type": "object", "properties": {"id": {"type": "integer"}}},
-                {"type": "object", "properties": {"name": {"type": "string"}}},
-            ],
-        }
-
-        result = add_additional_properties(schema)
-
-        assert result["prefixItems"][0]["additionalProperties"] is False
-        assert result["prefixItems"][1]["additionalProperties"] is False
-
-
-class TestLLMSerializeChatParams:
-    """Test suite for LLM._serialize_chat_params method."""
-
-    def test_serialize_chat_params_primitives(self):
-        """Test serializing primitive values."""
-        llm = LLM(model="test-model")
-        params = {
+        assert data["chat_params"] == {
+            "response_format": {"ref": f"{__name__}:SampleModel"},
             "temperature": 0.7,
-            "max_tokens": 100,
-            "top_p": 0.9,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
         }
+        json.dumps(data)  # Plain JSON.
+        # A python-mode dump keeps the class itself.
+        assert llm.model_dump()["chat_params"]["response_format"] is SampleModel
 
-        result = llm._serialize_chat_params(params)
+    def test_a_response_format_class_round_trips_as_the_same_class(self):
+        llm = LLM(
+            model="test-model",
+            chat_params={"response_format": NestedModel, "max_tokens": 100},
+            structured_output=True,
+        )
+        data = llm.model_dump(mode="json")
 
-        assert result == params
-        assert result["temperature"] == 0.7
-        assert result["max_tokens"] == 100
+        restored = Tool.model_validate(data)
 
-    def test_serialize_chat_params_pydantic_instance(self):
-        """Test serializing Pydantic model instance."""
-        llm = LLM(model="test-model")
-        sample = SampleModel(name="John", age=30)
-        params = {"response_format": sample}
+        assert type(restored) is LLM
+        assert restored.tool_id == llm.tool_id
+        assert restored.chat_params == {
+            "response_format": NestedModel,
+            "max_tokens": 100,
+        }
+        assert restored.chat_params["response_format"] is NestedModel
+        assert restored.structured_output is True
+        assert restored.model_dump(mode="json") == data
 
-        result = llm._serialize_chat_params(params)
-
-        assert result["response_format"] == {"name": "John", "age": 30}
-        assert isinstance(result["response_format"], dict)
-
-    def test_serialize_chat_params_pydantic_class(self):
-        """Test serializing Pydantic model class."""
-        llm = LLM(model="test-model")
-        params = {"response_format": SampleModel}
-
-        result = llm._serialize_chat_params(params)
-
-        assert result["response_format"]["type"] == "json_schema"
-        assert result["response_format"]["json_schema"]["name"] == "SampleModel"
-        assert result["response_format"]["json_schema"]["strict"] is True
-        assert "schema" in result["response_format"]["json_schema"]
-
-    def test_serialize_chat_params_nested_dict(self):
-        """Test serializing nested dictionaries with Pydantic models."""
-        llm = LLM(model="test-model")
-        sample = SampleModel(name="Jane", age=25)
+    def test_model_classes_nested_in_dicts_and_lists_round_trip(self):
         params = {
+            "formats": [SampleModel, NestedModel],
+            "advanced": {"response_format": SampleModel, "temperature": 0.5},
+            "stop": ["a", "b"],
+        }
+        llm = LLM(model="test-model", chat_params=params)
+        data = llm.model_dump(mode="json")
+
+        assert data["chat_params"] == {
+            "formats": [
+                {"ref": f"{__name__}:SampleModel"},
+                {"ref": f"{__name__}:NestedModel"},
+            ],
             "advanced": {
-                "response_format": sample,
+                "response_format": {"ref": f"{__name__}:SampleModel"},
                 "temperature": 0.5,
+            },
+            "stop": ["a", "b"],
+        }
+        assert LLM.model_validate(data).chat_params == params
+
+    def test_plain_params_are_saved_as_they_are(self):
+        params = {"temperature": 0.7, "top_p": 0.9, "seed": None, "stop": ["x"]}
+        llm = LLM(model="test-model", chat_params=params)
+
+        assert llm.model_dump(mode="json")["chat_params"] == params
+        assert LLM.model_validate(llm.model_dump(mode="json")).chat_params == params
+
+    def test_a_model_class_from_an_untrusted_module_is_not_loaded(self):
+        data = {"chat_params": {"response_format": {"ref": "json:JSONDecoder"}}}
+
+        with pytest.raises(UntrustedImportError):
+            LLM.model_validate(data)
+
+    def test_a_model_class_that_is_not_a_pydantic_model_is_not_loaded(self):
+        data = {
+            "chat_params": {
+                "response_format": {"ref": "grafi.tools.llms.llm:LLMBuilder"}
             }
         }
 
-        result = llm._serialize_chat_params(params)
+        with pytest.raises(ManifestError, match="is not a subclass of BaseModel"):
+            LLM.model_validate(data)
 
-        assert result["advanced"]["response_format"] == {"name": "Jane", "age": 25}
-        assert result["advanced"]["temperature"] == 0.5
 
-    def test_serialize_chat_params_list_with_instances(self):
-        """Test serializing list containing Pydantic instances."""
-        llm = LLM(model="test-model")
-        samples = [
-            SampleModel(name="Alice", age=20),
-            SampleModel(name="Bob", age=30),
-        ]
-        params = {"examples": samples}
+class TestChatParamsSecrets:
+    """A secret in chat_params, at any depth, is never saved."""
 
-        result = llm._serialize_chat_params(params)
+    @pytest.mark.parametrize(
+        "params,held",
+        [
+            (
+                {"extra_headers": {"Authorization": "Bearer sk-literal"}},
+                "Authorization",
+            ),
+            ({"extra_headers": {"X-Api-Key": "literal"}}, "X-Api-Key"),
+            ({"extra_body": {"auth": [{"access_token": "literal"}]}}, "auth"),
+            ({"api_key": "sk-literal"}, "api_key"),
+        ],
+    )
+    def test_a_secret_held_as_a_value_is_never_saved(self, params, held):
+        llm = LLM(model="m", chat_params=params)
 
-        assert len(result["examples"]) == 2
-        assert result["examples"][0] == {"name": "Alice", "age": 20}
-        assert result["examples"][1] == {"name": "Bob", "age": 30}
+        with pytest.raises(PydanticSerializationError, match="ManifestError"):
+            llm.model_dump(mode="json")
+        match = f"LLM.chat_params holds a secret, at '{held}'"
+        with pytest.raises(ManifestError, match=match):
+            llm.to_manifest()
 
-    def test_serialize_chat_params_list_with_classes(self):
-        """Test serializing list containing Pydantic classes."""
-        llm = LLM(model="test-model")
-        params = {"response_formats": [SampleModel, NestedModel]}
-
-        result = llm._serialize_chat_params(params)
-
-        assert len(result["response_formats"]) == 2
-        assert "json_schema" in result["response_formats"][0]
-        assert "json_schema" in result["response_formats"][1]
-
-    def test_serialize_chat_params_mixed_list(self):
-        """Test serializing list with mixed primitive and Pydantic values."""
-        llm = LLM(model="test-model")
-        sample = SampleModel(name="Charlie", age=35)
-        params = {"mixed": ["string_value", 42, sample, True]}
-
-        result = llm._serialize_chat_params(params)
-
-        assert result["mixed"][0] == "string_value"
-        assert result["mixed"][1] == 42
-        assert result["mixed"][2] == {"name": "Charlie", "age": 35}
-        assert result["mixed"][3] is True
-
-    def test_serialize_chat_params_empty_dict(self):
-        """Test serializing empty dictionary."""
-        llm = LLM(model="test-model")
-        params = {}
-
-        result = llm._serialize_chat_params(params)
-
-        assert result == {}
-
-    def test_serialize_chat_params_none_values(self):
-        """Test serializing None values."""
-        llm = LLM(model="test-model")
-        params = {"optional_param": None, "temperature": 0.7}
-
-        result = llm._serialize_chat_params(params)
-
-        assert result["optional_param"] is None
-        assert result["temperature"] == 0.7
-
-    def test_serialize_chat_params_deeply_nested(self):
-        """Test serializing deeply nested structures."""
-        llm = LLM(model="test-model")
-        sample = SampleModel(name="Deep", age=40)
+    def test_a_reference_to_a_variable_and_names_not_of_secrets_are_saved(self):
         params = {
-            "level1": {"level2": {"level3": {"response_format": sample, "value": 123}}}
+            "extra_headers": {"Authorization": "Bearer ${MY_TOKEN}", "X-Title": "t"},
+            "max_tokens": 100,
+            "cache_key": "k",
+            "eos_token": "</s>",
         }
+        llm = LLM(model="m", chat_params=params)
 
-        result = llm._serialize_chat_params(params)
+        assert llm.to_manifest()["spec"]["chat_params"] == params
 
-        assert result["level1"]["level2"]["level3"]["response_format"] == {
-            "name": "Deep",
-            "age": 40,
-        }
-        assert result["level1"]["level2"]["level3"]["value"] == 123
+    def test_a_python_dump_keeps_the_values(self):
+        params = {"extra_headers": {"Authorization": "Bearer sk-literal"}}
+        llm = LLM(model="m", chat_params=params)
 
-    def test_serialize_chat_params_preserves_other_types(self):
-        """Test that other JSON-serializable types are preserved."""
-        llm = LLM(model="test-model")
-        params = {
-            "string": "test",
-            "number": 42,
-            "float": 3.14,
-            "boolean": True,
-            "null": None,
-            "list": [1, 2, 3],
-            "dict": {"key": "value"},
-        }
+        assert llm.model_dump()["chat_params"] == params
 
-        result = llm._serialize_chat_params(params)
 
-        assert result == params
-        assert result["string"] == "test"
-        assert result["number"] == 42
-        assert result["float"] == 3.14
-        assert result["boolean"] is True
-        assert result["null"] is None
-        assert result["list"] == [1, 2, 3]
-        assert result["dict"] == {"key": "value"}
+class TestBaseLLMKey:
+    """The base LLM's key has no variable of its own."""
 
-    def test_serialize_chat_params_used_in_to_dict(self):
-        """Test that _serialize_chat_params is properly used in to_dict method."""
-        sample = SampleModel(name="Test", age=50)
-        llm = LLM(model="test-model", chat_params={"response_format": sample})
+    def test_an_unset_key_is_saved_as_none(self):
+        assert LLM(model="m").model_dump(mode="json")["api_key"] is None
 
-        result = llm.to_dict()
+    def test_a_key_set_in_code_is_never_saved(self):
+        llm = LLM(model="m", api_key="sk-literal")
 
-        # chat_params should be serialized
-        assert "chat_params" in result
-        assert result["chat_params"]["response_format"] == {"name": "Test", "age": 50}
+        with pytest.raises(PydanticSerializationError, match="ManifestError"):
+            llm.model_dump(mode="json")
+        with pytest.raises(ManifestError, match="LLM.api_key"):
+            llm.to_manifest()
+        assert "sk-literal" not in repr(llm)
+
+    def test_a_key_named_by_its_variable_is_read_and_saved_as_it(self, monkeypatch):
+        monkeypatch.setenv("MY_LLM_KEY", "from-env")
+
+        llm = LLM.model_validate({"model": "m", "api_key": {"env": "MY_LLM_KEY"}})
+
+        assert llm.api_key == "from-env"
+        assert llm.model_dump(mode="json")["api_key"] == {"env": "MY_LLM_KEY"}
+
+
+class TestRequiredApiKey:
+    """An OpenAI-compatible tool given no key raises, naming its variable,
+    before the OpenAI SDK is called: the SDK would read OPENAI_API_KEY, perhaps
+    another provider's, and send it wherever base_url points."""
+
+    OPENAI_CLIENT = "grafi.tools.llms.impl.openai_compatible.AsyncClient"
+
+    @pytest.mark.parametrize(
+        "tool_class, variable, foreign, client",
+        [
+            (OpenAITool, "OPENAI_API_KEY", None, OPENAI_CLIENT),
+            (DeepseekTool, "DEEPSEEK_API_KEY", "OPENAI_API_KEY", OPENAI_CLIENT),
+            (OpenRouterTool, "OPENROUTER_API_KEY", "OPENAI_API_KEY", OPENAI_CLIENT),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_a_provider_without_a_key_raises_before_building_a_client(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        invoke_context: InvokeContext,
+        tool_class: Type[LLM],
+        variable: str,
+        foreign: Optional[str],
+        client: str,
+    ) -> None:
+        monkeypatch.delenv(variable, raising=False)
+        if foreign is not None:  # Another provider's, which its SDK reads.
+            monkeypatch.setenv(foreign, "sk-another-providers-key")
+        sdk_client = Mock()
+        monkeypatch.setattr(client, sdk_client)
+        tool = tool_class()
+        match = re.escape(f"{tool_class.__name__} has no API key: set {variable}.")
+
+        with pytest.raises(LLMToolException, match=match) as raised:
+            async for _ in tool.invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+        assert raised.value.tool_name == tool.name
+        sdk_client.assert_not_called()
+
+    def test_the_key_is_given_when_set(self) -> None:
+        assert OpenAITool(api_key="sk-given").required_api_key() == "sk-given"
+
+    def test_a_key_set_after_the_tool_was_made_is_read(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        tool = OpenAITool()
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-later")
+
+        assert tool.required_api_key() == "sk-later"
+
+    def test_a_key_read_from_another_variable_is_named(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("TEAM_OPENAI_KEY", raising=False)
+        tool = OpenAITool.model_validate({"api_key": {"env": "TEAM_OPENAI_KEY"}})
+
+        with pytest.raises(LLMToolException, match="set TEAM_OPENAI_KEY"):
+            tool.required_api_key()
+
+    @pytest.mark.parametrize("tool_class", [DeepseekTool, OpenRouterTool])
+    @pytest.mark.asyncio
+    async def test_another_provider_gets_none_of_openais_settings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        invoke_context: InvokeContext,
+        tool_class: Type[LLM],
+    ) -> None:
+        """The OpenAI SDK makes headers from OpenAI's variables: another
+        provider's base_url is sent none of them."""
+        monkeypatch.setenv("OPENAI_ORG_ID", "org-fake")
+        monkeypatch.setenv("OPENAI_CUSTOM_HEADERS", "X-Gateway-Key: fake-secret")
+        sdk_client = Mock(side_effect=RuntimeError("stop"))
+        monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
+
+        with pytest.raises(Exception):
+            async for _ in tool_class(api_key="sk-own").invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+
+        headers = dict(sdk_client.call_args.kwargs["default_headers"])
+        assert headers.pop("Authorization") == "Bearer sk-own"
+        assert set(headers) == {"OpenAI-Organization", "OpenAI-Project", "X-Gateway-Key"}
+        assert all(isinstance(value, Omit) for value in headers.values())
+
+    @pytest.mark.asyncio
+    async def test_another_providers_key_is_sent_whatever_openais_headers_name(
+        self, monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+    ) -> None:
+        monkeypatch.setenv("OPENAI_CUSTOM_HEADERS", "Authorization: Bearer proxy")
+        sdk_client = Mock(side_effect=RuntimeError("stop"))
+        monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
+
+        with pytest.raises(Exception):
+            async for _ in DeepseekTool(api_key="ds-key").invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+
+        headers = sdk_client.call_args.kwargs["default_headers"]
+        assert headers["Authorization"] == "Bearer ds-key"
+
+    @pytest.mark.asyncio
+    async def test_another_provider_needs_its_base_url(
+        self, monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+    ) -> None:
+        """Without one, the SDK would read OPENAI_BASE_URL."""
+        sdk_client = Mock()
+        monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
+
+        with pytest.raises(LLMToolException, match="DeepseekTool has no base_url"):
+            async for _ in DeepseekTool(api_key="ds-key", base_url=None).invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+        sdk_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_openai_keeps_its_own_settings(
+        self, monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+    ) -> None:
+        sdk_client = Mock(side_effect=RuntimeError("stop"))
+        monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
+
+        with pytest.raises(Exception):
+            async for _ in OpenAITool(api_key="sk-own").invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            ):
+                pass
+
+        assert "default_headers" not in sdk_client.call_args.kwargs
+
+    def test_gemini_without_a_key_lets_its_sdk_use_googles_own(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Google's SDK reads GOOGLE_API_KEY, or Vertex AI's credentials."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        sdk_client = Mock()
+        monkeypatch.setattr("google.genai.Client", sdk_client)
+
+        GeminiTool()._client()
+
+        sdk_client.assert_called_once_with(api_key=None)
+
+    def test_a_key_without_a_variable_names_none(self) -> None:
+        with pytest.raises(LLMToolException, match=r"LLM has no API key\.$"):
+            LLM(model="m").required_api_key()
 
 
 @pytest.mark.asyncio

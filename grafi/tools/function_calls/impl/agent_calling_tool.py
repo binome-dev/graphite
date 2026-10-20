@@ -7,8 +7,7 @@ from typing import Self
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.callable_ref import deserialize_callable
-from grafi.common.callable_ref import serialize_callable
+from grafi.common.callable_ref import CallableRef
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
@@ -26,10 +25,11 @@ class AgentCallingTool(FunctionCallTool):
     agent_name: str = ""
     agent_description: str = ""
     argument_description: str = ""
-    agent_call: Callable[[InvokeContext, Message], Any]
+    agent_call: CallableRef
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     def model_post_init(self, _context: Any) -> None:
+        super().model_post_init(_context)
         if any(spec.name == self.agent_name for spec in self.function_specs):
             return  # A copy of a tool already set up.
         self.function_specs.append(
@@ -72,57 +72,6 @@ class AgentCallingTool(FunctionCallTool):
         if inspect.isawaitable(response):
             response = await response
         return response["content"]
-
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-        return {
-            **super().to_dict(),
-            "agent_name": self.agent_name,
-            "agent_description": self.agent_description,
-            "argument_description": self.argument_description,
-            "agent_call": serialize_callable(self.agent_call),
-            "oi_span_type": self.oi_span_type.value,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "AgentCallingTool":
-        """
-        Create an AgentCallingTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the AgentCallingTool.
-
-        Returns:
-            AgentCallingTool: An AgentCallingTool instance created from the dictionary.
-
-        Note:
-            ``agent_call`` is reconstructed (without pickle) from its import
-            reference or CallableComponent config. See
-            :mod:`grafi.common.callable_ref`.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "AgentCallingTool"))
-            .type(data.get("type", "AgentCallingTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .agent_name(data.get("agent_name", ""))
-            .agent_description(data.get("agent_description", ""))
-            .argument_description(data.get("argument_description", ""))
-            .agent_call(
-                deserialize_callable(
-                    data["agent_call"],
-                    context=f"agent_call for '{data.get('agent_name', '')}'",
-                )
-            )
-            .build()
-        )
 
 
 class AgentCallingToolBuilder(FunctionCallToolBuilder[AgentCallingTool]):

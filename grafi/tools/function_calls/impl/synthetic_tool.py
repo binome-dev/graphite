@@ -2,6 +2,7 @@ import inspect
 import json
 from typing import Any
 from typing import Dict
+from typing import Optional
 
 from openai import OpenAIError
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -10,6 +11,8 @@ from pydantic import field_validator
 
 from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import ModelRef
+from grafi.common.manifest import env_secret
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
@@ -29,10 +32,11 @@ class SyntheticTool(FunctionCallTool):
     type: str = "SyntheticTool"
     tool_name: str = ""
     description: str = ""
-    input_model: Any = ""
-    output_model: Any = ""
+    # Pydantic model classes, saved as their import paths, or JSON schemas.
+    input_model: ModelRef[Any] = ""
+    output_model: ModelRef[Any] = ""
     model: str = ""
-    openai_api_key: str = ""
+    openai_api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @field_validator("input_model", "output_model")
@@ -74,6 +78,7 @@ class SyntheticTool(FunctionCallTool):
         )
 
     def model_post_init(self, _context: Any) -> None:
+        super().model_post_init(_context)
         if any(spec.name == self.tool_name for spec in self.function_specs):
             return  # A copy of a tool already set up.
         if self.input_model:
@@ -248,49 +253,6 @@ class SyntheticTool(FunctionCallTool):
                 message=f"SyntheticTool LLM call failed: {e}",
                 cause=e,
             ) from e
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-        return {
-            **super().to_dict(),
-            "tool_name": self.tool_name,
-            "description": self.description,
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
-            "model": self.model,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "SyntheticTool":
-        """
-        Create a SyntheticTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the SyntheticTool.
-
-        Returns:
-            SyntheticTool: A SyntheticTool instance created from the dictionary.
-
-        Note:
-            The client needs to be recreated with an API key from environment
-            or other secure source as API keys are masked in serialization.
-        """
-        return (
-            cls.builder()
-            .tool_name(data.get("tool_name", "synthetic_tool"))
-            .description(data.get("description", ""))
-            .input_model(data.get("input_schema", {}))
-            .output_model(data.get("output_schema", {}))
-            .model(data.get("model", "gpt-5-mini"))
-            .openai_api_key(data.get("openai_api_key", ""))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .build()
-        )
 
 
 class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):

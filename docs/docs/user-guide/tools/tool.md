@@ -16,7 +16,8 @@ The `Tool` class is the fundamental base class for all tools in the Graphite fra
 | Method       | Signature                                                                  | Description                                                                                    |
 |--------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
 | `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield its output in batches of messages; the node publishes each batch as one event. |
-| `to_dict`    | `() -> Dict[str, Any]`                                                     | Serializes the tool instance into a dictionary representation.                                |
+| `model_dump(mode="json")` | `() -> Dict[str, Any]`                                        | Saves the tool as data: its fields, and its class by import path, as `"class"`. See [Manifests](../manifests.md). |
+| `model_validate` | `classmethod (data: Dict[str, Any]) -> Tool`                          | Loads a tool from that data, as the class it names, which must be this class or a subclass of it. |
 
 ## Builder Pattern
 
@@ -138,7 +139,7 @@ def builder(cls) -> "MyCustomToolBuilder":
 Here's a complete example of a custom tool implementation:
 
 ```python
-from typing import Any, Self
+from typing import Self
 from pydantic import Field
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -186,16 +187,6 @@ class TextProcessorTool(Tool):
         """Convert processed text to Messages."""
         return [Message(role="assistant", content=response)]
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize tool configuration."""
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "operation": self.operation,
-            "prefix": self.prefix,
-        }
-
 class TextProcessorToolBuilder(ToolBuilder[TextProcessorTool]):
     """Builder for TextProcessorTool instances."""
 
@@ -216,6 +207,26 @@ text_tool = (
     .build()
 )
 ```
+
+### Saving and Loading
+
+A tool is saved as data, with its fields and its class, and needs no code of
+its own for it:
+
+```python
+from grafi.common.import_ref import trust_modules
+
+data = text_tool.model_dump(mode="json")
+# {"class": "my_app.tools:TextProcessorTool", "tool_id": "...",
+#  "name": "Text Processor", "operation": "uppercase", "prefix": "PROCESSED: ", ...}
+
+trust_modules("my_app")  # Loading imports classes from trusted modules only.
+restored = Tool.model_validate(data)  # A TextProcessorTool.
+```
+
+A field holding something that is not data, such as a client or an index, is
+left out with `Field(exclude=True)`, and a secret is declared with
+`env_secret("VAR")`. See [Manifests](../manifests.md).
 
 ## OpenInference Integration
 
@@ -246,13 +257,6 @@ oi_span_type = OpenInferenceSpanKindValues.EMBEDDING
 ```python
 class MyTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "oi_span_type": self.oi_span_type.value,
-            # Other fields...
-        }
 ```
 
 ## Tool Categories

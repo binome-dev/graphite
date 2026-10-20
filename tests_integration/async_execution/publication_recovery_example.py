@@ -2,11 +2,13 @@
 step failing mid-stream stores nothing and streams again when retried."""
 
 import asyncio
+import json
 from uuid import uuid4
 
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -99,7 +101,8 @@ async def check_recovery(sequential: bool) -> None:
     for offset in range(3):
         pair = [record for record in outputs if record.offset == offset]
         assert pair[0].emission_id == pair[1].emission_id
-        assert PublishToTopicEvent.from_dict(pair[0].to_dict()) == pair[0]
+        stored = json.loads(json.dumps(default_event_codec.encode(pair[0])))
+        assert default_event_codec.decode(stored) == pair[0]
 
     # Simulate later, persisted outputs still awaiting delivery. Restore from a
     # deliberately reordered history to exercise the recorded topic positions.

@@ -10,6 +10,7 @@ after the workflow).
 
 import asyncio
 import contextlib
+import json
 import re
 import sys
 import uuid
@@ -29,6 +30,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.event import Event
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -2426,4 +2428,6 @@ async def test_a_node_that_publishes_nothing_is_not_a_failure(
         e for e in history if isinstance(e, NodeRespondEvent) and e.name == "quiet"
     ]
     assert responded.output_data is None
-    assert NodeRespondEvent.from_dict(responded.to_dict()).output_data is None
+    stored = json.loads(json.dumps(default_event_codec.encode(responded)))
+    assert stored["output_data"] is None
+    assert default_event_codec.decode(stored) == responded

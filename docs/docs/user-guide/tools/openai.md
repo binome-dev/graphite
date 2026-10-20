@@ -8,7 +8,7 @@
 |--------------------|-------------------------|----------------------------------------------------------------------------------------------------------------|
 | `name`             | `str`                   | Name of the tool (defaults to `"OpenAITool"`).                                                                |
 | `type`             | `str`                   | Type indicator for this tool (defaults to `"OpenAITool"`).                                                    |
-| `api_key`          | `Optional[str]`         | API key required to authenticate with OpenAI's services (defaults to `OPENAI_API_KEY` environment variable). |
+| `api_key`          | `Optional[str]`         | API key required to authenticate with OpenAI's services (defaults to `OPENAI_API_KEY` environment variable; saved as `{"env": "OPENAI_API_KEY"}`, never as its value). |
 | `model`            | `str`                   | Model name used for OpenAI API calls (defaults to `"gpt-4.1-nano"`).                                           |
 | `system_message`   | `Optional[str]`         | Optional system message to include in API calls (inherited from `LLM`).                                       |
 | `chat_params`      | `Dict[str, Any]`        | Additional optional [chat completion parameters](https://platform.openai.com/docs/api-reference/chat/create) (inherited from `LLM`). |
@@ -24,7 +24,7 @@
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[ChatCompletionMessageParam], Union[List[ChatCompletionToolParam], Omit]]` | Adapts Message objects to OpenAI API format, including function specifications. |
 | `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Calls the OpenAI API and yields its answer as one message, streaming its text while a caller streams the run. |
 | `to_messages`       | `(response: ChatCompletion) -> Messages`                          | Converts a complete response from OpenAI's API into Message objects.                               |
-| `to_dict`           | `() -> Dict[str, Any]`                                             | Serializes OpenAITool configuration, masking the API key for security.                             |
+| `model_dump(mode="json")` | `() -> Dict[str, Any]`                                       | Saves the tool as data: the key as the variable it is read from, and a `response_format` model class in `chat_params` by import path. See [Manifests](../manifests.md). |
 
 ## How It Works
 

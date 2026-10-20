@@ -1,6 +1,11 @@
 """Tests for grafi.common.exceptions.serialization."""
 
 import json
+from datetime import datetime
+from datetime import timezone
+
+import pytest
+from pydantic import ValidationError
 
 from grafi.common.exceptions.base import GrafiError
 from grafi.common.exceptions.serialization import error_message
@@ -133,21 +138,54 @@ def test_error_message_prefers_grafi_message() -> None:
     assert error_message(ValueError("plain")) == "plain"
 
 
-def test_error_to_dict_is_json_safe_with_exotic_invoke_context_kwargs() -> None:
-    class _Weird:
-        def __repr__(self) -> str:
-            return "<weird-object>"
+class _Weird:
+    def __repr__(self) -> str:
+        return "<weird-object>"
 
+
+def test_invoke_context_refuses_kwargs_json_cannot_hold() -> None:
+    with pytest.raises(ValidationError, match=r"kwargs\['obj'\] cannot be stored"):
+        InvokeContext(
+            conversation_id="c",
+            invoke_id="i",
+            assistant_request_id="a",
+            kwargs={"fine": 1, "obj": _Weird()},
+        )
+
+
+def test_error_to_dict_is_json_safe_with_exotic_invoke_context_kwargs() -> None:
+    at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
     ctx = InvokeContext(
         conversation_id="c",
         invoke_id="i",
         assistant_request_id="a",
-        kwargs={"obj": _Weird()},
+        kwargs={"at": at, "tags": ("a", "b"), "nested": {"at": at}},
     )
     err = GrafiError("boom", invoke_context=ctx)
     details = error_to_dict(err, include_traceback=False)
 
     # The whole payload must be JSON-serializable for JSONB persistence.
+    json.dumps(details)
+    assert details["invoke_context"]["kwargs"] == {
+        "at": "2026-01-02T03:04:05Z",
+        "tags": ["a", "b"],
+        "nested": {"at": "2026-01-02T03:04:05Z"},
+    }
+
+
+def test_error_to_dict_is_json_safe_with_a_context_never_validated() -> None:
+    """A context built without validation, or changed after it, may hold an
+    object JSON cannot: the error's details still serialize."""
+    ctx = InvokeContext.model_construct(
+        conversation_id="c",
+        invoke_id="i",
+        assistant_request_id="a",
+        user_id="",
+        kwargs={"obj": _Weird()},
+    )
+    err = GrafiError("boom", invoke_context=ctx)
+    details = error_to_dict(err, include_traceback=False)
+
     json.dumps(details)
     # The non-serializable object is rendered to a string, not dropped.
     assert isinstance(details["invoke_context"]["kwargs"]["obj"], str)

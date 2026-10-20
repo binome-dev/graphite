@@ -1,9 +1,7 @@
-"""Module for storing and managing events with optional file logging."""
+"""The event store: where a run's events are recorded, and read back."""
 
 from abc import ABC
 from abc import abstractmethod
-from typing import Any
-from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -16,12 +14,11 @@ from grafi.common.events.event_codec import default_event_codec
 class EventStore(ABC):
     """Stores and manages events."""
 
-    # Decoder for stored event dicts. Persistence backends delegate decoding to
-    # the codec instead of knowing concrete event classes. This is a shared,
-    # process-wide default registry: calling ``.register(...)`` on it affects all
-    # stores. For an isolated registry, assign a fresh ``EventCodec`` to the
-    # instance (``self._codec = EventCodec({...})``) in a subclass constructor.
-    _codec: EventCodec = default_event_codec
+    # How the store encodes and decodes events, so that it need not know their
+    # classes. The default is shared by every store in the process, so
+    # ``.register(...)`` on it affects them all; for a registry of its own, give
+    # the store another: ``store.codec = EventCodec({...})``.
+    codec: EventCodec = default_event_codec
 
     @abstractmethod
     async def record_event(self, event: Event) -> None: ...
@@ -55,11 +52,3 @@ class EventStore(ABC):
 
     async def aclose(self) -> None:
         """Release what the store holds, such as a connection pool."""
-
-    def _create_event_from_dict(self, event_dict: Dict[str, Any]) -> Optional[Event]:
-        """Decode a stored event dict into an :class:`Event` via the codec.
-
-        Kept as a thin delegate for backends (and tests) that decode persisted
-        rows; the registry and error policy live in :class:`EventCodec`.
-        """
-        return self._codec.decode(event_dict)

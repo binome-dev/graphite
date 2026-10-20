@@ -79,6 +79,93 @@ Tools run plain functions, and answer every tool call:
 `has_text_response` is true only for a final answer: text with no tool call.
 Text that came with tool calls was also routed to the output.
 
+Components are saved as data with pydantic, in manifests (see
+[Manifests](user-guide/manifests.md)):
+- Assistants, workflows, nodes, tools and topics are saved with
+  `model_dump(mode="json")`, which names the class by import path as `"class"`,
+  and loaded with `model_validate`, as that class, synchronously. Every
+  `to_dict()` and `from_dict()` of theirs (and of routes, expressions and
+  commands) is gone, as are `ToolFactory`, `TopicFactory`,
+  `add_additional_properties` and `Assistant.from_dict`. A tool of your own
+  saves its fields without a `to_dict()`; one holding a client or an index
+  leaves it out with `Field(exclude=True)`. A field a component does not have
+  is refused, and a class defined in a script or a function cannot be saved.
+- A manifest is `{"apiVersion": "grafi/v2", "kind": ..., "spec": ...}`:
+  `to_manifest()`, `generate_manifest()`, and `from_manifest(path)`, which also
+  upgrades a manifest saved before (`legacy_classes` names its own classes),
+  and requires that every component name its class. An assistant loaded from
+  one keeps the workflow it holds; `ReActAgent` saves only its workflow. A
+  `FunctionCallTool`'s specs are not saved: they come from its functions.
+- Loading imports classes and functions only from trusted modules: grafi's,
+  and those named with `grafi.common.import_ref.trust_modules("my_app")`;
+  others raise `UntrustedImportError`, an `ImportError`. Functions are saved by
+  reference (`CallableRef`), and so are pydantic model classes, such as a
+  `response_format` (`ModelRef`), as `{"ref": ...}`; of grafi's functions,
+  only the route predicates in `grafi.nodes.conditions` can be named. A name
+  reaches a class or a function of a trusted module, through classes only. A
+  `CallableComponent` is a component, saved as its class and fields. `grafi`
+  is a regular package (`grafi/__init__.py`), so a `grafi/` directory
+  elsewhere on the path adds no module to it.
+- A manifest never holds a secret's value. An LLM's `api_key`,
+  `TavilyTool.api_key` and others declared with `env_secret("VAR")` are saved
+  as `{"env": "VAR"}`; saving one set to another value raises `ManifestError`,
+  and so does saving other text held under a name like a secret's, at any
+  depth. An MCP setting holding a secret refers to a variable, as `${VAR}`.
+  `from_manifest` lets a manifest read only each secret's own variable, and
+  those named with `env=[...]`.
+- An OpenAI-compatible tool (`OpenAITool`, `DeepseekTool`, `OpenRouterTool`)
+  raises `LLMToolException` naming its variable when it has no API key, rather
+  than letting the OpenAI SDK read `OPENAI_API_KEY`, which it would send to
+  the tool's `base_url`. `DeepseekTool` and `OpenRouterTool` need their
+  `base_url` (each has one by default), and send none of what the SDK reads
+  from OpenAI's variables (`OPENAI_BASE_URL`, `OPENAI_ORG_ID`,
+  `OPENAI_PROJECT_ID`, `OPENAI_CUSTOM_HEADERS`). `OllamaTool.api_key` reads
+  `OLLAMA_API_KEY`.
+- `ManifestError` is a `GrafiError`, not a `ValueError`, and
+  `UntrustedImportError` both a `ManifestError` and an `ImportError`;
+  `CallableSerializationError` is a `ManifestError`, no longer a `ValueError`.
+  `model_dump()`, in python mode, gives plain values, with the class itself as
+  `"class"`, so it is not for `json.dumps`: use `mode="json"`. `TavilyTool.client` is a property, made from `api_key` on
+  first use.
+
+Events are saved as their JSON form, flat (see
+[Events](user-guide/events/events.md)):
+- An event is stored as `model_dump(mode="json")`, `"event_version": 2`: no
+  `event_context`, and a topic event's `data` is a list of messages, not JSON
+  text. `EventCodec.encode()` and `decode()` (`default_event_codec`) save and
+  load one, choosing the class by `event_type`. `Event.to_dict()`,
+  `from_dict()`, `event_dict()` and `event_base()`, the `serialize_*` and
+  `deserialize_*` helpers of `component_events`, and
+  `EventGraph.to_dict()`/`from_dict()` are gone.
+- Events stored before, of version `"1.0"`, are read as version 2, back to
+  those of grafi 0.0.25, which named their fields otherwise. Stored events are
+  not rewritten. An event of an earlier grafi raises `EventSerializationError`.
+  `EventStorePostgres` reads tables with an `event_data` column, as written
+  since grafi 0.0.30.
+- Upgrade every process reading a store before any writes version 2: an
+  earlier grafi skips version 2 events, and would resume a request without
+  them. Rolling back after version 2 events are written is not safe.
+- An event a store cannot write or read raises `EventSerializationError`: a
+  value JSON cannot hold, an unknown type (register its class with
+  `default_event_codec.register()`), an event of a class other than its type
+  decodes as, a missing, unknown or newer version, or a field that does not
+  validate. Before, a store logged and skipped an event it could not read.
+  `EventStore._create_event_from_dict` is gone: a store's `codec` decodes.
+- Each event class accepts only its own `event_type`. The generated classes
+  are named `NodeInvokeEvent`, `ToolFailedEvent` and so on, and
+  `FailedEvent.error` is text. An event in a field typed as its base class is
+  saved as its own class.
+- `InvokeContext.kwargs` must hold JSON values, checked when it is made: a
+  datetime is saved as ISO text, and read back as that text. `Message.tools`
+  is a list.
+- `EventStorePostgres` writes rows with `event_version` `"2"`, and reads rows
+  of either version, in `get_topic_events` too. `record_events` encodes the
+  whole batch first, so an event it cannot encode writes nothing, and it
+  stores a naive timestamp as UTC. `record_event` writes through it.
+- `EventStoreInMemory(strict=True)` keeps events as a durable store does,
+  encoded as JSON and decoded back, so a test fails on an event such a store
+  could not keep. grafi's tests use it.
+
 Providers:
 - `ClaudeTool` gives a reply without tool use `tool_calls=None`, not `[]`,
   which routed it as a tool call and could loop a ReAct workflow. It always

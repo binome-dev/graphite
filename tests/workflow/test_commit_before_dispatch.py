@@ -1,6 +1,7 @@
 """Parallel steps commit before their publications become visible downstream."""
 
 import asyncio
+import json
 from typing import Any
 from typing import List
 from typing import Optional
@@ -15,6 +16,7 @@ from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.component_events import NodeFailedEvent
 from grafi.common.events.component_events import WorkflowFailedEvent
 from grafi.common.events.event import Event
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -1788,9 +1790,10 @@ async def test_resent_answer_is_recognised_after_a_store_round_trip(
 
     async def round_trip(request_id: str) -> list[Event]:
         return [
-            decoded
+            default_event_codec.decode(
+                json.loads(json.dumps(default_event_codec.encode(event)))
+            )
             for event in await get_agent_events(request_id)
-            if (decoded := event_store._create_event_from_dict(event.to_dict()))
         ]
 
     event_store.get_agent_events = round_trip  # type: ignore[method-assign]
