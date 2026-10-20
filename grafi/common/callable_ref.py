@@ -38,7 +38,14 @@ from grafi.common.import_ref import UntrustedImportError
 from grafi.common.import_ref import reference_to
 from grafi.common.import_ref import resolve_import_ref
 from grafi.common.manifest import ManifestError
-from grafi.common.manifest import refuse_save
+from grafi.common.manifest import save_refused
+
+__all__ = [
+    "CallableRef",
+    "CallableSerializationError",
+    "deserialize_callable",
+    "serialize_callable",
+]
 
 # grafi's modules whose functions a manifest may name.
 _GRAFI_FUNCTIONS = frozenset({"grafi.nodes.conditions"})
@@ -51,16 +58,10 @@ class CallableSerializationError(ManifestError):
 
 def _resolve_reference(ref: str) -> Any:
     """The function ``"module:qualname"`` names (see
-    :func:`~grafi.common.import_ref.resolve_import_ref`), translating a malformed
-    or unimportable reference into this module's error type; an untrusted one
-    raises ``UntrustedImportError``."""
+    :func:`~grafi.common.import_ref.resolve_import_ref`), unless it is a grafi
+    function a manifest may not name."""
     _refuse_grafi(ref, ref.partition(":")[0])  # Before importing anything.
-    try:
-        resolved = resolve_import_ref(ref)
-    except UntrustedImportError:
-        raise
-    except (ValueError, ImportError, AttributeError) as e:
-        raise CallableSerializationError(f"Cannot import {ref!r}: {e}") from e
+    resolved = resolve_import_ref(ref)
     _refuse_grafi(ref, getattr(resolved, "__module__", ""))  # Wherever named.
     return resolved
 
@@ -87,7 +88,7 @@ def serialize_callable(fn: Callable[..., Any]) -> Dict[str, Any]:
     ref = reference_to(fn)
     if ref is not None:
         return {"ref": ref}
-    raise refuse_save(
+    raise save_refused(
         CallableSerializationError(
             f"Cannot serialize callable {_name(fn)} without pickle. Make it an "
             "importable module-level function (serialized as a reference) or a "
@@ -106,36 +107,26 @@ def deserialize_callable(
     value: Any, context: Optional[Dict[str, Any]] = None
 ) -> Callable[..., Any]:
     """Reconstruct a callable serialized by :func:`serialize_callable`, in the
-    validation ``context``. A component saved before grafi/v2,
-    ``{"component": ..., "config": {...}}``, loads too.
+    validation ``context``.
 
     Raises:
-        CallableSerializationError: On an unknown shape, a failed reconstruction,
-            or a legacy pickle payload (no longer supported -- regenerate the
-            manifest).
+        CallableSerializationError: On a value of another shape, such as one a
+            grafi before v2 saved (regenerate the manifest).
         UntrustedImportError: If it names a function outside the trusted
             modules.
     """
     if isinstance(value, Mapping) and "class" in value:
         return CallableComponent.model_validate(value, context=context)
-    if isinstance(value, Mapping) and "component" in value:
-        component = {"class": value["component"], **value.get("config", {})}
-        return CallableComponent.model_validate(component, context=context)
     if isinstance(value, Mapping) and set(value) == {"ref"}:
         return _resolve_reference(str(value["ref"]))  # A class or a function.
     if isinstance(value, str) and ":" in value:
         raise CallableSerializationError(
             f'A function is saved as {{"ref": {value!r}}}, not as {value!r}.'
         )
-    if isinstance(value, str) or (isinstance(value, Mapping) and "base64" in value):
-        raise CallableSerializationError(
-            "The manifest stores a pickle payload, which is no longer supported. "
-            "Regenerate the manifest with the current version "
-            "(e.g. assistant.generate_manifest())."
-        )
     raise CallableSerializationError(
         f'Cannot load a callable from {value!r}: expected {{"ref": ...}} or a '
-        "CallableComponent."
+        "CallableComponent. A manifest saved by a grafi before v2 is loaded with "
+        "Component.from_manifest(), which upgrades it."
     )
 
 

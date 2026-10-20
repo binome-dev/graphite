@@ -16,6 +16,7 @@ from grafi.common.import_ref import reference_to
 from grafi.common.import_ref import resolve_import_ref
 from grafi.common.import_ref import trust_modules
 from grafi.common.manifest import Component
+from grafi.common.manifest import ManifestError
 from grafi.nodes.conditions import always_true
 
 # A package whose import leaves a mark, to tell whether it was imported.
@@ -76,15 +77,27 @@ def test_resolves_an_attribute_nested_on_a_class() -> None:
     ["", "grafi", "grafi.nodes.conditions", "grafi:", ":always_true", "os:"],
 )
 def test_malformed_reference_raises(ref: str) -> None:
-    with pytest.raises(ValueError, match="Malformed import reference"):
+    match = r"is not an import path, which is \"module:Qualname\""
+    with pytest.raises(ManifestError, match=match) as raised:
         resolve_import_ref(ref)
+    assert not isinstance(raised.value, (UntrustedImportError, ValueError))
 
 
-def test_missing_module_or_attribute_of_a_trusted_module_raises() -> None:
-    with pytest.raises(ImportError):
-        resolve_import_ref("grafi.no_such_module:thing")
-    with pytest.raises(AttributeError):
-        resolve_import_ref("grafi.nodes.conditions:no_such_condition")
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "grafi.no_such_module:thing",
+        "grafi.nodes.conditions:no_such_condition",
+        "grafi.common.manifest:Component.no_such_method",
+    ],
+    ids=["module", "attribute", "nested attribute"],
+)
+def test_missing_module_or_attribute_of_a_trusted_module_raises(ref: str) -> None:
+    """A ManifestError, from the ImportError or AttributeError it holds."""
+    with pytest.raises(ManifestError, match=f"Cannot import {ref!r}") as raised:
+        resolve_import_ref(ref)
+    assert not isinstance(raised.value, UntrustedImportError)
+    assert isinstance(raised.value.__cause__, (ImportError, AttributeError))
 
 
 def test_grafi_and_its_submodules_are_trusted() -> None:
@@ -276,7 +289,6 @@ def test_a_grafi_module_from_elsewhere_on_the_path_is_never_imported(
     path.write_text(f"open({str(marker)!r}, 'w').close()\nclass Evil: ...\n")
     monkeypatch.syspath_prepend(str(tmp_path))
 
-    with pytest.raises((ImportError, AttributeError)):
+    with pytest.raises(ManifestError, match="Cannot import"):
         resolve_import_ref(ref)
     assert not marker.exists()
-

@@ -25,10 +25,10 @@ class FunctionTool(Tool):
     The function returns the tool's output, like any Python function, sync or
     async: messages, which pass as they are (so an empty list is no output);
     None, for no output; or any other value, which becomes one message from
-    ``role`` holding it as text. A
-    generator streams its output instead: each string it yields reaches a
-    streaming caller as a delta, and the text it yielded is its output (see
-    :mod:`grafi.tools.results`). Sync code runs in a worker thread.
+    ``role`` holding it as text. A generator streams its output instead: each
+    string it yields reaches a streaming caller as a delta, and the text it
+    yielded is its output (see :mod:`grafi.tools.results`). Sync code runs in
+    a worker thread.
     """
 
     name: str = "FunctionTool"

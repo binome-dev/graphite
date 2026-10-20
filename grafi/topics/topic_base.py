@@ -148,25 +148,25 @@ class TopicBase(Component):
 
 
 # The topics of the workflow being loaded, by name, which its nodes name.
-_loading_topics: ContextVar[Optional[Dict[str, TopicBase]]] = ContextVar(
-    "grafi_loading_topics", default=None
+_topics_in_scope: ContextVar[Optional[Dict[str, TopicBase]]] = ContextVar(
+    "grafi_topics_in_scope", default=None
 )
 
 
 @contextmanager
-def loading_topics(topics: Dict[str, TopicBase]) -> Iterator[None]:
+def topics_in_scope(topics: Dict[str, TopicBase]) -> Iterator[None]:
     """Resolve the topic names loaded in this block to ``topics``."""
-    token = _loading_topics.set(topics)
+    token = _topics_in_scope.set(topics)
     try:
         yield
     finally:
-        _loading_topics.reset(token)
+        _topics_in_scope.reset(token)
 
 
 def _topic(value: Any, info: ValidationInfo) -> Any:
     """A topic, from its name: one of the topics of the workflow being loaded
     (see ``EventDrivenWorkflow``), or of the validation context's ``topics``."""
-    topics = _loading_topics.get()
+    topics = _topics_in_scope.get()
     if topics is None:
         topics = (info.context or {}).get("topics", {})
     if isinstance(value, Mapping) and value.get("name") in topics:

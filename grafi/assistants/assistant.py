@@ -18,13 +18,8 @@ from grafi.runtime.deltas import Delta
 
 
 class Assistant(AssistantBase):
-    """
-    An abstract base class for assistants that use language models to process input and generate responses.
-
-    Attributes:
-        name (str): The name of the assistant
-        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
-    """
+    """An assistant that runs an event-driven workflow on each request, and
+    saves as a manifest holding that workflow (see ``generate_manifest``)."""
 
     @overload
     def invoke(

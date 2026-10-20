@@ -1,100 +1,100 @@
-"""
-Simplified event implementations using the base event framework.
-This module replaces 20+ separate event files with a single, maintainable module.
-"""
+"""The events of a component's lifecycle: a node, tool, workflow or
+assistant being invoked, responding, or failing. Each class fixes its
+``event_type``, and holds what its component took and gave."""
 
 from typing import List
 from typing import Optional
 
 from grafi.common.events.component_base import AssistantEventBase
+from grafi.common.events.component_base import FailedEvent
+from grafi.common.events.component_base import InvokeEvent
 from grafi.common.events.component_base import NodeEventBase
+from grafi.common.events.component_base import RespondEvent
 from grafi.common.events.component_base import ToolEventBase
 from grafi.common.events.component_base import WorkflowEventBase
-from grafi.common.events.component_base import create_component_events
+from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.message import Messages
 
-# ============================================================================
-# NODE EVENTS
-# ============================================================================
-
-NodeInvokeEvent, NodeRespondEvent, NodeFailedEvent = create_component_events(
-    base_class=NodeEventBase,
-    component_name="NODE",
-    input_type=List[ConsumeFromTopicEvent],
-    output_type=Optional[PublishToTopicEvent],
-    module=__name__,
-)
+# A node takes the events it consumed, and gives one publication, or none.
 
 
-# ============================================================================
-# TOOL EVENTS
-# ============================================================================
-
-ToolInvokeEvent, ToolRespondEvent, ToolFailedEvent = create_component_events(
-    base_class=ToolEventBase,
-    component_name="TOOL",
-    input_type=Messages,
-    output_type=Messages,
-    module=__name__,
-)
+class NodeInvokeEvent(InvokeEvent[List[ConsumeFromTopicEvent]], NodeEventBase):
+    event_type: EventType = EventType.NODE_INVOKE
 
 
-# ============================================================================
-# WORKFLOW EVENTS
-# ============================================================================
-
-(
-    WorkflowInvokeEvent,
-    WorkflowRespondEvent,
-    WorkflowFailedEvent,
-) = create_component_events(
-    base_class=WorkflowEventBase,
-    component_name="WORKFLOW",
-    input_type=PublishToTopicEvent,
-    output_type=List[ConsumeFromTopicEvent],
-    module=__name__,
-)
+class NodeRespondEvent(
+    RespondEvent[List[ConsumeFromTopicEvent], Optional[PublishToTopicEvent]],
+    NodeEventBase,
+):
+    event_type: EventType = EventType.NODE_RESPOND
 
 
-# ============================================================================
-# ASSISTANT EVENTS
-# ============================================================================
-
-(
-    AssistantInvokeEvent,
-    AssistantRespondEvent,
-    AssistantFailedEvent,
-) = create_component_events(
-    base_class=AssistantEventBase,
-    component_name="ASSISTANT",
-    input_type=PublishToTopicEvent,
-    output_type=List[ConsumeFromTopicEvent],
-    module=__name__,
-)
+class NodeFailedEvent(FailedEvent[List[ConsumeFromTopicEvent]], NodeEventBase):
+    event_type: EventType = EventType.NODE_FAILED
 
 
-# ============================================================================
-# EXPORT ALL EVENT CLASSES
-# ============================================================================
+# A tool takes messages, and gives messages.
+
+
+class ToolInvokeEvent(InvokeEvent[Messages], ToolEventBase):
+    event_type: EventType = EventType.TOOL_INVOKE
+
+
+class ToolRespondEvent(RespondEvent[Messages, Messages], ToolEventBase):
+    event_type: EventType = EventType.TOOL_RESPOND
+
+
+class ToolFailedEvent(FailedEvent[Messages], ToolEventBase):
+    event_type: EventType = EventType.TOOL_FAILED
+
+
+# A workflow, and an assistant, take one publication, and give the events
+# consumed from their output topics.
+
+
+class WorkflowInvokeEvent(InvokeEvent[PublishToTopicEvent], WorkflowEventBase):
+    event_type: EventType = EventType.WORKFLOW_INVOKE
+
+
+class WorkflowRespondEvent(
+    RespondEvent[PublishToTopicEvent, List[ConsumeFromTopicEvent]], WorkflowEventBase
+):
+    event_type: EventType = EventType.WORKFLOW_RESPOND
+
+
+class WorkflowFailedEvent(FailedEvent[PublishToTopicEvent], WorkflowEventBase):
+    event_type: EventType = EventType.WORKFLOW_FAILED
+
+
+class AssistantInvokeEvent(InvokeEvent[PublishToTopicEvent], AssistantEventBase):
+    event_type: EventType = EventType.ASSISTANT_INVOKE
+
+
+class AssistantRespondEvent(
+    RespondEvent[PublishToTopicEvent, List[ConsumeFromTopicEvent]],
+    AssistantEventBase,
+):
+    event_type: EventType = EventType.ASSISTANT_RESPOND
+
+
+class AssistantFailedEvent(FailedEvent[PublishToTopicEvent], AssistantEventBase):
+    event_type: EventType = EventType.ASSISTANT_FAILED
+
 
 __all__ = [
-    # Node events
     "NodeInvokeEvent",
     "NodeRespondEvent",
     "NodeFailedEvent",
-    # Tool events
     "ToolInvokeEvent",
     "ToolRespondEvent",
     "ToolFailedEvent",
-    # Workflow events
     "WorkflowInvokeEvent",
     "WorkflowRespondEvent",
     "WorkflowFailedEvent",
-    # Assistant events
     "AssistantInvokeEvent",
     "AssistantRespondEvent",
     "AssistantFailedEvent",

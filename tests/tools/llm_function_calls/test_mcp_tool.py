@@ -384,8 +384,8 @@ def test_a_secret_environment_variable_set_to_a_value_is_never_saved():
             },
             "auth",  # The outer name, which all within it is under.
         ),
-        # A URL's query parameter.
-        ({"url": "https://mcp.example/mcp?api_key=literal"}, "api_key"),
+        # A URL's query parameter, reported under the URL's name.
+        ({"url": "https://mcp.example/mcp?api_key=literal"}, "url"),
         # A setting named like a token, as a header.
         (
             {"url": "https://mcp.example/mcp", "headers": {"X-Auth-Token": "t"}},

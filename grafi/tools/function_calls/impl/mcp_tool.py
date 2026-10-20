@@ -12,10 +12,10 @@ from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import Connection
-from grafi.common.models.mcp_connections import MCPConfig
-from grafi.common.models.mcp_connections import with_env
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
+from grafi.tools.mcp_config import MCPConfig
+from grafi.tools.mcp_config import with_env
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 

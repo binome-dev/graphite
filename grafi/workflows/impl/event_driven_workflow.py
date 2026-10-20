@@ -30,7 +30,7 @@ from grafi.tools.llms.llm import LLM
 from grafi.topics.expressions.topic_expression import extract_topics
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_base import TopicBase
-from grafi.topics.topic_base import loading_topics
+from grafi.topics.topic_base import topics_in_scope
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
 from grafi.topics.topic_types import TopicType
 from grafi.workflows.impl.workflow_run import WorkflowRun
@@ -105,7 +105,7 @@ class EventDrivenWorkflow(Workflow):
         return dict(self._topics)
 
     @classmethod
-    def _loading(
+    def _load_scope(
         cls, data: Dict[str, Any], context: Any
     ) -> AbstractContextManager[object]:
         if "topics" not in data:
@@ -117,7 +117,7 @@ class EventDrivenWorkflow(Workflow):
         for name, topic in topics.items():
             if topic.name != name:
                 raise ManifestError(f"The topic {topic.name!r} is keyed as {name!r}.")
-        return loading_topics(topics)
+        return topics_in_scope(topics)
 
     def stop(self) -> None:
         """Stop every run of this workflow in flight.

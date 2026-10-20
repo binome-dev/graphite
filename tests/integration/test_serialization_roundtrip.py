@@ -935,12 +935,15 @@ def test_nested_literal_mcp_secret_cannot_be_saved(kitchen_sink: Assistant) -> N
 
 
 def test_legacy_pickle_payload_is_rejected() -> None:
+    """A pickle, as grafi before v2 saved a lambda, is of no shape a callable
+    is loaded from: refused, naming the upgrade of a manifest before v2."""
     manifest = WeatherAssistant().to_manifest()
     tool = manifest["spec"]["workflow"]["nodes"]["FormatNode"]["tool"]
     tool["function"] = "gASVbase64legacyblob"
 
-    with pytest.raises(CallableSerializationError, match="pickle payload"):
+    with pytest.raises(CallableSerializationError, match="Cannot load a callable") as e:
         Assistant.from_manifest(manifest)
+    assert "Component.from_manifest()" in str(e.value)
 
 
 def test_route_to_a_topic_outside_the_workflow_is_rejected() -> None:

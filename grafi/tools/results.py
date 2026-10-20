@@ -13,8 +13,8 @@ event loop; a sync generator runs in a thread of its own, in one context, so
 what it holds across a ``yield`` stays valid. Sync code cannot be stopped
 midway: a cancellation waits for the call or step running to return, and drops
 one not started. Sync code must not wait for the event loop, which may be
-waiting for it. A result
-becomes text, or messages, with :func:`as_text` and :func:`as_messages`.
+waiting for it. A result becomes text, or messages, with :func:`as_text` and
+:func:`as_messages`.
 """
 
 import asyncio

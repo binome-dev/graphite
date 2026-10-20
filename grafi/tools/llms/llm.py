@@ -13,7 +13,6 @@ from pydantic import PrivateAttr
 from grafi.common.exceptions import LLMToolException
 from grafi.common.manifest import ModelRef
 from grafi.common.manifest import env_secret
-from grafi.common.manifest import secret_variable
 from grafi.common.models.function_spec import FunctionSpecs
 from grafi.common.models.message import Messages
 from grafi.runtime.deltas import streaming
@@ -80,7 +79,7 @@ class LLM(Tool):
         Raises:
             LLMToolException: If there is none.
         """
-        var = self._secret_env.get("api_key", secret_variable(type(self), "api_key"))
+        var = self.secret_variable("api_key")
         key = self.api_key or (os.getenv(var) if var else None)
         if not key:
             where = f": set {var}" if var else ""

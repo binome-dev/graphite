@@ -12,21 +12,32 @@ in ``"grafi.x:os.system"``), nor any value, such as a setting.
 
 import importlib
 import inspect
+import re
 import sys
 import threading
 from typing import Any
 from typing import FrozenSet
 from typing import Optional
 
+from grafi.common.exceptions.manifest_exceptions import ManifestError
 from grafi.common.exceptions.manifest_exceptions import UntrustedImportError
 
 __all__ = [
     "UntrustedImportError",
+    "is_import_path",
     "is_trusted",
     "reference_to",
     "resolve_import_ref",
     "trust_modules",
 ]
+
+# An import path, "module:Qualname".
+_IMPORT_PATH = re.compile(r"[A-Za-z_][\w.]*:[A-Za-z_][\w.]*")
+
+
+def is_import_path(text: str) -> bool:
+    """Whether ``text`` has the form of an import path, ``"module:Qualname"``."""
+    return bool(_IMPORT_PATH.fullmatch(text))
 
 # Replaced whole, never changed, so it is read without the lock.
 _trusted: FrozenSet[str] = frozenset({"grafi"})
@@ -70,12 +81,16 @@ def resolve_import_ref(ref: str) -> Any:
     too (e.g. ``"pkg.mod:Outer.method"``).
 
     Raises:
-        ValueError: If *ref* is not of the form ``"module:qualname"``.
-        UntrustedImportError: If its module is not trusted (see trust_modules()).
+        ManifestError: If *ref* is not of the form ``"module:qualname"``, or
+            names nothing that can be imported.
+        UntrustedImportError: If it names something outside the trusted modules
+            (see trust_modules()).
     """
     module_path, sep, qualname = ref.partition(":")
     if not sep or not module_path or not qualname:
-        raise ValueError(f"Malformed import reference: {ref!r}")
+        raise ManifestError(
+            f"{ref!r} is not an import path, which is \"module:Qualname\"."
+        )
     if any(part.startswith("__") for part in module_path.split(".")):
         raise UntrustedImportError(
             f"{ref!r} names a special module, such as a package's __main__."
@@ -89,9 +104,15 @@ def resolve_import_ref(ref: str) -> Any:
     for attr in attrs:
         if attr.startswith("__") and attr.endswith("__"):
             raise UntrustedImportError(f"{ref!r} names a special attribute, {attr}")
-    obj: Any = importlib.import_module(module_path)
+    try:
+        obj: Any = importlib.import_module(module_path)
+    except ImportError as error:
+        raise ManifestError(f"Cannot import {ref!r}: {error}") from error
     for at, attr in enumerate(attrs, start=1):
-        obj = inspect.getattr_static(obj, attr)  # Runs no property.
+        try:
+            obj = inspect.getattr_static(obj, attr)  # Runs no property.
+        except AttributeError as error:
+            raise ManifestError(f"Cannot import {ref!r}: {error}") from error
         if isinstance(obj, classmethod):
             raise UntrustedImportError(
                 f"{ref!r} names a classmethod; name a function, or a staticmethod."

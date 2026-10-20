@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.callable_component import CallableComponent
-from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.event_stores import EventStoreInMemory
 from grafi.common.import_ref import UntrustedImportError
@@ -422,7 +421,7 @@ def test_a_function_that_is_not_found_is_not_loaded():
         "functions": {"gone": {"ref": f"{__name__}:gone"}},
     }
 
-    with pytest.raises(CallableSerializationError, match="Cannot import"):
+    with pytest.raises(ManifestError, match="Cannot import"):
         Tool.model_validate(data)
 
 
@@ -534,4 +533,3 @@ class Doubler(CallableComponent):
 def test_a_function_call_tool_refuses_what_is_not_a_function():
     with pytest.raises(TypeError, match="calls functions, not Doubler"):
         FunctionCallTool.builder().function(Doubler()).build()
-

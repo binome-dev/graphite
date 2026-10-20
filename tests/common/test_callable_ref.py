@@ -8,13 +8,14 @@ import pytest
 from pydantic import BaseModel
 from pydantic import ValidationError
 
+from grafi.common import import_ref
 from grafi.common.callable_component import CallableComponent
 from grafi.common.callable_ref import CallableRef
 from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.callable_ref import deserialize_callable
 from grafi.common.callable_ref import serialize_callable
 from grafi.common.import_ref import UntrustedImportError
-from grafi.common.import_ref import trust_modules  # noqa: F401 - named by a test.
+from grafi.common.import_ref import trust_modules
 from grafi.common.manifest import API_VERSION
 from grafi.common.manifest import Component
 from grafi.common.manifest import ManifestError
@@ -65,13 +66,13 @@ class Hooked(Component):
 # --- reference form -------------------------------------------------------
 
 
-def test_module_level_function_serializes_as_reference():
+def test_module_level_function_serializes_as_reference() -> None:
     assert serialize_callable(module_level_function) == {
         "ref": f"{__name__}:module_level_function"
     }
 
 
-def test_reference_roundtrips_to_same_object():
+def test_reference_roundtrips_to_same_object() -> None:
     restored = deserialize_callable(serialize_callable(module_level_function))
     assert restored is module_level_function
     assert restored(41) == 42
@@ -80,7 +81,7 @@ def test_reference_roundtrips_to_same_object():
 # --- component form -------------------------------------------------------
 
 
-def test_component_serializes_as_a_component():
+def test_component_serializes_as_a_component() -> None:
     assert serialize_callable(Adder(amount=5)) == {
         "class": f"{__name__}:Adder",
         "amount": 5,
@@ -90,16 +91,8 @@ def test_component_serializes_as_a_component():
     )
 
 
-def test_component_roundtrips():
+def test_component_roundtrips() -> None:
     restored = deserialize_callable(serialize_callable(Adder(amount=5)))
-    assert isinstance(restored, Adder)
-    assert restored(10) == 15
-
-
-def test_component_saved_before_grafi_v2_loads():
-    restored = deserialize_callable(
-        {"component": f"{__name__}:Adder", "config": {"amount": 5}}
-    )
     assert isinstance(restored, Adder)
     assert restored(10) == 15
 
@@ -107,23 +100,24 @@ def test_component_saved_before_grafi_v2_loads():
 @pytest.mark.parametrize(
     "value",
     [
-        {"component": f"{__name__}:module_level_function"},
         {"class": f"{__name__}:module_level_function"},
         {"class": f"{__name__}:Hooked", "fn": {"ref": f"{__name__}:Adder"}},
     ],
-    ids=["legacy function", "function", "component not callable"],
+    ids=["function", "component not callable"],
 )
-def test_component_naming_what_is_not_a_callable_component_raises(value):
+def test_component_naming_what_is_not_a_callable_component_raises(
+    value: Any,
+) -> None:
     with pytest.raises(ManifestError, match="is not a subclass of CallableComponent"):
         deserialize_callable(value)
 
 
-def test_component_with_an_unknown_field_raises():
+def test_component_with_an_unknown_field_raises() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         deserialize_callable({"class": f"{__name__}:Adder", "amount": 5, "x": 1})
 
 
-def test_component_field_round_trips(monkeypatch: pytest.MonkeyPatch):
+def test_component_field_round_trips(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(SECRET_VAR, "s3cret")
     hooked = Hooked(fn=Signer())
 
@@ -137,14 +131,16 @@ def test_component_field_round_trips(monkeypatch: pytest.MonkeyPatch):
 
 def test_component_secret_set_to_a_value_cannot_be_saved(
     monkeypatch: pytest.MonkeyPatch,
-):
+) -> None:
     monkeypatch.setenv(SECRET_VAR, "s3cret")
 
     with pytest.raises(ManifestError, match=f"Signer.key .*{SECRET_VAR}"):
         Hooked(fn=Signer(key="another")).to_manifest()
 
 
-def test_component_in_a_manifest_follows_its_rules(monkeypatch: pytest.MonkeyPatch):
+def test_component_in_a_manifest_follows_its_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("GRAFI_TEST_OTHER_SECRET", "other")
 
     def manifest(fn: Any) -> dict:
@@ -165,14 +161,14 @@ def test_component_in_a_manifest_follows_its_rules(monkeypatch: pytest.MonkeyPat
 # --- no pickle: hard errors -----------------------------------------------
 
 
-def test_lambda_cannot_be_serialized():
+def test_lambda_cannot_be_serialized() -> None:
     with pytest.raises(CallableSerializationError, match="without pickle"):
         serialize_callable(lambda x: x > 0)
 
 
-def test_closure_cannot_be_serialized():
-    def make_adder(n):
-        def adder(x):
+def test_closure_cannot_be_serialized() -> None:
+    def make_adder(n: int) -> Any:
+        def adder(x: int) -> int:
             return x + n
 
         return adder
@@ -181,7 +177,7 @@ def test_closure_cannot_be_serialized():
         serialize_callable(make_adder(10))
 
 
-def test_an_error_names_a_callable_without_showing_what_it_holds():
+def test_an_error_names_a_callable_without_showing_what_it_holds() -> None:
     """A partial's repr shows the arguments bound to it, such as a key."""
     bound = functools.partial(module_level_function, "sk-bound-secret")
 
@@ -194,19 +190,63 @@ def test_an_error_names_a_callable_without_showing_what_it_holds():
         serialize_callable(lambda x: x)
 
 
-def test_legacy_base64_string_is_rejected():
-    with pytest.raises(CallableSerializationError, match="pickle payload"):
-        deserialize_callable("gASVbase64blob")
+@pytest.mark.parametrize(
+    "value",
+    [
+        "gASVbase64blob",  # A pickle, as grafi before v2 saved a lambda.
+        {"base64": "blob", "code": "lambda _: True"},
+        {"component": f"{__name__}:Adder", "config": {"amount": 5}},  # Before v2.
+        {"component": f"{__name__}:module_level_function"},
+        {"unexpected": "value"},
+        {"ref": f"{__name__}:module_level_function", "x": 1},  # Other keys too.
+        42,
+        None,
+        [{"ref": f"{__name__}:module_level_function"}],
+    ],
+    ids=[
+        "pickle text",
+        "pickle dict",
+        "legacy component",
+        "legacy function",
+        "unknown keys",
+        "ref with other keys",
+        "int",
+        "null",
+        "list",
+    ],
+)
+def test_a_value_of_another_shape_raises_naming_the_upgrade(value: Any) -> None:
+    """Any shape but a reference or a component is refused, as what grafi
+    before v2 saved is: Component.from_manifest() upgrades such a manifest."""
+    with pytest.raises(CallableSerializationError, match="Cannot load a callable") as e:
+        deserialize_callable(value)
+
+    assert "Component.from_manifest()" in str(e.value)
+    assert '{"ref": ...}' in str(e.value) and "CallableComponent" in str(e.value)
 
 
-def test_legacy_base64_dict_is_rejected():
-    with pytest.raises(CallableSerializationError, match="pickle payload"):
-        deserialize_callable({"base64": "blob", "code": "lambda _: True"})
+@pytest.mark.parametrize(
+    "ref, match",
+    [
+        ("no_separator_here", "is not an import path"),
+        (f"{__name__}:no_such_fn", "Cannot import"),
+        ("grafi.nodes.conditions:no_such_fn", "Cannot import"),
+        (f"{__name__}_no_such_module:fn", "Cannot import"),
+    ],
+    ids=["malformed", "missing function", "missing grafi function", "missing module"],
+)
+def test_malformed_or_unimportable_reference_raises(
+    ref: str, match: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reference's own error is raised, a ManifestError, as it is."""
+    monkeypatch.setattr(import_ref, "_trusted", import_ref._trusted)
+    trust_modules(f"{__name__}_no_such_module")
 
-
-def test_malformed_reference_raises():
-    with pytest.raises(CallableSerializationError, match="Malformed import reference"):
-        deserialize_callable({"ref": "no_separator_here"})
+    with pytest.raises(ManifestError, match=match) as raised:
+        deserialize_callable({"ref": ref})
+    assert not isinstance(raised.value, (UntrustedImportError, ValueError))
+    with pytest.raises(ManifestError, match=match):
+        Hooked.model_validate({"fn": {"ref": ref}})
 
 
 class Inert(BaseModel):
@@ -216,34 +256,26 @@ class Inert(BaseModel):
 NOT_CALLABLE = Inert()
 
 
-def test_reference_to_a_value_raises():
+def test_reference_to_a_value_raises() -> None:
     """A reference reaches a class or a function, never a value."""
     with pytest.raises(UntrustedImportError, match="reaches 'Inert'"):
         deserialize_callable({"ref": f"{__name__}:NOT_CALLABLE"})
 
 
-def test_dict_without_known_keys_raises():
-    with pytest.raises(CallableSerializationError, match="ref.*CallableComponent"):
-        deserialize_callable({"unexpected": "value"})
-
-
-def test_reference_with_other_keys_raises():
-    with pytest.raises(CallableSerializationError, match="Cannot load a callable"):
-        deserialize_callable({"ref": f"{__name__}:module_level_function", "x": 1})
-
-
 @pytest.mark.parametrize(
     "value", ["grafi.nodes.conditions:always_true", f"{__name__}:module_level_function"]
 )
-def test_bare_import_path_raises_naming_ref(value: str):
+def test_bare_import_path_raises_naming_ref(value: str) -> None:
     with pytest.raises(CallableSerializationError, match=r'saved as \{"ref": '):
         deserialize_callable(value)
+    with pytest.raises(CallableSerializationError, match=r'saved as \{"ref": '):
+        Hooked.model_validate({"fn": value})
 
 
 # --- what a reference may name --------------------------------------------
 
 
-def test_grafi_route_predicates_load_by_reference():
+def test_grafi_route_predicates_load_by_reference() -> None:
     ref = {"ref": "grafi.nodes.conditions:always_true"}
     assert deserialize_callable(ref) is always_true
 
@@ -254,26 +286,34 @@ def test_grafi_route_predicates_load_by_reference():
         "grafi.common.import_ref:trust_modules",
         "grafi.common.callable_ref:deserialize_callable",
         "grafi.nodes.node:Node",
+        "grafi.no_such_module:fn",  # Refused by its module, before importing.
     ],
 )
-def test_other_grafi_functions_are_refused(ref: str):
+def test_other_grafi_functions_are_refused(ref: str) -> None:
     with pytest.raises(UntrustedImportError, match="grafi function a manifest may"):
         deserialize_callable({"ref": ref})
+    with pytest.raises(UntrustedImportError, match="grafi function a manifest may"):
+        Hooked.model_validate({"fn": {"ref": ref}})
 
 
 @pytest.mark.parametrize("attr", ["BaseModel", "pytest.raises", "pytest", "SECRET_VAR"])
-def test_reference_to_what_a_trusted_module_does_not_own_is_refused(attr: str):
+def test_reference_to_what_a_trusted_module_does_not_own_is_refused(
+    attr: str,
+) -> None:
     """This module is trusted, but not what it imported from elsewhere."""
     with pytest.raises(UntrustedImportError, match="reaches|is not trusted"):
         deserialize_callable({"ref": f"{__name__}:{attr}"})
 
 
-def test_reference_to_an_untrusted_module_is_refused():
+@pytest.mark.parametrize("ref", ["os:system", "os:getcwd", "json:JSONDecoder"])
+def test_reference_to_an_untrusted_module_is_refused(ref: str) -> None:
     with pytest.raises(UntrustedImportError, match="trust_modules"):
-        deserialize_callable({"ref": "os:system"})
+        deserialize_callable({"ref": ref})
+    with pytest.raises(UntrustedImportError, match="trust_modules"):
+        Hooked.model_validate({"fn": {"ref": ref}})
 
 
-def test_deserialize_validates_in_the_context_given():
+def test_deserialize_validates_in_the_context_given() -> None:
     topic = Topic(name="answers")
     value = {"class": f"{__name__}:ToTopic", "topic": "answers"}
 
@@ -285,7 +325,7 @@ def test_deserialize_validates_in_the_context_given():
         deserialize_callable(value)
 
 
-def test_a_grafi_function_imported_into_a_trusted_module_is_refused():
+def test_a_grafi_function_imported_into_a_trusted_module_is_refused() -> None:
     """What decides is where a function belongs, not where it is named."""
     with pytest.raises(UntrustedImportError, match="grafi function a manifest may"):
         deserialize_callable({"ref": f"{__name__}:trust_modules"})

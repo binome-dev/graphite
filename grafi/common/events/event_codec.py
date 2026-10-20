@@ -1,10 +1,8 @@
-"""Registry-based encoding and decoding of stored events.
+"""Encoding and decoding the events a store keeps.
 
-The codec owns event-type registration and decoding so that persistence
-backends (``EventStore`` implementations) do not need to know concrete event
-classes, and new event types can be registered without editing the store
-(Open/Closed). Built-ins are registered here, at the composition boundary,
-rather than imported into the persistence layer.
+The codec knows the event classes, by their ``event_type``, so that a store
+need not: it encodes an event to store, and decodes a stored one. grafi's own
+event types are registered here; another is registered with ``register()``.
 
 An event is stored as its JSON form, ``model_dump(mode="json")``, whose
 ``event_version`` names its revision (see ``EVENT_VERSION``). Decoding upgrades

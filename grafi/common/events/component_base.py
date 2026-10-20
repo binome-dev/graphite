@@ -1,22 +1,17 @@
-"""
-Simplified event base classes with clear hierarchy.
-
-Reduces code duplication and provides consistent patterns for all events.
-"""
+"""The bases of a component's lifecycle events: what a node, tool, workflow or
+assistant records when invoked, when it responds, and when it fails. The event
+classes themselves are in :mod:`grafi.common.events.component_events`."""
 
 from typing import Any
 from typing import Dict
 from typing import Generic
 from typing import List
 from typing import Optional
-from typing import Tuple
-from typing import Type
 from typing import TypeVar
 
 from pydantic import Field
 
 from grafi.common.events.event import Event
-from grafi.common.events.event import EventType
 from grafi.common.models.default_id import default_id
 
 # ============================================================================
@@ -89,42 +84,3 @@ class AssistantEventBase(ComponentEvent):
     """Base for Assistant events with model info."""
 
     model: Optional[str] = None
-
-
-# ============================================================================
-# FACTORY FUNCTIONS FOR CREATING TYPED EVENTS
-# ============================================================================
-
-
-def create_component_events(
-    base_class: Type[ComponentEvent],
-    component_name: str,
-    input_type: Any,  # A type, or a typing form such as List[...] or Optional[...].
-    output_type: Any,
-    module: str = __name__,
-) -> Tuple[Type[InvokeEvent], Type[RespondEvent], Type[FailedEvent]]:
-    """
-    Factory to create a set of Invoke, Respond, and Failed events for a component.
-    Each class fixes its ``event_type``, and belongs to ``module``, where it is
-    defined.
-
-    Returns:
-        Tuple of (InvokeEvent, RespondEvent, FailedEvent) classes
-    """
-
-    def event_class(lifecycle: str, base: Type[ComponentEvent]) -> Any:
-        event_type = EventType[f"{component_name.upper()}_{lifecycle}"]
-        name = f"{event_type.value}Event"  # Such as NodeInvokeEvent.
-        namespace = {
-            "__annotations__": {"event_type": EventType},
-            "__module__": module,
-            "__qualname__": name,
-            "event_type": event_type,
-        }
-        return type(name, (base, base_class), namespace)
-
-    return (
-        event_class("INVOKE", InvokeEvent[input_type]),
-        event_class("RESPOND", RespondEvent[input_type, output_type]),
-        event_class("FAILED", FailedEvent[input_type]),
-    )

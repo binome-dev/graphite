@@ -45,7 +45,7 @@ class Tool(Component):
         input_data: Messages,
     ) -> MsgsAGen:
         """Yield the tool's output for ``input_data``, in batches of messages."""
-        yield []  # Too keep mypy happy
+        yield []  # An async generator, for mypy.
         raise NotImplementedError("Subclasses must implement this method.")
 
 

@@ -17,6 +17,7 @@ from typing import Union
 from grafi.common.manifest import API_VERSION
 from grafi.common.manifest import ManifestError
 from grafi.common.manifest import import_path
+from grafi.common.manifest import kind_of
 
 _TOOLS = "grafi.tools"
 
@@ -93,9 +94,7 @@ def upgrade_manifest(
     }
     assistant = classes.get(str(manifest.get("type")), _ASSISTANT)
     if assistant == _ASSISTANT and loading is not None:
-        from grafi.assistants.assistant import Assistant
-
-        if issubclass(loading, Assistant):
+        if kind_of(loading) == "Assistant" and loading.__name__ != "AssistantBase":
             assistant = import_path(loading)
     workflow = _workflow(manifest["workflow"], classes)
     return {
@@ -131,13 +130,21 @@ def _condition(condition: Any) -> Any:
     """A topic's condition, as the ``when`` of the routes to it: None for
     always, and grafi's own predicates where they now are."""
     if not isinstance(condition, Mapping) or "ref" not in condition:
-        return condition  # None, a component, or a pickle, which fails loudly.
+        return _callable(condition)  # None, a component, or a pickle (fails).
     module, _, name = str(condition["ref"]).partition(":")
     if condition["ref"] == "grafi.topics.topic_base:always_true":
         return None
     if module == "grafi.topics.conditions":
         return {"ref": f"grafi.nodes.conditions:{name}"}
     return condition
+
+
+def _callable(value: Any) -> Any:
+    """A saved callable as grafi/v2 saves it: a component saved before as
+    ``{"component": path, "config": {...}}`` is ``{"class": path, ...}``."""
+    if isinstance(value, Mapping) and "component" in value:
+        return {"class": value["component"], **(value.get("config") or {})}
+    return value
 
 
 def _topic(data: Mapping[str, Any]) -> Dict[str, Any]:
@@ -162,7 +169,11 @@ def _node(
     node_class = _NODE if name == "Node" else _class(name, classes, "node")
     if "publisher_router" in data:
         routes = [
-            {key: value for key, value in route.items() if key != "from_stage"}
+            {
+                key: _callable(value) if key == "when" else value
+                for key, value in route.items()
+                if key != "from_stage"
+            }
             for route in data["publisher_router"].get("routes", [])
         ]
     else:  # The list of topic names, before routes.
@@ -190,6 +201,11 @@ def _tool(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, Any]
     tool_class = _class(data.get("class"), classes, "tool")
     if tool_class != TOOL_CLASSES["MCPTool"]:
         tool.pop("function_specs", None)  # They follow from the functions.
+    for key in ("function", "agent_call"):  # A tool's callables.
+        if key in tool:
+            tool[key] = _callable(tool[key])
+    if isinstance(tool.get("functions"), Mapping):
+        tool["functions"] = {k: _callable(v) for k, v in tool["functions"].items()}
     return {"class": tool_class, **tool}
 
 

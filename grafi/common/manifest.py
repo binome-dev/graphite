@@ -18,27 +18,26 @@ those named with :func:`~grafi.common.import_ref.trust_modules`.
 Secrets are saved as references to environment variables, never as values. A
 field declared with :func:`env_secret` is saved as ``{"env": "VAR"}``, and
 saving one set to a value that is not its variable's raises
-:class:`ManifestError`, as does saving a field not so declared whose name says
-it holds a secret (see :func:`secret_name`). These rules apply to the JSON
-form: ``model_dump()`` gives a component's values, as pydantic does.
+:class:`ManifestError`, as does saving a value recognized as a secret anywhere
+else (see :mod:`grafi.common.secrets`). These rules apply to the JSON form:
+``model_dump()`` gives a component's values, as pydantic does.
 
 A manifest wraps a component's JSON in an envelope naming the format and the
 component's kind, ``{"apiVersion": "grafi/v2", "kind": "Assistant", "spec":
 {...}}``: see :meth:`Component.to_manifest` and :meth:`Component.from_manifest`,
 which also reads a manifest saved before this format. ``from_manifest`` loads a
-manifest you did not write with care: every component in it names its class,
-no secret is given as a value, and a secret is read only from its own
-environment variable, or one you name. A manifest still chooses what its
-components call -- an LLM's ``base_url``, an MCP server's URL or command -- and
-they get the secrets the components use: load manifests from sources you trust
-with those.
+manifest you did not write with care, under a :class:`ManifestPolicy`: every
+component in it names its class, no secret is given as a value, and a secret is
+read only from its own environment variable, or one you name. A manifest still
+chooses what its components call -- an LLM's ``base_url``, an MCP server's URL
+or command -- and they get the secrets the components use: load manifests from
+sources you trust with those.
 """
 
 import functools
 import inspect
 import json
 import os
-import re
 from contextlib import AbstractContextManager
 from contextlib import nullcontext
 from contextvars import ContextVar
@@ -57,8 +56,6 @@ from typing import Self
 from typing import Type
 from typing import TypeVar
 from typing import Union
-from urllib.parse import parse_qsl
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel
 from pydantic import BeforeValidator
@@ -75,50 +72,32 @@ from pydantic import model_validator
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.exceptions.manifest_exceptions import ManifestError
-from grafi.common.import_ref import UntrustedImportError
+from grafi.common.import_ref import is_import_path
 from grafi.common.import_ref import reference_to
 from grafi.common.import_ref import resolve_import_ref
+from grafi.common.secrets import env_reference
+from grafi.common.secrets import held_secret
 
-__all__ = ["API_VERSION", "Component", "ManifestError", "ModelRef", "env_secret"]
+__all__ = [
+    "API_VERSION",
+    "Component",
+    "ManifestError",
+    "ManifestPolicy",
+    "ModelRef",
+    "env_secret",
+    "import_path",
+    "kind_of",
+    "save_refused",
+]
 
 API_VERSION = "grafi/v2"
 
-# Names that say they hold a secret: api_key, client_secret, password,
-# access_token, GITHUB_TOKEN, Authorization, X-Api-Key...
-_SECRET_NAME = re.compile(
-    r"^auth$|(password|passwd)s?$"
-    r"|(^|_)(api_?keys?|secrets?(_?keys?)?|(private|ssh|signing|access)_?keys?"
-    r"|credentials?|authorization|cookies?|token)$",
-    re.IGNORECASE,
-)
-
-# ... but not a tokenizer's special tokens.
-_TOKENIZER_TOKEN = re.compile(r"(^|_)(eos|bos|pad|unk|sep|cls|mask)_token$", re.I)
-
-# Where a camelCase name's words meet, as in clientSecret and OpenAIApiKey.
-_CAMEL_HUMP = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-
-# Text that only refers to an environment variable, after an auth scheme.
-_REFERENCE_TEXT = re.compile(
-    r"(?:(?:Bearer|Basic|Token|Digest|ApiKey|Api-Key|Key|OAuth|SSWS)\s+)?"
-    r"\$\{[A-Za-z_][A-Za-z0-9_]*\}",
-    re.IGNORECASE,
-)
-
-# The validation context key of the policy from_manifest() loads with.
+# The validation context key of the policy from_manifest() loads under.
 _POLICY = "grafi_manifest_policy"
 
 C = TypeVar("C", bound="Component")
 E = TypeVar("E", bound=Exception)
 T = TypeVar("T")
-
-
-def secret_name(name: str) -> bool:
-    """Whether ``name``, of a field, header or variable, says it holds a
-    secret, such as ``api_key``, ``client_secret``, ``accessToken``,
-    ``GITHUB_TOKEN``, ``Authorization`` or ``X-Api-Key``."""
-    name = _CAMEL_HUMP.sub("_", name).replace("-", "_")
-    return bool(_SECRET_NAME.search(name)) and not _TOKENIZER_TOKEN.search(name)
 
 
 # The errors raised while to_manifest() saves a component, in this context:
@@ -128,9 +107,10 @@ _save_errors: ContextVar[Optional[List[Exception]]] = ContextVar(
 )
 
 
-def refuse_save(error: E) -> E:
-    """``error``, about to be raised while saving a component, recorded so that
-    :meth:`Component.to_manifest` raises it as it is."""
+def save_refused(error: E) -> E:
+    """``error``, which refuses to save a component, as it is to be raised:
+    recorded, so that :meth:`Component.to_manifest` raises it as it is, where
+    ``model_dump`` would report only its text."""
     errors = _save_errors.get()
     if errors is not None:
         errors.append(error)
@@ -138,37 +118,28 @@ def refuse_save(error: E) -> E:
 
 
 @dataclass(frozen=True)
-class _Policy:
-    """What from_manifest() allows a manifest: the environment variables it may
-    read besides each secret field's own."""
+class ManifestPolicy:
+    """What :meth:`Component.from_manifest` allows a manifest: the environment
+    variables it may read, besides each secret field's own. A load has one in
+    its validation context when it is of a manifest."""
 
     env: FrozenSet[str]
 
+    @classmethod
+    def of(cls, context: Any) -> Optional["ManifestPolicy"]:
+        """The policy of the load with this validation ``context``, if it is a
+        load of a manifest."""
+        policy = context.get(_POLICY) if isinstance(context, Mapping) else None
+        return policy if isinstance(policy, ManifestPolicy) else None
+
     def check_env(self, var: str, own: Optional[str] = None) -> None:
+        """Refuse reading the environment variable ``var``, unless it is
+        ``own``, a secret field's own, or allowed."""
         if var != own and var not in self.env:
             raise ManifestError(
                 f"The manifest reads the environment variable {var!r}; allow it "
                 f"with from_manifest(..., env=[{var!r}])."
             )
-
-
-def _manifest_policy(context: Any) -> Optional[_Policy]:
-    """The policy a load through from_manifest() applies, if this is one."""
-    policy = context.get(_POLICY) if isinstance(context, Mapping) else None
-    return policy if isinstance(policy, _Policy) else None
-
-
-def check_manifest_env(context: Any, var: str) -> None:
-    """Refuse a manifest loaded with from_manifest() reading the environment
-    variable ``var``, unless it was allowed; in other loads, accept it."""
-    policy = _manifest_policy(context)
-    if policy is not None:
-        policy.check_env(var)
-
-
-def loading_manifest(context: Any) -> bool:
-    """Whether this load is of a manifest, through from_manifest()."""
-    return _manifest_policy(context) is not None
 
 
 class _EnvSecret:
@@ -211,95 +182,10 @@ def _secret_vars(cls: Type[BaseModel]) -> Dict[str, Optional[str]]:
     }
 
 
-def is_env_reference(value: str) -> bool:
-    """Whether ``value`` only refers to an environment variable, as
-    ``"${GITHUB_TOKEN}"`` or ``"Bearer ${GITHUB_TOKEN}"`` does (an auth scheme
-    and a reference), or names a way
-    to authenticate, as MCP's ``"auth": "oauth"`` does, rather than holding a
-    secret."""
-    return bool(_REFERENCE_TEXT.fullmatch(value.strip())) or value == "oauth"
-
-
-def _held_secret(name: str, value: Any) -> Optional[str]:
-    """The name of a secret ``value`` holds, itself or within it: text under a
-    name like a secret's, such as a header dict's ``Authorization``, unless it
-    only refers to a variable; or a URL's password."""
-    if isinstance(value, str):
-        if value and secret_name(name) and not is_env_reference(value):
-            return name
-        return name if holds_url_password(value) or _url_secret(value) else None
-    if _env_reference(value) is not None:
-        return None
-    under_secret = secret_name(name)  # All within it is under its name.
-    items: Iterable[Any] = ()
-    if isinstance(value, Mapping):
-        items = (
-            (name if under_secret else str(key), item)
-            for key, item in value.items()
-            if not (key == "class" and _IMPORT_PATH.fullmatch(str(item)))
-        )
-    elif isinstance(value, (list, tuple)):
-        items = (  # [name, value] pairs, unless under a secret's name.
-            item if _named_pair(item) and not under_secret else (name, item)
-            for item in value
-        )
-    for key, item in items:
-        held = _held_secret(str(key), item)
-        if held is not None:
-            return held
-    return None
-
-
-def _url_secret(text: str) -> bool:
-    """Whether ``text`` is a URL whose query holds a secret by its name."""
-    if "://" not in text or "?" not in text:
-        return False
-    try:
-        query = parse_qsl(urlsplit(text).query)
-    except ValueError:
-        return False
-    return any(
-        value and secret_name(name) and not is_env_reference(value)
-        for name, value in query
-    )
-
-
-def _named_pair(item: Any) -> bool:
-    return (
-        isinstance(item, (list, tuple))
-        and len(item) == 2
-        and all(isinstance(part, str) for part in item)
-    )
-
-
-def holds_url_password(text: str) -> bool:
-    """Whether ``text`` is a URL holding a password, not a variable's."""
-    if "://" not in text or "@" not in text:
-        return False
-    try:
-        password = urlsplit(text).password
-    except ValueError:
-        return False
-    return bool(password) and not is_env_reference(password or "")
-
-
 @functools.cache
 def _unsaved(cls: Type[BaseModel]) -> FrozenSet[str]:
     """The class's fields saving leaves out, such as what follows from others."""
     return frozenset(name for name, field in cls.model_fields.items() if field.exclude)
-
-
-def _env_reference(value: Any) -> Optional[str]:
-    """The variable ``value`` refers to, if it is ``{"env": "VAR"}``."""
-    if isinstance(value, Mapping) and set(value) == {"env"}:
-        if isinstance(value["env"], str) and _VARIABLE.fullmatch(value["env"]):
-            return value["env"]
-    return None
-
-
-def secret_variable(cls: Type[BaseModel], field: str) -> Optional[str]:
-    """The environment variable the secret ``field`` of ``cls`` is read from."""
-    return _secret_vars(cls).get(field)
 
 
 def import_path(obj: Any) -> str:
@@ -311,7 +197,7 @@ def import_path(obj: Any) -> str:
     """
     ref = reference_to(obj)
     if ref is None:
-        raise refuse_save(
+        raise save_refused(
             ManifestError(
                 f"{obj!r} cannot be saved by reference: define it at the top "
                 "level of a module that can be imported, not in a script or a "
@@ -321,21 +207,23 @@ def import_path(obj: Any) -> str:
     return ref
 
 
+def kind_of(cls: type) -> str:
+    """What a manifest calls a component of class ``cls``: its nearest
+    ``manifest_kind``, else its name."""
+    for klass in cls.__mro__:
+        kind = vars(klass).get("manifest_kind")
+        if kind:
+            return str(kind)
+    return cls.__name__
+
+
 def _load_class(path: Any, base: Type[C]) -> Type[C]:
     """The class ``path`` names, a subclass of ``base``: by its import path,
     or itself, as a python-mode dump holds it."""
     if inspect.isclass(path):
         cls = path
     elif isinstance(path, str):
-        try:
-            cls = resolve_import_ref(path)
-        except UntrustedImportError:
-            raise
-        except (ValueError, ImportError, AttributeError) as error:
-            raise ManifestError(
-                f"Cannot import {path!r}, which must be an import path, "
-                f'"module:Qualname": {error}'
-            ) from error
+        cls = resolve_import_ref(path)
     else:
         raise ManifestError(f"A class must be named by its import path: {path!r}")
     if not (inspect.isclass(cls) and issubclass(cls, base)):
@@ -388,6 +276,11 @@ class Component(BaseModel):
     # it, keeping the validation context (as pydantic's RootModel marks its own).
     __init__.__pydantic_base_init__ = True  # type: ignore[attr-defined]
 
+    def secret_variable(self, field: str) -> Optional[str]:
+        """The environment variable the secret ``field`` is read from: the one
+        a manifest named for it, else its own."""
+        return self._secret_env.get(field, _secret_vars(type(self)).get(field))
+
     @model_serializer(mode="wrap")
     def _save(
         self, handler: SerializerFunctionWrapHandler, info: SerializationInfo
@@ -397,15 +290,12 @@ class Component(BaseModel):
         if not info.mode_is_json():
             return {"class": cls, **data}
         secrets = _secret_vars(cls)
-        for name, own in secrets.items():
-            if name in data:
-                data[name] = self._secret_reference(
-                    name, self._secret_env.get(name, own)
-                )
+        for name in secrets.keys() & data.keys():
+            data[name] = self._secret_reference(name)
         for name in data.keys() - secrets.keys():
-            held = _held_secret(name, data[name])
+            held = held_secret(name, data[name])
             if held is not None:
-                raise refuse_save(
+                raise save_refused(
                     ManifestError(
                         f"{cls.__name__}.{name} holds a secret, at '{held}', and "
                         "a manifest never holds one: declare a secret field with "
@@ -415,14 +305,15 @@ class Component(BaseModel):
                 )
         return {"class": import_path(cls), **data}
 
-    def _secret_reference(self, name: str, var: Optional[str]) -> Any:
-        value = getattr(self, name)
+    def _secret_reference(self, name: str) -> Any:
+        """The secret field ``name`` as saved: a reference to its variable."""
+        var, value = self.secret_variable(name), getattr(self, name)
         if var is None and value is None:
             return None
         if var is not None and (value is None or value == os.getenv(var)):
             return {"env": var}
         source = f"the environment variable {var}" if var else "an environment variable"
-        raise refuse_save(
+        raise save_refused(
             ManifestError(
                 f"{type(self).__name__}.{name} is set to a value that is not "
                 f"{source}'s, and a manifest never holds a secret: read it "
@@ -437,7 +328,7 @@ class Component(BaseModel):
     ) -> Self:
         if not isinstance(data, Mapping):
             return handler(data)
-        policy = _manifest_policy(info.context)
+        policy = ManifestPolicy.of(info.context)
         if "class" in data:
             target = _load_class(data["class"], cls)
             if target is not cls:
@@ -448,55 +339,63 @@ class Component(BaseModel):
                 'Every component in a manifest names its class, as "class"; '
                 f"this {cls.__name__} does not."
             )
-        if policy is not None and cls.__pydantic_custom_init__:
-            # Pydantic validates such a class by calling its __init__, which
-            # would load what it holds without from_manifest()'s rules.
-            raise ManifestError(
-                f"{cls.__name__} has an __init__ of its own, so it cannot be "
-                "loaded from a manifest: set it up in model_post_init()."
-            )
-        data = dict(data)
         if policy is not None:
-            for name in data.keys() & _unsaved(cls):
-                raise ManifestError(
-                    f"{cls.__name__}.{name} is never saved, so a manifest does "
-                    "not hold it."
-                )
-            for name in data.keys() - _secret_vars(cls).keys():
-                held = _held_secret(name, data[name])
-                if held is not None:
-                    raise ManifestError(
-                        f"{cls.__name__}.{name} holds a secret, at '{held}', "
-                        "and a manifest never holds one."
-                    )
+            cls._check_manifest_rules(data)
+        data = dict(data)
         secret_env: Dict[str, str] = {}
         for name, own in _secret_vars(cls).items():
-            value = data.get(name)
-            var = _env_reference(value)
-            if var is not None:
-                if policy is not None:
-                    policy.check_env(var, own)
-                data[name] = os.getenv(var)
-                if var != own:
-                    secret_env[name] = var
-            elif policy is not None and (value is not None or own is not None):
-                if name in data:  # Saving writes no value, nor null for one.
-                    raise ManifestError(
-                        f"{cls.__name__}.{name} is given a value, and a manifest "
-                        "never holds a secret: refer to its variable, "
-                        '{"env": "VAR"}.'
-                    )
-        with cls._loading(data, info.context):
+            var = env_reference(data.get(name))
+            if var is None:
+                continue
+            if policy is not None:
+                policy.check_env(var, own)
+            data[name] = os.getenv(var)
+            if var != own:
+                secret_env[name] = var
+        with cls._load_scope(data, info.context):
             component = handler(data)
         component._secret_env.update(secret_env)
         return component
 
     @classmethod
-    def _loading(
+    def _check_manifest_rules(cls, data: Mapping[str, Any]) -> None:
+        """Refuse what a manifest never holds, as saving never writes it: a
+        component with an ``__init__`` of its own, a field saving leaves out,
+        a secret given as a value."""
+        if cls.__init__ is not Component.__init__:
+            # Pydantic validates such a class by calling its __init__, which
+            # would load what it holds without the manifest's rules.
+            raise ManifestError(
+                f"{cls.__name__} has an __init__ of its own, so it cannot be "
+                "loaded from a manifest: set it up in model_post_init()."
+            )
+        for name in data.keys() & _unsaved(cls):
+            raise ManifestError(
+                f"{cls.__name__}.{name} is never saved, so a manifest does not "
+                "hold it."
+            )
+        secrets = _secret_vars(cls)
+        for name in data.keys() - secrets.keys():
+            held = held_secret(name, data[name])
+            if held is not None:
+                raise ManifestError(
+                    f"{cls.__name__}.{name} holds a secret, at '{held}', and a "
+                    "manifest never holds one."
+                )
+        for name, own in secrets.items():
+            if name in data and env_reference(data[name]) is None:
+                if data[name] is not None or own is not None:  # Nor null for one.
+                    raise ManifestError(
+                        f"{cls.__name__}.{name} is given a value, and a manifest "
+                        'never holds a secret: refer to its variable, {"env": "VAR"}.'
+                    )
+
+    @classmethod
+    def _load_scope(
         cls, data: Dict[str, Any], context: Any
     ) -> AbstractContextManager[object]:
         """What loading ``data`` needs in scope, taken out of it: a workflow
-        loads its topics here, which its nodes name."""
+        puts its topics in scope here, which its nodes name."""
         return nullcontext()
 
     def to_manifest(self) -> Dict[str, Any]:
@@ -516,7 +415,7 @@ class Component(BaseModel):
             raise
         finally:
             _save_errors.reset(token)
-        return {"apiVersion": API_VERSION, "kind": _kind(type(self)), "spec": spec}
+        return {"apiVersion": API_VERSION, "kind": kind_of(type(self)), "spec": spec}
 
     @classmethod
     def from_manifest(
@@ -551,6 +450,18 @@ class Component(BaseModel):
         """
         if isinstance(env, str):
             raise TypeError(f"env is the variables' names: env=[{env!r}]")
+        spec, target = cls._spec_of(manifest, legacy_classes)
+        policy = ManifestPolicy(env=frozenset(env))
+        return target.model_validate(spec, context={**(context or {}), _POLICY: policy})
+
+    @classmethod
+    def _spec_of(
+        cls,
+        manifest: Union[Mapping[str, Any], str, Path],
+        legacy_classes: Optional[Mapping[str, Union[str, type]]],
+    ) -> "tuple[Dict[str, Any], Type[Self]]":
+        """A manifest's spec, and the class it is of, checked against the
+        envelope before anything is built."""
         if isinstance(manifest, (str, Path)):
             manifest = json.loads(Path(manifest).read_text())
         if not isinstance(manifest, Mapping):
@@ -573,56 +484,39 @@ class Component(BaseModel):
             raise ManifestError("A manifest's spec is a component, with its class.")
         target = _load_class(spec["class"], cls)
         kind = manifest.get("kind")
-        if kind != _kind(target):
+        if kind != kind_of(target):
             raise ManifestError(
                 f"The manifest's kind is {kind!r}, but its spec is of kind "
-                f"{_kind(target)!r}."
+                f"{kind_of(target)!r}."
             )
-        policy = _Policy(env=frozenset(env))
-        return target.model_validate(spec, context={**(context or {}), _POLICY: policy})
-
-
-def _kind(cls: type) -> str:
-    """What a manifest calls a component of class ``cls``: its nearest kind."""
-    for klass in cls.__mro__:
-        kind = vars(klass).get("manifest_kind")
-        if kind:
-            return str(kind)
-    return cls.__name__
-
-
-# An environment variable's name.
-_VARIABLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-
-# An import path, "module:Qualname".
-_IMPORT_PATH = re.compile(r"[A-Za-z_][\w.]*:[A-Za-z_][\w.]*")
+        return dict(spec), target
 
 
 def _model_class(value: Any) -> bool:
     return inspect.isclass(value) and issubclass(value, BaseModel)
 
 
-def save_model_refs(value: Any) -> Any:
+def _save_model_refs(value: Any) -> Any:
     """``value`` with each pydantic model class in it, in dicts and lists too,
     replaced by a reference to it, ``{"ref": "module:Qualname"}``."""
     if _model_class(value):
         return {"ref": import_path(value)}
     if isinstance(value, Mapping):
-        return {key: save_model_refs(item) for key, item in value.items()}
+        return {key: _save_model_refs(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
-        return [save_model_refs(item) for item in value]
+        return [_save_model_refs(item) for item in value]
     return value
 
 
-def load_model_refs(value: Any) -> Any:
-    """``value`` with each reference written by :func:`save_model_refs`
+def _load_model_refs(value: Any) -> Any:
+    """``value`` with each reference written by :func:`_save_model_refs`
     replaced by the model class it names."""
     if isinstance(value, Mapping):
-        if set(value) == {"ref"} and _IMPORT_PATH.fullmatch(str(value["ref"])):
+        if set(value) == {"ref"} and is_import_path(str(value["ref"])):
             return _load_class(value["ref"], BaseModel)
-        return {key: load_model_refs(item) for key, item in value.items()}
+        return {key: _load_model_refs(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [load_model_refs(item) for item in value]
+        return [_load_model_refs(item) for item in value]
     return value
 
 
@@ -631,6 +525,6 @@ def load_model_refs(value: Any) -> Any:
 # ``ModelRef[Dict[str, Any]]``.
 ModelRef = Annotated[
     T,
-    PlainSerializer(save_model_refs, when_used="json"),
-    BeforeValidator(load_model_refs),
+    PlainSerializer(_save_model_refs, when_used="json"),
+    BeforeValidator(_load_model_refs),
 ]

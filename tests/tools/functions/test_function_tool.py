@@ -254,7 +254,7 @@ def test_a_function_from_an_untrusted_module_is_not_loaded():
 def test_a_function_that_is_not_found_is_not_loaded():
     data = {"class": FUNCTION_TOOL, "function": {"ref": f"{__name__}:no_such"}}
 
-    with pytest.raises(CallableSerializationError, match="Cannot import"):
+    with pytest.raises(ManifestError, match="Cannot import"):
         Tool.model_validate(data)
 
 
@@ -290,22 +290,6 @@ async def test_a_callable_component_is_saved_as_its_class_and_fields(
     assert restored == original
     outputs = await _outputs(restored, invoke_context)
     assert [[m.content for m in batch] for batch in outputs] == [["hi, 1"]]
-
-
-def test_a_callable_component_saved_before_grafi_v2_loads():
-    data = {
-        "class": FUNCTION_TOOL,
-        "function": {
-            "component": f"{__name__}:Greeter",
-            "config": {"greeting": "hey"},
-        },
-    }
-
-    tool = Tool.model_validate(data)
-
-    assert type(tool.function) is Greeter
-    assert tool.function.greeting == "hey"
-    assert tool.model_dump(mode="json")["function"]["class"] == f"{__name__}:Greeter"
 
 
 def test_a_callable_component_holding_a_secret_is_never_saved(monkeypatch):

