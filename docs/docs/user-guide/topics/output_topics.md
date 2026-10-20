@@ -1,14 +1,16 @@
 # Output Topics
 
-The Graphite output topic system provides specialized topic implementations for handling output events from workflows and nodes. These topics support both synchronous and asynchronous message processing, streaming capabilities, and human-in-the-loop workflows.
+The Graphite output topic system provides specialized topic implementations for handling output events from workflows and nodes. These topics support both synchronous and asynchronous message processing and human-in-the-loop workflows.
+
+An output reaches the caller only once the step that published it is stored. Streaming partial output, such as an LLM's tokens, does not go through topics: a caller streaming the run gets it as deltas, which are never published (see [Runtime](../runtime.md#streaming)).
 
 ## Overview
 
 The output topic system includes:
 
-- **OutputTopic**: Handles agent output with async generator support and streaming
+- **OutputTopic**: Handles agent output
 - **InWorkflowOutputTopic**: Handles workflow output that requires human interaction
-- **Async Processing**: Support for async generators and streaming responses
+- **Async Processing**: Support for async generators
 - **Event Queuing**: Queue-based event management for real-time processing
 - **Reserved Topics**: Pre-configured topics for agent communication
 

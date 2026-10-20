@@ -15,6 +15,7 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
 from grafi.runtime import GrafiRuntime
+from grafi.runtime import emit_delta
 from grafi.runtime.execution_services import current_services
 from grafi.tools.tool import Tool
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -33,7 +34,7 @@ class OpenStream(Tool):
     ) -> MsgsAGen:
         services = current_services()
         try:
-            yield [Message(role="assistant", content="first", is_streaming=True)]
+            yield [Message(role="assistant", content="first")]
             await asyncio.Event().wait()
         finally:
             self.scope_seen = current_services()
@@ -44,8 +45,8 @@ class OpenStream(Tool):
 def stored_and_open_workflow(open_tool: Tool) -> EventDrivenWorkflow:
     """One node commits an output; another keeps its stream open until closed.
 
-    Both write the output topic, so it is not streamed: the caller receives an
-    output only once it is stored, and closing then acknowledges it.
+    The caller receives an output once it is stored, and closing then
+    acknowledges it.
     """
     from grafi.topics.expressions.topic_expression import TopicExpr
     from tests_integration.async_execution.support import EchoTool
@@ -326,7 +327,7 @@ async def test_node_failure_is_not_noted_as_its_own_cleanup_failure() -> None:
     class Chatty(EchoTool):
         async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
             for text in ("first", "second"):
-                yield [Message(role="assistant", content=text, is_streaming=True)]
+                yield [Message(role="assistant", content=text)]
 
     source = InputTopic(name="input")
     workflow = (
@@ -470,8 +471,9 @@ async def test_repeated_caller_cancellation_does_not_abandon_node_tasks() -> Non
     class Stubborn(EchoTool):
         async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
             try:
-                yield [Message(role="assistant", content="first", is_streaming=True)]
+                emit_delta("first")
                 await asyncio.Event().wait()
+                yield [Message(role="assistant", content="never")]
             finally:
                 cleanup.set()
                 while not release.is_set():
@@ -496,7 +498,9 @@ async def test_repeated_caller_cancellation_does_not_abandon_node_tasks() -> Non
 
     async def consume() -> None:
         async with aclosing(
-            GrafiRuntime().invoke(Assistant(workflow=workflow), input_event())
+            GrafiRuntime().invoke(
+                Assistant(workflow=workflow), input_event(), stream=True
+            )
         ) as output:
             async for _ in output:
                 ready.set()

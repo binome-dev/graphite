@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import List
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,9 +9,11 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import Delta
 from grafi.runtime import current_services
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
-from grafi.tools.tool_factory import ToolFactory
+from grafi.tools.tool import Tool
 from grafi.topics.topic_types import TopicType
 
 event_store = current_services().event_store
@@ -34,16 +37,24 @@ async def test_deepseek_tool_stream() -> None:
     await event_store.clear_events()
     ds_tool = DeepseekTool.builder().is_streaming(True).api_key(api_key).build()
 
+    deltas: List[Delta] = []
     content = ""
-    async for messages in ds_tool.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content and isinstance(message.content, str):
-                content += message.content
-                print(message.content + "_", end="", flush=True)
+    with deltas_to(deltas.append):
+        async for messages in ds_tool.invoke(
+            get_invoke_context(),
+            [
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        ):
+            for message in messages:
+                assert message.role == "assistant"
+                if message.content and isinstance(message.content, str):
+                    content += message.content
+    streamed = "".join(delta.content for delta in deltas)
+    print(streamed)
+    assert len(deltas) > 1 and streamed == content  # The text, as it came.
 
     assert content
     assert "Grafi" in content
@@ -145,13 +156,16 @@ async def test_deepseek_tool_serialization() -> None:
     # Create original tool
     original_tool = DeepseekTool.builder().api_key(api_key).build()
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
     print(f"Serialized: {serialized}")
+    assert serialized["api_key"] == {"env": "DEEPSEEK_API_KEY"}
 
-    # Deserialize back using ToolFactory
-    ToolFactory.register_tool_class("DeepseekTool", DeepseekTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, DeepseekTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works correctly
     content = ""
@@ -180,12 +194,15 @@ async def test_deepseek_tool_with_chat_param_serialization() -> None:
         DeepseekTool.builder().api_key(api_key).chat_params(chat_param).build()
     )
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
+    assert serialized["api_key"] == {"env": "DEEPSEEK_API_KEY"}
 
-    # Deserialize back
-    ToolFactory.register_tool_class("DeepseekTool", DeepseekTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, DeepseekTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
     async for messages in restored_tool.invoke(

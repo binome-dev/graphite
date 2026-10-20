@@ -6,6 +6,7 @@ from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
 from grafi.runtime import current_services
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from tests_integration.simple_stream_assistant.simple_stream_function_call_assistant import (
@@ -54,21 +55,37 @@ async def test_simple_function_call_assistant() -> None:
     input_data = [Message(role="user", content="Hello, how's the weather in 12345?")]
 
     content = ""
+    streamed = ""
 
-    async for event in assistant.invoke(
+    async for item in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=input_data,
-        )
+        ),
+        stream=True,
     ):
-        for message in event.data:
+        if isinstance(item, Delta):
+            # Every LLM streams; show the answering one's text as it comes.
+            if item.node_name == "LLMStreamNode":
+                streamed += item.content
+                print(item.content, end="", flush=True)
+            continue
+        for message in item.data:
             assert message.role == "assistant"
             if message.content is not None:
                 content += str(message.content)
-                print(message.content, end="", flush=True)
 
-    print(content)
-    assert "bad" in content
+    print()
+    assert streamed == content
+    # The function's own words, not the LLM's rewording of them.
+    tool_results = [
+        message.content
+        for event in await event_store.get_events()
+        if isinstance(event, PublishToTopicEvent)
+        for message in event.data
+        if message.role == "tool"
+    ]
+    assert any("bad" in str(result) for result in tool_results)
     assert "12345" in content
     assert content is not None
 

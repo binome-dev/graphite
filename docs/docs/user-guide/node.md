@@ -60,7 +60,7 @@ The following table summarizes the methods available in the Node class, highligh
 | `invoke`          | Asynchronously invokes the node's command, yielding `PublishToTopicEvent` objects as they become available. |
 | `can_invoke`        | Evaluates subscription conditions to determine whether the node is ready to invoke based on available topics. |
 | `can_invoke_with_topics` | Checks if the node can invoke given a specific list of topic names. |
-| `to_dict`            | Serializes node attributes to a dictionary, suitable for persistence or transmission.                    |
+| `model_dump(mode="json")` | Saves the node as data: its tool, subscriptions and routes, naming topics by name. See [Manifests](manifests.md). |
 
 ## NodeBaseBuilder
 

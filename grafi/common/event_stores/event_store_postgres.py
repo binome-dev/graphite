@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import timezone
 from typing import Any
 from typing import AsyncIterator
 from typing import Dict
@@ -19,7 +19,9 @@ try:
     from sqlalchemy import DateTime
     from sqlalchemy import Integer
     from sqlalchemy import String
+    from sqlalchemy import cast as cast_
     from sqlalchemy import delete
+    from sqlalchemy import func
     from sqlalchemy import select
     from sqlalchemy import text
     from sqlalchemy.dialects.postgresql import JSONB
@@ -58,7 +60,7 @@ class EventModel(Base):
     conversation_id = Column(String, index=True, nullable=False)
     assistant_request_id = Column(String, index=True, nullable=False)
     event_type = Column(String, index=True, nullable=False)
-    event_version = Column(String, nullable=False, default="1.0")
+    event_version = Column(String, nullable=False)
     event_data = Column(JSONB, nullable=False)
     timestamp = Column(DateTime, nullable=False)  # Stored as naive UTC
 
@@ -171,81 +173,66 @@ class EventStorePostgres(EventStore):
                     "Failed to clear events", "clear_events", e
                 ) from e
 
-    def _row_to_event(self, row: "EventModel") -> Optional[Event]:
-        """Decode a single ``EventModel`` row into an :class:`Event`.
+    async def _select(self, statement: Any, operation: str) -> List[Event]:
+        """The events of the rows ``statement`` selects, in its order.
 
-        Centralizes the row-to-event conversion shared by every query method.
-        ``row.event_data`` is a JSONB column typed as ``Column[Any]`` at the
-        class level; at the instance level it holds the stored dict.
+        Raises:
+            EventPersistenceError: If the query fails.
+            EventSerializationError: If a row cannot be decoded (see
+                :class:`~grafi.common.events.event_codec.EventCodec`).
         """
-        return self._create_event_from_dict(cast(Dict[str, Any], row.event_data))
+        async with self._session() as session:
+            try:
+                result = await session.execute(statement)
+                rows = result.scalars().all()
+            except Exception as e:
+                raise self._persistence_error(
+                    "Failed to read events", operation, e
+                ) from e
+        return [self.codec.decode(cast(Dict[str, Any], row.event_data)) for row in rows]
 
     async def get_events(self) -> List[Event]:
         """Get all events from the database."""
-        async with self._session() as session:
-            try:
-                result = await session.execute(
-                    select(EventModel).order_by(EventModel.timestamp, EventModel.id)
-                )
-                rows = result.scalars().all()
+        return await self._select(
+            select(EventModel).order_by(EventModel.timestamp, EventModel.id),
+            "get_events",
+        )
 
-                events: List[Event] = []
-                for r in rows:
-                    event = self._row_to_event(r)
-                    if event:
-                        events.append(event)
-
-                return events
-            except Exception as e:
-                raise self._persistence_error(
-                    "Failed to read events", "get_events", e
-                ) from e
-
-    @staticmethod
-    def _event_values(event: Event) -> dict:
-        """Flatten an :class:`Event` into a column-value dict for insertion."""
-        event_dict = event.to_dict()
-        # The invoke_context is nested inside event_context.
-        event_context = event_dict.get("event_context", {})
-        invoke_context = event_context.get("invoke_context", {})
-        conversation_id = invoke_context.get("conversation_id", "")
+    def _event_values(self, event: Event) -> Dict[str, Any]:
+        """An :class:`Event` as the column values of its row, taken from its
+        stored JSON, so an event type of your own is stored too."""
+        data = self.codec.encode(event)
+        timestamp = event.timestamp  # Stored naive, in UTC; naive is UTC.
+        if timestamp.tzinfo is not None:
+            timestamp = timestamp.astimezone(timezone.utc).replace(tzinfo=None)
         return {
-            "event_id": event_dict["event_id"],
-            "conversation_id": conversation_id,
-            "assistant_request_id": event_dict["assistant_request_id"],
-            "event_type": event_dict["event_type"],
-            "event_version": event_dict.get("event_version", "1.0"),
-            "event_data": event_dict,
-            "timestamp": datetime.fromisoformat(event_dict["timestamp"]).replace(
-                tzinfo=None
-            ),
+            "event_id": data["event_id"],
+            "conversation_id": event.invoke_context.conversation_id,
+            "assistant_request_id": event.invoke_context.assistant_request_id,
+            "event_type": data["event_type"],
+            "event_version": str(data["event_version"]),
+            "event_data": data,
+            "timestamp": timestamp,
         }
 
     async def record_event(self, event: Event) -> None:
         """Record a single event idempotently (no-op on duplicate event_id)."""
-        async with self._session() as session:
-            try:
-                stmt = (
-                    pg_insert(EventModel)
-                    .values(**self._event_values(event))
-                    .on_conflict_do_nothing(index_elements=["event_id"])
-                )
-                await session.execute(stmt)
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise self._persistence_error(
-                    "Failed to record event", "record_event", e
-                ) from e
+        await self.record_events([event])
 
     async def record_events(self, events: Sequence[Event]) -> None:
         """Record multiple events idempotently.
 
         Duplicate ``event_id`` rows are skipped via ``ON CONFLICT DO NOTHING``
         rather than aborting the whole batch, so replay/retry stays idempotent.
+
+        Raises:
+            EventSerializationError: If an event cannot be encoded; nothing is
+                written.
+            EventPersistenceError: If writing fails; nothing is written.
         """
         if not events:
             return
+        rows = [self._event_values(event) for event in events]
         async with self._session() as session:
             try:
                 # One statement, compiled once and executed for every row in
@@ -254,7 +241,7 @@ class EventStorePostgres(EventStore):
                     pg_insert(EventModel).on_conflict_do_nothing(
                         index_elements=["event_id"]
                     ),
-                    [self._event_values(event) for event in events],
+                    rows,
                 )
                 await session.commit()
             except Exception as e:
@@ -265,124 +252,51 @@ class EventStorePostgres(EventStore):
 
     async def get_event(self, event_id: str) -> Optional[Event]:
         """Get an event by ID asynchronously."""
-        async with self._session() as session:
-            try:
-                result = await session.execute(
-                    select(EventModel).where(EventModel.event_id == event_id)
-                )
-                row = result.scalar_one_or_none()
-
-                if not row:
-                    return None
-
-                return self._row_to_event(row)
-            except Exception as e:
-                raise self._persistence_error(
-                    "Failed to read event", f"get_event:{event_id}", e
-                ) from e
+        events = await self._select(
+            select(EventModel).where(EventModel.event_id == event_id),
+            f"get_event:{event_id}",
+        )
+        return events[0] if events else None
 
     async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
         """Get all events for a given assistant_request_id asynchronously."""
-        async with self._session() as session:
-            try:
-                result = await session.execute(
-                    select(EventModel)
-                    .where(EventModel.assistant_request_id == assistant_request_id)
-                    .order_by(EventModel.timestamp, EventModel.id)
-                )
-                rows = result.scalars().all()
-
-                if not rows:
-                    return []
-
-                events: List[Event] = []
-                for r in rows:
-                    event = self._row_to_event(r)
-                    if event:
-                        events.append(event)
-
-                return events
-            except Exception as e:
-                raise self._persistence_error(
-                    "Failed to read agent events",
-                    f"get_agent_events:{assistant_request_id}",
-                    e,
-                ) from e
+        return await self._select(
+            select(EventModel)
+            .where(EventModel.assistant_request_id == assistant_request_id)
+            .order_by(EventModel.timestamp, EventModel.id),
+            f"get_agent_events:{assistant_request_id}",
+        )
 
     async def get_conversation_events(self, conversation_id: str) -> List[Event]:
         """Get all events for a given conversation ID asynchronously."""
-        async with self._session() as session:
-            try:
-                result = await session.execute(
-                    select(EventModel)
-                    .where(EventModel.conversation_id == conversation_id)
-                    .order_by(EventModel.timestamp, EventModel.id)
-                )
-                rows = result.scalars().all()
-
-                if not rows:
-                    return []
-
-                events: List[Event] = []
-                for r in rows:
-                    event = self._row_to_event(r)
-                    if event:
-                        events.append(event)
-
-                return events
-            except Exception as e:
-                raise self._persistence_error(
-                    "Failed to read conversation events",
-                    f"get_conversation_events:{conversation_id}",
-                    e,
-                ) from e
+        return await self._select(
+            select(EventModel)
+            .where(EventModel.conversation_id == conversation_id)
+            .order_by(EventModel.timestamp, EventModel.id),
+            f"get_conversation_events:{conversation_id}",
+        )
 
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:
-        """Get all events for a given topic name and specific offsets asynchronously."""
+        """Get the publications to the topic ``name`` at ``offsets``, by offset."""
         if not offsets:
             return []
+        offset = cast_(_topic_field("offset"), Integer)
+        return await self._select(
+            select(EventModel)
+            .where(
+                EventModel.event_type.in_(["PublishToTopic", "TopicEvent"]),
+                _topic_field("name") == name,
+                offset.in_(offsets),
+            )
+            .order_by(offset),
+            f"get_topic_events:{name}",
+        )
 
-        async with self._session() as session:
-            try:
-                # Use JSONB operators for efficient filtering at the database level
-                # The topic name and offset are now in event_context
-                stmt = (
-                    select(EventModel).where(
-                        # Filter by event type
-                        EventModel.event_type.in_(["PublishToTopic", "TopicEvent"]),
-                        # JSONB navigation: event_data -> 'event_context' ->> 'name'.
-                        # Keys are passed unquoted; quoting them ('"name"') makes the
-                        # operator look up a key that literally includes quotes and
-                        # therefore matches nothing.
-                        EventModel.event_data.op("->")("event_context").op("->>")(
-                            "name"
-                        )
-                        == name,
-                        # event_data -> 'event_context' -> 'offset' (cast to int)
-                        EventModel.event_data.op("->")("event_context")
-                        .op("->")("offset")
-                        .astext.cast(Integer)
-                        .in_(offsets),
-                    )
-                    # Order by offset for consistent results
-                    .order_by(
-                        EventModel.event_data.op("->")("event_context")
-                        .op("->")("offset")
-                        .astext.cast(Integer)
-                    )
-                )
 
-                result = await session.execute(stmt)
-                rows = result.scalars().all()
-
-                events: List[Event] = []
-                for r in rows:
-                    event = self._row_to_event(r)
-                    if event:
-                        events.append(event)
-
-                return events
-            except Exception as e:
-                raise self._persistence_error(
-                    "Failed to read topic events", f"get_topic_events:{name}", e
-                ) from e
+def _topic_field(key: str) -> Any:
+    """A topic event's field ``key`` in its stored JSON, of either version:
+    under ``event_context`` (version 1), or at the top level (version 2).
+    Keys are passed unquoted; quoting them ('"name"') makes the operator look
+    up a key that literally includes quotes, which matches nothing."""
+    version_1 = EventModel.event_data.op("->")("event_context").op("->>")(key)
+    return func.coalesce(version_1, EventModel.event_data.op("->>")(key))

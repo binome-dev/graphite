@@ -18,11 +18,8 @@ The subscription expression system enables:
 
 #### SubExpr (Base Class)
 
-Abstract base class for all subscription expressions.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `to_dict` | `() -> dict[str, Any]` | Serialize expression to dictionary (abstract) |
+Abstract base class for all subscription expressions. An expression is saved
+with `model_dump(mode="json")`: see [Serialization](#serialization).
 
 #### TopicExpr
 
@@ -30,11 +27,7 @@ Represents a subscription to a single topic.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `topic` | `TopicBase` | The topic to subscribe to |
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `to_dict` | `() -> dict[str, Any]` | Serialize topic expression to dictionary |
+| `topic` | `TopicBase` | The topic to subscribe to, saved by its name |
 
 #### CombinedExpr
 
@@ -45,10 +38,6 @@ Represents a logical combination of two expressions.
 | `op` | `LogicalOp` | Logical operator (AND/OR) |
 | `left` | `SubExpr` | Left expression operand |
 | `right` | `SubExpr` | Right expression operand |
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `to_dict` | `() -> dict[str, Any]` | Serialize combined expression to dictionary |
 
 ### Logical Operators
 
@@ -279,13 +268,13 @@ result = evaluate_subscription(or_expr, ["other_topic"])
 
 ### Expression Serialization
 
-All expressions can be serialized to dictionaries for persistence or transport:
+An expression is saved as data, naming each topic by its name:
 
 ```python
 # Simple topic expression
 topic_expr = TopicExpr(topic=notifications)
-serialized = topic_expr.to_dict()
-# Returns: {"topic": {"name": "notifications", "condition": {...}}}
+serialized = topic_expr.model_dump(mode="json")
+# Returns: {"topic": "notifications"}
 
 # Combined expression
 combined_expr = CombinedExpr(
@@ -293,12 +282,21 @@ combined_expr = CombinedExpr(
     left=TopicExpr(topic=notifications),
     right=TopicExpr(topic=alerts)
 )
-serialized = combined_expr.to_dict()
-# Returns: {
-#   "op": "AND",
-#   "left": {"topic": {"name": "notifications", ...}},
-#   "right": {"topic": {"name": "alerts", ...}}
-# }
+serialized = combined_expr.model_dump(mode="json")
+# Returns: {"op": "AND", "left": {"topic": "notifications"},
+#           "right": {"topic": "alerts"}}
+```
+
+Loading one resolves the names through the topics given in the validation
+context, as a workflow does with its own:
+
+```python
+from pydantic import TypeAdapter
+from grafi.topics.expressions.topic_expression import Subscription
+
+expr = TypeAdapter(Subscription).validate_python(
+    serialized, context={"topics": {"notifications": notifications, "alerts": alerts}}
+)
 ```
 
 ## Error Handling

@@ -1,5 +1,6 @@
 """Tests for the ReAct agent implementation."""
 
+import json
 import os
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -12,6 +13,7 @@ os.environ["TAVILY_API_KEY"] = "test-tavily-key"
 # Now import after setting the environment variable
 from grafi.agents.react_agent import ReActAgent  # noqa: E402
 from grafi.agents.react_agent import ReActAgentBuilder  # noqa: E402
+from grafi.assistants.assistant import Assistant  # noqa: E402
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool  # noqa: E402
 
 
@@ -172,3 +174,89 @@ class TestConversation:
             one.get_input("hi").invoke_context.conversation_id
             != other.get_input("hi").invoke_context.conversation_id
         )
+
+
+class TestManifest:
+    """A ReAct agent's manifest holds only its workflow: what it builds the
+    workflow from is not saved, and loading keeps the saved workflow."""
+
+    @pytest.fixture
+    def agent(self, monkeypatch) -> ReActAgent:
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-from-env")
+        monkeypatch.setenv("TAVILY_API_KEY", "tvly-from-env")
+        return (
+            ReActAgent.builder()
+            .name("researcher")
+            .api_key("sk-from-env")
+            .model("gpt-4.1-nano")
+            .system_prompt("Be brief.")
+            .function_call_tool(TavilyTool.builder().name("search").build())
+            .build()
+        )
+
+    def test_the_manifest_holds_only_the_workflow(self, agent: ReActAgent):
+        manifest = agent.to_manifest()
+
+        assert manifest["kind"] == "Assistant"
+        spec = manifest["spec"]
+        assert spec["class"] == "grafi.agents.react_agent:ReActAgent"
+        assert set(spec) == {
+            "class",
+            "assistant_id",
+            "name",
+            "type",
+            "oi_span_type",
+            "workflow",
+        }
+        # What the workflow was built from is in it.
+        nodes = spec["workflow"]["nodes"]
+        llm = nodes["OpenAIInputNode"]["tool"]
+        assert llm["model"] == "gpt-4.1-nano"
+        assert llm["system_message"] == "Be brief."
+        assert llm["api_key"] == {"env": "OPENAI_API_KEY"}
+        search = nodes["Node"]["tool"]
+        assert search["class"] == (
+            "grafi.tools.function_calls.impl.tavily_tool:TavilyTool"
+        )
+        assert search["name"] == "search"
+        assert search["api_key"] == {"env": "TAVILY_API_KEY"}
+        text = json.dumps(manifest)
+        assert "sk-from-env" not in text
+        assert "tvly-from-env" not in text
+        # Nor does a python-mode dump hold the fields it is built from.
+        assert not {"api_key", "model", "system_prompt", "function_call_tool"} & (
+            agent.model_dump().keys()
+        )
+
+    @pytest.mark.parametrize("loader", [ReActAgent, Assistant])
+    def test_it_loads_back_with_the_workflow_intact(self, agent: ReActAgent, loader):
+        manifest = agent.to_manifest()
+
+        with patch.object(ReActAgent, "_construct_workflow") as construct:
+            restored = loader.from_manifest(manifest)
+
+        construct.assert_not_called()  # The saved workflow is kept.
+        assert type(restored) is ReActAgent
+        assert restored.assistant_id == agent.assistant_id
+        assert restored.name == "researcher"
+        workflow = restored.workflow
+        assert workflow.workflow_id == agent.workflow.workflow_id
+        assert list(workflow.nodes) == list(agent.workflow.nodes)
+        llm = workflow.nodes["OpenAIInputNode"].tool
+        assert llm.model == "gpt-4.1-nano"
+        assert llm.system_message == "Be brief."
+        assert llm.api_key == "sk-from-env"  # Read from OPENAI_API_KEY.
+        search = workflow.nodes["Node"].tool
+        assert type(search) is TavilyTool
+        assert search.api_key == "tvly-from-env"
+        assert [spec.name for spec in llm.get_function_specs()] == [
+            "web_search_using_tavily"
+        ]
+        assert restored.to_manifest() == manifest
+
+    def test_a_python_dump_round_trips(self, agent: ReActAgent):
+        restored = ReActAgent.model_validate(agent.model_dump())
+
+        assert type(restored) is ReActAgent
+        assert restored.workflow.workflow_id == agent.workflow.workflow_id
+        assert restored.to_manifest() == agent.to_manifest()

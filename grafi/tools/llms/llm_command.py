@@ -65,6 +65,8 @@ class LLMCommand(Command):
         ]
 
         all_messages.extend([msg for event in node_input_datas for msg in event.data])
+        # A message published on several topics comes once per copy: keep one.
+        all_messages = list({msg.message_id: msg for msg in all_messages}.values())
 
         # Make sure the llm tool call message are followed by the function call messages
         # Step 1: get all the messages with tool_call_id and remove them from the messages list
@@ -84,21 +86,21 @@ class LLMCommand(Command):
         while i < len(sorted_messages):
             message = sorted_messages[i]
             if message.tool_calls is not None:
-                for tool_call in message.tool_calls:
-                    if tool_call.id in tool_call_messages:
-                        sorted_messages.insert(i + 1, tool_call_messages[tool_call.id])
-                    else:
+                # In the calls' order: some providers match results by position.
+                for position, tool_call in enumerate(message.tool_calls, start=1):
+                    result = tool_call_messages.get(tool_call.id)
+                    if result is None:
                         logger.warning(
                             f"Tool call message not found for id: {tool_call.id}, add an empty message"
                         )
-                        message_args = {
-                            "role": "tool",
-                            "content": None,
-                            "tool_call_id": tool_call.id,
-                        }
-                        sorted_messages.insert(
-                            i + 1, Message.model_validate(message_args)
+                        result = Message.model_validate(
+                            {
+                                "role": "tool",
+                                "content": None,
+                                "tool_call_id": tool_call.id,
+                            }
                         )
+                    sorted_messages.insert(i + position, result)
                 i += len(message.tool_calls) + 1
             else:
                 i += 1

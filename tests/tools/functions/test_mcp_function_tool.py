@@ -1,13 +1,18 @@
 import json
 import uuid
+from typing import Any
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+from mcp.types import TextContent
+from pydantic_core import PydanticSerializationError
 
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+from grafi.tools.tool import Tool
 
 
 @pytest.fixture
@@ -200,9 +205,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
                 content=json.dumps({"query": "test query"}),
             )
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert "Search result for query" in results[0]
@@ -239,9 +242,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
             input_message = Message(role="assistant", content="{}")
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert results[0] == "base64data"
@@ -282,93 +283,127 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
             input_message = Message(role="assistant", content="{}")
 
-            results = []
-            async for result in tool.invoke_mcp_function([input_message]):
-                results.append(result)
+            results = [await tool.invoke_mcp_function([input_message])]
 
             assert len(results) == 1
             assert "[Embedded resource:" in results[0]
 
 
+MCP_FUNCTION_TOOL = "grafi.tools.functions.impl.mcp_function_tool:MCPFunctionTool"
+CLIENT = "grafi.tools.functions.impl.mcp_function_tool.Client"
+CONFIG = {"mcpServers": {"test": {"command": "test"}}}
+
+
+def _client_offering(mock_client_class: MagicMock, *tools: Any) -> AsyncMock:
+    """The client MCPFunctionTool connects with, listing ``tools``."""
+    mock_client = AsyncMock()
+    mock_client.list_tools = AsyncMock(return_value=list(tools))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client_class.return_value = mock_client
+    return mock_client
+
+
 class TestMCPFunctionToolSerialization:
     @pytest.mark.asyncio
-    async def test_to_dict(self, mock_mcp_tool):
-        """Test to_dict serializes the tool correctly."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
+    async def test_dump(self, mock_mcp_tool):
+        """The server and the tool's name are saved; the function is not."""
+        with patch(CLIENT) as mock_client_class:
+            _client_offering(mock_client_class, mock_mcp_tool)
             tool = await MCPFunctionTool.initialize(
-                name="TestMCPTool",
-                mcp_config={"mcpServers": {"test": {"command": "test"}}},
-                function_name="test_tool",
+                name="TestMCPTool", mcp_config=CONFIG, function_name="test_tool"
             )
 
-            result = tool.to_dict()
+        assert tool.model_dump(mode="json") == {
+            "class": MCP_FUNCTION_TOOL,
+            "tool_id": tool.tool_id,
+            "name": "TestMCPTool",
+            "type": "MCPFunctionTool",
+            "oi_span_type": "TOOL",
+            "role": "assistant",
+            "mcp_config": CONFIG,
+            "function_name": "test_tool",
+        }
 
-            assert result["name"] == "TestMCPTool"
-            assert result["type"] == "MCPFunctionTool"
-            assert "mcp_config" in result
-            assert result["function_name"] == "test_tool"
+    def test_load_does_not_connect(self):
+        data = {
+            "class": MCP_FUNCTION_TOOL,
+            "tool_id": "test-id",
+            "name": "RestoredMCPTool",
+            "oi_span_type": "TOOL",
+            "mcp_config": CONFIG,
+            "function_name": "test_tool",
+        }
 
-    @pytest.mark.asyncio
-    async def test_from_dict(self, mock_mcp_tool):
-        """Test from_dict deserializes the tool correctly."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
+        with patch(CLIENT) as mock_client_class:
+            tool = Tool.model_validate(data)
 
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
-            data = {
-                "name": "RestoredMCPTool",
-                "type": "MCPFunctionTool",
-                "oi_span_type": "TOOL",
-                "mcp_config": {"mcpServers": {"test": {"command": "test"}}},
-                "function_name": "test_tool",
-            }
-
-            tool = await MCPFunctionTool.from_dict(data)
-
-            assert isinstance(tool, MCPFunctionTool)
-            assert tool.name == "RestoredMCPTool"
-            assert tool.function_name == "test_tool"
+        mock_client_class.assert_not_called()
+        assert isinstance(tool, MCPFunctionTool)
+        assert tool.tool_id == "test-id"
+        assert tool.name == "RestoredMCPTool"
+        assert tool.mcp_config == CONFIG
+        assert tool.function_name == "test_tool"
+        assert tool.function == tool.invoke_mcp_function
 
     @pytest.mark.asyncio
-    async def test_to_dict_from_dict_roundtrip(self, mock_mcp_tool):
-        """Test that to_dict and from_dict are consistent."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value = mock_client
-
-            from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
-
+    async def test_round_trip(self, mock_mcp_tool):
+        with patch(CLIENT) as mock_client_class:
+            mock_client = _client_offering(mock_client_class, mock_mcp_tool)
             original = await MCPFunctionTool.initialize(
-                name="RoundtripTool",
-                mcp_config={"mcpServers": {"test": {"command": "test"}}},
-                function_name="test_tool",
+                name="RoundtripTool", mcp_config=CONFIG
+            )
+            data = original.model_dump(mode="json")
+            mock_client_class.reset_mock()
+
+            restored = Tool.model_validate(data)
+
+            mock_client_class.assert_not_called()
+            assert type(restored) is MCPFunctionTool
+            assert restored.tool_id == original.tool_id
+            assert restored.name == "RoundtripTool"
+            assert restored.function_name == "test_tool"  # The server's first.
+            assert restored.mcp_config == original.mcp_config
+            assert restored.function == restored.invoke_mcp_function
+            assert restored.model_dump(mode="json") == data
+            # It calls the tool it was saved with.
+            mock_client.call_tool = AsyncMock(
+                return_value=MagicMock(content=[TextContent(type="text", text="ok")])
+            )
+            answer = await restored.function(
+                [Message(role="user", content='{"query": "q"}')]
             )
 
-            data = original.to_dict()
-            restored = await MCPFunctionTool.from_dict(data)
+        assert answer == "ok"
+        mock_client.call_tool.assert_awaited_once_with("test_tool", {"query": "q"})
 
-            assert restored.name == original.name
-            assert restored.function_name == original.function_name
-            assert restored.mcp_config == original.mcp_config
+    def test_a_secret_environment_variable_set_to_a_value_is_never_saved(self):
+        tool = MCPFunctionTool(
+            mcp_config={
+                "mcpServers": {"s": {"command": "srv", "env": {"API_KEY": "literal"}}}
+            },
+            function_name="search",
+        )
+
+        with pytest.raises(
+            PydanticSerializationError,
+            match="ManifestError: .*The MCP server 's' has 'API_KEY' set to a value",
+        ):
+            tool.model_dump(mode="json")
+
+    def test_a_secret_saved_as_a_reference_is_kept(self):
+        config = {
+            "mcpServers": {
+                "s": {
+                    "url": "https://mcp.example/mcp",
+                    "headers": {"Authorization": "Bearer ${SEARCH_TOKEN}"},
+                    "env": {"API_KEY": "${SEARCH_API_KEY}"},
+                }
+            }
+        }
+        tool = MCPFunctionTool(mcp_config=config, function_name="search")
+
+        data = tool.model_dump(mode="json")
+
+        assert data["mcp_config"] == config
+        assert Tool.model_validate(data).mcp_config == config

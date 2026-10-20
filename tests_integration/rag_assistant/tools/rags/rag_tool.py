@@ -1,7 +1,5 @@
-from typing import Any
-from typing import Dict
-
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
@@ -29,7 +27,8 @@ except ImportError:
 class RagTool(Tool):
     name: str = "RagTool"
     type: str = "RagTool"
-    index: BaseIndex
+    # A live index, not data: left out of the tool's manifest.
+    index: BaseIndex = Field(exclude=True)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_invoke
@@ -45,12 +44,3 @@ class RagTool(Tool):
             return [Message(role="assistant", content=str(response.response))]
         else:
             return [Message(role="assistant", content=str(response))]
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "text": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "index": self.index.__class__.__name__,
-        }

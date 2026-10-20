@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import List
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,9 +9,11 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import Delta
 from grafi.runtime import current_services
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
-from grafi.tools.tool_factory import ToolFactory
+from grafi.tools.tool import Tool
 from grafi.topics.topic_types import TopicType
 
 event_store = current_services().event_store
@@ -32,16 +35,24 @@ async def test_gemini_tool_stream() -> None:
     await event_store.clear_events()
     gemini = GeminiTool.builder().is_streaming(True).api_key(api_key).build()
 
+    deltas: List[Delta] = []
     content = ""
-    async for messages in gemini.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if isinstance(message.content, str):
-                content += message.content
-                print(message.content + "_", end="", flush=True)
+    with deltas_to(deltas.append):
+        async for messages in gemini.invoke(
+            get_invoke_context(),
+            [
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        ):
+            for message in messages:
+                assert message.role == "assistant"
+                if isinstance(message.content, str):
+                    content += message.content
+    streamed = "".join(delta.content for delta in deltas)
+    print(streamed)
+    assert len(deltas) > 1 and streamed == content  # The text, as it came.
 
     assert content  # non-empty natural-language response (phrasing-independent)
     assert len(await event_store.get_events()) == 2
@@ -54,7 +65,9 @@ async def test_gemini_tool_with_chat_param() -> None:
     # Gemini SDK expects a GenerationConfig object – we can pass it as dict
     chat_param = {
         "temperature": 0.1,
-        "max_output_tokens": 15,
+        # Gemini 3 thinks first, and its thoughts count towards this limit:
+        # one too small for them can leave no answer.
+        "max_output_tokens": 1024,
     }
 
     await event_store.clear_events()
@@ -68,11 +81,6 @@ async def test_gemini_tool_with_chat_param() -> None:
             assert message.role == "assistant"
             assert message.content  # non-empty response (phrasing-independent)
             print(message.content)
-            # 15 tokens ~ < 120 chars in normal language
-            if isinstance(message.content, str):
-                # Ensure the content length is within the expected range
-                print(len(message.content))
-                assert len(message.content) < 300
 
     assert len(await event_store.get_events()) == 2
 
@@ -147,13 +155,16 @@ async def test_gemini_tool_serialization() -> None:
     # Create original tool
     original_tool = GeminiTool.builder().api_key(api_key).build()
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
     print(f"Serialized: {serialized}")
+    assert serialized["api_key"] == {"env": "GEMINI_API_KEY"}
 
-    # Deserialize back using ToolFactory
-    ToolFactory.register_tool_class("GeminiTool", GeminiTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, GeminiTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works correctly
     content = ""
@@ -177,7 +188,9 @@ async def test_gemini_tool_with_chat_param_serialization() -> None:
 
     chat_param = {
         "temperature": 0.1,
-        "max_output_tokens": 15,
+        # Gemini 3 thinks first, and its thoughts count towards this limit:
+        # one too small for them can leave no answer.
+        "max_output_tokens": 1024,
     }
 
     # Create original tool
@@ -185,12 +198,15 @@ async def test_gemini_tool_with_chat_param_serialization() -> None:
         GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
     )
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
+    assert serialized["api_key"] == {"env": "GEMINI_API_KEY"}
 
-    # Deserialize back
-    ToolFactory.register_tool_class("GeminiTool", GeminiTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, GeminiTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
     async for messages in restored_tool.invoke(
@@ -201,8 +217,6 @@ async def test_gemini_tool_with_chat_param_serialization() -> None:
             assert message.role == "assistant"
             assert message.content  # non-empty response (phrasing-independent)
             print(message.content)
-            if isinstance(message.content, str):
-                assert len(message.content) < 300
 
     assert len(await event_store.get_events()) == 2
 

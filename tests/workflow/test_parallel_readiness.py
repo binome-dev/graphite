@@ -4,7 +4,6 @@ The AND/OR join readiness tests live in test_workflow_run.py.
 """
 
 import asyncio
-from typing import Any
 
 import pytest
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -46,10 +45,6 @@ class RecordingTool(Tool):
         if self.fail_first and len(self.calls) == 1:
             raise RuntimeError("join failed")
         yield [Message(role="assistant", content="joined")]
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "RecordingTool":
-        return cls()
 
 
 class PairTool(RecordingTool):

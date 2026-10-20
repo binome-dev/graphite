@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from typing import Self
 
@@ -7,6 +6,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -35,7 +35,7 @@ class SimpleLLMPromptTemplateAssistant(Assistant):
     )
     name: str = Field(default="SimpleLLMPromptTemplateAssistant")
     type: str = Field(default="SimpleLLMPromptTemplateAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     system_message: Optional[str] = Field(default=None)
     model: str = Field(default="gpt-4o-mini")
 

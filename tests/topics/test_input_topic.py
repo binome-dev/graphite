@@ -3,6 +3,7 @@ import pytest
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_base import TopicType
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.topic import Topic
@@ -176,34 +177,39 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
     assert not await topic.can_consume("consumer_2")
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from a dictionary (pure-queue topic)."""
+def test_model_validate():
+    """Test loading a topic from its JSON form (pure-queue topic)."""
     data = {
+        "class": "grafi.topics.topic_impl.input_topic:InputTopic",
         "name": "test_input_topic",
         "type": "AgentInputTopic",
     }
 
-    topic = await InputTopic.from_dict(data)
+    topic = InputTopic.model_validate(data)
 
     assert isinstance(topic, InputTopic)
     assert topic.name == "test_input_topic"
     assert topic.type == TopicType.AGENT_INPUT_TOPIC_TYPE
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip():
+def test_model_dump_roundtrip():
     """Test serialization and deserialization roundtrip."""
     # Create original topic
     original = InputTopic(name="roundtrip_input_topic")
 
-    # Serialize to dict
-    data = original.to_dict()
+    # Serialize to JSON data
+    data = original.model_dump(mode="json")
+    assert data == {
+        "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+        "name": "roundtrip_input_topic",
+        "type": "AgentInputTopic",
+    }
 
-    # Deserialize back
-    restored = await InputTopic.from_dict(data)
+    # Deserialize back, through the base class
+    restored = TopicBase.model_validate(data)
 
     # Verify key properties match
     assert isinstance(restored, InputTopic)
     assert restored.name == original.name
     assert restored.type == original.type
+    assert restored.model_dump(mode="json") == data

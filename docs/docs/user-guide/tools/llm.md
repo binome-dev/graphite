@@ -2,16 +2,18 @@
 
 The `LLM` class is the abstract base class for all language model tools in Graphite. It provides a unified interface and common functionality for integrating various language model providers, including OpenAI, Ollama, and other LLM services. This base class handles function specifications, chat parameters, streaming configurations, and provides standardized patterns for LLM tool implementations.
 
+An LLM yields its answer as one message: its text, its refusal, if any, and its tool calls. While a caller streams the run, it also streams the answer's text as the provider produces it (see [Runtime](../runtime.md#streaming)).
+
 ## Fields
 
 | Field              | Type                          | Description                                                                                           |
 |--------------------|-------------------------------|-------------------------------------------------------------------------------------------------------|
 | `system_message`   | `Optional[str]`               | Optional system message to include in API calls (defaults to `None`).                                |
 | `oi_span_type`     | `OpenInferenceSpanKindValues` | Semantic attribute for tracing (set to `LLM` for observability).                                     |
-| `api_key`          | `Optional[str]`               | API key for the LLM service (defaults to `None`).                                                    |
+| `api_key`          | `Optional[str]`               | API key for the LLM service, declared with `env_secret`: each provider reads it from its variable, such as `OPENAI_API_KEY`, and saves it as `{"env": "OPENAI_API_KEY"}`, never as its value (the base class has no variable, and defaults to `None`). |
 | `model`            | `str`                         | The name of the LLM model to use (e.g., `'gpt-4o-mini'`, defaults to empty string).                 |
-| `chat_params`      | `Dict[str, Any]`              | Additional chat completion parameters specific to the LLM provider (defaults to empty dict).         |
-| `is_streaming`     | `bool`                        | Whether to enable streaming mode for responses (defaults to `False`).                                |
+| `chat_params`      | `Dict[str, Any]`              | Additional chat completion parameters specific to the LLM provider (defaults to empty dict). A pydantic model class in it, such as a `response_format`, is saved by import path. |
+| `is_streaming`     | `bool`                        | Whether to stream the answer, token by token, to a caller that streams the run (defaults to `True`). The provider is asked for a stream only then. |
 | `structured_output`| `bool`                        | Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text, defaults to `False`). |
 | `_function_specs`  | `FunctionSpecs` (private)     | Private attribute storing function specifications for function calling capabilities.                  |
 
@@ -22,7 +24,7 @@ The `LLM` class is the abstract base class for all language model tools in Graph
 | `add_function_specs` | `(function_spec: FunctionSpecs) -> None`      | Adds function specifications to the LLM for function calling capabilities.                  |
 | `get_function_specs` | `() -> FunctionSpecs`                         | Returns a copy of the function specifications currently registered with the LLM.            |
 | `prepare_api_input`  | `(input_data: Messages) -> Any`               | Abstract method that must be implemented by subclasses to prepare API input data.           |
-| `to_dict`            | `() -> dict[str, Any]`                        | Serializes the LLM configuration into a dictionary format.                                  |
+| `model_dump(mode="json")` | `() -> dict[str, Any]`                   | Saves the LLM as data. See [Manifests](../manifests.md).                                    |
 
 ## Builder Pattern
 
@@ -32,7 +34,7 @@ The `LLM` class uses the `LLMBuilder` base class that provides common builder me
 |-------------------|--------------------------------------------------|---------------------------------------------------------------------------------------|
 | `model`          | `(model: str) -> Self`                          | Sets the model name for the LLM.                                                     |
 | `chat_params`    | `(params: Dict[str, Any]) -> Self`              | Sets chat completion parameters. Automatically enables `structured_output` if `response_format` is present. |
-| `is_streaming`   | `(is_streaming: bool) -> Self`                  | Enables or disables streaming mode.                                                  |
+| `is_streaming`   | `(is_streaming: bool) -> Self`                  | `False` sends a streaming caller the whole answer only, such as a router's JSON.     |
 | `system_message` | `(system_message: Optional[str]) -> Self`      | Sets the system message to be included in API calls.                                 |
 
 ## Usage Patterns
@@ -80,15 +82,18 @@ print(f"Registered {len(registered_specs)} function specifications")
 
 ### Streaming Configuration
 
+An LLM streams to a caller that streams the run (`invoke(..., stream=True)`) unless it is turned off, as for a node whose output the user should not see token by token:
+
 ```python
-# Enable streaming for real-time responses
-streaming_llm = (
+router_llm = (
     ConcreteLLMTool.builder()
     .model("gpt-4o")
-    .is_streaming(True)
+    .is_streaming(False)  # Its answer comes whole, even to a streaming caller.
     .build()
 )
 ```
+
+A structured-output call made with the provider's parse endpoint is never streamed.
 
 ### Structured Output Configuration
 
@@ -170,7 +175,7 @@ The LLM base class integrates with OpenInference for observability:
 
 - **Span Type**: All LLM tools use `OpenInferenceSpanKindValues.LLM` for consistent tracing
 - **Command Integration**: Uses `@use_command(LLMCommand)` for workflow integration
-- **Serialization**: `to_dict()` method provides structured representation for logging and debugging
+- **Serialization**: `model_dump(mode="json")` saves the LLM as data, its key as a reference to its environment variable (see [Manifests](../manifests.md))
 
 ## Implementation Requirements
 
@@ -178,7 +183,7 @@ When creating a concrete LLM implementation, you must:
 
 1. **Inherit from LLM**: Extend the `LLM` base class
 2. **Implement `prepare_api_input`**: Convert `Messages` to provider-specific format
-3. **Implement `invoke`**: Handle asynchronous API calls
+3. **Implement `invoke`**: Call the provider, and yield its answer as one message. When `self.should_stream()` is true (a caller streams the run, and `is_streaming` is on), ask the provider for a stream and send each piece of text with `emit_delta(text)` as it arrives
 4. **Implement response conversion**: Convert provider responses back to `Messages`
 5. **Create a builder**: Extend `LLMBuilder` with provider-specific configuration
 
@@ -239,7 +244,7 @@ Graphite provides several concrete LLM implementations:
 
 ### Performance
 
-1. **Streaming**: Use streaming for long responses to improve user experience
+1. **Streaming**: Have the caller stream the run (`stream=True`) to show long answers as they come
 2. **Caching**: Consider caching responses for repeated queries
 3. **Batch processing**: Group multiple requests when possible
 

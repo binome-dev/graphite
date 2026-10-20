@@ -1,6 +1,7 @@
 """Parallel steps commit before their publications become visible downstream."""
 
 import asyncio
+import json
 from typing import Any
 from typing import List
 from typing import Optional
@@ -15,6 +16,7 @@ from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.component_events import NodeFailedEvent
 from grafi.common.events.component_events import WorkflowFailedEvent
 from grafi.common.events.event import Event
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -30,6 +32,8 @@ from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
+from grafi.runtime import emit_delta
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -57,8 +61,8 @@ class ScriptedTool(Tool):
             yield batch
 
 
-def reply(*texts: str, streaming: bool = False) -> Messages:
-    return [Message(role="assistant", content=t, is_streaming=streaming) for t in texts]
+def reply(*texts: str) -> Messages:
+    return [Message(role="assistant", content=t) for t in texts]
 
 
 def node(name: str, tool: Tool, source: TopicBase, *destinations: TopicBase) -> Node:
@@ -86,16 +90,17 @@ async def drain(workflow: EventDrivenWorkflow, event: PublishToTopicEvent) -> li
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sequential", [False, True])
-async def test_single_producer_output_still_streams_before_step_commits(
+async def test_a_streaming_caller_gets_deltas_before_the_step_commits(
     sequential: bool,
 ) -> None:
     first_seen = asyncio.Event()
 
     async def stream(call: int, inputs: list[str]) -> Any:
-        yield reply("one", streaming=True)
+        emit_delta("one")
         # Deadlocks unless "one" reaches the caller before this step finishes.
         await first_seen.wait()
-        yield reply("two", streaming=True)
+        emit_delta("two")
+        yield reply("one two")
 
     tool = ScriptedTool(script=stream)
     workflow = (
@@ -103,12 +108,14 @@ async def test_single_producer_output_still_streams_before_step_commits(
         .node(node("llm", tool, InputTopic(name="input"), OutputTopic(name="out")))
         .build()
     )
-    received = []
+    received: list[Any] = []
     async with asyncio.timeout(5):
-        async for output in workflow.invoke(input_event(), sequential):
-            received.append(output.data[0].content)
+        async for output in workflow.invoke(input_event(), sequential, stream=True):
+            received.append(output)
             first_seen.set()
-    assert received == ["one", "two"]
+    assert received[:2] == [Delta("one", "llm", 1), Delta("two", "llm", 1)]
+    [final] = received[2:]  # The step's output, once committed.
+    assert final.data[0].content == "one two"
 
 
 @pytest.mark.asyncio
@@ -126,11 +133,11 @@ async def test_failed_producer_on_shared_output_topic_leaves_no_gap(
     event_store.record_events = record  # type: ignore[method-assign]
 
     async def a_script(call: int, inputs: list[str]) -> Any:
-        yield reply("a1", streaming=True)
+        yield reply("a1")
         if call == 1:
             await b_done.wait()
             raise RuntimeError("a failed")
-        yield reply("a2", streaming=True)
+        yield reply("a2")
 
     async def b_script(call: int, inputs: list[str]) -> Any:
         yield reply("b")
@@ -150,8 +157,7 @@ async def test_failed_producer_on_shared_output_topic_leaves_no_gap(
         with pytest.raises(NodeExecutionError, match="a failed"):
             async for output in workflow.invoke(event):
                 received.append(str(output.data[0].content))
-    # Two producers share the output topic, so A's chunks were staged: the caller
-    # never saw output from the failed attempt.
+    # Outputs reach the caller once stored: it never saw the failed attempt's.
     assert "a1" not in received
     history = await event_store.get_agent_events(
         event.invoke_context.assistant_request_id
@@ -175,7 +181,7 @@ async def test_concurrent_producers_commit_contiguous_positions(
     async def emit(call: int, inputs: list[str]) -> Any:
         for index in range(3):
             await asyncio.sleep(0)
-            yield reply(f"{inputs[0]}-{index}", streaming=True)
+            yield reply(f"{inputs[0]}-{index}")
 
     async def sink(call: int, inputs: list[str]) -> Any:
         yield reply(*inputs)
@@ -218,24 +224,6 @@ async def test_concurrent_producers_commit_contiguous_positions(
     # The recorded history restores without gaps or conflicting positions, and
     # resuming the finished request has nothing left to run or deliver.
     assert await drain(workflow, event) == []
-
-
-def test_streamed_topics_are_single_producer_workflow_outputs() -> None:
-    async def noop(call: int, inputs: list[str]) -> Any:
-        yield reply("x")
-
-    from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
-
-    source, mid = InputTopic(name="input"), Topic(name="mid")
-    solo, shared = OutputTopic(name="solo"), OutputTopic(name="shared")
-    request = InWorkflowOutputTopic(name="request")  # Answered later by event ID.
-    workflow = (
-        EventDrivenWorkflow.builder()
-        .node(node("a", ScriptedTool(script=noop), source, solo, shared, mid, request))
-        .node(node("b", ScriptedTool(script=noop), mid, shared))
-        .build()
-    )
-    assert workflow._streamed_topics == {"solo"}
 
 
 @pytest.mark.asyncio
@@ -789,7 +777,7 @@ async def test_run_started_in_a_withdrawn_cancellation_sees_a_later_one() -> Non
     resumed = asyncio.Event()
 
     async def emit_then_wait(call: int, inputs: list[str]) -> Any:
-        yield reply("a")
+        emit_delta("a")
         await asyncio.Event().wait()
         yield reply("never")
 
@@ -813,7 +801,7 @@ async def test_run_started_in_a_withdrawn_cancellation_sees_a_later_one() -> Non
                     await asyncio.sleep(1)
                 except asyncio.CancelledError:
                     # Started while the timeout's cancellation is handled...
-                    outputs = workflow.invoke(input_event())
+                    outputs = workflow.invoke(input_event(), stream=True)
                     await anext(outputs)
                     raise  # ...which the timeout then withdraws.
         except TimeoutError:
@@ -834,11 +822,12 @@ async def test_run_started_in_a_withdrawn_cancellation_sees_a_later_one() -> Non
 @pytest.mark.asyncio
 async def test_node_ending_with_an_interrupt_as_it_stops_fails_the_close() -> None:
     async def emits_then_waits(call: int, inputs: list[str]) -> Any:
-        yield reply("ok")
+        emit_delta("ok")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
             raise Interrupt("interrupted while stopping")
+        yield reply("never")
 
     workflow = (
         EventDrivenWorkflow.builder()
@@ -852,7 +841,7 @@ async def test_node_ending_with_an_interrupt_as_it_stops_fails_the_close() -> No
         )
         .build()
     )
-    outputs = workflow.invoke(input_event())
+    outputs = workflow.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         with pytest.raises(Interrupt):  # Not dropped as stopping's fallout.
@@ -1654,8 +1643,9 @@ async def test_teardown_lets_a_node_finish_its_cleanup() -> None:
             self, invoke_context: InvokeContext, input_data: Messages
         ) -> MsgsAGen:
             try:
-                yield reply("a", streaming=True)
+                emit_delta("a")
                 await asyncio.Event().wait()
+                yield reply("never")
             finally:
                 await asyncio.sleep(0.05)  # For example releasing a client.
                 cleaned.set()
@@ -1667,9 +1657,9 @@ async def test_teardown_lets_a_node_finish_its_cleanup() -> None:
         )
         .build()
     )
-    outputs = workflow.invoke(input_event())
+    outputs = workflow.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "a"
+        assert await anext(outputs) == Delta("a", "llm", 1)
         await outputs.aclose()
     assert cleaned.is_set()  # Teardown cancels once, then waits.
 
@@ -1800,9 +1790,10 @@ async def test_resent_answer_is_recognised_after_a_store_round_trip(
 
     async def round_trip(request_id: str) -> list[Event]:
         return [
-            decoded
+            default_event_codec.decode(
+                json.loads(json.dumps(default_event_codec.encode(event)))
+            )
             for event in await get_agent_events(request_id)
-            if (decoded := event_store._create_event_from_dict(event.to_dict()))
         ]
 
     event_store.get_agent_events = round_trip  # type: ignore[method-assign]

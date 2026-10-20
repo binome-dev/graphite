@@ -78,15 +78,21 @@ event = ConsumeFromTopicEvent(
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from typing import List, AsyncGenerator
+from grafi.runtime import Delta
+from typing import AsyncGenerator, Union
 
 class MyAssistant(Assistant):
     async def invoke(
         self,
-        input_data: PublishToTopicEvent
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
         """Asynchronous streaming of events."""
-        async for output in self.workflow.invoke(input_data):
+        async for output in self.workflow.invoke(
+            input_data, is_sequential, stream=stream
+        ):
             yield output
 ```
 
@@ -121,12 +127,21 @@ class ProcessorNode(Node):
 ### Workflow Integration
 
 ```python
+from typing import AsyncGenerator, Union
+
 from grafi.workflows.workflow import Workflow
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.runtime import Delta
 
 class MyWorkflow(Workflow):
-    async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    async def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
         """Execute workflow asynchronously."""
         # Initialize workflow with input event
         await self.init_workflow(input_data)
@@ -177,8 +192,14 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
 
 **New Pattern:**
 ```python
-async def invoke(self, input_data: PublishToTopicEvent) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-    async for output in self.workflow.invoke(input_data):
+async def invoke(
+    self,
+    input_data: PublishToTopicEvent,
+    is_sequential: bool = False,
+    *,
+    stream: bool = False,
+) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+    async for output in self.workflow.invoke(input_data, is_sequential, stream=stream):
         yield output
 ```
 

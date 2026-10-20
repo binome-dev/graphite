@@ -47,6 +47,7 @@ from grafi.common.exceptions.serialization import error_to_dict
 from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.runtime.deltas import Delta
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
@@ -87,7 +88,8 @@ class ComponentConfig:
     failed_event: Type[FailedEvent]
     # Typed Any, so this layer need not import the component classes.
     extract_metadata: Callable[[Any], EventContext]
-    # The output its respond event records, from all its stream yielded.
+    # The output its respond event records, from all its stream yielded but
+    # deltas, which are never recorded.
     process_async_result: Callable[[List[Any]], Any]
     span_name_suffix: str = "invoke"
     # An assistant or a workflow runs in its caller's task, so its event writes
@@ -183,7 +185,8 @@ def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
                                     cancelled,
                                 )
                         yield result
-                        results.append(result)
+                        if not isinstance(result, Delta):
+                            results.append(result)
                 output_data = config.process_async_result(results)
                 _set_payload(
                     span,

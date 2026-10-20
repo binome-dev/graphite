@@ -56,9 +56,6 @@ class MockTopic(TopicBase):
     async def consume(self, consumer_name: str) -> List:
         return []
 
-    def to_dict(self):
-        return {"name": self.name, "type": "MockTopic"}
-
 
 class ConcreteNodeBase(NodeBase):
     """Concrete implementation of NodeBase for testing."""
@@ -441,6 +438,9 @@ class TestNodeBase:
 
         assert "_subscribed_topics" not in dumped
         assert "_command" not in dumped
+        # The command follows from the tool's class: it is never saved.
+        assert "command" not in dumped
+        assert "command" not in node.model_dump(mode="json")
 
     # Test Inheritance
     def test_inheritance_from_base_model(self):

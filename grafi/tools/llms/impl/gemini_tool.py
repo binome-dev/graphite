@@ -5,8 +5,8 @@ Uses the **new Google Gen AI SDK** (package ``google-genai>=1.5``).
 Docs & examples:  https://ai.google.dev/gemini-api  :contentReference[oaicite:0]{index=0}
 """
 
+import base64
 import json
-import os
 import uuid
 from typing import Any
 from typing import Dict
@@ -21,10 +21,12 @@ from grafi.common.async_lifecycle import cleanup_on_exit
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.runtime.deltas import emit_delta
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -42,11 +44,16 @@ except ImportError:
         "`google-genai` not installed. Please install using `pip install google-genai`"
     )
 
+# Gemini 3 requires the first function call of each answer to carry the
+# signature Gemini gave it. A call it did not make (another provider's, or one
+# stored before signatures were kept) carries this value instead, which Google
+# documents for exactly that.
+_UNSIGNED = b"skip_thought_signature_validator"
+
 GEMINI_ROLE_MAP = {
     "user": "user",
     "assistant": "model",
-    "tool": "user",
-    "system": "model",
+    "tool": "user",  # Function responses are the user's turn.
 }
 
 
@@ -57,7 +64,7 @@ class GeminiTool(LLM):
 
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY"))
+    api_key: Optional[str] = env_secret("GEMINI_API_KEY")
     # Capable current Gemini tier; use "gemini-3.1-flash-lite" for lower cost or
     # "gemini-3.1-pro-preview" for the hardest tasks.
     model: str = Field(default="gemini-3.5-flash")
@@ -87,7 +94,9 @@ class GeminiTool(LLM):
         Initialise a *stateless* client.  The Google SDK uses a lightweight
         Client object; it's fine to create one per request.
         """
-        return genai.Client(api_key=self.api_key)
+        # Without a key, the SDK reads Google's own (GOOGLE_API_KEY), or uses
+        # Vertex AI's credentials, as configured in the environment.
+        return genai.Client(api_key=self.api_key or None)
 
     def prepare_api_input(
         self, input_data: Messages
@@ -115,18 +124,47 @@ class GeminiTool(LLM):
         if self.system_message:
             system_parts.append(self.system_message)
 
+        # A function response names its function: the call with its id did.
+        call_names: Dict[str, str] = {}
         for m in input_data:
             if m.role == "system":
                 if isinstance(m.content, str) and m.content:
                     system_parts.append(m.content)
                 continue
-            # Gemini only needs role + parts; we ignore tool_call fields here
-            if m.content is not None and isinstance(m.content, str) and m.content != "":
-                contents.append(
-                    Content(
-                        role=GEMINI_ROLE_MAP.get(m.role, m.role),
-                        parts=[Part(text=m.content)],
+            parts: List[Part] = []
+            if m.role == "tool":
+                parts.append(
+                    Part(
+                        function_response=types.FunctionResponse(
+                            id=m.tool_call_id,
+                            name=call_names.get(m.tool_call_id or "", ""),
+                            response={"result": m.content},
+                        )
                     )
+                )
+            elif isinstance(m.content, str) and m.content:
+                parts.append(Part(text=m.content))
+            for position, call in enumerate(m.tool_calls or []):
+                call_names[call.id] = call.function.name
+                google = (call.model_extra or {}).get("extra_content", {}).get("google")
+                signature = (google or {}).get("thought_signature")
+                parts.append(
+                    Part(
+                        function_call=types.FunctionCall(
+                            id=call.id,
+                            name=call.function.name,
+                            args=self.parse_tool_arguments(call.function.arguments),
+                        ),
+                        thought_signature=(
+                            base64.b64decode(signature)
+                            if signature
+                            else _UNSIGNED if position == 0 else None
+                        ),
+                    )
+                )
+            if parts:
+                contents.append(
+                    Content(role=GEMINI_ROLE_MAP.get(m.role, m.role), parts=parts)
                 )
 
         function_declarations: List[FunctionDeclaration] = []
@@ -186,7 +224,9 @@ class GeminiTool(LLM):
         # Created per call, so closed per call.
         async with cleanup_on_exit(close_client, best_effort="Gemini client"):
             try:
-                if self.is_streaming:
+                if self.should_stream():
+                    parts: List[Part] = []
+                    refusal: Optional[str] = None
                     stream = await client.aio.models.generate_content_stream(
                         model=self.model, contents=contents, config=cfg
                     )
@@ -194,16 +234,17 @@ class GeminiTool(LLM):
                         stream, best_effort="Gemini stream"
                     ) as chunks:
                         async for chunk in chunks:
-                            yield self.to_stream_messages(chunk)
+                            refusal = refusal or _refusal(chunk)
+                            for part in _parts(chunk):
+                                if part.text and not part.thought:
+                                    emit_delta(part.text)
+                                parts.append(part)
+                    message = self._message(parts, refusal)
                 else:
-                    response: GenerateContentResponse = (
-                        await client.aio.models.generate_content(
-                            model=self.model,
-                            contents=contents,
-                            config=cfg,
-                        )
+                    response = await client.aio.models.generate_content(
+                        model=self.model, contents=contents, config=cfg
                     )
-                    yield self.to_messages(response)
+                    [message] = self.to_messages(response)
             except Exception as exc:
                 raise LLMToolException(
                     tool_name=self.name,
@@ -212,97 +253,44 @@ class GeminiTool(LLM):
                     invoke_context=invoke_context,
                     cause=exc,
                 ) from exc
+        yield [message]
 
     # --------------------------------------------------------------------- #
     # Response conversion helpers
     # --------------------------------------------------------------------- #
-    def to_stream_messages(self, chunk: GenerateContentResponse) -> Messages:
-        """
-        Convert a streaming chunk → grafi Message list.
-
-        The SDK's ``text`` property gives you the incremental delta; we wrap
-        it in a single assistant message so grafi can assemble the full
-        answer just like with OpenAI chunks.
-        """
-        return [Message(role="assistant", content=chunk.text, is_streaming=True)]
-
     def to_messages(self, response: GenerateContentResponse) -> Messages:
-        """
-        Convert the Gemini API response to a Message object.
-        """
-        message_data = response.text
+        """A response as a message: its text, and its function calls if any."""
+        return [self._message(_parts(response), _refusal(response))]
 
-        # Handle the basic fields
-        role = "assistant"
-        content = message_data or "No content provided"
-
-        message_args: Dict[str, Any] = {
-            "role": role,
-            "content": content,
-        }
-
-        # Process tool calls if they exist
-        if response.function_calls and len(response.function_calls) > 0:
-            if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
-            tool_calls = []
-            for raw_function_call in response.function_calls:
-                # Include the function call if provided
-                tool_call = {
-                    "id": raw_function_call.id or uuid.uuid4().hex,
+    @staticmethod
+    def _message(parts: List[Part], refusal: Optional[str] = None) -> Message:
+        """The message a response's parts make: their text, thoughts aside,
+        and their function calls; and why Gemini refused, if it did."""
+        tool_calls: List[Dict[str, Any]] = []
+        for part in parts:
+            if call := part.function_call:
+                tool_call: Dict[str, Any] = {
+                    "id": call.id or uuid.uuid4().hex,
                     "type": "function",
                     "function": {
-                        "name": raw_function_call.name,
-                        "arguments": json.dumps(raw_function_call.args),
+                        "name": call.name,
+                        "arguments": json.dumps(call.args or {}),
                     },
                 }
+                if part.thought_signature:  # Kept as Gemini's OpenAI API keeps it.
+                    signature = base64.b64encode(part.thought_signature).decode()
+                    tool_call["extra_content"] = {
+                        "google": {"thought_signature": signature}
+                    }
                 tool_calls.append(tool_call)
-
-            message_args["tool_calls"] = tool_calls
-
-        return [Message.model_validate(message_args)]
-
-    # --------------------------------------------------------------------- #
-    # Serialisation helper (do **not** expose real key)
-    # --------------------------------------------------------------------- #
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "api_key": "****************",
-            "model": self.model,
-            "thinking_budget": self.thinking_budget,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "GeminiTool":
-        """
-        Create a GeminiTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the GeminiTool.
-
-        Returns:
-            GeminiTool: A GeminiTool instance created from the dictionary.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        # GeminiTool uses the same fields as base LLM
-        return (
-            cls.builder()
-            .name(data.get("name", "GeminiTool"))
-            .type(data.get("type", "GeminiTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
-            .system_message(data.get("system_message", ""))
-            .api_key(os.getenv("GEMINI_API_KEY"))
-            .model(data.get("model", "gemini-3.5-flash"))
-            .thinking_budget(data.get("thinking_budget"))
-            .build()
+        text = "".join(part.text for part in parts if part.text and not part.thought)
+        return Message.model_validate(
+            {
+                "role": "assistant",
+                "content": text,
+                "refusal": refusal,
+                "tool_calls": tool_calls or None,
+            }
         )
 
 
@@ -319,3 +307,35 @@ class GeminiToolBuilder(LLMBuilder[GeminiTool]):
         """Set the Gemini 2.5 thinking budget in tokens (0 off, -1 dynamic)."""
         self.kwargs["thinking_budget"] = thinking_budget
         return self
+
+
+def _parts(response: GenerateContentResponse) -> List[Part]:
+    """The parts of a response's first candidate, if it has any."""
+    candidates = response.candidates or []
+    content = candidates[0].content if candidates else None
+    return list(content.parts or []) if content else []
+
+
+# Finish reasons that mean Gemini would not answer.
+_REFUSED = {
+    "SAFETY",
+    "RECITATION",
+    "BLOCKLIST",
+    "PROHIBITED_CONTENT",
+    "SPII",
+    "IMAGE_SAFETY",
+    "IMAGE_PROHIBITED_CONTENT",
+    "IMAGE_RECITATION",
+}
+
+
+def _refusal(response: GenerateContentResponse) -> Optional[str]:
+    """Why Gemini blocked the prompt or stopped its answer, if it refused."""
+    feedback = response.prompt_feedback
+    if feedback and feedback.block_reason:
+        return f"Prompt blocked by Gemini: {feedback.block_reason.name}"
+    candidates = response.candidates or []
+    reason = candidates[0].finish_reason if candidates else None
+    if reason and reason.name in _REFUSED:
+        return f"Answer stopped by Gemini: {reason.name}"
+    return None

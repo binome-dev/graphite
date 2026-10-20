@@ -1,5 +1,4 @@
 import heapq
-from typing import Any
 from typing import Dict
 from typing import List
 from typing import Set
@@ -21,23 +20,6 @@ class EventGraphNode(BaseModel):
     event: TopicEvent
     upstream_events: List[EventId] = Field(default_factory=list)
     downstream_events: List[EventId] = Field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "event_id": self.event_id,
-            "event": self.event.to_dict(),
-            "upstream_events": self.upstream_events,
-            "downstream_events": self.downstream_events,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "EventGraphNode":
-        return cls(
-            event_id=data["event_id"],
-            event=ConsumeFromTopicEvent.from_dict(data["event"]),
-            upstream_events=data["upstream_events"],
-            downstream_events=data["downstream_events"],
-        )
 
 
 class EventGraph(BaseModel):
@@ -62,7 +44,7 @@ class EventGraph(BaseModel):
 
         Args:
             consume_events: List of ConsumeFromTopicEvent to start building from
-            topic_events: Dictionary mapping topic names to TopicEvents
+            topic_events: The topic events to link them with, by event id
         """
         # Clear existing graph
         self.nodes.clear()
@@ -168,16 +150,3 @@ class EventGraph(BaseModel):
         ordered_result = list(reversed(result))
 
         return ordered_result
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "nodes": {k: v.to_dict() for k, v in self.nodes.items()},
-            "root_nodes": [node.to_dict() for node in self.root_nodes],
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "EventGraph":
-        return cls(
-            nodes={k: EventGraphNode.from_dict(v) for k, v in data["nodes"].items()},
-            root_nodes=[EventGraphNode.from_dict(node) for node in data["root_nodes"]],
-        )

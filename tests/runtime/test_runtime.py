@@ -29,7 +29,7 @@ class _ProbeAssistant:
     runtime bound them for the whole invocation, child tasks included.
     """
 
-    async def invoke(self, input_data, is_sequential=False):
+    async def invoke(self, input_data, is_sequential=False, *, stream=False):
         direct = current_services()
         in_task = await asyncio.create_task(_read_services())
         yield (direct, in_task)
@@ -126,7 +126,7 @@ class TestRuntimeInvokeBinding:
 
         class _ClosingProbe(_ProbeAssistant):
             async def invoke(
-                self, input_data: Any, is_sequential: bool = False
+                self, input_data: Any, is_sequential: bool = False, *, stream=False
             ) -> AsyncIterator[tuple[ExecutionServices, None]]:
                 try:
                     yield (current_services(), None)

@@ -7,6 +7,7 @@ import uuid
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
 from grafi.runtime import current_services
 from tests_integration.simple_stream_assistant.simple_stream_assistant import (
     SimpleStreamAssistant,
@@ -41,9 +42,9 @@ async def test_simple_llm_assistant() -> None:
     await event_store.clear_events()
 
     content = ""
-    chunks = 0
+    streamed = ""
 
-    async for event in assistant.invoke(
+    async for item in assistant.invoke(
         PublishToTopicEvent(
             invoke_context=get_invoke_context(),
             data=[
@@ -51,30 +52,32 @@ async def test_simple_llm_assistant() -> None:
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        )
+        ),
+        stream=True,
     ):
-        chunks += 1
-        for message in event.data:
+        if isinstance(item, Delta):  # The answer's text, as it comes.
+            streamed += item.content
+            print(item.content, end="", flush=True)
+            continue
+        for message in item.data:  # The answer, once stored.
             assert message.role == "assistant"
-            if message.content is not None:
-                content += str(message.content)
-                print(message.content, end="_", flush=True)
+            content += str(message.content)
 
-    print(content)
+    print()
     assert "Grafi" in content
-    assert content is not None
+    assert streamed == content
 
     events = await event_store.get_events()
     print(f"Total events: {len(events)}")
     # 8 component events (invoke and respond for the assistant, the workflow,
     # the node and its tool), then a publication and its consumption for the
-    # input and for every streamed chunk.
-    assert len(events) == 8 + 2 * (1 + chunks)
+    # input and for the answer. Deltas are not stored.
+    assert len(events) == 12
 
     # Save events to local json file
     # import json
 
-    # events_data = [event.to_dict() for event in events]
+    # events_data = [default_event_codec.encode(event) for event in events]
     # with open("events.json", "w") as f:
     #     json.dump(events_data, f, indent=4)
     # print(f"Saved {len(events)} events to events.json")

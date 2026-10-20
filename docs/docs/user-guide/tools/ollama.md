@@ -1,6 +1,6 @@
 # OllamaTool
 
-`OllamaTool` is an implementation of the `LLM` interface designed to interface with Ollama's language model API. It supports asynchronous interaction patterns, streaming responses, and function calling, converting workflow `Message` objects into an Ollama-compatible format and translating API responses back into the workflow.
+`OllamaTool` is an implementation of the `LLM` interface designed to interface with Ollama's language model API. It supports asynchronous interaction, streaming its answer to a caller that streams the run, and function calling, converting workflow `Message` objects into an Ollama-compatible format and translating API responses back into the workflow.
 
 ## Fields
 
@@ -11,8 +11,8 @@
 | `api_url`          | `str`                   | URL of the Ollama API endpoint (defaults to `"http://localhost:11434"`).                                      |
 | `model`            | `str`                   | Ollama model name (defaults to `"qwen3"`).                                                                    |
 | `system_message`   | `Optional[str]`         | Optional system message to include in API calls (inherited from `LLM`).                                       |
-| `chat_params`      | `Dict[str, Any]`        | Additional optional chat completion parameters (inherited from `LLM`).                                        |
-| `is_streaming`     | `bool`                  | Whether to enable streaming mode for responses (defaults to `False`, inherited from `LLM`).                   |
+| `chat_params`      | `Dict[str, Any]`        | Additional optional chat parameters, passed to `chat()`; a key set here replaces the tool's own, such as `model` (inherited from `LLM`). |
+| `is_streaming`     | `bool`                  | Whether to stream the answer to a caller that streams the run (defaults to `True`, inherited from `LLM`).     |
 | `structured_output`| `bool`                  | Whether to use structured output mode (defaults to `False`, inherited from `LLM`).                            |
 | `oi_span_type`     | `OpenInferenceSpanKindValues` | Semantic attribute for tracing (set to `LLM`, inherited from `LLM`).                                    |
 
@@ -22,10 +22,9 @@
 |---------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> OllamaToolBuilder`                                | Returns a builder instance for constructing OllamaTool objects.                                    |
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]` | Adapts Message objects to Ollama API format, including function specifications. |
-| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronously calls the Ollama API, supporting both streaming and non-streaming modes.     |
-| `to_stream_messages`| `(chunk: ChatResponse \| dict[str, Any]) -> Messages` | Converts streaming response chunks from Ollama's API into Message objects. |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Calls the Ollama API and yields its answer as one message, streaming its text while a caller streams the run. |
 | `to_messages`       | `(response: ChatResponse) -> Messages`                            | Converts a complete response from Ollama's API into Message objects.                               |
-| `to_dict`           | `() -> dict[str, Any]`                                             | Provides a dictionary representation of the OllamaTool configuration.                              |
+| `model_dump(mode="json")` | `() -> dict[str, Any]`                                       | Saves the tool as data. See [Manifests](../manifests.md).                                         |
 
 ## How It Works
 
@@ -39,14 +38,14 @@ The Ollama tool processes requests through several key steps:
 
 2. **API Invocation**:
    - **Asynchronous (`invoke`)**: Uses AsyncClient for concurrent operations
-   - **Streaming**: When `is_streaming=True`, processes responses incrementally
+   - **Streaming**: While a caller streams the run and `is_streaming` is on, asks for a stream and emits its text as deltas
    - **Function Calling**: Supports tool/function calling through Ollama's API
 
 3. **Response Processing**:
-   - **Streaming responses**: Processed chunk by chunk via `to_stream_messages`
+   - **Streamed responses**: The text and tool calls of every chunk are gathered into one message
    - **Complete responses**: Processed via `to_messages`
    - **Function calls**: Converted to proper tool_call format with generated IDs
-   - All responses are converted to standardized `Message` objects
+   - Either way, the tool yields one `Message`: its text and its tool calls
 
 ## Builder Pattern
 
@@ -59,7 +58,6 @@ ollama_tool = (
     .model("llama3.2")
     .system_message("You are a helpful assistant.")
     .chat_params({"temperature": 0.7})
-    .is_streaming(True)
     .build()
 )
 ```
@@ -90,23 +88,16 @@ async for response in ollama_tool.invoke(invoke_context, messages):
 
 ### Streaming Usage
 
-```python
-# Enable streaming
-ollama_tool = (
-    OllamaTool.builder()
-    .api_url("http://localhost:11434")
-    .model("qwen3")
-    .is_streaming(True)
-    .build()
-)
+In a workflow, the caller streams the run with `invoke(..., stream=True)` (see [Runtime](../runtime.md#streaming)). Invoking the tool directly, collect its deltas with `deltas_to`:
 
-# Asynchronous streaming
+```python
+from grafi.runtime import deltas_to
+
 async def stream_example():
     messages = [Message(role="user", content="Tell me a story")]
-    async for message_batch in ollama_tool.invoke(invoke_context, messages):
-        for message in message_batch:
-            if message.content:
-                print(message.content, end="", flush=True)
+    with deltas_to(lambda delta: print(delta.content, end="", flush=True)):
+        async for message_batch in ollama_tool.invoke(invoke_context, messages):
+            story = message_batch[0]  # The whole answer, once it is complete.
 ```
 
 ### Function Calling
@@ -162,15 +153,6 @@ chat_params = {
 }
 ```
 
-## Streaming Response Handling
-
-The `to_stream_messages` method handles both `ChatResponse` objects and plain dictionaries:
-
-- **Empty content filtering**: Skips empty deltas to avoid blank messages
-- **Role mapping**: Ensures proper role assignment with fallback to "assistant"
-- **Streaming flag**: Sets `is_streaming=True` on streamed messages
-- **Incremental content**: Provides delta content for real-time display
-
 ## Function Call Support
 
 Ollama tool provides comprehensive function calling support:
@@ -185,7 +167,7 @@ Ollama tool provides comprehensive function calling support:
 The Ollama tool provides robust error handling:
 
 - **Import errors**: Clear error message if `ollama` package is not installed
-- **API errors**: Ollama-specific errors are caught and re-raised as `RuntimeError` with descriptive messages
+- **API errors**: Failures are raised as `LLMToolException`, with the original error as its cause
 - **Connection issues**: Network and server connectivity issues are properly handled
 
 ## Installation Requirements

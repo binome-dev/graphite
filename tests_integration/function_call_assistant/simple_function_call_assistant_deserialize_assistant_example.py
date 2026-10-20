@@ -1,23 +1,19 @@
 import asyncio
-import json
 import uuid
 from pathlib import Path
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.import_ref import trust_modules
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.runtime import current_services
-from grafi.tools.tool_factory import ToolFactory
-from tests_integration.function_call_assistant.simple_function_call_assistant_multi_functions_example import (  # noqa: E501
-    LocalInfoMock,
-)
 
-# The custom FunctionCallTool subclass must be registered so the manifest's
-# "LocalInfoMock" tool reconstructs with its @llm_function methods (they are
-# defined by the class, not serialized).
-ToolFactory.register_tool_class("LocalInfoMock", LocalInfoMock)
+# The manifest names classes of tests_integration: the assistant's, and the
+# LocalInfoMock tool's, which brings its @llm_function methods. Loading imports
+# classes only from trusted modules.
+trust_modules("tests_integration")
 
 
 def get_invoke_context() -> InvokeContext:
@@ -32,15 +28,10 @@ event_store = current_services().event_store
 
 
 async def test_deserialized_assistant() -> None:
-    """Test the deserialized assistant using the new load_from_manifest method."""
-    # Read the manifest JSON file
-    with open(
-        Path(__file__).parent / "SimpleFunctionCallAssistant_manifest.json", "r"
-    ) as f:
-        manifest_json = f.read()
-
-    # Deserialize the assistant using the new method
-    assistant = await Assistant.from_dict(json.loads(manifest_json))
+    """Load the assistant from its manifest, and run it."""
+    assistant = Assistant.from_manifest(
+        Path(__file__).parent / "SimpleFunctionCallAssistant_manifest.json"
+    )
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")
@@ -61,7 +52,15 @@ async def test_deserialized_assistant() -> None:
     print(output[-1].data[0].content)
     assert output is not None
     assert "12345" in str(output[-1].data[0].content)
-    assert "bad" in str(output[-1].data[0].content)
+    # The function's own words, not the LLM's rewording of them.
+    tool_results = [
+        message.content
+        for event in await event_store.get_events()
+        if isinstance(event, PublishToTopicEvent)
+        for message in event.data
+        if message.role == "tool"
+    ]
+    assert any("bad" in str(result) for result in tool_results)
     print(len(await event_store.get_events()))
     # Same workflow as the freshly-built assistant, so the same event count
     # (see simple_function_call_assistant_multi_functions_example.py).

@@ -3,12 +3,10 @@ import uuid
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Literal
 from typing import Optional
 from typing import Self
-from typing import cast
+from typing import Sequence
 
-from loguru import logger
 from ollama import ChatResponse
 from pydantic import Field
 
@@ -16,10 +14,12 @@ from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.common.models.message import MsgsAGen
+from grafi.runtime.deltas import emit_delta
 from grafi.tools.llms.impl.openai_adapter import to_openai_tool
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
@@ -41,6 +41,7 @@ class OllamaTool(LLM):
 
     name: str = Field(default="OllamaTool")
     type: str = Field(default="OllamaTool")
+    api_key: Optional[str] = env_secret("OLLAMA_API_KEY")
     api_url: str = Field(default="http://localhost:11434")
     model: str = Field(default="qwen3")
 
@@ -63,11 +64,18 @@ class OllamaTool(LLM):
         )
         api_functions = None
 
+        # A tool result names its function: the call with its id did. Ollama
+        # gives calls no ids, so it matches results to calls by name and order.
+        call_names: Dict[str, str] = {}
         for message in input_data:
             api_message = {
                 "role": "tool" if message.role == "function" else message.role,
                 "content": message.content or "",
             }
+            if message.tool_call_id in call_names:
+                api_message["tool_name"] = call_names[message.tool_call_id]
+            for call in message.tool_calls or []:
+                call_names[call.id] = call.function.name
             if message.tool_calls:
                 # grafi stores assistant tool calls in `tool_calls`; forward them
                 # so multi-turn function calling survives (the deprecated
@@ -110,33 +118,36 @@ class OllamaTool(LLM):
         """
         Invoke a request to the Ollama API asynchronously.
         """
-        logger.debug("Input data: %s", input_data)
-
-        # Prepare payload
         api_messages, api_functions = self.prepare_api_input(input_data)
-        # Use Ollama Client to send the request
-        client = ollama.AsyncClient(self.api_url)
+        # chat_params last, so a key it sets replaces the default.
+        chat_kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": api_messages,
+            "tools": api_functions,
+            **self.chat_params,
+        }
+        # Its own key, if any: the SDK would read OLLAMA_API_KEY otherwise.
+        headers = {"authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        client = ollama.AsyncClient(self.api_url, headers=headers)
         # Created per call, so closed per call.
         async with best_effort_exit(client, "Ollama client"):
             try:
-                if self.is_streaming:
-                    stream = await client.chat(
-                        model=self.model,
-                        messages=api_messages,
-                        tools=api_functions,
-                        stream=True,
-                    )
+                if self.should_stream():
+                    text: List[str] = []
+                    tool_calls: List[Any] = []
+                    stream = await client.chat(**{**chat_kwargs, "stream": True})
                     async with owned_iterator(
                         stream, best_effort="Ollama stream"
                     ) as chunks:
                         async for chunk in chunks:
-                            yield self.to_stream_messages(chunk)
+                            if content := chunk.message.content:
+                                emit_delta(content)
+                                text.append(content)
+                            tool_calls.extend(chunk.message.tool_calls or [])
+                    message = self._message("".join(text), tool_calls)
                 else:
-                    response = await client.chat(
-                        model=self.model, messages=api_messages, tools=api_functions
-                    )
-                    # Return the raw response as a Message object
-                    yield self.to_messages(response)
+                    response = await client.chat(**chat_kwargs)
+                    [message] = self.to_messages(response)
             except Exception as e:
                 # The lifecycle decorator emits the authoritative record; raise a
                 # domain error with a stable message and the original cause attached.
@@ -147,116 +158,31 @@ class OllamaTool(LLM):
                     invoke_context=invoke_context,
                     cause=e,
                 ) from e
-
-    def to_stream_messages(self, chunk: ChatResponse | dict[str, Any]) -> Messages:
-        """
-        Convert a single streaming chunk coming from the Ollama client to
-        the grafi `Message` envelope expected by downstream nodes.
-
-        Ollama yields either a `ChatResponse` object or a plain dict that
-        contains a `"message"` entry with incremental text.
-        Only the **delta** is propagated so the caller can assemble the
-        final answer.
-        """
-        if isinstance(chunk, ChatResponse):
-            # `chunk.message.content` is the incremental bit
-            msg = chunk.message
-            role_value = msg.role or "assistant"
-            content = msg.content or ""
-        else:  # plain dict (↔ ollama.chat(..., stream=True) docs)
-            msg = chunk.get("message", {})
-            role_value = msg.get("role", "assistant")
-            content = msg.get("content", "")
-
-        if role_value in ("system", "user", "assistant", "tool"):
-            safe_role: Literal["system", "user", "assistant", "tool"] = cast(
-                Literal["system", "user", "assistant", "tool"], role_value
-            )
-        else:
-            safe_role = "assistant"
-
-        # skip empty deltas to avoid emitting blank messages
-        if not content:
-            return []
-
-        return [Message(role=safe_role, content=content, is_streaming=True)]
+        yield [message]
 
     def to_messages(self, response: ChatResponse) -> Messages:
-        """
-        Convert the Ollama API response to a Message object.
-        """
-        message_data = response.message
+        """A response as a message: its text, and its tool calls if any."""
+        return [
+            self._message(
+                response.message.content or "", response.message.tool_calls or []
+            )
+        ]
 
-        # Handle the basic fields
-        role = message_data.role or "assistant"
-        content = message_data.content or "No content provided"
-
-        message_args: Dict[str, Any] = {
-            "role": role,
-            "content": content,
-        }
-
-        # Process tool calls if they exist
-        if "tool_calls" in message_data and message_data.tool_calls:
-            raw_tool_calls = message_data.tool_calls
-
-            if content == "No content provided":
-                message_args["content"] = (
-                    ""  # Clear content when function call is included
-                )
-
-            tool_calls = []
-            for raw_tool_call in raw_tool_calls:
-                # Include the function call if provided
-                function = raw_tool_call.function
-                tool_call = {
-                    "id": uuid.uuid4().hex,
-                    "type": "function",
-                    "function": {
-                        "name": function.name,
-                        "arguments": json.dumps(function.arguments),
-                    },
-                }
-                tool_calls.append(tool_call)
-
-            message_args["tool_calls"] = tool_calls
-
-        # Include the name if provided
-        if "name" in message_data:
-            message_args["name"] = message_data["name"]
-
-        return [Message.model_validate(message_args)]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "api_url": self.api_url,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "OllamaTool":
-        """
-        Create an OllamaTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the OllamaTool.
-
-        Returns:
-            OllamaTool: An OllamaTool instance created from the dictionary.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "OllamaTool"))
-            .type(data.get("type", "OllamaTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
-            .system_message(data.get("system_message", ""))
-            .api_url(data.get("api_url", "http://localhost:11434"))
-            .model(data.get("model", "qwen3"))
-            .build()
+    @staticmethod
+    def _message(text: str, raw_tool_calls: Sequence[Any]) -> Message:
+        tool_calls = [
+            {
+                "id": uuid.uuid4().hex,  # Ollama gives tool calls no id.
+                "type": "function",
+                "function": {
+                    "name": call.function.name,
+                    "arguments": json.dumps(call.function.arguments),
+                },
+            }
+            for call in raw_tool_calls
+        ]
+        return Message.model_validate(
+            {"role": "assistant", "content": text, "tool_calls": tool_calls or None}
         )
 
 

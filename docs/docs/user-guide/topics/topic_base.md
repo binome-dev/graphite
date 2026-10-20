@@ -46,8 +46,7 @@ The base class for all topic implementations, providing core messaging functiona
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `to_dict` | `() -> dict[str, Any]` | Serialize topic to dictionary |
-| `serialize_callable` | `() -> dict` | Serialize condition function |
+| `model_dump(mode="json")` | `() -> dict[str, Any]` | Save the topic as data: its class, name and type (its `event_queue` is left out). See [Manifests](../manifests.md). |
 
 ### TopicBaseBuilder
 
@@ -86,9 +85,9 @@ the enqueued publication. It is built from two steps:
 - `add_event(publication)` enqueues it and returns it with its offset set.
 
 A workflow run keeps its topics' events itself and calls only
-`prepare_publication()` (and `to_dict()` to serialize the topic), so building a
-workflow with a topic that overrides any other public `TopicBase` instance method
-(`publish_data()`, `consume()`, `commit()` and the like), or that has a custom
+`prepare_publication()`, so building a workflow with a topic that overrides any
+other public `TopicBase` instance method (`publish_data()`, `consume()`,
+`commit()` and the like), or that has a custom
 `event_queue`, raises `WorkflowError`: those are for using a topic on its own.
 To transform or validate a publication, override `prepare_publication()`: it
 runs before anything is stored.
@@ -154,35 +153,6 @@ Topics support flexible message filtering through condition functions:
 condition: Callable[[Messages], bool] = Field(default=lambda _: True)
 ```
 
-### Condition Serialization
-
-The system can serialize various types of condition functions:
-
-```python
-def serialize_callable(self) -> dict:
-    """Serialize condition function for persistence."""
-    if callable(self.condition):
-        if inspect.isfunction(self.condition):
-            if self.condition.__name__ == "<lambda>":
-                # Lambda function
-                try:
-                    source = inspect.getsource(self.condition).strip()
-                except (OSError, TypeError):
-                    source = "<unable to retrieve source>"
-                return {"type": "lambda", "code": source}
-            else:
-                # Named function
-                return {"type": "function", "name": self.condition.__name__}
-        elif inspect.isbuiltin(self.condition):
-            return {"type": "builtin", "name": self.condition.__name__}
-        elif hasattr(self.condition, "__call__"):
-            return {
-                "type": "callable_object",
-                "class_name": self.condition.__class__.__name__,
-            }
-    return {"type": "unknown"}
-```
-
 ## Topic State Management
 
 ### Reset Topic
@@ -231,12 +201,17 @@ async def restore_topic(self, topic_event: TopicEvent) -> None:
 
 ## Serialization
 
-### Topic Serialization
+A topic is saved as data with `model_dump(mode="json")`, and loaded back with
+`TopicBase.model_validate(data)`, as the class it names:
 
 ```python
-def to_dict(self) -> dict[str, Any]:
-    return {"name": self.name, "condition": self.serialize_callable()}
+Topic(name="processing_results").model_dump(mode="json")
+# {"class": "grafi.topics.topic_impl.topic:Topic",
+#  "name": "processing_results", "type": "Topic"}
 ```
+
+Nodes refer to topics by name, and a workflow saves its topics with it. See
+[Manifests](../manifests.md).
 
 ## Builder Pattern Usage
 

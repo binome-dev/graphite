@@ -115,15 +115,3 @@ def test_topology_sort(mock_events):
 
     # Ensure correct order based on timestamps
     assert sorted_ids == ["event_3", "event_1"]
-
-
-def test_to_dict_and_from_dict(mock_events):
-    """Test serialization and deserialization"""
-    graph = EventGraph()
-    graph.build_graph(mock_events["consume_events"], mock_events["topic_events"])
-
-    graph_dict = graph.to_dict()
-    new_graph = EventGraph.from_dict(graph_dict)
-
-    assert graph_dict == new_graph.to_dict()  # Ensure correct serialization
-    assert len(new_graph.nodes) == len(graph.nodes)  # Ensure all nodes are restored

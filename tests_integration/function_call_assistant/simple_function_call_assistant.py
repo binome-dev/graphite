@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from typing import Self
 
@@ -7,6 +6,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
@@ -40,7 +40,7 @@ class SimpleFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleFunctionCallAssistant")
     type: str = Field(default="SimpleFunctionCallAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     model: str = Field(default="gpt-4o-mini")
     function_call_llm_system_message: Optional[str] = Field(default=None)
     summary_llm_system_message: Optional[str] = Field(default=None)

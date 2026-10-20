@@ -1,14 +1,16 @@
 import asyncio
-import json
 import uuid
 from pathlib import Path
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.import_ref import trust_modules
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.tools.function_calls.impl.tavily_tool import TavilyTool
-from grafi.tools.tool_factory import ToolFactory
+
+# The manifest names the assistant's class, of tests_integration. Loading
+# imports classes only from trusted modules.
+trust_modules("tests_integration")
 
 
 def get_invoke_context() -> InvokeContext:
@@ -20,14 +22,10 @@ def get_invoke_context() -> InvokeContext:
 
 
 async def test_deserialized_assistant() -> None:
-    """Test the deserialized assistant using the new load_from_manifest method."""
-    # Read the manifest JSON file
-    with open(Path(__file__).parent / "ReActAssistant_manifest.json", "r") as f:
-        manifest_json = f.read()
-
-    # Deserialize the assistant using the new method
-    ToolFactory.register_tool_class("TavilyTool", TavilyTool)
-    assistant = await Assistant.from_dict(json.loads(manifest_json))
+    """Load the assistant from its manifest, and run it."""
+    assistant = Assistant.from_manifest(
+        Path(__file__).parent / "ReActAssistant_manifest.json"
+    )
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")

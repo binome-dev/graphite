@@ -1,4 +1,3 @@
-from typing import Any
 from typing import List
 from typing import Self
 
@@ -51,31 +50,6 @@ class InWorkflowOutputTopic(Topic):
         Returns a builder for OutputTopic.
         """
         return InWorkflowOutputTopicBuilder(cls)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "paired_in_workflow_input_topic_names": self.paired_in_workflow_input_topic_names,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "InWorkflowOutputTopic":
-        """
-        Create a Topic instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the Topic.
-
-        Returns:
-            InWorkflowOutputTopic: A Topic instance created from the dictionary.
-        """
-        return cls(
-            name=data["name"],
-            type=data["type"],
-            paired_in_workflow_input_topic_names=data.get(
-                "paired_in_workflow_input_topic_names", []
-            ),
-        )
 
 
 class InWorkflowOutputTopicBuilder(TopicBuilder[InWorkflowOutputTopic]):

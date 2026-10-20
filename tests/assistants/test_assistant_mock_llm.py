@@ -11,10 +11,7 @@ enabling reliable unit testing without real API calls.
 
 import inspect
 import uuid
-from typing import Any
-from typing import Callable
 from typing import List
-from typing import Union
 from unittest.mock import patch
 
 import pytest
@@ -23,8 +20,10 @@ from openai.types.chat.chat_completion_message_tool_call import (
 )
 from openai.types.chat.chat_completion_message_tool_call import Function
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic_core import PydanticSerializationError
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.callable_ref import CallableRef
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import FunctionToolException
@@ -47,7 +46,7 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
 
 def _mock_passthrough(messages: Messages) -> Messages:
-    """Identity stand-in re-attached when an LLMMockTool is deserialized."""
+    """An importable mock LLM, which a manifest saves by reference."""
     return messages
 
 
@@ -66,7 +65,7 @@ class LLMMockTool(Tool):
     name: str = "LLMMockTool"
     type: str = "LLMMockTool"
     role: str = "assistant"
-    function: Callable[[Messages], Union[Message, Messages]]
+    function: CallableRef  # Saved by reference: a module-level function.
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @record_tool_invoke
@@ -99,47 +98,6 @@ class LLMMockTool(Tool):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
-
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-        # from_dict re-attaches a fixed identity function, so the mock's real
-        # (closure) function is not serialized -- store a reference placeholder.
-        return {
-            **super().to_dict(),
-            "role": self.role,
-            "base_class": "FunctionTool",
-            "function": {"ref": f"{__name__}:_mock_passthrough"},
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "LLMMockTool":
-        """
-        Create a FunctionTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the FunctionTool.
-
-        Returns:
-            FunctionTool: A FunctionTool instance created from the dictionary.
-
-        Note:
-            Functions cannot be fully reconstructed from serialized data as they
-            contain executable code. This method creates an instance with a
-            placeholder function that needs to be re-registered after deserialization.
-        """
-
-        return cls(
-            name=data.get("name", "LLMMockTool"),
-            type=data.get("type", "LLMMockTool"),
-            role=data.get("role", "assistant"),
-            function=_mock_passthrough,
-            oi_span_type=OpenInferenceSpanKindValues.TOOL,
-        )
 
 
 def make_tool_call(
@@ -1577,6 +1535,7 @@ class TestEdgeCasesAndExceptions:
                 FunctionCallTool.builder()
                 .name("ErrorTool")
                 .function(raise_error)
+                .on_error("raise")
                 .build()
             )
             .publish_to(agent_output, when=_is_final_response)
@@ -1794,7 +1753,11 @@ class TestEdgeCasesAndExceptions:
             .name("FuncNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder().name("SomeFunc").function(some_func).build()
+                FunctionCallTool.builder()
+                .name("SomeFunc")
+                .function(some_func)
+                .on_error("raise")
+                .build()
             )
             .publish_to(agent_output, when=_is_final_response)
             .build()
@@ -1968,7 +1931,11 @@ class TestEdgeCasesAndExceptions:
             .name("FailNode")
             .subscribe(SubscriptionBuilder().subscribed_to(function_call_topic).build())
             .tool(
-                FunctionCallTool.builder().name("FailTool").function(fail_func).build()
+                FunctionCallTool.builder()
+                .name("FailTool")
+                .function(fail_func)
+                .on_error("raise")
+                .build()
             )
             .publish_to(function_result_topic)
             .build()
@@ -2001,27 +1968,112 @@ class TestEdgeCasesAndExceptions:
         assert call_count["count"] == 1
 
     @pytest.mark.asyncio
-    async def test_llm_mock_tool_serialization(self):
+    async def test_a_failing_function_is_answered_and_the_llm_recovers(
+        self, invoke_context
+    ):
+        """By default a function's error answers its call, so the LLM can go on."""
+        seen: List[Messages] = []
+
+        def mock_llm(messages: List[Message]) -> List[Message]:
+            seen.append(messages)
+            if len(seen) == 1:
+                return [
+                    Message(
+                        role="assistant",
+                        content=None,
+                        tool_calls=[make_tool_call("fail", "fail_func", "{}")],
+                    )
+                ]
+            return [Message(role="assistant", content="Recovered")]
+
+        def fail_func(self) -> str:
+            raise ValueError("flaky")
+
+        agent_input = InputTopic(name="agent_input")
+        agent_output = OutputTopic(name="agent_output")
+        function_call_topic = Topic(name="function_call")
+        function_result_topic = Topic(name="function_result")
+        llm_node = (
+            Node.builder()
+            .name("LLMNode")
+            .subscribe(
+                SubscriptionBuilder()
+                .subscribed_to(agent_input)
+                .or_()
+                .subscribed_to(function_result_topic)
+                .build()
+            )
+            .tool(LLMMockTool(function=mock_llm))
+            .publish_to(agent_output, when=_is_final_response)
+            .publish_to(function_call_topic, when=_has_tool_calls)
+            .build()
+        )
+        function_node = (
+            Node.builder()
+            .name("FlakyNode")
+            .subscribe(function_call_topic)
+            .tool(FunctionCallTool.builder().function(fail_func).build())
+            .publish_to(function_result_topic)
+            .build()
+        )
+        workflow = (
+            EventDrivenWorkflow.builder().node(llm_node).node(function_node).build()
+        )
+        with patch.object(Assistant, "_construct_workflow"):
+            assistant = Assistant(name="RecoveringAgent", workflow=workflow)
+
+        outputs = [
+            output
+            async for output in assistant.invoke(
+                PublishToTopicEvent(
+                    invoke_context=invoke_context,
+                    data=[Message(role="user", content="Try")],
+                )
+            )
+        ]
+        assert [output.data[-1].content for output in outputs] == ["Recovered"]
+        [answer] = seen[1]
+        assert (answer.tool_call_id, answer.content) == (
+            "fail",
+            "Error: ValueError: flaky",
+        )
+
+    def test_llm_mock_tool_serialization(self):
         """
-        Test LLMMockTool to_dict and from_dict methods.
+        Test LLMMockTool saves its function by reference and loads back as itself.
+        """
+        tool = LLMMockTool(
+            name="SerializationTestTool",
+            function=_mock_passthrough,
+        )
+
+        # Test model_dump
+        tool_dict = tool.model_dump(mode="json")
+        assert tool_dict["class"] == f"{__name__}:LLMMockTool"
+        assert tool_dict["name"] == "SerializationTestTool"
+        assert tool_dict["role"] == "assistant"
+        assert tool_dict["function"] == {"ref": f"{__name__}:_mock_passthrough"}
+
+        # Test model_validate, through the base class
+        restored_tool = Tool.model_validate(tool_dict)
+        assert type(restored_tool) is LLMMockTool
+        assert restored_tool.name == "SerializationTestTool"
+        assert restored_tool.tool_id == tool.tool_id
+        assert restored_tool.function is _mock_passthrough
+        assert restored_tool.model_dump(mode="json") == tool_dict
+
+    def test_llm_mock_tool_closure_cannot_be_saved(self):
+        """
+        A closure has no import path: saving it fails instead of pickling it.
         """
 
         def sample_llm(messages: List[Message]) -> List[Message]:
             return [Message(role="assistant", content="Serialization test")]
 
-        tool = LLMMockTool(
-            name="SerializationTestTool",
-            function=sample_llm,
-        )
+        tool = LLMMockTool(name="SerializationTestTool", function=sample_llm)
 
-        # Test to_dict
-        tool_dict = tool.to_dict()
-        assert tool_dict["name"] == "SerializationTestTool"
-        assert "function" in tool_dict
-
-        # Test from_dict
-        restored_tool = await LLMMockTool.from_dict(tool_dict)
-        assert restored_tool.name == "SerializationTestTool"
+        with pytest.raises(PydanticSerializationError, match="without pickle"):
+            tool.model_dump(mode="json")
 
     @pytest.mark.asyncio
     async def test_multiple_tool_calls_in_single_message(self, invoke_context):

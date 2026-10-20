@@ -1,6 +1,6 @@
 # FunctionCallTool
 
-`FunctionCallTool` is designed to allow Language Models (LLMs) to invoke specific Python functions directly through JSON-formatted calls. When a message from the LLM references a particular function name along with arguments, `FunctionCallTool` checks if it has a function matching that name and, if so, invokes it.
+`FunctionCallTool` lets a Language Model (LLM) call Python functions. It answers each tool call it is given with exactly one `role="tool"` message: what the function returned, as text, or, if the call failed, the error, so the LLM can recover.
 
 This design greatly reduces the complexity of integrating advanced logic: the LLM simply issues a request to invoke a function, and the tool handles the invocation details behind the scenes.
 
@@ -11,18 +11,20 @@ This design greatly reduces the complexity of integrating advanced logic: the LL
 | `name`             | Descriptive identifier (defaults to `"FunctionCallTool"`).                                       |
 | `type`             | Tool type (defaults to `"FunctionCallTool"`).                                                    |
 | `function_specs`   | List of `FunctionSpec` objects describing registered functions and their parameters.          |
-| `functions`        | Dictionary mapping function names to their callable implementations.                           |
+| `functions`        | Dictionary mapping function names to their callable implementations. A tool saves only the functions its class does not define, by import path; its `@llm_function` methods load with its class. |
+| `on_error`         | `"return"` (default) answers a failed call with its error; `"raise"` fails the node with `FunctionCallException` instead. |
 | `oi_span_type`     | Semantic tracing attribute (`TOOL`) for observability.                                        |
 
 ## Methods
 
 | Method               | Description                                                                                                              |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------|
-| `function` (Builder Class) | Builder method to register a function. Automatically applies `@llm_function` if not already decorated.                   |
+| `function` (Builder Class) | Builder method to register a function, beside the class's own `@llm_function` methods. Automatically applies `@llm_function` if not already decorated. |
+| `on_error` (Builder Class) | Builder method to set `on_error`.                                                                                       |
 | `get_function_specs` | Retrieves detailed metadata about registered functions (including parameter info), enabling structured LLM-based function calls. |
-| `invoke`          | Asynchronous method that evaluates incoming messages for tool calls, matches them to registered functions, and executes with JSON arguments, allowing concurrency and awaiting coroutine functions.                               |
-| `to_messages`       | Converts invoke results into `Message` objects with proper `tool_call_id` linkage.                          |
-| `to_dict`            | Serializes the `FunctionCallTool` instance, listing function specifications for debugging or persistence.                    |
+| `invoke`          | Answers every tool call in its input messages, concurrently, and yields one batch: one `role="tool"` message per call, in the calls' order. |
+| `call_function`   | `async`: calls one function with the LLM's arguments, validated against its signature, and returns what it returns, a value or a generator; a sync function runs in a worker thread. Override it to call functions elsewhere, as the MCP, agent-calling and synthetic tools do. |
+| `model_dump(mode="json")` | Saves the tool as data: its class, and the functions given to it, by import path; its `function_specs` follow from its functions. See [Manifests](../manifests.md). |
 
 ## LLM Function Decorator
 
@@ -65,6 +67,7 @@ def calculate_sum(x: int, y: int, precision: float = 0.1) -> float:
 - Extracts parameter descriptions from docstrings
 - Marks parameters without defaults as required
 - Supports type hints for comprehensive schema generation
+- Hides from the LLM the parameters named `self` or `cls`, those starting with `_`, and those typed `InvokeContext`, which the tool passes the request's context
 
 **Type Mapping**:
 
@@ -76,22 +79,23 @@ def calculate_sum(x: int, y: int, precision: float = 0.1) -> float:
 | `bool` | `"boolean"` |
 | `list` | `"array"` |
 | `dict` | `"object"` |
-| Other | `"string"` (default) |
+| Other class | `"object"` |
 
 ## How It Works
 
 1. **Function Registration**: Functions are registered either via the builder pattern using `.function()` method or by inheriting from `FunctionCallTool` and decorating methods with `@llm_function`. This automatically generates `FunctionSpec` objects describing each function's metadata.
 
-2. **Automatic Discovery**: When inheriting from `FunctionCallTool`, the `__init_subclass__` method automatically discovers all methods decorated with `@llm_function` and adds them to the `functions` dictionary and `function_specs` list.
+2. **Automatic Discovery**: A subclass of `FunctionCallTool` registers the methods decorated with `@llm_function` in it and in its base classes; a method it redefines replaces its base's.
 
-3. **Message Processing**: When `invoke` receives messages, it examines the `tool_calls` field in the first message to find function calls that match registered function names.
+3. **Message Processing**: `invoke` answers every tool call in the messages it is given. In a workflow, the node's `FunctionCallCommand` gives it the calls not yet answered that name its own functions, since one LLM reply can call functions of several tools. The workflow also makes, on each topic carrying calls, the first function-call node reading it (one answering errors, if any does) answer the calls there naming a function no LLM calling there was offered, so that every call reaching a function-call node gets a result.
 
-4. **Function Execution**: For each matching tool call:
-   - Arguments are parsed from JSON in the `tool_call.function.arguments` field
-   - The corresponding function is called with the parsed arguments
-   - Results are converted to `Message` objects with the appropriate `tool_call_id`
+4. **Function Execution**: The calls run concurrently, each to one result:
+   - Arguments are parsed from the JSON in `tool_call.function.arguments`, then validated and coerced against the function's signature (with Pydantic's `validate_call`), so a parameter typed as a Pydantic model gets the model.
+   - A parameter typed `InvokeContext` is passed the request's context. A function whose first parameter is `self`, such as an `@llm_function` method, is passed the tool; a method is called on the tool, so a subclass's override, decorated or not, is the one that runs.
+   - The function may be sync or async, or a generator. Sync code runs in a worker thread, so a blocking call never stalls the event loop; calls run concurrently, so a tool's sync functions must be thread-safe. Sync code cannot be stopped midway: a stop or cancellation drops a call not yet started, and waits for one running to return, so sync code must not wait for the event loop. Each string a generator yields, and each `emit_delta` the function calls, reaches a caller streaming the run as a delta tagged with the call's `tool_call_id` (see [Runtime](../runtime.md#streaming)).
+   - A failure, such as an unknown function, malformed JSON, invalid arguments or an exception the function raises, becomes the call's result, `Error: <type>: <message>`, which the LLM can act on. With `on_error="raise"`, it fails the node with `FunctionCallException` instead (a `ToolInvocationError` the function raised is raised as it is).
 
-5. **Response Handling**: The `to_messages` method formats function results into proper `Message` objects, maintaining the link between function calls and responses through `tool_call_id`.
+5. **Response Handling**: Each result becomes one `role="tool"` message linked by `tool_call_id`. Its content is always text: a string as it is, anything else (a number, a dict, a Pydantic model, None) as JSON. A generator's result is the text it yielded, joined, or the other values it yielded, one per line. With no tool call to answer, the tool yields nothing.
 
 ## Usage and Customization
 
@@ -149,7 +153,7 @@ class WeatherMock(FunctionCallTool):
 |-----------------|------------------------------------------------------------------------------------------------------------------|
 | `name`          | Descriptive identifier for the tool (default: `"TavilyTool"`).                                                   |
 | `type`          | Tool type indicator (default: `"TavilyTool"`).                                                                   |
-| `client`        | Instance of the `TavilyClient` used for performing search queries.                                               |
+| `api_key`       | Tavily API key (defaults to the `TAVILY_API_KEY` environment variable; saved as `{"env": "TAVILY_API_KEY"}`). The `client` property creates the `TavilyClient` with it when first used. |
 | `search_depth`  | Defines the search mode (either `"basic"` or `"advanced"`) for Tavily.                                           |
 | `max_tokens`    | Limits the total size (in tokens) of the returned JSON string, preventing overly large responses.                |
 
@@ -157,8 +161,7 @@ class WeatherMock(FunctionCallTool):
 
 ```python
 tavily_tool = (
-    TavilyTool.builder()
-    .api_key("YOUR_API_KEY")
+    TavilyTool.builder()  # The key is read from TAVILY_API_KEY.
     .search_depth("advanced")
     .max_tokens(6000)
     .build()
@@ -251,11 +254,11 @@ google_tool = (
 |---------------------|---------------------------------------------------------------------------------|
 | `name`              | Tool identifier (default: `"MCPTool"`).                                        |
 | `type`              | Tool type (default: `"MCPTool"`).                                              |
-| `mcp_config`        | Configuration dictionary for MCP server connections.                           |
+| `mcp_config`        | Configuration dictionary for MCP server connections. A header or environment variable that holds a secret refers to a variable, as `"Bearer ${GITHUB_TOKEN}"`, expanded when connecting. |
 | `resources`         | List of available MCP resources.                                               |
 | `prompts`           | List of available MCP prompts.                                                 |
 
-This tool automatically discovers available functions from connected MCP servers and makes them available for LLM function calling.
+This tool automatically discovers available functions from connected MCP servers and makes them available for LLM function calling. It is saved with them, so loading it does not connect.
 
 ## Agent Calling Tool
 
@@ -270,7 +273,7 @@ This tool automatically discovers available functions from connected MCP servers
 | `agent_name`          | Name of the agent to call; also used as the tool's name.                                                            |
 | `agent_description`    | High-level explanation of what the agent does, used to generate function specs.                                    |
 | `argument_description` | Describes the argument required (e.g., `prompt`) for the agent call.                                               |
-| `agent_call`          | A callable that takes `(invoke_context, Message)` and returns a dictionary (e.g., `{"content": ...}`).           |
+| `agent_call`          | A callable that takes `(invoke_context, Message)` and returns a dictionary (e.g., `{"content": ...}`). Saved by import path. |
 | `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
 
 **Methods**:
@@ -278,15 +281,13 @@ This tool automatically discovers available functions from connected MCP servers
 | Method           | Description                                                                                                                                                                                                 |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `get_function_specs` | Returns the function specification (name, description, parameters) for the agent call.                                                                                                                  |
-| `invoke`      | Asynchronous method that processes incoming tool calls matching `agent_name`, passing the `prompt` to the `agent_call` callable; yields messages in an async generator for real-time or concurrent agent calls.                                                                                           |
-| `to_messages`   | Creates a `Message` object from the agent's response, linking the output to `tool_call_id`.                                                                                                                 |
-| `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
+| `call_function` | Passes the call's `prompt` to `agent_call`, and returns the `content` of its answer; `invoke`, inherited from `FunctionCallTool`, makes it a tool message. |
 
 **Workflow Example**:
 
 1. **Tool Registration**: An `AgentCallingTool` is constructed with details about the agent (`agent_name`, `agent_description`, etc.) and the callable (`agent_call`).
 2. **Agent Invocation**: When an LLM includes a tool call referencing this agent's name, `invoke` receives the `prompt` and calls the agent.
-3. **Response Conversion**: The agent's return value is formed into a new `Message`, which the workflow can then process or forward.
+3. **Response Conversion**: The agent's answer becomes a tool message linked to the call, which the workflow can then process or forward.
 
 **Usage and Customization**:
 
@@ -308,10 +309,10 @@ By integrating `AgentCallingTool` into your event-driven workflow, you can build
 | `type`                | Tool type indicator, defaults to `"SyntheticTool"`.                                                                 |
 | `tool_name`           | Name used for function registration and LLM tool calls.                                                             |
 | `description`         | Explanation of what synthetic data this tool generates.                                                             |
-| `input_model`         | Pydantic `BaseModel` class or JSON schema dict defining expected input structure.                                   |
-| `output_model`        | Pydantic `BaseModel` class or JSON schema dict defining generated output structure.                                 |
+| `input_model`         | Pydantic `BaseModel` class (saved by import path) or JSON schema dict defining expected input structure.            |
+| `output_model`        | Pydantic `BaseModel` class (saved by import path) or JSON schema dict defining generated output structure.          |
 | `model`               | OpenAI model to use for data generation (e.g., `"gpt-4o-mini"`).                                                    |
-| `openai_api_key`      | API key for OpenAI authentication.                                                                                  |
+| `openai_api_key`      | API key for OpenAI authentication (defaults to the `OPENAI_API_KEY` environment variable; saved as a reference to it). |
 | `oi_span_type`        | OpenInference semantic attribute (`TOOL`), enabling observability and traceability.                                 |
 
 **Methods**:
@@ -319,9 +320,8 @@ By integrating `AgentCallingTool` into your event-driven workflow, you can build
 | Method           | Description                                                                                                                                                                                                 |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `get_function_specs` | Returns the function specification (name, description, input schema) for the synthetic. tool                                                                                                                  |
-| `invoke`      | Processes tool calls, generates synthetic data via LLM, returns schema-compliant JSON responses.                                                                                           |
+| `call_function` | Generates the tool's output for a call's arguments with an LLM, as schema-compliant JSON; `invoke`, inherited from `FunctionCallTool`, makes it a tool message. |
 | `ensure_strict_schema`   | Static method that recursively adds `additionalProperties: false` to JSON schemas for OpenAI strict mode compatibility.                                                                                                                 |
-| `to_dict`        | Serializes all relevant fields, including agent metadata and the assigned callable, for debugging or persistence.                                                                                           |
 
 **Workflow Example**:
 
@@ -354,7 +354,7 @@ type safety through Pydantic or JSON Schema validation.
 
 2. **Type Hints**: Use proper type hints for all parameters. These are used to generate accurate JSON schemas for function specifications.
 
-3. **Error Handling**: Implement proper error handling in your functions, as exceptions will be propagated back through the tool invoke chain.
+3. **Error Handling**: An exception a function raises answers its call, so write messages the LLM can act on. Set `on_error="raise"` where a failure must stop the workflow instead.
 
 ### Tool Configuration
 

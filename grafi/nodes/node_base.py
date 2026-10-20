@@ -1,6 +1,7 @@
 from typing import Any
 from typing import AsyncGenerator
 from typing import Callable
+from typing import ClassVar
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -15,13 +16,13 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import PrivateAttr
 
-from grafi.common.callable_ref import deserialize_callable
-from grafi.common.callable_ref import serialize_callable
+from grafi.common.callable_ref import CallableRef
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import NodeExecutionError
+from grafi.common.manifest import Component
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
@@ -29,9 +30,11 @@ from grafi.nodes.conditions import always_true
 from grafi.tools.command import Command
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.topic_expression import SubExpr
+from grafi.topics.expressions.topic_expression import Subscription
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.expressions.topic_expression import evaluate_subscription
 from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_base import TopicRef
 
 
 class PublishRoute(BaseModel):
@@ -40,43 +43,18 @@ class PublishRoute(BaseModel):
     ``when`` is the CONTENT predicate (what used to live on ``topic.condition``).
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # A key it does not have is refused, so a misspelt one changes no route.
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    topic: TopicBase  # destination (definition-time instance)
-    when: Callable[[PublishToTopicEvent], bool] = always_true  # content predicate
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "topic": self.topic.name,
-            "when": serialize_callable(self.when),
-        }
-
-    @classmethod
-    def from_dict(
-        cls, data: Dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "PublishRoute":
-        topic_name = data["topic"]
-        if topic_name not in topics:
-            raise ValueError(
-                f"Publisher route references unknown topic {topic_name!r}. "
-                f"Available topics: {sorted(topics)}."
-            )
-        raw = data.get("when")
-        when = (
-            deserialize_callable(raw, context=f"route '{topic_name}' when")
-            if raw
-            else always_true
-        )
-        return cls(
-            topic=topics[topic_name],
-            when=when,
-        )
+    topic: TopicRef  # destination (definition-time instance), saved by name
+    when: CallableRef = always_true  # content predicate, saved by reference
 
 
 class PublisherRouter(BaseModel):
     """The node's output routing table; ``publish_to`` derives from its routes."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # A key it does not have is refused, so a misspelt one changes no route.
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     routes: List[PublishRoute] = Field(default_factory=list)
 
@@ -117,29 +95,22 @@ class PublisherRouter(BaseModel):
         """Every destination topic (the node's single output declaration)."""
         return [r.topic for r in self.routes]
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {"routes": [r.to_dict() for r in self.routes]}
 
-    @classmethod
-    def from_dict(
-        cls, data: Dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "PublisherRouter":
-        return cls(
-            routes=[PublishRoute.from_dict(r, topics) for r in data.get("routes", [])]
-        )
+class NodeBase(Component):
+    """Abstract base class for nodes in a graph-based agent system.
 
+    A node is saved with its tool, its subscriptions and its routes, which name
+    their topics; its command follows from its tool.
+    """
 
-class NodeBase(BaseModel):
-    """Abstract base class for nodes in a graph-based agent system."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    manifest_kind: ClassVar[Optional[str]] = "Node"
 
     node_id: str = default_id
     name: str = Field(default="Node")
     type: str = Field(default="Node")
     tool: Optional[Tool] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.CHAIN
-    subscribed_expressions: List[SubExpr] = Field(default_factory=list)
+    subscribed_expressions: List[Subscription] = Field(default_factory=list)
     publisher_router: PublisherRouter = Field(default_factory=PublisherRouter)
 
     _subscribed_topics: Dict[str, TopicBase] = PrivateAttr(default_factory=dict)
@@ -222,35 +193,6 @@ class NodeBase(BaseModel):
 
         return True
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "class": self.__class__.__name__,
-            "node_id": self.node_id,
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "tool": self.tool.to_dict() if self.tool else None,
-            "subscribed_expressions": [
-                expr.to_dict() for expr in self.subscribed_expressions
-            ],
-            "publisher_router": self.publisher_router.to_dict(),
-            "command": self.command.to_dict() if self.command else None,
-        }
-
-    @classmethod
-    async def from_dict(
-        cls, node_dict: Dict[str, Any], topics: Dict[str, TopicBase]
-    ) -> "NodeBase":
-        """
-        Create a NodeBase instance from a dictionary representation.
-        Args:
-            node_dict (dict[str, Any]): A dictionary representation of the node.
-            topics (dict[str, Any]): A dictionary of topic instances keyed by topic name.
-        Returns:
-            NodeBase: A NodeBase instance created from the dictionary.
-        """
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
-
 
 T_N = TypeVar("T_N", bound=NodeBase)
 
@@ -273,9 +215,8 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
     def node_id(self, node_id: str) -> Self:
         """Set the node's stable identifier.
 
-        Used when reconstructing a node from a serialized representation so the
-        restored node keeps its original id (preserving event<->node correlation
-        across a restore) instead of getting a fresh uuid.
+        Events name the node by it, so a node built again keeps its events'
+        history by keeping its id, rather than getting a fresh one.
 
         Args:
             node_id: The node's unique identifier.
@@ -375,10 +316,10 @@ class NodeBaseBuilder(BaseBuilder[T_N]):
         return self
 
     def publisher_router(self, publisher_router: PublisherRouter) -> Self:
-        """Set the whole publisher router (used when deserializing a node).
+        """Set the whole publisher router, its routes at once.
 
         Args:
-            publisher_router: The reconstructed output routing table.
+            publisher_router: The node's output routing table.
 
         Returns:
             Self for method chaining.

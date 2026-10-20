@@ -15,9 +15,9 @@ The `Tool` class is the fundamental base class for all tools in the Graphite fra
 
 | Method       | Signature                                                                  | Description                                                                                    |
 |--------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield response messages via async generator.    |
-| `to_messages`| `(response: Any) -> Messages`                                              | Converts tool-specific response data into standardized Message objects.                       |
-| `to_dict`    | `() -> Dict[str, Any]`                                                     | Serializes the tool instance into a dictionary representation.                                |
+| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield its output in batches of messages; the node publishes each batch as one event. |
+| `model_dump(mode="json")` | `() -> Dict[str, Any]`                                        | Saves the tool as data: its fields, and its class by import path, as `"class"`. See [Manifests](../manifests.md). |
+| `model_validate` | `classmethod (data: Dict[str, Any]) -> Tool`                          | Loads a tool from that data, as the class it names, which must be this class or a subclass of it. |
 
 ## Builder Pattern
 
@@ -63,14 +63,30 @@ async for message_batch in tool.invoke(invoke_context, input_messages):
 
 ### Message Conversion
 
-All tools must handle conversion between internal data formats and standard Message objects:
+A tool yields `Message` objects. To turn a value into messages the way `FunctionTool` does (messages as they are, `None` as none, anything else as one message holding it as text, JSON unless a string), use `grafi.tools.results.as_messages`:
 
 ```python
-# Convert tool-specific response to Messages
-def to_messages(self, response: Any) -> Messages:
-    # Implementation-specific conversion logic
-    return [Message(role="assistant", content=str(response))]
+from grafi.tools.results import as_messages
+
+yield as_messages(result)
 ```
+
+### Streaming
+
+A tool that produces its output piece by piece, such as an LLM's tokens, can send the pieces to a caller streaming the run with `emit_delta`, then yield the whole output. The pieces are never published or stored; `streaming()` says whether anyone receives them (see [Runtime](../runtime.md#streaming)):
+
+```python
+from grafi.runtime import emit_delta
+
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+    text = []
+    async for token in self.client.stream(input_data):
+        emit_delta(token)
+        text.append(token)
+    yield [Message(role="assistant", content="".join(text))]
+```
+
+Plain functions need no subclass: `FunctionTool` and `FunctionCallTool` take a function, sync or async, that returns its result or, as a generator, streams it.
 
 ## Implementation Requirements
 
@@ -93,11 +109,7 @@ async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> M
     """Asynchronous processing implementation."""
     # Process input_data asynchronously
     result = await self.async_process_data(input_data)
-    yield self.to_messages(result)
-
-def to_messages(self, response: Any) -> Messages:
-    """Convert response to Messages."""
-    return [Message(role="tool", content=response)]
+    yield [Message(role="assistant", content=result)]
 ```
 
 ### 3. Create Builder Class
@@ -127,7 +139,7 @@ def builder(cls) -> "MyCustomToolBuilder":
 Here's a complete example of a custom tool implementation:
 
 ```python
-from typing import Any, Self
+from typing import Self
 from pydantic import Field
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
@@ -175,16 +187,6 @@ class TextProcessorTool(Tool):
         """Convert processed text to Messages."""
         return [Message(role="assistant", content=response)]
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize tool configuration."""
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "operation": self.operation,
-            "prefix": self.prefix,
-        }
-
 class TextProcessorToolBuilder(ToolBuilder[TextProcessorTool]):
     """Builder for TextProcessorTool instances."""
 
@@ -205,6 +207,26 @@ text_tool = (
     .build()
 )
 ```
+
+### Saving and Loading
+
+A tool is saved as data, with its fields and its class, and needs no code of
+its own for it:
+
+```python
+from grafi.common.import_ref import trust_modules
+
+data = text_tool.model_dump(mode="json")
+# {"class": "my_app.tools:TextProcessorTool", "tool_id": "...",
+#  "name": "Text Processor", "operation": "uppercase", "prefix": "PROCESSED: ", ...}
+
+trust_modules("my_app")  # Loading imports classes from trusted modules only.
+restored = Tool.model_validate(data)  # A TextProcessorTool.
+```
+
+A field holding something that is not data, such as a client or an index, is
+left out with `Field(exclude=True)`, and a secret is declared with
+`env_secret("VAR")`. See [Manifests](../manifests.md).
 
 ## OpenInference Integration
 
@@ -235,13 +257,6 @@ oi_span_type = OpenInferenceSpanKindValues.EMBEDDING
 ```python
 class MyTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "oi_span_type": self.oi_span_type.value,
-            # Other fields...
-        }
 ```
 
 ## Tool Categories
@@ -293,14 +308,26 @@ class MyTool(Tool):
 
 ### Async Error Handling
 
+Raise a `ToolInvocationError` subclass caused by the error: the tool's and the
+node's failed events record it, and the run fails with it. An error an LLM
+should see and recover from is a function call's, answered by
+[FunctionCallTool](function-call.md) (see its `on_error`).
+
 ```python
+from grafi.common.exceptions import FunctionToolException
+from grafi.tools.results import as_messages
+
 async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
     try:
         result = await self.async_process(input_data)
-        yield self.to_messages(result)
     except Exception as e:
-        logger.error(f"Async tool {self.name} failed: {e}")
-        yield [Message(role="assistant", content=f"Error: {str(e)}")]
+        raise FunctionToolException(
+            tool_name=self.name,
+            message=f"Processing failed: {e}",
+            invoke_context=invoke_context,
+            cause=e,
+        ) from e
+    yield as_messages(result)
 ```
 
 ## Testing Tools
@@ -332,10 +359,12 @@ async def test_tool_invoke():
 Tools integrate with Graphite's command system:
 
 ```python
-from grafi.common.models.command import use_command
-from grafi.tools.tool_command import ToolCommand
+from grafi.tools.command import Command, use_command
 
-@use_command(ToolCommand)
+class MyCommand(Command):
+    ...  # How the node prepares the tool's input; see Command.
+
+@use_command(MyCommand)
 class MyTool(Tool):
     # Tool implementation
     pass
@@ -347,7 +376,7 @@ Tools participate in event-driven workflows through:
 
 - **InvokeContext**: Carries workflow context and metadata
 - **Message passing**: Standardized communication via Messages
-- **Async generators**: Support for streaming and real-time processing
+- **Async generators**: A tool yields its output in batches, each one event, and can stream pieces of it to a caller with `emit_delta`
 
 ## Best Practices
 

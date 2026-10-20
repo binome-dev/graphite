@@ -1,12 +1,14 @@
 from typing import Any
 from typing import AsyncGenerator
+from typing import ClassVar
 from typing import Dict
+from typing import Optional
 from typing import Self
 from typing import TypeVar
+from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
 from pydantic import Field
 from pydantic import PrivateAttr
 
@@ -15,13 +17,17 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
+from grafi.common.manifest import Component
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.nodes.node_base import NodeBase
+from grafi.runtime.deltas import Delta
 
 
-class Workflow(BaseModel):
+class Workflow(Component):
     """Abstract base class for workflows in a graph-based agent system."""
+
+    manifest_kind: ClassVar[Optional[str]] = "Workflow"
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
     workflow_id: str = default_id
@@ -49,30 +55,20 @@ class Workflow(BaseModel):
         self._stop_requested = False
 
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Invokes the workflow with the given initial inputs parallelly."""
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the workflow on ``input_data``, yielding its outputs, and, if
+        ``stream``, the deltas its tools emit as they emit them."""
         yield None  # type: ignore
         raise NotImplementedError
 
     async def initial_workflow(self, assistant_request_id: str) -> Any:
         """Initial workflow state, and replays events from an unfinished request to resume invoke."""
         raise NotImplementedError
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the workflow to a dictionary."""
-        return {
-            "workflow_id": self.workflow_id,
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "nodes": {name: node.to_dict() for name, node in self.nodes.items()},
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "Workflow":
-        """Create a Workflow instance from a dictionary representation."""
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
 
 
 T_W = TypeVar("T_W", bound="Workflow")  # the Workflow subclass

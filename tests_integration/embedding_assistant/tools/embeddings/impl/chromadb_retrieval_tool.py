@@ -1,5 +1,4 @@
 import json
-from typing import Any
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -32,8 +31,9 @@ except ImportError:
 class ChromadbRetrievalTool(RetrievalTool):
     name: str = "ChromadbRetrievalTool"
     type: str = "ChromadbRetrievalTool"
-    collection: Collection
-    embedding_model: OpenAIEmbedding
+    # A live collection and client, not data: left out of the tool's manifest.
+    collection: Collection = Field(exclude=True)
+    embedding_model: OpenAIEmbedding = Field(exclude=True)
     n_results: int = Field(default=30)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
@@ -60,14 +60,3 @@ class ChromadbRetrievalTool(RetrievalTool):
         }
         content = json.dumps(response)
         return [Message(role="assistant", content=content)]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "n_results": self.n_results,
-            "collection": self.collection.__class__.__name__,
-            "embedding_model": self.embedding_model.__class__.__name__,
-        }

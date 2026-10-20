@@ -1,13 +1,21 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Annotated
 from typing import Any
+from typing import ClassVar
+from typing import Dict
+from typing import Iterator
 from typing import List
+from typing import Mapping
 from typing import Optional
 from typing import Self
 from typing import TypeVar
 from uuid import uuid4
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
+from pydantic import BeforeValidator
 from pydantic import Field
+from pydantic import PlainSerializer
+from pydantic import ValidationInfo
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -15,13 +23,14 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions.event_exceptions import TopicPublicationError
+from grafi.common.manifest import Component
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
 
 
-class TopicBase(BaseModel):
+class TopicBase(Component):
     """
     A named channel that nodes publish to and subscribe to.
 
@@ -32,14 +41,17 @@ class TopicBase(BaseModel):
     for using a topic on its own, through its ``event_queue``.
 
     - name: string (the topic's name)
-    - event_queue: FIFO queue of the topic's events, for use on its own
+    - event_queue: FIFO queue of the topic's events, for use on its own, and
+      never saved
     """
+
+    manifest_kind: ClassVar[Optional[str]] = "Topic"
 
     name: str = Field(default="")
     type: TopicType = Field(default=TopicType.DEFAULT_TOPIC_TYPE)
-    event_queue: TopicEventQueue = Field(default_factory=InMemTopicEventQueue)
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    event_queue: TopicEventQueue = Field(
+        default_factory=InMemTopicEventQueue, exclude=True
+    )
 
     async def publish_data(
         self, publish_event: PublishToTopicEvent
@@ -134,30 +146,47 @@ class TopicBase(BaseModel):
             return await self.event_queue.put(event)
         return None
 
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the topic to a dictionary representation.
-        """
-        return {
-            "name": self.name,
-            "type": self.type.value,
-        }
 
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "TopicBase":
-        """
-        Create a TopicBase instance from a dictionary representation.
+# The topics of the workflow being loaded, by name, which its nodes name.
+_topics_in_scope: ContextVar[Optional[Dict[str, TopicBase]]] = ContextVar(
+    "grafi_topics_in_scope", default=None
+)
 
-        Args:
-            data (dict[str, Any]): A dictionary representation of the TopicBase.
 
-        Returns:
-            TopicBase: A TopicBase instance created from the dictionary.
-        """
-        return cls(
-            name=data["name"],
-            type=data["type"],
+@contextmanager
+def topics_in_scope(topics: Dict[str, TopicBase]) -> Iterator[None]:
+    """Resolve the topic names loaded in this block to ``topics``."""
+    token = _topics_in_scope.set(topics)
+    try:
+        yield
+    finally:
+        _topics_in_scope.reset(token)
+
+
+def _topic(value: Any, info: ValidationInfo) -> Any:
+    """A topic, from its name: one of the topics of the workflow being loaded
+    (see ``EventDrivenWorkflow``), or of the validation context's ``topics``."""
+    topics = _topics_in_scope.get()
+    if topics is None:
+        topics = (info.context or {}).get("topics", {})
+    if isinstance(value, Mapping) and value.get("name") in topics:
+        return topics[value["name"]]  # A topic dumped in full: the same one.
+    if not isinstance(value, str):
+        return value
+    if value not in topics:
+        raise ValueError(
+            f"Unknown topic {value!r}: a topic named in a manifest must be "
+            f"one of its workflow's topics ({sorted(topics)})."
         )
+    return topics[value]
+
+
+# A field holding a topic, saved as the topic's name.
+TopicRef = Annotated[
+    TopicBase,
+    PlainSerializer(lambda topic: topic.name, return_type=str, when_used="json"),
+    BeforeValidator(_topic),
+]
 
 
 T_T = TypeVar("T_T", bound=TopicBase)

@@ -6,10 +6,12 @@ from unittest.mock import patch
 
 import pytest
 from pydantic import BaseModel
+from pydantic_core import PydanticSerializationError
 
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.synthetic_tool import SyntheticTool
+from grafi.tools.tool import Tool
 
 
 class WeatherInput(BaseModel):
@@ -159,17 +161,16 @@ async def test_invoke_successful(synthetic_tool, invoke_context):
 
 @pytest.mark.asyncio
 async def test_invoke_no_tool_calls(synthetic_tool, invoke_context):
-    """Test that invoke raises ValueError when no tool_calls are present."""
+    """Without tool calls, the tool yields nothing."""
     input_data = [Message(role="assistant", content="No tool calls here")]
 
-    with pytest.raises(ValueError, match="No tool_calls found"):
-        async for msg in synthetic_tool.invoke(invoke_context, input_data):
-            pass
+    outputs = [m async for m in synthetic_tool.invoke(invoke_context, input_data)]
+    assert outputs == []
 
 
 @pytest.mark.asyncio
 async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
-    """Test that invoke skips tool calls with non-matching function names."""
+    """A call to a function the tool lacks is answered with the error."""
     input_data = [
         Message(
             role="assistant",
@@ -190,7 +191,8 @@ async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
     async for msg in synthetic_tool.invoke(invoke_context, input_data):
         result.extend(msg)
 
-    assert len(result) == 0
+    [answer] = result
+    assert answer.content.startswith("Error: LookupError")
 
 
 @pytest.mark.asyncio
@@ -249,56 +251,139 @@ async def test_invoke_multiple_tool_calls(synthetic_tool, invoke_context):
         assert result[1].tool_call_id == "call_2"
 
 
-def test_to_messages(synthetic_tool):
-    """Test to_messages creates proper Message objects."""
-    response = '{"temperature": 22.5, "conditions": "Sunny", "location": "SF"}'
-    result = synthetic_tool.to_messages(response=response, tool_call_id="call_123")
-
-    assert len(result) == 1
-    assert result[0].role == "tool"
-    assert result[0].content == response
-    assert result[0].tool_call_id == "call_123"
+SYNTHETIC_TOOL = "grafi.tools.function_calls.impl.synthetic_tool:SyntheticTool"
 
 
-def test_to_dict(synthetic_tool):
-    """Test serialization to dictionary."""
-    result = synthetic_tool.to_dict()
+def test_dump_saves_the_model_classes_by_import_path(monkeypatch, synthetic_tool):
+    monkeypatch.setenv("OPENAI_API_KEY", "test_api_key")
 
-    assert isinstance(result, dict)
+    result = synthetic_tool.model_dump(mode="json")
+
+    assert result["class"] == SYNTHETIC_TOOL
     assert result["tool_name"] == "get_weather"
     assert result["description"] == "Get the current weather for a location"
     assert result["model"] == "gpt-4o-mini"
-    assert "input_schema" in result
-    assert "output_schema" in result
-    assert isinstance(result["input_schema"], dict)
-    assert isinstance(result["output_schema"], dict)
+    assert result["input_model"] == {"ref": f"{__name__}:WeatherInput"}
+    assert result["output_model"] == {"ref": f"{__name__}:WeatherOutput"}
+    assert result["openai_api_key"] == {"env": "OPENAI_API_KEY"}
+    # Its spec follows from its fields, so it is not saved.
+    assert "function_specs" not in result
+    assert "test_api_key" not in json.dumps(result)
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
+def test_a_python_dump_keeps_the_model_classes(synthetic_tool):
+    data = synthetic_tool.model_dump()
+
+    assert data["class"] is SyntheticTool
+    assert data["input_model"] is WeatherInput
+    assert data["output_model"] is WeatherOutput
+    restored = SyntheticTool.model_validate(data)
+    assert restored == synthetic_tool
+    assert restored.function_specs == synthetic_tool.function_specs
+
+
+def test_round_trip_loads_the_same_model_classes(monkeypatch, synthetic_tool):
+    monkeypatch.setenv("OPENAI_API_KEY", "test_api_key")
+    data = synthetic_tool.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is SyntheticTool
+    assert restored.tool_id == synthetic_tool.tool_id
+    assert restored.input_model is WeatherInput
+    assert restored.output_model is WeatherOutput
+    assert restored.openai_api_key == "test_api_key"  # Read from OPENAI_API_KEY.
+    assert restored.function_specs == synthetic_tool.function_specs
+    assert restored == synthetic_tool
+    assert restored.model_dump(mode="json") == data
+    # Saving and loading again offers the tool once.
+    again = Tool.model_validate(restored.model_dump(mode="json"))
+    assert [spec.name for spec in again.function_specs] == ["get_weather"]
+
+
+def test_editing_the_tool_in_a_dump_changes_what_it_offers(monkeypatch, synthetic_tool):
+    monkeypatch.setenv("OPENAI_API_KEY", "test_api_key")
+    data = synthetic_tool.model_dump(mode="json")
+    data["tool_name"] = "get_forecast"
+    data["description"] = "An edited description."
+
+    restored = Tool.model_validate(data)
+
+    [spec] = restored.function_specs
+    assert spec.name == "get_forecast"
+    assert spec.description == "An edited description."
+    assert "location" in spec.parameters.properties
+
+
+def test_json_schema_models_round_trip_as_they_are():
+    input_schema = {
+        "type": "object",
+        "properties": {"location": {"type": "string"}},
+        "required": ["location"],
+    }
+    output_schema = {
+        "type": "object",
+        "properties": {"temperature": {"type": "number"}},
+    }
+    tool = (
+        SyntheticTool.builder()
+        .tool_name("get_weather")
+        .description("Get weather data")
+        .input_model(input_schema)
+        .output_model(output_schema)
+        .model("gpt-4o-mini")
+        .build()
+    )
+    data = tool.model_dump(mode="json")
+    assert data["input_model"] == input_schema
+    assert data["output_model"] == output_schema
+
+    restored = Tool.model_validate(data)
+
+    assert restored.input_model == input_schema
+    assert restored.output_model == output_schema
+    assert restored == tool
+
+
+def test_load_from_a_manifest_naming_the_class(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test_key")
     data = {
-        "class": "SyntheticTool",
+        "class": SYNTHETIC_TOOL,
         "tool_id": "test-id",
         "name": "get_weather",
-        "type": "SyntheticTool",
         "oi_span_type": "TOOL",
         "tool_name": "get_weather",
         "description": "Get weather data",
-        "input_schema": {"type": "object", "properties": {}},
-        "output_schema": {"type": "object", "properties": {}},
+        "input_model": {"ref": f"{__name__}:WeatherInput"},
+        "output_model": {"ref": f"{__name__}:WeatherOutput"},
         "model": "gpt-4o-mini",
-        "openai_api_key": "test_key",
+        "openai_api_key": {"env": "OPENAI_API_KEY"},
     }
 
-    tool = await SyntheticTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, SyntheticTool)
+    assert tool.tool_id == "test-id"
     assert tool.tool_name == "get_weather"
     assert tool.description == "Get weather data"
     assert tool.model == "gpt-4o-mini"
-    # Note: the deserialized tool will have dict schemas, not Pydantic models
-    # This means it can't actually invoke the LLM without re-setting the models
+    assert tool.input_model is WeatherInput
+    assert tool.output_model is WeatherOutput
+    assert tool.openai_api_key == "test_key"
+    # Its spec is made from the input model, as when built.
+    [spec] = tool.function_specs
+    assert spec.name == "get_weather"
+    assert "location" in spec.parameters.properties
+
+
+def test_a_key_not_from_its_variable_is_never_saved(monkeypatch, synthetic_tool):
+    monkeypatch.setenv("OPENAI_API_KEY", "the_env_key")
+
+    with pytest.raises(
+        PydanticSerializationError,
+        match="ManifestError: .*SyntheticTool.openai_api_key",
+    ):
+        synthetic_tool.model_dump(mode="json")
 
 
 def test_field_validator_rejects_invalid_input_model():

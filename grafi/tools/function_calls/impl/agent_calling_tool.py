@@ -1,24 +1,22 @@
+import functools
 import inspect
-import json
 from typing import Any
 from typing import Callable
+from typing import Dict
 from typing import Self
 
-from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.callable_ref import deserialize_callable
-from grafi.common.callable_ref import serialize_callable
-from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.callable_ref import CallableRef
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
+from grafi.tools.results import in_thread
+from grafi.tools.results import is_sync
 
 
 class AgentCallingTool(FunctionCallTool):
@@ -27,10 +25,13 @@ class AgentCallingTool(FunctionCallTool):
     agent_name: str = ""
     agent_description: str = ""
     argument_description: str = ""
-    agent_call: Callable[[InvokeContext, Message], Any]
+    agent_call: CallableRef
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     def model_post_init(self, _context: Any) -> None:
+        super().model_post_init(_context)
+        if any(spec.name == self.agent_name for spec in self.function_specs):
+            return  # A copy of a tool already set up.
         self.function_specs.append(
             FunctionSpec(
                 name=self.agent_name,
@@ -61,109 +62,16 @@ class AgentCallingTool(FunctionCallTool):
         """
         return AgentCallingToolBuilder(cls)
 
-    @record_tool_invoke
-    async def invoke(
-        self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
-        """
-        Invoke the registered function with the given arguments.
-
-        This method is decorated with @record_tool_invoke to log its invoke.
-
-        Args:
-            function_name (str): The name of the function to invoke.
-            arguments (Dict[str, Any]): The arguments to pass to the function.
-
-        Returns:
-            Any: The result of the function invoke.
-
-        Raises:
-            ValueError: If the provided function_name doesn't match the registered function.
-        """
-        if len(input_data) > 0 and input_data[0].tool_calls is None:
-            logger.warning("Agent call is None.")
-            raise ValueError("Agent call is None.")
-
-        messages: Messages = []
-        for tool_call in input_data[0].tool_calls if input_data[0].tool_calls else []:
-            if tool_call.function.name == self.agent_name:
-                func = self.agent_call
-
-                prompt = json.loads(tool_call.function.arguments)["prompt"]
-                message = Message(
-                    role="assistant",
-                    content=prompt,
-                )
-                response = func(invoke_context, message)
-
-                if inspect.isawaitable(response):
-                    response = await response
-
-                messages.extend(
-                    self.to_messages(
-                        response=response["content"], tool_call_id=tool_call.id
-                    )
-                )
-            else:
-                logger.warning(
-                    f"Function name {tool_call.function.name} does not match the registered function {self.agent_name}."
-                )
-                messages.extend(
-                    self.to_messages(response=None, tool_call_id=tool_call.id)
-                )
-
-        yield messages
-
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-        return {
-            **super().to_dict(),
-            "agent_name": self.agent_name,
-            "agent_description": self.agent_description,
-            "argument_description": self.argument_description,
-            "agent_call": serialize_callable(self.agent_call),
-            "oi_span_type": self.oi_span_type.value,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "AgentCallingTool":
-        """
-        Create an AgentCallingTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the AgentCallingTool.
-
-        Returns:
-            AgentCallingTool: An AgentCallingTool instance created from the dictionary.
-
-        Note:
-            ``agent_call`` is reconstructed (without pickle) from its import
-            reference or CallableComponent config. See
-            :mod:`grafi.common.callable_ref`.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "AgentCallingTool"))
-            .type(data.get("type", "AgentCallingTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .agent_name(data.get("agent_name", ""))
-            .agent_description(data.get("agent_description", ""))
-            .argument_description(data.get("argument_description", ""))
-            .agent_call(
-                deserialize_callable(
-                    data["agent_call"],
-                    context=f"agent_call for '{data.get('agent_name', '')}'",
-                )
-            )
-            .build()
-        )
+    async def call_function(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> Any:
+        """Ask the agent the LLM's prompt, and return its answer's content."""
+        prompt = Message(role="assistant", content=arguments["prompt"])
+        call = functools.partial(self.agent_call, invoke_context, prompt)
+        response = await in_thread(call) if is_sync(self.agent_call) else call()
+        if inspect.isawaitable(response):
+            response = await response
+        return response["content"]
 
 
 class AgentCallingToolBuilder(FunctionCallToolBuilder[AgentCallingTool]):

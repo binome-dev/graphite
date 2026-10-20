@@ -112,10 +112,24 @@ async def test_restore_topic_consume_event_does_not_skip_next(
     assert [event.offset for event in remaining] == [1, 2]
 
 
-def test_to_dict_has_no_condition():
-    """Topics are pure queues -- the manifest carries only name and type."""
+def test_dump_has_no_condition_nor_event_queue():
+    """Topics are pure queues -- the manifest carries only class, name and type."""
     topic = MockTopic(name="plain_topic")
-    assert topic.to_dict() == {"name": "plain_topic", "type": topic.type.value}
+    assert topic.model_dump(mode="json") == {
+        "class": f"{__name__}:MockTopic",
+        "name": "plain_topic",
+        "type": topic.type.value,
+    }
+
+
+def test_subclass_loads_as_itself():
+    """The dumped class picks the subclass when loading through the base."""
+    data = MockTopic(name="plain_topic").model_dump(mode="json")
+
+    restored = TopicBase.model_validate(data)
+
+    assert type(restored) is MockTopic
+    assert restored.name == "plain_topic"
 
 
 @pytest.mark.asyncio

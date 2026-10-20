@@ -84,15 +84,14 @@ async def test_simple_function_call_assistant() -> None:
     # events = event_store.get_events()
     # for event in events:
     #     try:
-    #         print(json.dumps(event.to_dict(), indent=4))
+    #         print(json.dumps(default_event_codec.encode(event), indent=4))
     #     except Exception as e:
     #         print(e)
     #         print(event)
     #         break
 
 
-# Guard top-level execution so this module can be imported (e.g. to resolve and
-# register the LocalFileMock tool class when deserializing the manifest) without
-# running the agent.
+# Guard top-level execution so this module can be imported (e.g. when loading
+# the manifest imports the LocalFileMock tool class) without running the agent.
 if __name__ == "__main__":
     asyncio.run(test_simple_function_call_assistant())

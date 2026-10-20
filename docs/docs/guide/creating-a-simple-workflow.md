@@ -128,7 +128,7 @@ workflow = (
 
 ### 5. Workflow Execution
 
-With the `EventDrivenWorkflow` object created, we can invoke it with an input event carrying our `invoke_context` and `message`. The workflow streams its output events, whose messages we print. Save this complete code as `main.py`.
+With the `EventDrivenWorkflow` object created, we can invoke it with an input event carrying our `invoke_context` and `message`. The workflow yields its output events, whose messages we print. Save this complete code as `main.py`.
 
 ```python linenums="54"
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
