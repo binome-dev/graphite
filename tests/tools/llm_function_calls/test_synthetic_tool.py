@@ -380,7 +380,8 @@ def test_a_key_not_from_its_variable_is_never_saved(monkeypatch, synthetic_tool)
     monkeypatch.setenv("OPENAI_API_KEY", "the_env_key")
 
     with pytest.raises(
-        PydanticSerializationError, match="ManifestError: .*SyntheticTool.openai_api_key"
+        PydanticSerializationError,
+        match="ManifestError: .*SyntheticTool.openai_api_key",
     ):
         synthetic_tool.model_dump(mode="json")
 

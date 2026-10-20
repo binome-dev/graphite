@@ -39,6 +39,7 @@ def is_import_path(text: str) -> bool:
     """Whether ``text`` has the form of an import path, ``"module:Qualname"``."""
     return bool(_IMPORT_PATH.fullmatch(text))
 
+
 # Replaced whole, never changed, so it is read without the lock.
 _trusted: FrozenSet[str] = frozenset({"grafi"})
 _lock = threading.Lock()
@@ -89,7 +90,7 @@ def resolve_import_ref(ref: str) -> Any:
     module_path, sep, qualname = ref.partition(":")
     if not sep or not module_path or not qualname:
         raise ManifestError(
-            f"{ref!r} is not an import path, which is \"module:Qualname\"."
+            f'{ref!r} is not an import path, which is "module:Qualname".'
         )
     if any(part.startswith("__") for part in module_path.split(".")):
         raise UntrustedImportError(

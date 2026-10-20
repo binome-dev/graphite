@@ -14,10 +14,10 @@ from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import Connection
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.tools.mcp_config import MCPConfig
-from grafi.tools.mcp_config import with_env
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
+from grafi.tools.mcp_config import MCPConfig
+from grafi.tools.mcp_config import with_env
 
 try:
     from fastmcp import Client

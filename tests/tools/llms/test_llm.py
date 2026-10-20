@@ -9,10 +9,9 @@ from typing import Type
 from unittest.mock import Mock
 
 import pytest
+from openai import Omit
 from pydantic import BaseModel
 from pydantic_core import PydanticSerializationError
-
-from openai import Omit
 
 from grafi.common.exceptions import LLMToolException
 from grafi.common.import_ref import UntrustedImportError
@@ -314,7 +313,11 @@ class TestRequiredApiKey:
 
         headers = dict(sdk_client.call_args.kwargs["default_headers"])
         assert headers.pop("Authorization") == "Bearer sk-own"
-        assert set(headers) == {"OpenAI-Organization", "OpenAI-Project", "X-Gateway-Key"}
+        assert set(headers) == {
+            "OpenAI-Organization",
+            "OpenAI-Project",
+            "X-Gateway-Key",
+        }
         assert all(isinstance(value, Omit) for value in headers.values())
 
     @pytest.mark.asyncio

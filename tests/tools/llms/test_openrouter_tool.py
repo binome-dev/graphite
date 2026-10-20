@@ -88,7 +88,9 @@ async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_c
 
     # AsyncClient ctor must receive correct kwargs
     mock_async_client_cls.assert_called_once_with(
-        api_key="test_api_key", base_url="https://openrouter.ai/api/v1", default_headers=ANY
+        api_key="test_api_key",
+        base_url="https://openrouter.ai/api/v1",
+        default_headers=ANY,
     )
 
     # Verify parameters forwarded to completions.create

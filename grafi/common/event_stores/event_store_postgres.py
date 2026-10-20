@@ -189,9 +189,7 @@ class EventStorePostgres(EventStore):
                 raise self._persistence_error(
                     "Failed to read events", operation, e
                 ) from e
-        return [
-            self.codec.decode(cast(Dict[str, Any], row.event_data)) for row in rows
-        ]
+        return [self.codec.decode(cast(Dict[str, Any], row.event_data)) for row in rows]
 
     async def get_events(self) -> List[Event]:
         """Get all events from the database."""
