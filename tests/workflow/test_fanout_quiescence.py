@@ -31,11 +31,7 @@ class LabelTool(Tool):
     label: str = "?"
 
     async def invoke(self, invoke_context, input_data):
-        yield [Message(role="assistant", content=f"resp-{self.label}")]
-
-    @classmethod
-    async def from_dict(cls, data):  # pragma: no cover - not exercised here
-        return cls(oi_span_type=OpenInferenceSpanKindValues.TOOL)
+        return [Message(role="assistant", content=f"resp-{self.label}")]
 
 
 def _input_event(request_id: str) -> PublishToTopicEvent:

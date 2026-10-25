@@ -302,10 +302,10 @@ workflow = (EventDrivenWorkflow.builder()
     .node(postprocessing_node)
     .build())
 
-# Topic construction
+# Topic construction (a node's route decides what reaches it:
+# Node.builder().publish_to(topic, when=has_text_response))
 topic = (Topic.builder()
     .name("user_input")
-    .condition(lambda msgs: len(msgs) > 0)
     .build())
 ```
 

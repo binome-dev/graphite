@@ -1293,7 +1293,7 @@ requires-dist = [
     { name = "openinference-semantic-conventions", specifier = ">=0.1.30" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.42.1" },
     { name = "opentelemetry-sdk", specifier = ">=1.42.1" },
-    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic", specifier = ">=2.13.4,<3" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'postgres'", specifier = ">=2.0.51" },
 ]
 provides-extras = ["postgres"]

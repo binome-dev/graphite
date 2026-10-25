@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import List
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,9 +9,11 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import Delta
 from grafi.runtime import current_services
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
-from grafi.tools.tool_factory import ToolFactory
+from grafi.tools.tool import Tool
 from grafi.topics.topic_types import TopicType
 
 event_store = current_services().event_store
@@ -32,16 +35,24 @@ async def test_openrouter_tool_stream() -> None:
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().is_streaming(True).api_key(api_key).build()
 
+    deltas: List[Delta] = []
     content = ""
-    async for msgs in or_tool.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
+    with deltas_to(deltas.append):
+        msgs = await or_tool.invoke(
+            get_invoke_context(),
+            [
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        )
         for m in msgs:
             assert m.role == "assistant"
             if isinstance(m.content, str):
                 content += m.content
-                print(m.content + "_", end="", flush=True)
+    streamed = "".join(delta.content for delta in deltas)
+    print(streamed)
+    assert len(deltas) > 1 and streamed == content  # The text, as it came.
 
     assert content and "Grafi" in content
     assert len(await event_store.get_events()) == 2
@@ -56,16 +67,16 @@ async def test_openrouter_tool_with_chat_param() -> None:
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    async for msgs in or_tool.invoke(
+    msgs = await or_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in msgs:
-            print(m)
-            assert m.role == "assistant"
-            assert m.content and "Grafi" in m.content
-            if isinstance(m.content, str):
-                assert len(m.content) < 300
+    )
+    for m in msgs:
+        print(m)
+        assert m.role == "assistant"
+        assert m.content and "Grafi" in m.content
+        if isinstance(m.content, str):
+            assert len(m.content) < 300
 
     assert len(await event_store.get_events()) == 2
 
@@ -78,14 +89,14 @@ async def test_openrouter_tool_async() -> None:
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in or_tool.invoke(
+    messages = await or_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            assert m.role == "assistant"
-            if isinstance(m.content, str):
-                content += m.content
+    )
+    for m in messages:
+        assert m.role == "assistant"
+        if isinstance(m.content, str):
+            content += m.content
 
     print(content)
     assert "Grafi" in content
@@ -140,24 +151,27 @@ async def test_openrouter_tool_serialization() -> None:
     # Create original tool
     original_tool = OpenRouterTool.builder().api_key(api_key).build()
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
     print(f"Serialized: {serialized}")
+    assert serialized["api_key"] == {"env": "OPENROUTER_API_KEY"}
 
-    # Deserialize back using ToolFactory
-    ToolFactory.register_tool_class("OpenRouterTool", OpenRouterTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, OpenRouterTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            assert m.role == "assistant"
-            if isinstance(m.content, str):
-                content += m.content
+    )
+    for m in messages:
+        assert m.role == "assistant"
+        if isinstance(m.content, str):
+            content += m.content
 
     print(content)
     assert "Grafi" in content
@@ -175,24 +189,27 @@ async def test_openrouter_tool_with_chat_param_serialization() -> None:
         OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
     )
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
+    assert serialized["api_key"] == {"env": "OPENROUTER_API_KEY"}
 
-    # Deserialize back
-    ToolFactory.register_tool_class("OpenRouterTool", OpenRouterTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, OpenRouterTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            print(m)
-            assert m.role == "assistant"
-            assert m.content and "Grafi" in m.content
-            if isinstance(m.content, str):
-                assert len(m.content) < 300
+    )
+    for m in messages:
+        print(m)
+        assert m.role == "assistant"
+        assert m.content and "Grafi" in m.content
+        if isinstance(m.content, str):
+            assert len(m.content) < 300
 
     assert len(await event_store.get_events()) == 2
 

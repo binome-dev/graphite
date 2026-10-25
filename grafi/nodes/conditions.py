@@ -5,10 +5,10 @@ that route's topic. These named, importable predicates cover the common content
 checks so workflows can reference them (``when=has_tool_call``) instead of
 embedding inline lambdas.
 
-Named predicates are preferred over lambdas because they:
+Named predicates are used rather than lambdas because they:
 
-* serialize as a compact, human-readable reference (``{"ref": "...:has_tool_call"}``)
-  rather than inline code,
+* are saved as a compact, human-readable reference
+  (``{"ref": "...:has_tool_call"}``), where a lambda cannot be saved at all,
 * are reusable and unit-testable in isolation, and
 * keep one source of truth for a routing rule (DRY) instead of copy-pasted lambdas.
 
@@ -30,19 +30,19 @@ def always_true(_: PublishToTopicEvent) -> bool:
 
 def has_tool_call(event: PublishToTopicEvent) -> bool:
     """Publish only when the last message requests a tool/function call."""
-    return event.data[-1].tool_calls is not None
+    return bool(event.data) and bool(event.data[-1].tool_calls)  # Not [] either.
 
 
 def has_no_tool_call(event: PublishToTopicEvent) -> bool:
     """Publish only when the last message does NOT request a tool call."""
-    return event.data[-1].tool_calls is None
+    return not has_tool_call(event)
 
 
 def has_text_response(event: PublishToTopicEvent) -> bool:
-    """Publish only when the last message is a non-empty text response.
-
-    Stricter than :func:`has_content`: the content must be a string with
-    non-whitespace characters -- the usual "this is a final answer" gate.
-    """
+    """Publish only when the last message is a final text answer: text with
+    non-whitespace characters, and no tool call, as text that comes with tool
+    calls only leads up to them."""
+    if not event.data or has_tool_call(event):
+        return False
     content = event.data[-1].content
-    return content is not None and isinstance(content, str) and content.strip() != ""
+    return isinstance(content, str) and content.strip() != ""

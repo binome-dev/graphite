@@ -36,13 +36,9 @@ class MarkerTool(Tool):
 
     async def invoke(self, invoke_context, input_data):
         await asyncio.sleep(0.05)
-        yield [
+        return [
             Message(role="assistant", content=f"out:{invoke_context.conversation_id}")
         ]
-
-    @classmethod
-    async def from_dict(cls, data):  # pragma: no cover - not exercised here
-        return cls(oi_span_type=OpenInferenceSpanKindValues.TOOL)
 
 
 def _build_workflow() -> EventDrivenWorkflow:

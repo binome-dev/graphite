@@ -1,9 +1,11 @@
 import json
 import os
-from typing import Any
+import uuid
+from pathlib import Path
 from typing import AsyncGenerator
-
-from openinference.semconv.trace import OpenInferenceSpanKindValues
+from typing import Literal
+from typing import Union
+from typing import overload
 
 from grafi.assistants.assistant_base import AssistantBase
 from grafi.common.async_lifecycle import owned_iterator
@@ -12,93 +14,69 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from grafi.common.manifest import ManifestError
+from grafi.runtime.deltas import Delta
 
 
 class Assistant(AssistantBase):
-    """
-    An abstract base class for assistants that use language models to process input and generate responses.
+    """An assistant that runs an event-driven workflow on each request, and
+    saves as a manifest holding that workflow (see ``generate_manifest``)."""
 
-    Attributes:
-        name (str): The name of the assistant
-        event_store (EventStore): An instance of EventStore to record events during the assistant's operation.
-    """
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: Literal[False] = False,
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]: ...
+
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
 
     @record_assistant_invoke
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """
-        Process the input data through the LLM workflow, make function calls, and return the generated response.
-        Args:
-            invoke_context (InvokeContext): Context containing invoke information
-            input_data (Messages): List of input messages to be processed
-
-        Returns:
-            Messages: List of generated response messages, sorted by timestamp
-
-        Raises:
-            ValueError: If the OpenAI API key is not provided and not found in environment variables
-        """
-
-        # Invoke the workflow with the input data
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the assistant's workflow on ``input_data``, yielding its outputs
+        as they are committed, and, if ``stream``, each :class:`Delta` its tools
+        emit as they emit it, such as an LLM's tokens."""
         async with owned_iterator(
-            self.workflow.invoke(input_data, is_sequential)
-        ) as stream:
-            async for output in stream:
+            self.workflow.invoke(input_data, is_sequential, stream=stream)
+        ) as outputs:
+            async for output in outputs:
                 yield output
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the workflow to a dictionary."""
-        return {
-            **super().to_dict(),
-        }
-
-    def generate_manifest(self, output_dir: str = ".") -> str:
-        """
-        Generate a manifest file for the assistant.
-
-        Args:
-            output_dir (str): Directory where the manifest file will be saved
-
-        Returns:
-            str: Path to the generated manifest file
-        """
-        manifest_seed = self.to_dict()
-
-        # Add dependencies between node and topics
-        manifest_dict = manifest_seed
-
-        output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
-        with open(output_path, "w") as f:
-            f.write(json.dumps(manifest_dict, indent=4))
-
+    def generate_manifest(self, output_dir: "str | os.PathLike[str]" = ".") -> Path:
+        """Write the assistant's manifest (see ``to_manifest()``) to
+        ``<name>_manifest.json`` in ``output_dir``, and return its path. Load
+        it back with ``Assistant.from_manifest(path)``."""
+        if any(char in self.name for char in "/\\:\0"):
+            raise ManifestError(
+                f"The assistant's name {self.name!r} names its manifest's file, "
+                "so it holds no '/', '\\', ':' or NUL."
+            )
+        text = json.dumps(self.to_manifest(), indent=2) + "\n"
+        output_path = Path(output_dir) / f"{self.name}_manifest.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Written beside it, then moved over it, so a failure leaves it whole,
+        # and a link there is replaced, never followed; made as open() makes a
+        # file, as the umask allows.
+        partial = output_path.with_name(f".{uuid.uuid4().hex}.partial")
+        try:
+            with open(partial, "x", encoding="utf-8") as file:
+                file.write(text)
+            os.replace(partial, output_path)
+        finally:
+            partial.unlink(missing_ok=True)
         return output_path
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "Assistant":
-        """
-        Load an assistant from a manifest dictionary.
-
-        Args:
-            manifest_dict (dict[str, Any]): Dictionary containing the assistant manifest
-
-        Returns:
-            Assistant: The deserialized assistant instance
-
-        Raises:
-            NotImplementedError: Subclasses must implement this method
-        """
-
-        # Create a new instance
-        instance = cls.model_construct()
-        instance.name = data.get("name", "Assistant")
-        instance.type = data.get("type", "assistant")
-        instance.oi_span_type = OpenInferenceSpanKindValues(
-            data.get("oi_span_type", "AGENT")
-        )
-        instance.workflow = await EventDrivenWorkflow.from_dict(
-            data.get("workflow", {})
-        )
-
-        return instance

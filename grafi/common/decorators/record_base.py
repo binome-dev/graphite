@@ -3,6 +3,7 @@ respond and failed events and traces each invocation in a span."""
 
 import asyncio
 import functools
+import inspect
 import os
 import uuid
 from contextlib import AbstractContextManager
@@ -10,7 +11,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 from typing import AsyncGenerator
-from typing import AsyncIterator
+from typing import Awaitable
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -22,6 +23,7 @@ from typing import cast
 
 from openinference.semconv.trace import OpenInferenceMimeTypeValues
 from openinference.semconv.trace import SpanAttributes
+from opentelemetry.trace import INVALID_SPAN
 from opentelemetry.trace import Span
 from opentelemetry.trace import Status
 from opentelemetry.trace import StatusCode
@@ -47,6 +49,7 @@ from grafi.common.exceptions.serialization import error_to_dict
 from grafi.common.exceptions.serialization import iter_cause_chain
 from grafi.common.models.default_id import default_id
 from grafi.common.models.invoke_context import InvokeContext
+from grafi.runtime.deltas import Delta
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
@@ -61,7 +64,8 @@ _JSON = OpenInferenceMimeTypeValues.JSON.value
 _TEXT = OpenInferenceMimeTypeValues.TEXT.value
 _HIDE_SETTINGS = ("OPENINFERENCE_HIDE_INPUTS", "OPENINFERENCE_HIDE_OUTPUTS")
 
-F = TypeVar("F", bound=Callable[..., AsyncIterator[Any]])
+F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
 
 
 class EventContext(BaseModel):
@@ -87,140 +91,270 @@ class ComponentConfig:
     failed_event: Type[FailedEvent]
     # Typed Any, so this layer need not import the component classes.
     extract_metadata: Callable[[Any], EventContext]
-    # The output its respond event records, from all its stream yielded.
-    process_async_result: Callable[[List[Any]], Any]
+    # The output its respond event records: what its invoke returns, or, from
+    # a stream, made of all it yielded but deltas, which are never recorded.
+    output_of: Callable[[Any], Any] = lambda result: result
     span_name_suffix: str = "invoke"
     # An assistant or a workflow runs in its caller's task, so its event writes
     # run in a task of their own: the caller's cancellation stays the caller's.
     isolate_event_writes: bool = False
 
 
-def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
-    """A decorator for a component's async generator ``invoke``.
+# Set on a recorded method, to the method: a decorator stacked on it with
+# functools.wraps() copies it, so the decorated method is known as this one.
+_RECORDED = "__grafi_recorded__"
 
-    It records the invoke event, runs the stream in the component's span, then
-    records the respond event, or, on failure, the failed event with
+
+def is_recorded(method: Any) -> bool:
+    """Whether ``method`` is recorded by a record decorator, also under
+    another decorator."""
+    return getattr(method, _RECORDED, None) is not None
+
+
+def _records(layer: Callable[..., Any], component: Any) -> bool:
+    """Whether ``layer``, a recorded method, records this call of it: it does
+    unless the component's class overrides it with a method recorded alike,
+    which records the call, calling it with ``super()``. A call is recorded
+    once, by the most derived recorded method, with what that returns. A
+    decorator stacked on it without functools.wraps() hides its mark: it
+    then records, though the call may be recorded twice."""
+    marks = [
+        mark
+        for klass in type(component).__mro__
+        if (mark := getattr(vars(klass).get(layer.__name__), _RECORDED, None))
+    ]
+    return not any(mark is layer for mark in marks) or marks[0] is layer
+
+
+def create_async_decorator(config: ComponentConfig) -> Callable[[F], F]:
+    """A decorator for a component's ``invoke``: a coroutine function, or one
+    returning an async generator, such as an async generator function.
+
+    It records the invoke event, runs the invocation in the component's span,
+    then records the respond event, or, on failure, the failed event with
     structured details (logged once, by the layer closest to the failure)
-    before raising the failure again.
+    before raising the failure again. The services are resolved at the call:
+    every layer of an invocation runs with those where it was invoked,
+    wherever, and in whichever task, a stream of it is read.
     """
 
     def decorator(func: F) -> F:
+        if not inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            def stream(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
+                if not _records(stream, self):
+                    return func(self, *args, **kwargs)
+                recording = _Recording(config, current_services(), self, args)
+                start = functools.partial(func, self, *args, **kwargs)
+                return _recorded_stream(recording, start)
+
+            setattr(stream, _RECORDED, stream)
+            return cast(F, stream)
+
         @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> AsyncGenerator:
-            # Resolved at the call, and bound around every step: every layer of
-            # an invocation runs with the services where it was invoked,
-            # wherever, and in whichever task, its stream is read.
-            return recorded(current_services(), self, *args, **kwargs)
-
-        async def recorded(
-            services: ExecutionServices, self: Any, *args: Any, **kwargs: Any
-        ) -> AsyncGenerator:
-            record = functools.partial(
-                _record_event, services, isolate=config.isolate_event_writes
-            )
-            metadata = config.extract_metadata(self)
-            # A tool or a node takes (invoke_context, input); an assistant or a
-            # workflow takes an input event, which carries the context.
-            if isinstance(args[0], InvokeContext):
-                invoke_context, input_data = args[0], args[1]
-            else:
-                input_data = args[0]
-                invoke_context = input_data.invoke_context
-            fields: Dict[str, Any] = dict(
-                id=metadata.id,
-                name=metadata.name,
-                type=metadata.type,
-                input_data=input_data,
-                invoke_context=invoke_context,
-            )
-            await _record_lifecycle_event(
-                record, config.invoke_event(**fields), "invoke", invoke_context
-            )
-
-            span = services.tracer.start_span(
-                f"{metadata.name}.{config.span_name_suffix}"
-            )
+        async def call(self: Any, *args: Any, **kwargs: Any) -> Any:
+            if not _records(call, self):
+                return await func(self, *args, **kwargs)
+            recording = _Recording(config, current_services(), self, args)
+            await recording.begin()
             try:
-                if span.is_recording():
-                    # Span attributes hold neither None nor kwargs' free-form dict.
-                    span.set_attributes(
-                        metadata.model_dump(by_alias=True, exclude_none=True)
-                    )
-                    span.set_attributes(
-                        invoke_context.model_dump(exclude={"kwargs"}, exclude_none=True)
-                    )
-                    span.set_attribute(
-                        SpanAttributes.SESSION_ID, invoke_context.conversation_id
-                    )
-                    _set_payload(
-                        span,
-                        SpanAttributes.INPUT_VALUE,
-                        input_data,
-                        SpanAttributes.INPUT_MIME_TYPE,
-                    )
-
-                with bind_services(services), _current(span):
-                    stream = func(self, *args, **kwargs)
-
-                async def close_stream() -> None:
-                    with bind_services(services), _current(span):
-                        await close_iterator(stream)
-
-                results: List[Any] = []
-                async with cleanup_on_exit(close_stream):
-                    while True:
-                        with bind_services(services), _current(span):
-                            try:
-                                result = await anext(stream)
-                            except StopAsyncIteration:
-                                break
-                            except asyncio.CancelledError as cancelled:
-                                if cancelling():
-                                    raise
-                                # The component's own, not its task's: a failure.
-                                raise unexpected_cancellation(
-                                    f"{metadata.name} was unexpectedly cancelled",
-                                    cancelled,
-                                )
-                        yield result
-                        results.append(result)
-                output_data = config.process_async_result(results)
-                _set_payload(
-                    span,
-                    SpanAttributes.OUTPUT_VALUE,
-                    output_data,
-                    SpanAttributes.OUTPUT_MIME_TYPE,
-                )
+                recording.trace_input()
+                result = await recording.step(func(self, *args, **kwargs))
+                responded = recording.responded(result)
             except Exception as error:
-                # Failing to record a failure never replaces it.
-                try:
-                    first = _existing_error_id(error) is None
-                    details = _build_error_details(error, metadata, invoke_context)
-                    _record_span_error(span, error, details)
-                    if first:
-                        _report_failure(services, error, metadata, details)
-                    failed = config.failed_event(
-                        **fields, error=str(error), error_details=details
-                    )
-                    await record(failed)
-                except Exception as unrecorded:
-                    _note_unrecorded_failure(
-                        services, error, invoke_context, unrecorded
-                    )
+                await recording.fail(error)
                 raise
             finally:
-                span.end()
+                recording.end()
+            await recording.respond(responded)
+            return result
 
-            await _record_lifecycle_event(
-                record,
-                config.respond_event(**fields, output_data=output_data),
-                "respond",
-                invoke_context,
-            )
-
-        return cast(F, wrapper)
+        setattr(call, _RECORDED, call)
+        return cast(F, call)
 
     return decorator
+
+
+async def _recorded_stream(
+    recording: "_Recording", start: Callable[[], AsyncGenerator]
+) -> AsyncGenerator:
+    """The stream ``start()`` makes, an invocation's, recorded as one."""
+    await recording.begin()
+    try:
+        recording.trace_input()
+        stream = recording.run(start)
+
+        async def close_stream() -> None:
+            await recording.step(close_iterator(stream))
+
+        results: List[Any] = []
+        async with cleanup_on_exit(close_stream):
+            while True:
+                try:
+                    result = await recording.step(anext(stream))
+                except StopAsyncIteration:
+                    break
+                yield result
+                if not isinstance(result, Delta):
+                    results.append(result)
+        responded = recording.responded(results)
+    except Exception as error:
+        await recording.fail(error)
+        raise
+    finally:
+        recording.end()
+    await recording.respond(responded)
+
+
+class _Recording:
+    """One invocation of a component, as its events and its span record it."""
+
+    def __init__(
+        self,
+        config: ComponentConfig,
+        services: ExecutionServices,
+        component: Any,
+        args: Tuple[Any, ...],
+    ) -> None:
+        self.config = config
+        self.services = services
+        self.metadata = config.extract_metadata(component)
+        # A tool or a node takes (invoke_context, input); an assistant or a
+        # workflow takes an input event, which carries the context.
+        if isinstance(args[0], InvokeContext):
+            self.invoke_context, self.input_data = args[0], args[1]
+        else:
+            self.input_data = args[0]
+            self.invoke_context = self.input_data.invoke_context
+        declared = config.invoke_event.model_fields
+        self.fields: Dict[str, Any] = dict(
+            id=self.metadata.id,
+            name=self.metadata.name,
+            type=self.metadata.type,
+            input_data=self.input_data,
+            invoke_context=self.invoke_context,
+            # What else the events declare, such as a node's topics.
+            **{
+                key: value
+                for key, value in (self.metadata.model_extra or {}).items()
+                if key in declared
+            },
+        )
+        self.span: Span = INVALID_SPAN
+        self._ended = False
+
+    async def begin(self) -> None:
+        """Record the invoke event, then start the span."""
+        await self._lifecycle(self.config.invoke_event(**self.fields), "invoke")
+        self.span = self.services.tracer.start_span(
+            f"{self.metadata.name}.{self.config.span_name_suffix}"
+        )
+
+    def trace_input(self) -> None:
+        """Set what the span records of the component and its input."""
+        span = self.span
+        if not span.is_recording():
+            return
+        # Span attributes hold neither None nor kwargs' free-form dict.
+        span.set_attributes(self.metadata.model_dump(by_alias=True, exclude_none=True))
+        span.set_attributes(
+            self.invoke_context.model_dump(exclude={"kwargs"}, exclude_none=True)
+        )
+        span.set_attribute(
+            SpanAttributes.SESSION_ID, self.invoke_context.conversation_id
+        )
+        _set_payload(
+            span,
+            SpanAttributes.INPUT_VALUE,
+            self.input_data,
+            SpanAttributes.INPUT_MIME_TYPE,
+        )
+
+    def run(self, function: Callable[[], T]) -> T:
+        """``function()``, run with the invocation's services bound and its
+        span current."""
+        with bind_services(self.services), _current(self.span):
+            return function()
+
+    async def step(self, awaitable: Awaitable[T]) -> T:
+        """``awaitable``'s result, awaited with the invocation's services bound
+        and its span current. A cancellation nobody requested is the
+        component's own failure."""
+        with bind_services(self.services), _current(self.span):
+            try:
+                return await awaitable
+            except asyncio.CancelledError as cancelled:
+                if cancelling():
+                    raise
+                raise unexpected_cancellation(
+                    f"{self.metadata.name} was unexpectedly cancelled", cancelled
+                )
+
+    def responded(self, result: Any) -> RespondEvent:
+        """The respond event for ``result``, its output set on the span."""
+        output_data = self.config.output_of(result)
+        event = self.config.respond_event(**self.fields, output_data=output_data)
+        _set_payload(
+            self.span,
+            SpanAttributes.OUTPUT_VALUE,
+            output_data,
+            SpanAttributes.OUTPUT_MIME_TYPE,
+        )
+        return event
+
+    def end(self) -> None:
+        """End the span, once."""
+        if not self._ended:
+            self._ended = True
+            self.span.end()
+
+    async def respond(self, event: RespondEvent) -> None:
+        """Record the respond event."""
+        await self._lifecycle(event, "respond")
+
+    async def fail(self, error: Exception) -> None:
+        """Record ``error`` on the span, end it, and record the failed event.
+        Failing to record a failure never replaces it."""
+        try:
+            try:
+                first = _existing_error_id(error) is None
+                details = _build_error_details(
+                    error, self.metadata, self.invoke_context
+                )
+                _record_span_error(self.span, error, details)
+            finally:
+                self.end()
+            if first:
+                _report_failure(self.services, error, self.metadata, details)
+            failed = self.config.failed_event(
+                **self.fields, error=str(error), error_details=details
+            )
+            await self._record(failed)
+        except Exception as unrecorded:
+            _note_unrecorded_failure(
+                self.services, error, self.invoke_context, unrecorded
+            )
+
+    async def _record(self, event: ComponentEvent) -> None:
+        await _record_event(
+            self.services, event, isolate=self.config.isolate_event_writes
+        )
+
+    async def _lifecycle(self, event: ComponentEvent, operation: str) -> None:
+        """Record an invoke or respond event: failing to is itself the failure,
+        raised as an EventPersistenceError naming the operation."""
+        try:
+            await self._record(event)
+        except Exception as persist_error:
+            error = EventPersistenceError(
+                message=f"Failed to persist {operation} event",
+                invoke_context=self.invoke_context,
+                cause=persist_error,
+            )
+            # Captured by serialization's _DOMAIN_FIELDS for a precise diagnostic.
+            error.operation = operation  # type: ignore[attr-defined]
+            raise error from persist_error
 
 
 async def _record_event(
@@ -234,27 +368,6 @@ async def _record_event(
         )
     else:
         await services.event_store.record_event(event)
-
-
-async def _record_lifecycle_event(
-    record: Callable[[ComponentEvent], Any],
-    event: ComponentEvent,
-    operation: str,
-    invoke_context: InvokeContext,
-) -> None:
-    """Record an invoke or respond event: failing to is itself the failure,
-    raised as an EventPersistenceError naming the operation."""
-    try:
-        await record(event)
-    except Exception as persist_error:
-        error = EventPersistenceError(
-            message=f"Failed to persist {operation} event",
-            invoke_context=invoke_context,
-            cause=persist_error,
-        )
-        # Captured by serialization's _DOMAIN_FIELDS for a precise diagnostic.
-        error.operation = operation  # type: ignore[attr-defined]
-        raise error from persist_error
 
 
 def _current(span: Span) -> AbstractContextManager[Span]:

@@ -1,4 +1,3 @@
-import os
 import uuid
 from typing import AsyncGenerator
 from typing import Optional
@@ -13,6 +12,8 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
@@ -46,17 +47,19 @@ class ReActAgent(Assistant):
     )
     name: str = Field(default="ReActAgent")
     type: str = Field(default="ReActAgent")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE)
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    system_prompt: Optional[str] = Field(default=AGENT_SYSTEM_MESSAGE, exclude=True)
     function_call_tool: FunctionCallTool = Field(
-        default=TavilyTool.builder()
+        default_factory=lambda: TavilyTool.builder()
         .name("TavilyTestTool")
-        .api_key(os.getenv("TAVILY_API_KEY"))
         .max_tokens(6000)
         .search_depth("advanced")
-        .build()
+        .build(),
+        exclude=True,
     )
-    model: str = Field(default="gpt-4o-mini")
+    model: str = Field(default="gpt-4o-mini", exclude=True)
     # The conversation run() continues when given no invoke context: this
     # agent's own. A server passes an InvokeContext per user or session.
     _conversation_id: str = PrivateAttr(default_factory=lambda: uuid.uuid4().hex)
@@ -88,7 +91,7 @@ class ReActAgent(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_prompt)
                 .build()
@@ -188,7 +191,9 @@ class ReActAgent(Assistant):
 class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):
     """Concrete builder for ReActAgent."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
+        """Set the API key, or the variable to read it from, ``{"env":
+        "VAR"}``, as LLMBuilder.api_key() takes it."""
         self.kwargs["api_key"] = api_key
         return self
 
@@ -209,7 +214,7 @@ def create_react_agent(
     system_prompt: Optional[str] = None,
     function_call_tool: Optional[FunctionCallTool] = None,
     model: Optional[str] = None,
-    api_key: Optional[str] = None,
+    api_key: SecretInput = None,
 ) -> ReActAgent:
     builder = ReActAgent.builder()
 

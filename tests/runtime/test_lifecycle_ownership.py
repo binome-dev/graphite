@@ -13,8 +13,11 @@ from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
+from grafi.nodes.node import Node
+from grafi.nodes.node_base import PublisherRouter
+from grafi.nodes.node_base import PublishRoute
 from grafi.runtime import GrafiRuntime
+from grafi.runtime import emit_delta
 from grafi.runtime.execution_services import current_services
 from grafi.tools.tool import Tool
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -30,11 +33,11 @@ class OpenStream(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         services = current_services()
         try:
-            yield [Message(role="assistant", content="first", is_streaming=True)]
-            await asyncio.Event().wait()
+            await asyncio.Event().wait()  # Runs until the run stops it.
+            return []
         finally:
             self.scope_seen = current_services()
             assert self.scope_seen is services
@@ -42,10 +45,10 @@ class OpenStream(Tool):
 
 
 def stored_and_open_workflow(open_tool: Tool) -> EventDrivenWorkflow:
-    """One node commits an output; another keeps its stream open until closed.
+    """One node commits an output; another keeps running until it is stopped.
 
-    Both write the output topic, so it is not streamed: the caller receives an
-    output only once it is stored, and closing then acknowledges it.
+    The caller receives an output once it is stored, and closing then
+    acknowledges it.
     """
     from grafi.topics.expressions.topic_expression import TopicExpr
     from tests_integration.async_execution.support import EchoTool
@@ -55,6 +58,42 @@ def stored_and_open_workflow(open_tool: Tool) -> EventDrivenWorkflow:
     done = make_node("done", EchoTool(), TopicExpr(topic=source), out)
     still_open = make_node("open", open_tool, TopicExpr(topic=source), out)
     return EventDrivenWorkflow.builder().node(done).node(still_open).build()
+
+
+class Says(Tool):
+    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    text: str
+
+    async def invoke(
+        self, invoke_context: InvokeContext, input_data: Messages
+    ) -> Messages:
+        return [Message(role="assistant", content=self.text)]
+
+
+def one_two_three() -> EventDrivenWorkflow:
+    """Three outputs, "one", "two" and "three", in that order: a chain of
+    three nodes, each publishing its output and starting the next."""
+    from grafi.topics.expressions.topic_expression import TopicExpr
+    from grafi.topics.topic_impl.topic import Topic
+
+    out = OutputTopic(name="out")
+    previous: Any = InputTopic(name="input")
+    builder = EventDrivenWorkflow.builder()
+    for text in ("one", "two", "three"):
+        routes = [PublishRoute(topic=out)]
+        following = Topic(name=f"after_{text}")
+        if text != "three":
+            routes.append(PublishRoute(topic=following))
+        builder.node(
+            Node(
+                name=text,
+                tool=Says(text=text),
+                subscribed_expressions=[TopicExpr(topic=previous)],
+                publisher_router=PublisherRouter(routes=routes),
+            )
+        )
+        previous = following
+    return builder.build()
 
 
 def fail_acknowledgements(
@@ -128,9 +167,8 @@ async def test_node_failure_surfaces_inside_caller_exception_handler(
     from tests_integration.async_execution.support import make_node
 
     class Fails(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
+        async def invoke(self, context: InvokeContext, messages: Messages) -> Messages:
             raise ValueError("node failed")
-            yield []
 
     node = make_node(
         "fails",
@@ -163,10 +201,9 @@ async def test_cancellation_during_close_is_not_swallowed(
     class FailsAsItStops(OpenStream):
         async def invoke(
             self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+        ) -> Messages:
             try:
-                async for messages in super().invoke(invoke_context, input_data):
-                    yield messages
+                return await super().invoke(invoke_context, input_data)
             except asyncio.CancelledError:
                 raise RuntimeError("node cleanup failed") from None
 
@@ -317,28 +354,30 @@ async def test_node_failure_is_not_noted_as_its_own_cleanup_failure() -> None:
     go, failed = asyncio.Event(), asyncio.Event()
 
     class Fails(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
+        async def invoke(self, context: InvokeContext, messages: Messages) -> Messages:
             await go.wait()
             failed.set()
             raise ValueError("node failed")
-            yield []
-
-    class Chatty(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
-            for text in ("first", "second"):
-                yield [Message(role="assistant", content=text, is_streaming=True)]
 
     source = InputTopic(name="input")
+    # One step commits two outputs at once: on two output topics.
+    chatty = Node(
+        name="chatty",
+        tool=EchoTool(),
+        subscribed_expressions=[TopicExpr(topic=source)],
+        publisher_router=PublisherRouter(
+            routes=[
+                PublishRoute(topic=OutputTopic(name="b")),
+                PublishRoute(topic=OutputTopic(name="c")),
+            ]
+        ),
+    )
     workflow = (
         EventDrivenWorkflow.builder()
         .node(
             make_node("fails", Fails(), TopicExpr(topic=source), OutputTopic(name="a"))
         )
-        .node(
-            make_node(
-                "chatty", Chatty(), TopicExpr(topic=source), OutputTopic(name="b")
-            )
-        )
+        .node(chatty)
         .build()
     )
     with pytest.raises(NodeExecutionError) as raised:
@@ -347,8 +386,8 @@ async def test_node_failure_is_not_noted_as_its_own_cleanup_failure() -> None:
                 Assistant(workflow=workflow), input_event()
             ):
                 if not go.is_set():
-                    # "second" is still queued; the output loop meets the failed
-                    # node task when it hands that item over.
+                    # The second output is still queued; the output loop meets
+                    # the failed node task when it hands that item over.
                     go.set()
                     await failed.wait()
                     await asyncio.sleep(0.01)
@@ -358,27 +397,7 @@ async def test_node_failure_is_not_noted_as_its_own_cleanup_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_sequential_close_acknowledges_only_delivered_outputs() -> None:
-    from grafi.topics.expressions.topic_expression import TopicExpr
-    from tests_integration.async_execution.support import EchoTool
-    from tests_integration.async_execution.support import make_node
-
-    class Three(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
-            for text in ("one", "two", "three"):
-                yield [Message(role="assistant", content=text)]
-
-    workflow = (
-        EventDrivenWorkflow.builder()
-        .node(
-            make_node(
-                "three",
-                Three(),
-                TopicExpr(topic=InputTopic(name="input")),
-                OutputTopic(name="out"),
-            )
-        )
-        .build()
-    )
+    workflow = one_two_three()
     runtime, event = GrafiRuntime(), input_event()
     output = runtime.invoke(Assistant(workflow=workflow), event, True)
     async with asyncio.timeout(3):
@@ -468,10 +487,11 @@ async def test_repeated_caller_cancellation_does_not_abandon_node_tasks() -> Non
     cleanup, release = asyncio.Event(), asyncio.Event()
 
     class Stubborn(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
+        async def invoke(self, context: InvokeContext, messages: Messages) -> Messages:
             try:
-                yield [Message(role="assistant", content="first", is_streaming=True)]
+                emit_delta("first")
                 await asyncio.Event().wait()
+                return [Message(role="assistant", content="never")]
             finally:
                 cleanup.set()
                 while not release.is_set():
@@ -496,7 +516,9 @@ async def test_repeated_caller_cancellation_does_not_abandon_node_tasks() -> Non
 
     async def consume() -> None:
         async with aclosing(
-            GrafiRuntime().invoke(Assistant(workflow=workflow), input_event())
+            GrafiRuntime().invoke(
+                Assistant(workflow=workflow), input_event(), stream=True
+            )
         ) as output:
             async for _ in output:
                 ready.set()
@@ -523,27 +545,8 @@ async def test_async_result_reads_no_outputs_ahead_of_the_caller(
     sequential: bool,
 ) -> None:
     from grafi.common.models.async_result import async_func_wrapper
-    from grafi.topics.expressions.topic_expression import TopicExpr
-    from tests_integration.async_execution.support import EchoTool
-    from tests_integration.async_execution.support import make_node
 
-    class Three(EchoTool):
-        async def invoke(self, context: InvokeContext, messages: Messages) -> MsgsAGen:
-            for text in ("one", "two", "three"):
-                yield [Message(role="assistant", content=text)]
-
-    workflow = (
-        EventDrivenWorkflow.builder()
-        .node(
-            make_node(
-                "three",
-                Three(),
-                TopicExpr(topic=InputTopic(name="input")),
-                OutputTopic(name="out"),
-            )
-        )
-        .build()
-    )
+    workflow = one_two_three()
     runtime, event = GrafiRuntime(), input_event()
     result = async_func_wrapper(
         runtime.invoke(Assistant(workflow=workflow), event, sequential)

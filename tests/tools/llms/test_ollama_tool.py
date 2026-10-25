@@ -1,18 +1,26 @@
+import asyncio
 from typing import Any
 from typing import AsyncIterator
+from typing import List
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 
 import pytest
 from ollama import ChatResponse
+from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
 
+from grafi.common.exceptions import LLMToolException
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.ollama_tool import OllamaTool
+from grafi.tools.tool import Tool
 
 
 @pytest.fixture
@@ -99,6 +107,7 @@ def test_prepare_api_input():
 
 @pytest.mark.asyncio
 async def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     tool = OllamaTool()
     input_data = [Message(role="user", content="Hello")]
 
@@ -117,12 +126,39 @@ async def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
 
     mock_ollama_client.return_value.chat = mock_chat
     result = []
-    async for msg in tool.invoke(invoke_context, input_data):
-        result.extend(msg)
+    msg = await tool.invoke(invoke_context, input_data)
+    result.extend(msg)
 
     assert result[0].role == "assistant"
     assert result[0].content == "Hi there!"
-    mock_ollama_client.assert_called_once_with("http://localhost:11434")
+    # Without a key, it gives the client no authorization header.
+    mock_ollama_client.assert_called_once_with("http://localhost:11434", headers={})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "variable, given", [("ollama-key", None), ("", "ollama-key")], ids=["env", "code"]
+)
+async def test_a_key_is_sent_as_an_authorization_header(
+    monkeypatch, invoke_context, mock_ollama_client, variable, given
+):
+    monkeypatch.setenv("OLLAMA_API_KEY", variable)
+    tool = OllamaTool(api_url="https://ollama.example.com")
+    if given is not None:
+        tool = OllamaTool(api_url="https://ollama.example.com", api_key=given)
+
+    async def chat(**kwargs: Any) -> ChatResponse:
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "ok"}}
+        )
+
+    mock_ollama_client.return_value.chat = chat
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+
+    mock_ollama_client.assert_called_once_with(
+        "https://ollama.example.com",
+        headers={"authorization": "Bearer ollama-key"},
+    )
 
 
 def test_to_messages():
@@ -144,7 +180,7 @@ def test_to_messages():
             }
         }
     )
-    message = tool.to_messages(response)
+    message = tool._to_messages(response)
 
     assert message[0].role == "assistant"
     assert message[0].content == "Hi there!"
@@ -153,53 +189,92 @@ def test_to_messages():
     assert message[0].tool_calls[0].function.arguments == '{"arg1": "value1"}'
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "OllamaTool",
-        "tool_id": "test-id",
+OLLAMA_TOOL = "grafi.tools.llms.impl.ollama_tool:OllamaTool"
+
+
+def test_dump_names_the_class_and_saves_the_key_as_its_variable(monkeypatch):
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    tool = OllamaTool(
+        name="TestOllama",
+        system_message="Test system",
+        model="llama3.2",
+        api_url="http://ollama.internal:11434",
+        chat_params={"temperature": 0.7},
+        is_streaming=False,
+    )
+
+    assert tool.model_dump(mode="json") == {
+        "class": OLLAMA_TOOL,
+        "tool_id": tool.tool_id,
         "name": "TestOllama",
         "type": "OllamaTool",
+        "oi_span_type": "LLM",
+        "system_message": "Test system",
+        "api_key": {"env": "OLLAMA_API_KEY"},  # A local server needs none.
+        "model": "llama3.2",
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+        "structured_output": False,
+        "api_url": "http://ollama.internal:11434",
+    }
+
+
+def test_round_trip():
+    original = OllamaTool(
+        system_message="Test system",
+        name="TestOllama",
+        model="qwen3",
+        api_url="http://ollama.internal:11434",
+    )
+    data = original.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is OllamaTool
+    assert restored.tool_id == original.tool_id
+    assert restored.api_url == "http://ollama.internal:11434"
+    assert restored == original
+    assert restored.model_dump(mode="json") == data
+
+
+def test_load_from_a_manifest_naming_the_class():
+    data = {
+        "class": OLLAMA_TOOL,
+        "tool_id": "test-id",
+        "name": "TestOllama",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
         "model": "qwen3",
         "api_url": "http://localhost:11434",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
-        "structured_output": False,
     }
 
-    tool = await OllamaTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, OllamaTool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestOllama"
     assert tool.model == "qwen3"
     assert tool.api_url == "http://localhost:11434"
     assert tool.system_message == "You are helpful"
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip():
-    """Test that serialization and deserialization are consistent."""
-    original = OllamaTool(
-        system_message="Test system",
-        name="TestOllama",
-        model="qwen3",
-        api_url="http://localhost:11434",
-    )
+def test_a_key_is_saved_only_as_the_variable_it_was_read_from(monkeypatch):
+    monkeypatch.setenv("OLLAMA_API_KEY", "own_key")
+    monkeypatch.setenv("OLLAMA_PROXY_KEY", "proxy_key")
+    assert OllamaTool().api_key == "own_key"
+    assert OllamaTool().model_dump(mode="json")["api_key"] == {"env": "OLLAMA_API_KEY"}
+    manifest = OllamaTool().to_manifest()
+    manifest["spec"]["api_key"] = {"env": "OLLAMA_PROXY_KEY"}
+    tool = Tool.from_manifest(manifest, allow_env=["OLLAMA_PROXY_KEY"])
+    assert tool.api_key == "proxy_key"
+    assert tool.model_dump(mode="json")["api_key"] == {"env": "OLLAMA_PROXY_KEY"}
 
-    # Serialize to dict
-    data = original.to_dict()
-
-    # Deserialize back
-    restored = await OllamaTool.from_dict(data)
-
-    # Verify key properties match
-    assert restored.name == original.name
-    assert restored.model == original.model
-    assert restored.api_url == original.api_url
-    assert restored.system_message == original.system_message
+    with pytest.raises(
+        PydanticSerializationError, match="ManifestError: .*OllamaTool.api_key"
+    ):
+        OllamaTool(api_key="proxy_key").model_dump(mode="json")
 
 
 def test_prepare_api_input_forwards_tool_calls():
@@ -228,17 +303,18 @@ def test_prepare_api_input_forwards_tool_calls():
 
 
 @pytest.mark.asyncio
-async def test_early_close_releases_stream_and_client(
+async def test_a_call_cancelled_mid_stream_releases_the_stream_and_client(
     invoke_context: InvokeContext, mock_ollama_client: Mock
 ) -> None:
     closed: list[str] = []
+    first = asyncio.Event()
 
     async def chunks() -> AsyncIterator[ChatResponse]:
         try:
-            for text in ("a", "b"):
-                yield ChatResponse.model_validate(
-                    {"message": {"role": "assistant", "content": text}}
-                )
+            yield ChatResponse.model_validate(
+                {"message": {"role": "assistant", "content": "a"}}
+            )
+            await asyncio.Event().wait()
         finally:
             closed.append("stream")
 
@@ -246,16 +322,24 @@ async def test_early_close_releases_stream_and_client(
         return chunks()
 
     mock_ollama_client.return_value.chat = mock_chat
-    tool = OllamaTool(is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    await anext(stream)
-    await stream.aclose()
-    assert closed == ["stream"]
+
+    async def call() -> None:
+        with deltas_to(lambda delta: first.set()):
+            await OllamaTool().invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            )
+
+    task = asyncio.create_task(call())
+    async with asyncio.timeout(5):
+        await first.wait()
+        task.cancel()
+        await asyncio.wait({task})
+    assert task.cancelled() and closed == ["stream"]
     mock_ollama_client.return_value.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
+async def test_a_stream_failing_to_close_does_not_replace_the_calls_error(
     invoke_context: InvokeContext, mock_ollama_client: Mock
 ) -> None:
     async def chunks() -> AsyncIterator[ChatResponse]:
@@ -270,11 +354,13 @@ async def test_stream_close_failure_on_early_close_is_not_a_call_failure(
     async def mock_chat(*args: Any, **kwargs: Any) -> AsyncIterator[ChatResponse]:
         return chunks()
 
+    def receive(delta: Delta) -> None:
+        raise ValueError("caller gone")
+
     mock_ollama_client.return_value.chat = mock_chat
-    tool = OllamaTool(is_streaming=True)
-    stream = tool.invoke(invoke_context, [Message(role="user", content="Hi")])
-    await anext(stream)
-    await stream.aclose()  # Releasing the stream failed; the call did not.
+    with deltas_to(receive), pytest.raises(LLMToolException) as raised:
+        await OllamaTool().invoke(invoke_context, [Message(role="user", content="Hi")])
+    assert isinstance(raised.value.__cause__, ValueError)
     mock_ollama_client.return_value.close.assert_awaited_once()
 
 
@@ -290,11 +376,118 @@ async def test_client_close_failure_does_not_fail_completed_call(
     mock_ollama_client.return_value.chat = mock_chat
     mock_ollama_client.return_value.close = AsyncMock(side_effect=OSError("close"))
     tool = OllamaTool()
-    result = [
-        message
-        async for batch in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
     assert [message.content for message in result] == ["done"]
+
+
+@pytest.mark.asyncio
+async def test_chat_params_reach_the_client(invoke_context, mock_ollama_client):
+    calls: List[dict] = []
+
+    async def chat(**kwargs: Any) -> ChatResponse:
+        calls.append(kwargs)
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "ok"}}
+        )
+
+    mock_ollama_client.return_value.chat = chat
+    tool = OllamaTool(
+        chat_params={"options": {"temperature": 0}, "keep_alive": "5m", "model": "m2"}
+    )
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+
+    assert calls[0]["options"] == {"temperature": 0}
+    assert calls[0]["keep_alive"] == "5m"
+    assert calls[0]["model"] == "m2"  # A key chat_params sets replaces the default.
+
+
+@pytest.mark.asyncio
+async def test_a_model_setting_chat_takes_no_argument_for_is_an_option(
+    invoke_context, mock_ollama_client
+):
+    """As the docs write them, {"temperature": 0.7}, which chat() would refuse;
+    one given in options too replaces it."""
+    calls: List[dict] = []
+
+    async def chat(**kwargs: Any) -> ChatResponse:
+        calls.append(kwargs)
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "ok"}}
+        )
+
+    mock_ollama_client.return_value.chat = chat
+    tool = OllamaTool(
+        chat_params={"temperature": 0.7, "top_k": 5, "options": {"top_k": 9}}
+    )
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+
+    assert calls[0]["options"] == {"temperature": 0.7, "top_k": 9}
+    assert "temperature" not in calls[0]
+
+
+@pytest.mark.parametrize("key", ["temprature", "max_tokens", "stream"])
+def test_a_chat_param_ollama_does_not_take_is_refused_when_made(key: str):
+    """A misspelt key, or OpenAI's, would fail every call."""
+    with pytest.raises(ValidationError, match=f"holds \\['{key}'\\]"):
+        OllamaTool(chat_params={key: 7})
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
+    invoke_context, mock_ollama_client
+):
+    async def chunks() -> Any:
+        yield ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "Checking."}}
+        )
+        yield ChatResponse.model_validate(
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "weather",
+                                "arguments": {"city": "Paris"},
+                            }
+                        }
+                    ],
+                }
+            }
+        )
+
+    async def chat(**kwargs: Any) -> Any:
+        return chunks()
+
+    mock_ollama_client.return_value.chat = chat
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        output = await OllamaTool().invoke(
+            invoke_context, [Message(role="user", content="Weather?")]
+        )
+
+    [message] = output
+    assert [delta.content for delta in received] == ["Checking."]
+    assert message.content == "Checking."
+    assert message.tool_calls[0].function.name == "weather"
+    assert message.tool_calls[0].function.arguments == '{"city": "Paris"}'
+
+
+def test_a_tool_result_names_the_function_its_call_named():
+    call = {
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "weather", "arguments": '{"city": "Paris"}'},
+    }
+    api_messages, _ = OllamaTool().prepare_api_input(
+        [
+            Message(role="assistant", content="", tool_calls=[call]),
+            Message(role="tool", tool_call_id="call_1", content="sunny"),
+        ]
+    )
+    assert api_messages[-1] == {
+        "role": "tool",
+        "content": "sunny",
+        "tool_name": "weather",
+    }

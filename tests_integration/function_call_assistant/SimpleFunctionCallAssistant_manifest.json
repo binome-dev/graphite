@@ -1,194 +1,159 @@
 {
-    "assistant_id": "b6f603c5d6804e97a85958908b8d5d46",
+  "apiVersion": "grafi/v2",
+  "kind": "Assistant",
+  "spec": {
+    "class": "tests_integration.function_call_assistant.simple_function_call_assistant:SimpleFunctionCallAssistant",
+    "assistant_id": "92301242e12d4381bd03b8a57df67854",
     "name": "SimpleFunctionCallAssistant",
     "type": "SimpleFunctionCallAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "bb1edfa98ea44b7684052737f69ef4d1",
-        "name": "simple_function_call_workflow",
-        "type": "EventDrivenWorkflow",
-        "oi_span_type": "AGENT",
-        "nodes": {
-            "OpenAIInputNode": {
-                "class": "Node",
-                "node_id": "6f9085b566e444cdb32156f517015794",
-                "name": "OpenAIInputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "3ff8a415b92342ad9455befa827cb8ac",
-                    "name": "UserInputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "agent_input_topic"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "function_call_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_tool_call"
-                            },
-                            "from_stage": null
-                        },
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_text_response"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+      "class": "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow",
+      "oi_span_type": "AGENT",
+      "workflow_id": "04fa961ae40b4e408f5b9b9487231d48",
+      "name": "simple_function_call_workflow",
+      "type": "EventDrivenWorkflow",
+      "nodes": {
+        "OpenAIInputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "1bedf404700a4294944242b6ddfa469b",
+          "name": "OpenAIInputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "0873c6c62147433297172a019593a54b",
+            "name": "UserInputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "FunctionCallNode": {
-                "class": "Node",
-                "node_id": "8776600c35e6460684b5648921e01cfd",
-                "name": "FunctionCallNode",
-                "type": "FunctionCallNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "LocalInfoMock",
-                    "base_class": "FunctionCallTool",
-                    "tool_id": "a9e1056de5b847729bfdb909fb6ce849",
-                    "name": "LocalInfoMock",
-                    "type": "FunctionCallTool",
-                    "oi_span_type": "TOOL",
-                    "function_specs": [
-                        {
-                            "name": "get_weather_mock",
-                            "description": "Function to get weather information for a given postcode.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "postcode": {
-                                        "description": "The postcode for which to retrieve weather information.",
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "postcode"
-                                ]
-                            },
-                            "output_schema": {
-                                "type": "string"
-                            }
-                        },
-                        {
-                            "name": "get_population_mock",
-                            "description": "Function to get population information for a given postcode.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "postcode": {
-                                        "description": "The postcode for which to retrieve population information.",
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "postcode"
-                                ]
-                            },
-                            "output_schema": {
-                                "type": "string"
-                            }
-                        }
-                    ],
-                    "functions": {}
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_call_topic"
-                    }
-                ],
-                "command": {
-                    "class": "FunctionCallCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "function_result_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
-            },
-            "OpenAIOutputNode": {
-                "class": "Node",
-                "node_id": "62b65d7f45be4a6fa37ad8b24e0dd7e2",
-                "name": "OpenAIOutputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "8bbe6f433b724b47b182db34da686eba",
-                    "name": "UserOutputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_result_topic"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_text_response"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "agent_input_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_call_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_tool_call"
+                }
+              },
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         },
-        "topics": {
-            "agent_input_topic": {
-                "name": "agent_input_topic",
-                "type": "AgentInputTopic"
-            },
-            "function_call_topic": {
-                "name": "function_call_topic",
-                "type": "Topic"
-            },
-            "agent_output_topic": {
-                "name": "agent_output_topic",
-                "type": "AgentOutputTopic"
-            },
-            "function_result_topic": {
-                "name": "function_result_topic",
-                "type": "Topic"
+        "FunctionCallNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "691bdaf90da74a86ab582177b9cd9287",
+          "name": "FunctionCallNode",
+          "type": "FunctionCallNode",
+          "tool": {
+            "class": "tests_integration.function_call_assistant.simple_function_call_assistant_multi_functions_example:LocalInfoMock",
+            "tool_id": "260793721c3c4924bac2a6665a3acb2e",
+            "name": "LocalInfoMock",
+            "type": "FunctionCallTool",
+            "oi_span_type": "TOOL",
+            "functions": {},
+            "on_error": "return"
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_call_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_result_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
+        },
+        "OpenAIOutputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "2976e3a25d5547738d624e987f36c105",
+          "name": "OpenAIOutputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "a866bb33c2f8440e9db8e96489ae1036",
+            "name": "UserOutputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
+            },
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_result_topic"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         }
+      },
+      "topics": {
+        "agent_input_topic": {
+          "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+          "name": "agent_input_topic",
+          "type": "AgentInputTopic"
+        },
+        "function_call_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_call_topic",
+          "type": "Topic"
+        },
+        "agent_output_topic": {
+          "class": "grafi.topics.topic_impl.output_topic:OutputTopic",
+          "name": "agent_output_topic",
+          "type": "AgentOutputTopic"
+        },
+        "function_result_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_result_topic",
+          "type": "Topic"
+        }
+      }
     }
+  }
 }

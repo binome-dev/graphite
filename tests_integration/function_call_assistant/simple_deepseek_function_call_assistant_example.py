@@ -68,7 +68,15 @@ async def test_simple_function_call_assistant() -> None:
     print(outputs)
     print(outputs[-1].data[0].content)
     assert "12345" in str(outputs[-1].data[0].content)
-    assert "bad" in str(outputs[-1].data[0].content)
+    # The function's own words, not the LLM's rewording of them.
+    tool_results = [
+        message.content
+        for event in await event_store.get_events()
+        if isinstance(event, PublishToTopicEvent)
+        for message in event.data
+        if message.role == "tool"
+    ]
+    assert any("bad" in str(result) for result in tool_results)
 
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) >= 24

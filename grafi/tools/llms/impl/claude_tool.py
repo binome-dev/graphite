@@ -3,8 +3,8 @@ ClaudeTool - Anthropic Claude implementation of grafi.tools.llms.llm.LLM
 """
 
 import json
-import os
 from typing import Any
+from typing import ClassVar
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -16,10 +16,12 @@ from pydantic import Field
 from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
+from grafi.runtime.deltas import emit_delta
+from grafi.tools.llms.llm import _PROVIDER_REMOVED_METHODS
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -43,11 +45,11 @@ class ClaudeTool(LLM):
     Anthropic Claude implementation of the LLM tool interface used by *grafi*.
     """
 
+    removed_methods: ClassVar[Dict[str, str]] = _PROVIDER_REMOVED_METHODS
+
     name: str = Field(default="ClaudeTool")
     type: str = Field(default="ClaudeTool")
-    api_key: Optional[str] = Field(
-        default_factory=lambda: os.getenv("ANTHROPIC_API_KEY")
-    )
+    api_key: Optional[str] = env_secret("ANTHROPIC_API_KEY")
     # Anthropic recommends not lowballing max_tokens; this is an upper bound, not
     # a cost floor (you pay for what is generated). Opus 4.x supports up to 128K
     # when streaming — raise this if you stream long outputs.
@@ -214,27 +216,27 @@ class ClaudeTool(LLM):
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> MsgsAGen:
+    ) -> Messages:
         system, messages, tools = self.prepare_api_input(input_data)
         request_kwargs = self._request_kwargs(system, messages, tools)
+        # Without a key in its own variable, the SDK uses Anthropic's own
+        # credentials, such as ANTHROPIC_AUTH_TOKEN behind a gateway.
+        key = self.sdk_api_key(required=False)
 
         try:
             async with best_effort_exit(
-                AsyncAnthropic(api_key=self.api_key), "Anthropic client"
+                AsyncAnthropic(api_key=key), "Anthropic client"
             ) as client:
-                if self.is_streaming:
-                    async with best_effort_exit(
-                        client.messages.stream(**request_kwargs), "Anthropic stream"
-                    ) as stream:
-                        async for event in stream:
-                            if event.type == "text":
-                                yield self.to_stream_messages(event.text)
-                else:
-                    resp: AnthropicMessage = await client.messages.create(
-                        **request_kwargs
-                    )
-                    yield self.to_messages(resp)
-
+                # Always streamed: the SDK refuses a request that may take long
+                # (a large max_tokens) unless it is.
+                async with best_effort_exit(
+                    client.messages.stream(**request_kwargs), "Anthropic stream"
+                ) as stream:
+                    if self.should_stream():
+                        async for text in stream.text_stream:
+                            emit_delta(text)
+                    response = await stream.get_final_message()
+            messages = self._to_messages(response)
         except Exception as exc:
             raise LLMToolException(
                 tool_name=self.name,
@@ -243,16 +245,12 @@ class ClaudeTool(LLM):
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc
+        return messages
 
     # ------------------------------------------------------------------ #
     # Conversion helpers                                                 #
     # ------------------------------------------------------------------ #
-    def to_stream_messages(self, text: str) -> Messages:
-        if text:
-            return [Message(role="assistant", content=text, is_streaming=True)]
-        return []
-
-    def to_messages(self, resp: AnthropicMessage) -> Messages:
+    def _to_messages(self, resp: AnthropicMessage) -> Messages:
         text = ""
         tool_calls = []
         for block in resp.content:
@@ -272,10 +270,8 @@ class ClaudeTool(LLM):
         message_args: Dict[str, Any] = {
             "role": "assistant",
             "content": text,
-            "tool_calls": tool_calls,
+            "tool_calls": tool_calls or None,  # No tool call is None, not [].
         }
-        if len(tool_calls) > 0:
-            message_args["content"] = ""
 
         # A refused response (HTTP 200, stop_reason="refusal") carries empty or
         # partial content; surface the reason on the message so callers can react
@@ -289,58 +285,12 @@ class ClaudeTool(LLM):
 
         return [Message.model_validate(message_args)]
 
-    # ------------------------------------------------------------------ #
-    # Serialisation                                                      #
-    # ------------------------------------------------------------------ #
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "max_tokens": self.max_tokens,
-            "thinking": self.thinking,
-            "effort": self.effort,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "ClaudeTool":
-        """
-        Create a ClaudeTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the ClaudeTool.
-
-        Returns:
-            ClaudeTool: A ClaudeTool instance created from the dictionary.
-        """
-        # Create base instance from parent and add ClaudeTool-specific fields
-
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "ClaudeTool"))
-            .type(data.get("type", "ClaudeTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
-            .system_message(data.get("system_message", ""))
-            .api_key(os.getenv("ANTHROPIC_API_KEY"))
-            .model(data.get("model", "claude-haiku-4-5"))
-            .max_tokens(data.get("max_tokens", 16384))
-            .thinking(data.get("thinking"))
-            .effort(data.get("effort"))
-            .build()
-        )
-
 
 class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
     """
     Builder for ClaudeTool.
     This is a convenience class to create instances of ClaudeTool using a fluent interface.
     """
-
-    def api_key(self, api_key: Optional[str]) -> Self:
-        self.kwargs["api_key"] = api_key
-        return self
 
     def max_tokens(self, max_tokens: int) -> Self:
         self.kwargs["max_tokens"] = max_tokens

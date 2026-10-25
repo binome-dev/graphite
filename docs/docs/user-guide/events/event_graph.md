@@ -2,6 +2,8 @@
 
 The Graphite event graph system provides advanced event relationship modeling and topological analysis capabilities for topic-based events. It enables visualization of event dependencies, causal relationships, and proper ordering of events for replay and analysis scenarios.
 
+Graphite uses it in `LLMCommand`: for each LLM call, it builds the graph of the events that led to the node's input, in memory, to gather the messages of the LLM's history. It then orders those messages by their timestamps, not by the graph, placing each tool result right after the call it answers.
+
 ## Overview
 
 The event graph system is designed to:
@@ -15,23 +17,16 @@ The event graph system is designed to:
 
 ### EventGraphNode
 
-Represents a single event within the graph structure.
+Represents a single event within the graph structure: a consume event.
 
 #### Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `event_id` | `EventId` | Unique identifier for the event |
-| `event` | `TopicEvent` | The actual topic event data |
+| `event` | `TopicEvent` | The event itself, a `ConsumeFromTopicEvent` |
 | `upstream_events` | `List[EventId]` | Events that this event depends on |
 | `downstream_events` | `List[EventId]` | Events that depend on this event |
-
-#### Methods
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `to_dict` | `() -> dict[str, Any]` | Serialize node to dictionary |
-| `from_dict` | `classmethod (data: dict) -> EventGraphNode` | Deserialize node from dictionary |
 
 ### EventGraph
 
@@ -42,7 +37,7 @@ The main graph structure that manages event relationships and provides analysis 
 | Field | Type | Description |
 |-------|------|-------------|
 | `nodes` | `Dict[EventId, EventGraphNode]` | All nodes in the graph |
-| `root_nodes` | `List[EventGraphNode]` | Entry point nodes (no dependencies) |
+| `root_nodes` | `List[EventGraphNode]` | The consume events the graph was built from |
 
 #### Core Methods
 
@@ -54,7 +49,7 @@ The main graph structure that manages event relationships and provides analysis 
 
 ## Graph Construction Algorithm
 
-The event graph is built by analyzing the relationships between consume and publish events.
+The event graph is built by analyzing the relationships between consume and publish events. Its nodes are consume events: a consume event depends on the consume events listed in the `consumed_event_ids` of the publication it read, found by topic name and offset.
 
 ### Algorithm Overview
 
@@ -109,33 +104,32 @@ def build_node_relations(consume_event: ConsumeFromTopicEvent) -> None:
 
 ### Example Graph Structure
 
+An arrow runs from an event to the event that depends on it. The graph below was built from the consume event R, its root:
+
 ```mermaid
 graph TB
     subgraph "Event Graph Example"
-        A[Consume Event A<br/>Topic: input<br/>Offset: 1] --> B[Publish Event B<br/>Topic: processing<br/>Offset: 1]
-        B --> C[Consume Event C<br/>Topic: processing<br/>Offset: 1]
-        C --> D[Publish Event D<br/>Topic: output<br/>Offset: 1]
-
-        E[Consume Event E<br/>Topic: input<br/>Offset: 2] --> F[Publish Event F<br/>Topic: processing<br/>Offset: 2]
-        F --> G[Consume Event G<br/>Topic: processing<br/>Offset: 2]
-        G --> D
+        A[Consume Event A<br/>Topic: input<br/>Offset: 0] --> C[Consume Event C<br/>Topic: processing<br/>Offset: 0]
+        E[Consume Event E<br/>Topic: input<br/>Offset: 1] --> G[Consume Event G<br/>Topic: processing<br/>Offset: 1]
+        C --> R[Consume Event R<br/>Topic: output<br/>Offset: 0]
+        G --> R
     end
 
     style A fill:#e1f5fe
     style E fill:#e1f5fe
-    style D fill:#e8f5e8
+    style R fill:#e8f5e8
 ```
 
 ## Topological Sorting Algorithm
 
-The system provides topologically sorted events using a modified Kahn's algorithm with timestamp-based ordering.
+The system provides topologically sorted events using a modified Kahn's algorithm with timestamp-based ordering. It starts from the events nothing depends on, takes the latest first, and reverses the result: every event comes after the events it depends on, and otherwise, as far as they allow, in timestamp order.
 
 ### Algorithm Visualization
 
 ```mermaid
 graph TD
     A[Compute In-Degrees] --> B[Initialize Min-Heap with Zero In-Degree Nodes]
-    B --> C[Pop Node with Earliest Timestamp]
+    B --> C[Pop Node with Latest Timestamp]
     C --> D[Add to Result]
     D --> E[Decrement In-Degrees of Upstream Nodes]
     E --> F{Any Zero In-Degree Nodes?}
@@ -205,11 +199,9 @@ gantt
     section Processing Order
     Event A (t=100) :done, a, 0, 1
     Event E (t=150) :done, e, 1, 2
-    Event B (t=200) :done, b, 2, 3
-    Event F (t=250) :done, f, 3, 4
-    Event C (t=300) :done, c, 4, 5
-    Event G (t=350) :done, g, 5, 6
-    Event D (t=400) :done, d, 6, 7
+    Event C (t=200) :done, c, 2, 3
+    Event G (t=250) :done, g, 3, 4
+    Event R (t=300) :done, r, 4, 5
 ```
 
 ## Usage Patterns
@@ -225,8 +217,8 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 graph = EventGraph()
 
 # Collect events
-consume_events = [...]  # List of ConsumeFromTopicEvent
-topic_events = {...}    # Dict mapping event IDs to events
+consume_events = [...]  # List of ConsumeFromTopicEvent, the graph's roots
+topic_events = {...}    # Dict mapping event IDs to consume and publish events
 
 # Build the graph
 graph.build_graph(consume_events, topic_events)
@@ -270,8 +262,8 @@ def analyze_event_dependencies(graph: EventGraph, event_id: str):
 ### Root Event Analysis
 
 ```python
-def find_root_causes(graph: EventGraph):
-    """Find all events that started processing chains."""
+def describe_root_events(graph: EventGraph):
+    """Describe the events the graph was built from."""
     root_nodes = graph.get_root_event_nodes()
 
     return [
@@ -312,33 +304,17 @@ graph LR
 
 ```python
 def identify_parallel_opportunities(graph: EventGraph):
-    """Identify events that can be processed in parallel."""
-    sorted_events = graph.get_topology_sorted_events()
-    parallel_groups = []
-
-    current_level = []
-    processed_dependencies = set()
-
-    for node in sorted_events:
-        # Check if all dependencies are satisfied
-        dependencies_satisfied = all(
-            dep_id in processed_dependencies
-            for dep_id in node.upstream_events
+    """Group events by depth: the events of a group do not depend on each other."""
+    depth = {}
+    for node in graph.get_topology_sorted_events():  # Upstream events first.
+        depth[node.event_id] = 1 + max(
+            (depth[up_id] for up_id in node.upstream_events), default=-1
         )
 
-        if dependencies_satisfied:
-            current_level.append(node.event_id)
-        else:
-            if current_level:
-                parallel_groups.append(current_level)
-                current_level = [node.event_id]
-
-        processed_dependencies.add(node.event_id)
-
-    if current_level:
-        parallel_groups.append(current_level)
-
-    return parallel_groups
+    levels = {}
+    for event_id, level in depth.items():
+        levels.setdefault(level, []).append(event_id)
+    return [levels[level] for level in sorted(levels)]
 ```
 
 ### Event Graph Validation
@@ -372,41 +348,30 @@ def validate_event_graph(graph: EventGraph):
     return issues
 ```
 
-## Serialization and Persistence
+## Persistence
 
-### Graph Serialization
-
-```python
-# Serialize graph to dictionary
-graph_dict = graph.to_dict()
-
-# Save to JSON
-import json
-with open("event_graph.json", "w") as f:
-    json.dump(graph_dict, f, indent=2)
-
-# Load from JSON
-with open("event_graph.json", "r") as f:
-    graph_data = json.load(f)
-
-# Reconstruct graph
-graph = EventGraph.from_dict(graph_data)
-```
-
-### Integration with Event Store
+An event graph is not saved: it has no `to_dict()` or `from_dict()`. It is built in memory from events in the event store, so rebuild it to analyze a past request, as `LLMCommand` does:
 
 ```python
-def save_graph_to_event_store(graph: EventGraph, event_store: EventStore):
-    """Save event graph analysis as a special event."""
-    from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.events.event import TOPIC_EVENT_TYPES
+from grafi.common.events.event_graph import EventGraph
+from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
-    graph_event = TopicEvent(
-        name="event_graph_analysis",
-        offset=0,
-        data=graph.to_dict()
-    )
+# The request to analyze: invoke_context.assistant_request_id, as LLMCommand reads it.
+events = await event_store.get_agent_events(
+    assistant_request_id, event_types=TOPIC_EVENT_TYPES
+)
+topic_events = {
+    event.event_id: event
+    for event in events
+    if isinstance(event, (ConsumeFromTopicEvent, PublishToTopicEvent))
+}
+# The roots: here, what the request's last node consumed.
+consume_events = [e for e in events if isinstance(e, ConsumeFromTopicEvent)][-1:]
 
-    event_store.record_event(graph_event)
+graph = EventGraph()
+graph.build_graph(consume_events, topic_events)
 ```
 
 ## Performance Considerations
@@ -417,22 +382,8 @@ def save_graph_to_event_store(graph: EventGraph, event_store: EventStore):
 |-----------|----------------|-------------|
 | Graph Construction | O(V + E) | V = events, E = relationships |
 | Topological Sort | O(V log V + E) | Heap operations + edge processing |
-| Root Node Finding | O(V) | Linear scan of all nodes |
+| Root Node Finding | O(1) | The roots are kept as the graph is built |
 | Dependency Lookup | O(1) | Direct dictionary access |
-
-### Memory Optimization
-
-```python
-def optimize_graph_memory(graph: EventGraph):
-    """Optimize graph memory usage for large datasets."""
-    # Remove unnecessary downstream references if only upstream needed
-    for node in graph.nodes.values():
-        if not_needed_downstream():
-            node.downstream_events.clear()
-
-    # Implement node pooling for frequent operations
-    # Consider lazy loading for large graphs
-```
 
 ### Scaling Strategies
 
@@ -459,7 +410,7 @@ def optimize_graph_memory(graph: EventGraph):
 
 ### Integration Patterns
 
-1. **Event Store Integration**: Persist graphs for historical analysis
+1. **Event Store Integration**: Rebuild graphs from the event store for historical analysis
 2. **Monitoring Integration**: Use graphs for real-time monitoring
 3. **Debugging Support**: Leverage graphs for debugging event flows
 4. **Performance Analysis**: Use graphs to identify bottlenecks

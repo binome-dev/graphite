@@ -34,7 +34,7 @@ class MockTool(Tool):
         )
 
     async def invoke(self, invoke_context: InvokeContext, input_data: Messages):
-        yield [
+        return [
             Message(role="assistant", content=f"Mock async response from {self.name}")
         ]
 
@@ -55,9 +55,6 @@ class MockTopic(TopicBase):
 
     async def consume(self, consumer_name: str) -> List:
         return []
-
-    def to_dict(self):
-        return {"name": self.name, "type": "MockTopic"}
 
 
 class ConcreteNodeBase(NodeBase):
@@ -145,7 +142,7 @@ class TestNodeBase:
         assert basic_node_base.subscribed_expressions == []
         assert basic_node_base.publish_to == []
         assert basic_node_base._subscribed_topics == {}
-        assert basic_node_base._command is None
+        assert basic_node_base.command is None
 
     def test_node_base_creation_with_custom_values(
         self, mock_tool: MockTool, mock_topic: MockTopic
@@ -197,32 +194,16 @@ class TestNodeBase:
         """Test the command property getter."""
         # Initially should be None
         assert basic_node_base.command is None
-        assert basic_node_base._command is None
+        assert basic_node_base.command is None
 
-    def test_command_property_setter(
+    def test_command_cannot_be_set(
         self, basic_node_base: ConcreteNodeBase, mock_tool: MockTool
     ):
-        """Test the command property setter."""
-        command = Command(tool=mock_tool)
-        basic_node_base.command = command
-
-        assert basic_node_base._command is command
-        assert basic_node_base.command is command
-
-    def test_command_property_round_trip(
-        self, basic_node_base: ConcreteNodeBase, mock_tool: MockTool
-    ):
-        """Test setting and getting the command property."""
-        command = Command(tool=mock_tool)
-
-        # Set command
-        basic_node_base.command = command
-
-        # Get command
-        retrieved_command = basic_node_base.command
-
-        assert retrieved_command is command
-        assert basic_node_base._command is command
+        """A node's command follows from its tool, which is saved: one set
+        apart would not be, and the node would load without it."""
+        with pytest.raises((AttributeError, ValueError)):
+            basic_node_base.command = Command(tool=mock_tool)
+        assert basic_node_base.command is None
 
     @pytest.mark.asyncio
     async def test_concrete_invoke_method(
@@ -269,7 +250,7 @@ class TestNodeBase:
         assert hasattr(basic_node_base, "_subscribed_topics")
         assert hasattr(basic_node_base, "_command")
         assert basic_node_base._subscribed_topics == {}
-        assert basic_node_base._command is None
+        assert basic_node_base.command is None
 
     # Test Field Validation
     def test_subscribed_expressions_field_validation(self, mock_topic: MockTopic):
@@ -389,18 +370,13 @@ class TestNodeBase:
         assert len(node.subscribed_expressions) == 1
         assert len(node.publish_to) == 1
 
-    def test_field_assignment_after_creation(self, mock_tool: MockTool):
-        """Test that fields can be reassigned after creation."""
+    def test_a_tool_set_later_is_the_one_the_command_runs(self, mock_tool: MockTool):
+        """The command follows the node's tool when read."""
         node = ConcreteNodeBase(name="test_node")
 
-        # Initially None
-        assert node.tool is None
-
-        # Assign tool
         node.tool = mock_tool
 
-        # Verify assignment
-        assert node.tool is mock_tool
+        assert node.command is not None and node.command.tool is mock_tool
 
     # Test Pydantic Model Features
     def test_model_dump(self, mock_tool: MockTool, mock_topic: MockTopic):
@@ -441,6 +417,9 @@ class TestNodeBase:
 
         assert "_subscribed_topics" not in dumped
         assert "_command" not in dumped
+        # The command follows from the tool's class: it is never saved.
+        assert "command" not in dumped
+        assert "command" not in node.model_dump(mode="json")
 
     # Test Inheritance
     def test_inheritance_from_base_model(self):

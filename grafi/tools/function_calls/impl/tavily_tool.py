@@ -1,12 +1,15 @@
 import json
-import os
 from typing import Any
 from typing import Dict
 from typing import Literal
 from typing import Optional
 from typing import Self
 
+from pydantic import PrivateAttr
+
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
@@ -23,12 +26,22 @@ class TavilyTool(FunctionCallTool):
     TavilyTools extends FunctionCallTool to provide web search functionality using the Tavily API.
     """
 
-    # Set up API key and Tavily client
     name: str = "TavilyTool"
     type: str = "TavilyTool"
-    client: TavilyClient
+    api_key: Optional[str] = env_secret("TAVILY_API_KEY")
     search_depth: Literal["basic", "advanced"] = "advanced"
     max_tokens: int = 6000
+
+    _client: Optional[TavilyClient] = PrivateAttr(default=None)
+
+    @property
+    def client(self) -> TavilyClient:
+        """The Tavily client, made with the tool's key on first use, and again
+        when its key changed, as a copy given another has."""
+        key, client = self.secret_value("api_key"), self._client
+        if client is None or client.api_key != key:
+            client = self._client = TavilyClient(key)
+        return client
 
     @classmethod
     def builder(cls) -> "TavilyToolBuilder":
@@ -75,50 +88,14 @@ class TavilyTool(FunctionCallTool):
 
         return json.dumps(clean_response) if clean_response else "No results found."
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "api_key": "****************",
-            "search_depth": self.search_depth,
-            "max_tokens": self.max_tokens,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "TavilyTool":
-        """
-        Create a TavilyTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the TavilyTool.
-
-        Returns:
-            TavilyTool: A TavilyTool instance created from the dictionary.
-
-        Note:
-            The client needs to be recreated with an API key from environment
-            or other secure source as API keys are masked in serialization.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "TavilyTool"))
-            .type(data.get("type", "TavilyTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .api_key(os.getenv("TAVILY_API_KEY"))
-            .search_depth(data.get("search_depth", "advanced"))
-            .max_tokens(data.get("max_tokens", 6000))
-            .build()
-        )
-
 
 class TavilyToolBuilder(FunctionCallToolBuilder[TavilyTool]):
     """Builder for TavilyTool instances."""
 
-    def api_key(self, api_key: Optional[str]) -> Self:
-        from tavily import TavilyClient
-
-        self.kwargs["client"] = TavilyClient(api_key)
+    def api_key(self, api_key: SecretInput) -> Self:
+        """Set the API key, or the variable to read it from, ``{"env":
+        "VAR"}``, as LLMBuilder.api_key() takes it."""
+        self.kwargs["api_key"] = api_key
         return self
 
     def search_depth(self, search_depth: Literal["basic", "advanced"]) -> Self:

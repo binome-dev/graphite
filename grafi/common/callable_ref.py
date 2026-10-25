@@ -1,157 +1,166 @@
-"""Pickle-free (de)serialization of the callables embedded in a manifest.
+"""Callables saved as data in a manifest, without pickle.
 
-Grafi manifests are JSON. Every component except the user's callables -- a
-:class:`FunctionTool`'s ``function``, a topic's routing ``condition``, an
-:class:`AgentCallingTool`'s ``agent_call`` -- round-trips as plain data. This
-module makes the callables round-trip as data too, with **no pickle** (pickle
-embeds opaque, version-fragile bytecode and executes arbitrary code on load).
-
-A callable is serialized in one of two JSON-native forms, chosen by what it is:
+A component's field holding a function -- a :class:`FunctionTool`'s
+``function``, a route's ``when``, an :class:`AgentCallingTool`'s
+``agent_call`` -- is typed :data:`CallableRef`, which saves it as data, in one
+of two forms, chosen by what it is:
 
 * **reference** -- ``{"ref": "module:qualname"}`` for an importable, module-level
-  function (e.g. a named topic predicate). Re-imported on load. Lightest option.
-* **component** -- ``{"component": "module:Class", "config": {...}}`` for a
-  :class:`~grafi.common.callable_component.CallableComponent` subclass. The class
-  is re-imported and re-instantiated from its (validated) config. Pure data; no
-  code in the manifest.
+  function (e.g. a named route predicate). Re-imported on load.
+* **component** -- a :class:`~grafi.common.callable_component.CallableComponent`
+  is saved as any component is, ``{"class": "module:Class", ...its fields}``,
+  and loaded back from its validated fields. Pure data; no code in the manifest.
 
 A callable that fits neither -- a lambda, an arbitrary closure, a nested
 ``def`` -- raises :class:`CallableSerializationError` rather than falling back to
 pickle. The fix is to make it an importable function or a component.
+
+Loading imports only from trusted modules (see
+:func:`grafi.common.import_ref.trust_modules`). Of grafi's own functions, a
+manifest names only its route predicates, in ``grafi.nodes.conditions``: grafi
+has other functions, which no manifest should call.
 """
 
+import re
+import reprlib
+from typing import Annotated
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import Mapping
 from typing import Optional
-from typing import Union
+
+from pydantic import PlainSerializer
+from pydantic import ValidationInfo
+from pydantic import ValidatorFunctionWrapHandler
+from pydantic import WrapValidator
 
 from grafi.common.callable_component import CallableComponent
+from grafi.common.exceptions import CallableSerializationError
+from grafi.common.import_ref import UntrustedImportError
+from grafi.common.import_ref import reference_to
 from grafi.common.import_ref import resolve_import_ref
+from grafi.common.manifest import ChecksOwnSecrets
+from grafi.common.manifest import save_refused
 
+__all__ = [
+    "CallableRef",
+    "CallableSerializationError",
+]
 
-class CallableSerializationError(ValueError):
-    """Raised when a callable cannot be represented without pickle, or when a
-    manifest's serialized callable cannot be reconstructed."""
+# grafi's modules whose functions a manifest may name.
+_GRAFI_FUNCTIONS = frozenset({"grafi.nodes.conditions"})
 
 
 def _resolve_reference(ref: str) -> Any:
-    """Import the object named by ``"module:qualname"`` (see
-    :func:`~grafi.common.import_ref.resolve_import_ref`), translating a malformed
-    reference into this module's error type."""
-    try:
-        return resolve_import_ref(ref)
-    except ValueError as e:
-        raise CallableSerializationError(str(e)) from e
+    """The function ``"module:qualname"`` names (see
+    :func:`~grafi.common.import_ref.resolve_import_ref`), unless it is a grafi
+    function a manifest may not name."""
+    _refuse_grafi(ref, ref.partition(":")[0])  # Before importing anything.
+    resolved = resolve_import_ref(ref)
+    _refuse_grafi(ref, getattr(resolved, "__module__", ""))  # Wherever named.
+    return resolved
 
 
-def _reference_for(fn: Callable[..., Any]) -> Optional[str]:
-    """Return ``"module:qualname"`` if *fn* can be re-imported, else ``None``.
-
-    Only stable, module-level callables qualify. Lambdas/locals (``<lambda>`` /
-    ``<locals>`` in the qualname) and objects in ``__main__`` (not importable from
-    a fresh process) are rejected. The candidate is resolved and compared by
-    identity, so a name that no longer points at *fn* is never emitted.
-    """
-    module = getattr(fn, "__module__", None)
-    qualname = getattr(fn, "__qualname__", None)
-    if not module or not qualname or module == "__main__" or "<" in qualname:
-        return None
-    ref = f"{module}:{qualname}"
-    try:
-        return ref if _resolve_reference(ref) is fn else None
-    except Exception:
-        return None
+def _refuse_grafi(ref: str, module: str) -> None:
+    """Refuse a function of grafi's ``module`` a manifest may not name."""
+    if module.split(".")[0] == "grafi" and module not in _GRAFI_FUNCTIONS:
+        raise UntrustedImportError(
+            f"{ref!r} is a grafi function a manifest may not name; it names "
+            f"those in {', '.join(sorted(_GRAFI_FUNCTIONS))}."
+        )
 
 
 def serialize_callable(fn: Callable[..., Any]) -> Dict[str, Any]:
-    """Serialize a callable to a JSON-safe dict, without pickle.
-
-    Tries, in order: a :class:`CallableComponent` (``component``), then an
-    importable reference (``ref``).
+    """A callable as data, without pickle: a :class:`CallableComponent` as its
+    JSON, anything else as a reference to it.
 
     Raises:
         CallableSerializationError: If *fn* is neither -- a lambda, a closure, or
             a nested ``def``.
     """
     if isinstance(fn, CallableComponent):
-        cls = type(fn)
-        return {
-            "component": f"{cls.__module__}:{cls.__qualname__}",
-            "config": fn.model_dump(mode="json"),
-        }
-
-    ref = _reference_for(fn)
+        return fn.model_dump(mode="json")
+    ref = reference_to(fn)
     if ref is not None:
         return {"ref": ref}
-
-    raise CallableSerializationError(
-        f"Cannot serialize callable {fn!r} without pickle. Make it an importable "
-        "module-level function (serialized as a reference) or a CallableComponent "
-        "subclass (serialized as config)."
+    raise save_refused(
+        CallableSerializationError(
+            f"Cannot serialize callable {_name(fn)} without pickle. Make it an "
+            "importable module-level function (serialized as a reference) or a "
+            "CallableComponent subclass (serialized as its fields)."
+        )
     )
+
+
+def _name(fn: Callable[..., Any]) -> str:
+    """What to call ``fn`` in a message: never its repr, which may show
+    arguments bound to it, such as a key."""
+    return str(getattr(fn, "__qualname__", type(fn).__qualname__))
 
 
 def deserialize_callable(
-    value: Union[str, Dict[str, Any]], *, context: str = ""
+    value: Any, context: Optional[Dict[str, Any]] = None
 ) -> Callable[..., Any]:
-    """Reconstruct a callable serialized by :func:`serialize_callable`.
-
-    Args:
-        value: ``{"ref": ...}`` or ``{"component": ..., "config": {...}}``.
-        context: Description surfaced in error messages.
+    """Reconstruct a callable serialized by :func:`serialize_callable`, in the
+    validation ``context``.
 
     Raises:
-        CallableSerializationError: On an unknown shape, a failed reconstruction,
-            or a legacy pickle payload (no longer supported -- regenerate the
-            manifest).
+        CallableSerializationError: On a value of another shape, such as one a
+            grafi 0.0.35 or 0.0.36 saved (load such a manifest with
+            from_manifest(), which upgrades it).
+        UntrustedImportError: If it names a function outside the trusted
+            modules.
     """
-    where = f" for {context}" if context else ""
-
-    # Legacy pickle formats: a bare base64 string, or a {"base64": ...} dict.
-    if isinstance(value, str) or (isinstance(value, dict) and "base64" in value):
+    if isinstance(value, Mapping) and "class" in value:
+        return CallableComponent.model_validate(value, context=context)
+    if isinstance(value, Mapping) and set(value) == {"ref"}:
+        return _resolve_reference(str(value["ref"]))  # A class or a function.
+    if isinstance(value, str) and ":" in value:
         raise CallableSerializationError(
-            f"The manifest stores a pickle payload{where}, which is no longer "
-            "supported. Regenerate the manifest with the current version "
-            "(e.g. assistant.generate_manifest())."
+            f'A function is saved as {{"ref": {value!r}}}, not as {value!r}.'
         )
-
-    if not isinstance(value, dict):
+    if looks_pickled(value):
         raise CallableSerializationError(
-            f"Cannot deserialize callable{where}: expected a dict, got "
-            f"{type(value).__name__}."
+            "A function saved by pickle, as grafi 0.0.30 to 0.0.34 saved one, is "
+            "never loaded, as loading it would run any code it holds: build it "
+            'in code and save it again, or give it as {"ref": "module:function"}.'
         )
-
-    if "component" in value:
-        return _deserialize_component(value, where)
-    if "ref" in value:
-        resolved = _resolve_reference(value["ref"])
-        if not callable(resolved):
-            raise CallableSerializationError(
-                f"Reference {value['ref']!r}{where} resolved to a non-callable "
-                f"{type(resolved).__name__}."
-            )
-        return resolved
-
+    if isinstance(value, str):  # A function's name, as grafi 0.0.29 saved one.
+        raise CallableSerializationError(
+            f"A function saved by its name only, {value!r}, says not where it "
+            'is: give it as {"ref": "module:function"}, a function defined in '
+            "a module."
+        )
     raise CallableSerializationError(
-        f"Cannot deserialize callable{where}: dict must contain 'ref' or "
-        f"'component'; got keys {sorted(value)}."
+        f"Cannot load a callable from {reprlib.repr(value)}: expected "
+        '{"ref": ...} or a CallableComponent. A manifest saved by grafi 0.0.35 '
+        "or 0.0.36 is loaded with Component.from_manifest(), which upgrades it."
     )
 
 
-def _deserialize_component(value: Dict[str, Any], where: str) -> CallableComponent:
-    cls = _resolve_reference(value["component"])
-    if not (isinstance(cls, type) and issubclass(cls, CallableComponent)):
-        raise CallableSerializationError(
-            f"Component {value['component']!r}{where} is not a CallableComponent "
-            "subclass."
-        )
-    try:
-        return cls(**value.get("config", {}))
-    except Exception as e:
-        # Surface invalid/incompatible config as this module's error type rather
-        # than leaking a raw pydantic ValidationError.
-        raise CallableSerializationError(
-            f"Failed to build component {value['component']!r}{where} from its "
-            f"config: {e}"
-        ) from e
+def looks_pickled(value: Any) -> bool:
+    """Whether ``value`` is a function saved by pickle, as base64 text (a
+    pickle's first byte, 0x80, starts it "gA"), or ``{"base64": ...}``."""
+    if isinstance(value, Mapping):
+        return "base64" in value
+    return isinstance(value, str) and bool(re.fullmatch(r"gA[A-Za-z0-9+/]+=*", value))
+
+
+def _load_callable(
+    value: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
+) -> Any:
+    if not callable(value):
+        value = deserialize_callable(value, info.context)
+    return handler(value)
+
+
+# A field holding a function, saved as its reference or as the component it is
+# (see serialize_callable) and loaded back from it.
+CallableRef = Annotated[
+    Callable[..., Any],
+    PlainSerializer(serialize_callable, return_type=Dict[str, Any], when_used="json"),
+    WrapValidator(_load_callable),
+    # A reference holds no secret, and a CallableComponent checks its own.
+    ChecksOwnSecrets(),
+]

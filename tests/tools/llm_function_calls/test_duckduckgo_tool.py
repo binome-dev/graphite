@@ -3,10 +3,13 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
+from grafi.common.manifest import ManifestError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.duckduckgo_tool import DuckDuckGoTool
+from grafi.tools.tool import Tool
 
 
 @pytest.fixture
@@ -71,8 +74,8 @@ async def test_invoke_function(duckduckgo_tool, mock_ddgs):
 
     result = []
 
-    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-        result.extend(msg)
+    msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+    result.extend(msg)
 
     assert isinstance(result[0], Message)
     assert result[0].role == "tool"
@@ -121,9 +124,10 @@ async def test_invoke_with_invalid_function_name(duckduckgo_tool):
 
     result = []
 
-    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-        result.extend(msg)
-    assert len(result) == 0
+    msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+    result.extend(msg)
+    [answer] = result  # The error, for the LLM.
+    assert answer.content.startswith("Error: LookupError")
 
 
 @pytest.mark.asyncio
@@ -157,20 +161,21 @@ async def test_error_handling(duckduckgo_tool):
 
         from grafi.common.exceptions import FunctionCallException
 
+        duckduckgo_tool.on_error = "raise"
         with pytest.raises(FunctionCallException) as excinfo:
-            async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-                assert msg  # should not reach here
+            msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+            assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)
 
 
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
+DUCKDUCKGO_TOOL = "grafi.tools.function_calls.impl.duckduckgo_tool:DuckDuckGoTool"
+
+
+def test_load_from_a_manifest_naming_the_class():
     data = {
-        "class": "DuckDuckGoTool",
+        "class": DUCKDUCKGO_TOOL,
         "tool_id": "test-id",
-        "name": "TestDuckDuckGo",
-        "type": "DuckDuckGoTool",
+        "name": "TestDuckDuckGoTool",
         "oi_span_type": "TOOL",
         "fixed_max_results": 5,
         "headers": {"User-Agent": "test"},
@@ -178,34 +183,64 @@ async def test_from_dict():
         "timeout": 15,
     }
 
-    tool = await DuckDuckGoTool.from_dict(data)
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, DuckDuckGoTool)
-    assert tool.name == "TestDuckDuckGo"
+    assert tool.tool_id == "test-id"
+    assert tool.name == "TestDuckDuckGoTool"
     assert tool.fixed_max_results == 5
     assert tool.headers == {"User-Agent": "test"}
     assert tool.proxy == "http://proxy.test"
     assert tool.timeout == 15
+    # Its search function is the class's, not saved, so loaded with it.
+    assert tool._functions() == {
+        "web_search_using_duckduckgo": DuckDuckGoTool.web_search_using_duckduckgo
+    }
+    assert [spec.name for spec in tool.get_function_specs()] == [
+        "web_search_using_duckduckgo"
+    ]
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip():
-    """Test that serialization and deserialization are consistent."""
+def test_round_trip():
     original = (
         DuckDuckGoTool.builder()
         .name("TestDDG")
         .fixed_max_results(3)
         .headers({"User-Agent": "test"})
+        .proxy("http://proxy.test")
+        .timeout(20)
         .build()
     )
+    data = original.model_dump(mode="json")
+    assert data["class"] == DUCKDUCKGO_TOOL
+    assert data["functions"] == {}
+    # What it offers follows from its search method, so it is not saved.
+    assert "function_specs" not in data  # Those it derives follow from it.
 
-    # Serialize to dict
-    data = original.to_dict()
+    restored = Tool.model_validate(data)
 
-    # Deserialize back
-    restored = await DuckDuckGoTool.from_dict(data)
+    assert type(restored) is DuckDuckGoTool
+    assert restored.tool_id == original.tool_id
+    assert restored.fixed_max_results == 3
+    assert restored.headers == {"User-Agent": "test"}
+    assert restored.proxy == "http://proxy.test"
+    assert restored.timeout == 20
+    assert restored._functions() == {
+        "web_search_using_duckduckgo": DuckDuckGoTool.web_search_using_duckduckgo
+    }
+    assert restored.get_function_specs() == original.get_function_specs()
+    assert [spec.name for spec in restored.get_function_specs()] == [
+        "web_search_using_duckduckgo"
+    ]
+    assert restored == original
+    assert restored.model_dump(mode="json") == data
+    # Every field it saves is one it loads: a misspelt one is refused.
+    with pytest.raises(ValidationError, match="max_result"):
+        Tool.model_validate({**data, "max_result": 3})
 
-    # Verify key properties match
-    assert restored.name == original.name
-    assert restored.fixed_max_results == original.fixed_max_results
-    assert restored.headers == original.headers
+
+def test_a_secret_header_set_to_a_value_is_never_saved():
+    tool = DuckDuckGoTool(headers={"Authorization": "Bearer literal"})
+
+    with pytest.raises(ManifestError, match="'Authorization'"):
+        tool.to_manifest()

@@ -11,8 +11,9 @@ coordinator task that owns all of the run's state:
 * A step invokes the node and returns what it published. The coordinator then
   commits it: one atomic ``record_events`` write of the step's consumptions and
   publications, and only then appends the publications to their topics, where
-  they can make other nodes ready. Chunks on a streamed output topic reach the
-  caller as they are produced.
+  they can make other nodes ready. A caller streaming the run also gets the
+  deltas its steps emit, as they emit them (see :mod:`grafi.runtime.deltas`);
+  they are neither published nor stored.
 * The run ends when no step is running and no node is ready.
 * A failure, a stop request or the caller leaving early stops the run: the
   running steps are cancelled at once and the coordinator waits for them. A
@@ -26,8 +27,8 @@ Run state changes only in synchronous code on the run's loop, so it needs no
 locks (except one guarding stop() from another thread) and nothing polls. Tools
 and stores run in the coordinator and step tasks; the caller's task only reads
 finished outputs from a queue. When the caller closes the stream, the outputs it
-received from stored steps are acknowledged; the rest are delivered again when
-the request resumes.
+received are acknowledged; the rest are delivered again when the request
+resumes.
 """
 
 import asyncio
@@ -47,6 +48,7 @@ from typing import Sequence
 from typing import Set
 from typing import Tuple
 from typing import Type
+from typing import Union
 
 from loguru import logger
 
@@ -60,6 +62,7 @@ from grafi.common.async_lifecycle import note_on_primary
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.async_lifecycle import unexpected_cancellation
 from grafi.common.event_stores.event_store import EventStore
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -69,7 +72,11 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.nodes.node_base import NodeBase
+from grafi.runtime.deltas import Delta
+from grafi.runtime.deltas import deltas_to
 from grafi.runtime.execution_services import current_services
+from grafi.runtime.wiring import Wiring
+from grafi.runtime.wiring import wired
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -102,9 +109,6 @@ class _TopicLog:
         self.events: List[PublishToTopicEvent] = []  # From position `start`.
         self.start = 0
         self.size = 0  # The position of the next publication.
-        # Positions below this are stored: commits store each topic's positions
-        # in order, and the run commits nothing more after a failed write.
-        self.stored_until = 0
         self.next_position: Dict[str, int] = {}  # By consumer.
 
     def append(self, publication: PublishToTopicEvent) -> None:
@@ -172,20 +176,23 @@ class WorkflowRun:
     ) -> None:
         self.name: str = workflow.name
         self.type: str = workflow.type
-        self.nodes: Dict[str, NodeBase] = workflow.nodes
+        # The workflow as it is now: a change to it reaches the next run.
+        self.nodes: Dict[str, NodeBase] = dict(workflow.nodes)
+        topics, readers, self._wiring = workflow._wire()
         self.event_store = (
             event_store if event_store is not None else current_services().event_store
         )
-        self._streamed: Set[str] = workflow._streamed_topics
         self._topics: Dict[str, _TopicLog] = {
-            name: _TopicLog(topic, workflow._topic_nodes.get(name, []))
-            for name, topic in workflow._topics.items()
+            name: _TopicLog(topic, readers.get(name, []))
+            for name, topic in topics.items()
         }
         self._invoke_context: Optional[InvokeContext] = None
         self._sequential = False  # One step at a time.
+        self._stream = False  # The caller gets the steps' deltas.
         # Ready nodes without a running step, in the order they became ready.
         self._ready: Dict[str, None] = {}
         self._steps: Dict[str, _Step] = {}  # Running steps, by node name.
+        self._started = 0  # Steps started: their numbers, from 1.
         # Nodes whose step finished, and None for a stop request: what wakes
         # the coordinator.
         self._inbox: "asyncio.Queue[Optional[str]]" = asyncio.Queue()
@@ -211,10 +218,14 @@ class WorkflowRun:
     # ------------------------------------------------------------------ #
 
     async def run(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Run the workflow, yielding its outputs as their steps commit, and the
-        chunks of streamed output topics as they are produced.
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the workflow, yielding its outputs as their steps commit, and,
+        if ``stream``, the deltas its steps emit as they emit them.
 
         The run's tasks (the coordinator, its steps) first yield to the loop, so
         none runs its first step in its creator's frame under an eager task
@@ -225,6 +236,7 @@ class WorkflowRun:
             self._loop = asyncio.get_running_loop()
         self._invoke_context = input_data.invoke_context
         self._sequential = is_sequential
+        self._stream = stream
         coordinator = asyncio.create_task(self._coordinate(input_data), name=self.name)
         coordinator.add_done_callback(self._coordinator_done)
         primary: Optional[BaseException] = None
@@ -233,6 +245,9 @@ class WorkflowRun:
                 event = await self._outputs.get()
                 if event is _END or self._failure is not None:
                     break
+                if isinstance(event, Delta):
+                    yield event
+                    continue
                 consumed = consumption_of(event, self.name, self.type)
                 # Counted as delivered once handed over: a caller that stops
                 # here has received it, and resuming must find its record (for
@@ -422,8 +437,9 @@ class WorkflowRun:
                 for event in self._topics[topic].take(node.name)
             ]
             marker = object()
+            self._started += 1
             task = asyncio.create_task(
-                self._run_step(node, consumed, marker), name=name
+                self._run_step(node, consumed, marker, self._started), name=name
             )
 
             def finished(_: "asyncio.Task[Any]", name: str = name) -> None:
@@ -573,9 +589,14 @@ class WorkflowRun:
     # ------------------------------------------------------------------ #
 
     async def _run_step(
-        self, node: NodeBase, consumed: List[ConsumeFromTopicEvent], marker: object
+        self,
+        node: NodeBase,
+        consumed: List[ConsumeFromTopicEvent],
+        marker: object,
+        number: int,
     ) -> List[PublishToTopicEvent]:
-        """Invoke ``node`` on its inputs and return its publications.
+        """Invoke ``node`` on its inputs and return its publications; the
+        deltas it emits carry the step's ``number``.
 
         A failure fails the run at once, before the node's stream is closed, so
         that close cannot hold back stopping the other steps. A node's own
@@ -588,36 +609,40 @@ class WorkflowRun:
         published: List[PublishToTopicEvent] = []
         assert self._invoke_context is not None  # Set as the run starts.
         invocation = node.invoke(self._invoke_context, consumed)
-        async with owned_iterator(invocation):
-            while True:
-                try:
-                    event = await anext(invocation)
-                except StopAsyncIteration:
-                    break
-                except Exception as error:
-                    raise self._step_failed(node, error)
-                # A route whose condition raises does not match; the router logs it.
-                topics = node.publisher_router.select(event)
-                try:
-                    publications = [
-                        self._topics[name].topic.prepare_publication(event)
-                        for name in topics
-                    ]
-                except Exception as error:
-                    failure = self._step_failed(node, error)
+        # None unless the caller streams, so that a run a tool starts inside
+        # this step (to call an agent) streams to its own caller only.
+        receive = self._outputs.put_nowait if self._stream else None
+        with (
+            deltas_to(receive, node.name, number),
+            wired(self._wiring.get(node.name, Wiring())),
+        ):
+            async with owned_iterator(invocation):
+                while True:
                     try:
-                        await invocation.athrow(error)  # Raised again, recorded.
-                    except Exception as raised:
-                        if raised is not error:
-                            note_failure(failure, raised, "Raised as the node closed")
-                    raise failure
-                for publication in publications:
-                    if publication.name in self._streamed:
-                        # Only this node writes the topic and only the caller
-                        # reads it, so a chunk can reach it at once.
-                        publication.offset = self._topics[publication.name].size
-                        self._publish(publication)
-                    published.append(publication)
+                        event = await anext(invocation)
+                    except StopAsyncIteration:
+                        break
+                    except Exception as error:
+                        raise self._step_failed(node, error)
+                    # A route whose condition raises does not match; the router
+                    # logs it.
+                    topics = node.publisher_router.select(event)
+                    try:
+                        publications = [
+                            self._topics[name].topic.prepare_publication(event)
+                            for name in topics
+                        ]
+                    except Exception as error:
+                        failure = self._step_failed(node, error)
+                        try:
+                            await invocation.athrow(error)  # Raised again, recorded.
+                        except Exception as raised:
+                            if raised is not error:
+                                note_failure(
+                                    failure, raised, "Raised as the node closed"
+                                )
+                        raise failure
+                    published.extend(publications)
         return published
 
     def _step_failed(self, node: NodeBase, error: Exception) -> BaseException:
@@ -643,11 +668,10 @@ class WorkflowRun:
             records.extend(step.consumed)
             for publication in step.task.result():
                 name = publication.name
-                if name not in self._streamed:
-                    offset = next_offsets.get(name, self._topics[name].size)
-                    publication.offset = offset
-                    next_offsets[name] = offset + 1
-                    staged.append(publication)
+                offset = next_offsets.get(name, self._topics[name].size)
+                publication.offset = offset
+                next_offsets[name] = offset + 1
+                staged.append(publication)
                 records.append(publication)
         await self._store(records)
         for publication in staged:
@@ -662,10 +686,6 @@ class WorkflowRun:
             # whatever the store holds.
             self._store_failed = True
             raise
-        for event in records:
-            if isinstance(event, PublishToTopicEvent):
-                log = self._topics[event.name]
-                log.stored_until = max(log.stored_until, event.offset + 1)
 
     def _publish(self, publication: PublishToTopicEvent) -> None:
         """Make a publication visible to its topic's consumers."""
@@ -677,15 +697,11 @@ class WorkflowRun:
             self._outputs.put_nowait(publication)
 
     async def _acknowledge(self) -> None:
-        """Record the stored outputs handed to the caller as consumed by the
-        workflow; the rest are delivered again when the request resumes."""
-        acknowledged = [
-            event
-            for event in self._delivered
-            if event.offset < self._topics[event.name].stored_until
-        ]
-        if acknowledged:
-            await self.event_store.record_events(acknowledged)
+        """Record the outputs handed to the caller, all stored before, as
+        consumed by the workflow; the rest are delivered again when the request
+        resumes."""
+        if self._delivered:
+            await self.event_store.record_events(self._delivered)
 
     # ------------------------------------------------------------------ #
     # Starting: a fresh request, or resuming one from its stored events
@@ -695,7 +711,8 @@ class WorkflowRun:
         history = [
             event
             for event in await self.event_store.get_agent_events(
-                input_data.invoke_context.assistant_request_id
+                input_data.invoke_context.assistant_request_id,
+                event_types=TOPIC_EVENT_TYPES,
             )
             if isinstance(event, TopicEvent)
         ]
@@ -774,7 +791,6 @@ class WorkflowRun:
         for event in pending:
             self._outputs.put_nowait(in_position_order[event.name].popleft())
         for log in self._topics.values():
-            log.stored_until = log.size
             log.trim()
 
     def _log_of(self, event: TopicEvent) -> _TopicLog:

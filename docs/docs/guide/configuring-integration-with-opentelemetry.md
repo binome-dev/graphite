@@ -77,7 +77,7 @@ docker run -p 6006:6006 -p 4317:4317 arizephoenix/phoenix
 
 | Attributes | Content |
 |------------|---------|
-| `id`, `name`, `type` | The component. An assistant adds `model`, and a node adds `subscribed_topics` and `publish_to_topics`. |
+| `id`, `name`, `type` | The component. A node adds `subscribed_topics` and `publish_to_topics`. |
 | `session.id`, `conversation_id`, `invoke_id`, `assistant_request_id`, `user_id` | The invoke context. `session.id` holds the conversation; backends group a session's traces by it. |
 | `input.value`, `output.value`, with their `mime_type` | The input and the output, as JSON; as plain text when cut short or when JSON cannot hold them. |
 | `error.type`, `error_id`, `error.details` | A failure. The span's status is then `ERROR`, and an `exception` event holds the traceback. `error_id` is the id in the failure's log line and in its failed events. |

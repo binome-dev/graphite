@@ -1,24 +1,29 @@
-"""Fan-out retains raw streaming publications and resumes at the next offset."""
+"""Fan-out keeps each publication's position and resumes at the next one; a
+step failing mid-stream stores nothing and streams again when retried."""
 
 import asyncio
+import json
 from uuid import uuid4
 
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
 from grafi.runtime import GrafiRuntime
+from grafi.runtime import emit_delta
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -31,10 +36,11 @@ from tests_integration.async_execution.support import input_event
 class StreamTool(EchoTool):
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append(["seed"])
-        for text in ("one", "two", "three"):
-            yield [Message(role="assistant", content=text, is_streaming=True)]
+        return [
+            Message(role="assistant", content=text) for text in ("one", "two", "three")
+        ]
 
 
 class InterruptedStreamTool(EchoTool):
@@ -42,13 +48,14 @@ class InterruptedStreamTool(EchoTool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append(["seed"])
         for text in ("one", "two", "three"):
-            yield [Message(role="assistant", content=text, is_streaming=True)]
+            emit_delta(text)
             if len(self.calls) == 1 and text == "two":
                 await self.partial_received.wait()
                 raise RuntimeError("stream interrupted")
+        return [Message(role="assistant", content="one two three")]
 
 
 async def check_recovery(sequential: bool) -> None:
@@ -79,11 +86,11 @@ async def check_recovery(sequential: bool) -> None:
         for record in history
         if isinstance(record, PublishToTopicEvent) and record.name in ("a", "b")
     ]
-    assert len(outputs) == len({record.event_id for record in outputs}) == 6
+    # One output, at each destination: the topic named twice is routed once.
+    assert len(outputs) == len({record.event_id for record in outputs}) == 2
     for name in ("a", "b"):
-        chunks = [record for record in outputs if record.name == name]
-        assert [record.offset for record in chunks] == [0, 1, 2]
-        assert all(record.data[0].is_streaming for record in chunks)
+        published = [record for record in outputs if record.name == name]
+        assert [record.offset for record in published] == [0]
         consumed = [
             record
             for record in history
@@ -91,11 +98,10 @@ async def check_recovery(sequential: bool) -> None:
             and record.name == name
             and record.consumer_name == workflow.name
         ]
-        assert [record.offset for record in consumed] == [0, 1, 2]
-    for offset in range(3):
-        pair = [record for record in outputs if record.offset == offset]
-        assert pair[0].emission_id == pair[1].emission_id
-        assert PublishToTopicEvent.from_dict(pair[0].to_dict()) == pair[0]
+        assert [record.offset for record in consumed] == [0]
+    assert outputs[0].emission_id == outputs[1].emission_id
+    stored = json.loads(json.dumps(default_event_codec.encode(outputs[0])))
+    assert default_event_codec.decode(stored) == outputs[0]
 
     # Simulate later, persisted outputs still awaiting delivery. Restore from a
     # deliberately reordered history to exercise the recorded topic positions.
@@ -107,7 +113,7 @@ async def check_recovery(sequential: bool) -> None:
                 "emission_id": tail.event_id,
                 "name": topic.name,
                 "type": topic.type,
-                "offset": 3,
+                "offset": 1,
                 "invoke_context": event.invoke_context,
             }
         )
@@ -118,9 +124,7 @@ async def check_recovery(sequential: bool) -> None:
     async with asyncio.timeout(5):
         assert await drain(runtime, workflow, event, sequential) == ["later", "later"]
     assert tool.calls == [["seed"]], "Recovery reran a committed source node"
-    print(
-        f"Fan-out stream offsets and same-request recovery, sequential={sequential}: OK"
-    )
+    print(f"Fan-out offsets and same-request recovery, sequential={sequential}: OK")
 
 
 async def main() -> None:
@@ -144,10 +148,12 @@ async def check_interrupted_stream_retry() -> None:
     partial = []
     async with asyncio.timeout(5):
         try:
-            async for output in runtime.invoke(Assistant(workflow=workflow), event):
-                text = output.data[0].content
-                partial.append(text)
-                if text == "two":
+            async for item in runtime.invoke(
+                Assistant(workflow=workflow), event, stream=True
+            ):
+                assert isinstance(item, Delta)  # No output is stored yet.
+                partial.append(item.content)
+                if item.content == "two":
                     tool.partial_received.set()
         except NodeExecutionError as error:
             assert "stream interrupted" in str(error)
@@ -158,13 +164,12 @@ async def check_interrupted_stream_retry() -> None:
         event.invoke_context.assistant_request_id
     )
     assert not any(
-        isinstance(record, ConsumeFromTopicEvent) and record.name == "out"
-        for record in history
-    )
+        isinstance(record, TopicEvent) and record.name == "out" for record in history
+    ), "The failed step stored nothing; its deltas are never stored"
     async with asyncio.timeout(5):
-        assert await drain(runtime, workflow, event) == ["one", "two", "three"]
+        assert await drain(runtime, workflow, event) == ["one two three"]
     assert len(tool.calls) == 2
-    print("Mid-stream failure retries the full stream with the same request ID: OK")
+    print("Mid-stream failure stores nothing; the retry, same request ID, does: OK")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import Field
@@ -8,7 +8,6 @@ from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from tests_integration.embedding_assistant.tools.embeddings.retrieval_tool import (
     RetrievalTool,
 )
@@ -32,20 +31,24 @@ except ImportError:
 class ChromadbRetrievalTool(RetrievalTool):
     name: str = "ChromadbRetrievalTool"
     type: str = "ChromadbRetrievalTool"
-    collection: Collection
-    embedding_model: OpenAIEmbedding
+    # A live collection and client, not data: left out of the tool's manifest,
+    # so given again to a tool loaded from one.
+    collection: Optional[Collection] = Field(default=None, exclude=True)
+    embedding_model: Optional[OpenAIEmbedding] = Field(default=None, exclude=True)
     n_results: int = Field(default=30)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
+        if self.collection is None or self.embedding_model is None:
+            raise ValueError(f"{self.name} has no collection or embedding model.")
         embeddings = self.embedding_model._get_text_embeddings(input_data[-1].content)
         result: QueryResult = self.collection.query(
             query_embeddings=embeddings, n_results=self.n_results
         )
-        yield self.to_messages(result)
+        return self.to_messages(result)
 
     def to_messages(self, result: QueryResult) -> Messages:
         ids = result["ids"]
@@ -60,14 +63,3 @@ class ChromadbRetrievalTool(RetrievalTool):
         }
         content = json.dumps(response)
         return [Message(role="assistant", content=content)]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "n_results": self.n_results,
-            "collection": self.collection.__class__.__name__,
-            "embedding_model": self.embedding_model.__class__.__name__,
-        }

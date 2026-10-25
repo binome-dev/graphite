@@ -1,9 +1,8 @@
 import inspect
 import json
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
-from typing import List
+from typing import Optional
 
 from openai import OpenAIError
 from openinference.semconv.trace import OpenInferenceSpanKindValues
@@ -11,13 +10,13 @@ from pydantic import BaseModel
 from pydantic import field_validator
 
 from grafi.common.async_lifecycle import best_effort_exit
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import LLMToolException
+from grafi.common.manifest import ModelRef
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message
-from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
 
@@ -34,10 +33,11 @@ class SyntheticTool(FunctionCallTool):
     type: str = "SyntheticTool"
     tool_name: str = ""
     description: str = ""
-    input_model: Any = ""
-    output_model: Any = ""
+    # Pydantic model classes, saved as their import paths, or JSON schemas.
+    input_model: ModelRef[Any] = ""
+    output_model: ModelRef[Any] = ""
     model: str = ""
-    openai_api_key: str = ""
+    openai_api_key: Optional[str] = env_secret("OPENAI_API_KEY")
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     @field_validator("input_model", "output_model")
@@ -78,21 +78,18 @@ class SyntheticTool(FunctionCallTool):
             f"Got: {type(v).__name__}"
         )
 
-    def model_post_init(self, _context: Any) -> None:
-        if self.input_model:
-            # Handle both dict schemas and Pydantic models
-            if isinstance(self.input_model, dict):
-                input_schema = self.input_model
-            else:
-                input_schema = self.input_model.model_json_schema()
-
-            self.function_specs.append(
-                FunctionSpec(
-                    name=self.tool_name,
-                    description=self.description,
-                    parameters=ParametersSchema(**input_schema),
-                )
-            )
+    def derived_specs(self) -> Dict[str, FunctionSpec]:
+        """Its functions' specs, and, with an input model, the tool's, made
+        from its fields."""
+        functions = super().derived_specs()
+        if not self.input_model:
+            return functions
+        tool = FunctionSpec(
+            name=self.tool_name,
+            description=self.description,
+            parameters=ParametersSchema(**self.input_schema),
+        )
+        return {self.tool_name: tool, **functions}  # Its own functions win.
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -120,45 +117,13 @@ class SyntheticTool(FunctionCallTool):
         """
         return SyntheticToolBuilder(cls)
 
-    @record_tool_invoke
-    async def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> AsyncGenerator[Messages, None]:
-        """
-        Invokes the synthetic tool by processing incoming tool calls and generating
-        LLM-based responses for each matching invocation.
-
-        Args:
-            invoke_context (InvokeContext): The context for this invocation.
-            input_data (Messages): A list of incoming messages that may contain tool calls.
-
-        Yields:
-            AsyncGenerator[Messages, None]: A stream of messages representing the
-            responses from the LLM for each valid tool call.
-
-        Raises:
-            ValueError: If no tool_calls are found in the input data.
-        """
-        input_msg = input_data[0]
-        if input_msg.tool_calls is None:
-            raise ValueError("No tool_calls found for SyntheticTool invocation.")
-
-        messages: List[Message] = []
-
-        for tool_call in input_msg.tool_calls:
-            if tool_call.function.name != self.tool_name:
-                continue
-
-            args = json.loads(tool_call.function.arguments)
-            prompt = self._make_prompt(args)
-            response = await self._call_llm(prompt)
-            messages.extend(
-                self.to_messages(response=response, tool_call_id=tool_call.id)
-            )
-
-        yield messages
+    async def call_function(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> str:
+        """Have the LLM produce the tool's output for ``arguments``."""
+        if name != self.tool_name:  # Another given spec's: not this tool's.
+            return await super().call_function(invoke_context, name, arguments)
+        return await self._call_llm(self._make_prompt(arguments))
 
     def _make_prompt(self, user_input: Dict[str, Any]) -> str:
         """Builds the synthetic execution prompt."""
@@ -216,7 +181,7 @@ class SyntheticTool(FunctionCallTool):
             if not self.output_model:
                 raise ValueError("output_model must be set to call LLM")
 
-            client = AsyncOpenAI(api_key=self.openai_api_key)
+            client = AsyncOpenAI(api_key=self.secret_value("openai_api_key"))
             # Created per call, so closed per call.
             async with best_effort_exit(client, "OpenAI client"):
                 # If output model is json (dict)
@@ -286,49 +251,6 @@ class SyntheticTool(FunctionCallTool):
                 cause=e,
             ) from e
 
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert the tool instance to a dictionary representation.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the tool.
-        """
-        return {
-            **super().to_dict(),
-            "tool_name": self.tool_name,
-            "description": self.description,
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
-            "model": self.model,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "SyntheticTool":
-        """
-        Create a SyntheticTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the SyntheticTool.
-
-        Returns:
-            SyntheticTool: A SyntheticTool instance created from the dictionary.
-
-        Note:
-            The client needs to be recreated with an API key from environment
-            or other secure source as API keys are masked in serialization.
-        """
-        return (
-            cls.builder()
-            .tool_name(data.get("tool_name", "synthetic_tool"))
-            .description(data.get("description", ""))
-            .input_model(data.get("input_schema", {}))
-            .output_model(data.get("output_schema", {}))
-            .model(data.get("model", "gpt-5-mini"))
-            .openai_api_key(data.get("openai_api_key", ""))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .build()
-        )
-
 
 class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):
     """Builder for SyntheticTool instances."""
@@ -394,8 +316,9 @@ class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):
         self.kwargs["model"] = model
         return self
 
-    def openai_api_key(self, openai_api_key: str) -> "SyntheticToolBuilder":
-        """Set the OpenAI API key.
+    def openai_api_key(self, openai_api_key: SecretInput) -> "SyntheticToolBuilder":
+        """Set the OpenAI API key, or the variable to read it from,
+        ``{"env": "VAR"}``, as LLMBuilder.api_key() takes it.
 
         Args:
             openai_api_key: The API key for OpenAI authentication.

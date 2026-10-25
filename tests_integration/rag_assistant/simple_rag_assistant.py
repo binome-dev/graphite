@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from llama_index.core.indices.base import BaseIndex
@@ -7,6 +6,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -32,13 +32,16 @@ class SimpleRagAssistant(Assistant):
     )
     name: str = Field(default="SimpleRagAssistant")
     type: str = Field(default="SimpleRagAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    model: Optional[str] = Field(default="gpt-4o-mini")
-    index: BaseIndex
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: Optional[str] = Field(default="gpt-4o-mini", exclude=True)
+    index: Optional[BaseIndex] = Field(default=None, exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _construct_workflow(self) -> "SimpleRagAssistant":
+        assert self.index is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         # Create an LLM node

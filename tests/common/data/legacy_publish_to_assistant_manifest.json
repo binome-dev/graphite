@@ -1,0 +1,176 @@
+{
+    "assistant_id": "b6f603c5d6804e97a85958908b8d5d46",
+    "name": "SimpleFunctionCallAssistant",
+    "type": "SimpleFunctionCallAssistant",
+    "oi_span_type": "AGENT",
+    "workflow": {
+        "workflow_id": "bb1edfa98ea44b7684052737f69ef4d1",
+        "name": "simple_function_call_workflow",
+        "type": "EventDrivenWorkflow",
+        "oi_span_type": "AGENT",
+        "nodes": {
+            "OpenAIInputNode": {
+                "class": "Node",
+                "node_id": "6f9085b566e444cdb32156f517015794",
+                "name": "OpenAIInputNode",
+                "type": "LLMNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "base_class": "LLMTool",
+                    "tool_id": "3ff8a415b92342ad9455befa827cb8ac",
+                    "name": "UserInputLLM",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": null,
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "agent_input_topic"
+                    }
+                ],
+                "publish_to": [
+                    "function_call_topic",
+                    "agent_output_topic"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            },
+            "FunctionCallNode": {
+                "class": "Node",
+                "node_id": "8776600c35e6460684b5648921e01cfd",
+                "name": "FunctionCallNode",
+                "type": "FunctionCallNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "LocalInfoMock",
+                    "base_class": "FunctionCallTool",
+                    "tool_id": "a9e1056de5b847729bfdb909fb6ce849",
+                    "name": "LocalInfoMock",
+                    "type": "FunctionCallTool",
+                    "oi_span_type": "TOOL",
+                    "function_specs": [
+                        {
+                            "name": "get_weather_mock",
+                            "description": "Function to get weather information for a given postcode.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "postcode": {
+                                        "description": "The postcode for which to retrieve weather information.",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "postcode"
+                                ]
+                            },
+                            "output_schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "get_population_mock",
+                            "description": "Function to get population information for a given postcode.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "postcode": {
+                                        "description": "The postcode for which to retrieve population information.",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "postcode"
+                                ]
+                            },
+                            "output_schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "functions": {}
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "function_call_topic"
+                    }
+                ],
+                "publish_to": [
+                    "function_result_topic"
+                ],
+                "command": {
+                    "class": "FunctionCallCommand"
+                }
+            },
+            "OpenAIOutputNode": {
+                "class": "Node",
+                "node_id": "62b65d7f45be4a6fa37ad8b24e0dd7e2",
+                "name": "OpenAIOutputNode",
+                "type": "LLMNode",
+                "oi_span_type": "CHAIN",
+                "tool": {
+                    "class": "OpenAITool",
+                    "base_class": "LLMTool",
+                    "tool_id": "8bbe6f433b724b47b182db34da686eba",
+                    "name": "UserOutputLLM",
+                    "type": "OpenAITool",
+                    "oi_span_type": "LLM",
+                    "system_message": null,
+                    "api_key": "****************",
+                    "model": "gpt-4o-mini",
+                    "chat_params": {},
+                    "is_streaming": false,
+                    "structured_output": false
+                },
+                "subscribed_expressions": [
+                    {
+                        "topic": "function_result_topic"
+                    }
+                ],
+                "publish_to": [
+                    "agent_output_topic"
+                ],
+                "command": {
+                    "class": "LLMCommand"
+                }
+            }
+        },
+        "topics": {
+            "agent_input_topic": {
+                "name": "agent_input_topic",
+                "type": "AgentInputTopic",
+                "condition": {
+                    "ref": "grafi.topics.topic_base:always_true"
+                }
+            },
+            "function_call_topic": {
+                "name": "function_call_topic",
+                "type": "Topic",
+                "condition": {
+                    "ref": "grafi.topics.conditions:has_tool_call"
+                }
+            },
+            "agent_output_topic": {
+                "name": "agent_output_topic",
+                "type": "AgentOutputTopic",
+                "condition": {
+                    "ref": "grafi.topics.conditions:has_text_response"
+                }
+            },
+            "function_result_topic": {
+                "name": "function_result_topic",
+                "type": "Topic",
+                "condition": {
+                    "ref": "grafi.topics.topic_base:always_true"
+                }
+            }
+        }
+    }
+}

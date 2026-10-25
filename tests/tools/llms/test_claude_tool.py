@@ -7,13 +7,18 @@ from unittest.mock import Mock
 import pytest
 from anthropic import omit
 from anthropic.types.text_block import TextBlock
+from anthropic.types.tool_use_block import ToolUseBlock
+from pydantic_core import PydanticSerializationError
 
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
+from grafi.runtime import Delta
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
+from grafi.tools.tool import Tool
 
 
 # --------------------------------------------------------------------------- #
@@ -49,6 +54,27 @@ def test_init(claude_instance):
     assert claude_instance.max_tokens == 2048
 
 
+class _Answering:
+    """An Anthropic message stream that answers ``response`` whole."""
+
+    def __init__(self, response: Any) -> None:
+        self.response = response
+
+    async def __aenter__(self) -> "_Answering":
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        return None
+
+    @property
+    async def text_stream(self) -> Any:
+        return
+        yield
+
+    async def get_final_message(self) -> Any:
+        return self.response
+
+
 # --------------------------------------------------------------------------- #
 #  invoke() – simple assistant response
 # --------------------------------------------------------------------------- #
@@ -63,7 +89,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=fake_response)
+    mock_client.messages.stream = Mock(return_value=_Answering(fake_response))
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -82,8 +108,8 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
-    async for messages in claude_instance.invoke(invoke_context, input_data):
-        result.extend(messages)
+    messages = await claude_instance.invoke(invoke_context, input_data)
+    result.extend(messages)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
@@ -93,7 +119,7 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
     mock_async_anthropic_cls.assert_called_once_with(api_key="test_api_key")
 
     # verify create() called with right kwargs
-    kwargs = mock_client.messages.create.call_args[1]
+    kwargs = mock_client.messages.stream.call_args[1]
     assert kwargs["model"] == "claude-haiku-4-5"
     assert kwargs["max_tokens"] == 2048
     # system prompt must be the top-level `system=` param, NOT a message role
@@ -117,7 +143,7 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
     fake_response = Mock(content=[fake_block])
 
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=fake_response)
+    mock_client.messages.stream = Mock(return_value=_Answering(fake_response))
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -146,10 +172,9 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
 
     msgs = [Message(role="user", content="Weather?")]
     claude_instance.add_function_specs(tools)
-    async for _ in claude_instance.invoke(invoke_context, msgs):
-        pass  # Just consume the generator to trigger the API call
+    await claude_instance.invoke(invoke_context, msgs)
 
-    kwargs = mock_client.messages.create.call_args[1]
+    kwargs = mock_client.messages.stream.call_args[1]
     assert kwargs["tools"] is not None
 
 
@@ -164,7 +189,7 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
         raise Exception("Boom")
 
     mock_client = MagicMock()
-    mock_client.messages.create.side_effect = _raise
+    mock_client.messages.stream.side_effect = _raise
 
     # Create async context manager mock for AsyncAnthropic
     async def mock_aenter(self):
@@ -183,10 +208,9 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Anthropic async call failed"):
-        async for _ in claude_instance.invoke(
+        await claude_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass  # Exception should be raised before we get any results
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -248,64 +272,98 @@ def test_prepare_api_input_tool_call_linkage(claude_instance):
 
 
 # --------------------------------------------------------------------------- #
-#  to_dict                                                                     #
+#  Saving and loading                                                          #
 # --------------------------------------------------------------------------- #
-def test_to_dict(claude_instance):
-    d = claude_instance.to_dict()
-    assert d["name"] == "ClaudeTool"
-    assert d["type"] == "ClaudeTool"
-    assert d["api_key"] == "****************"
-    assert d["model"] == "claude-haiku-4-5"
+CLAUDE_TOOL = "grafi.tools.llms.impl.claude_tool:ClaudeTool"
 
 
-# --------------------------------------------------------------------------- #
-#  from_dict                                                                   #
-# --------------------------------------------------------------------------- #
-@pytest.mark.asyncio
-async def test_from_dict():
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "ClaudeTool",
-        "tool_id": "test-id",
+@pytest.fixture
+def saved_claude(monkeypatch: pytest.MonkeyPatch) -> ClaudeTool:
+    """A ClaudeTool with every field set, its key from ANTHROPIC_API_KEY."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test_api_key")
+    return ClaudeTool(
+        name="TestClaude",
+        system_message="You are helpful",
+        api_key="test_api_key",
+        model="claude-sonnet-4-5",
+        max_tokens=2048,
+        thinking={"type": "enabled", "budget_tokens": 1024},
+        effort="high",
+        chat_params={"temperature": 0.7},
+        is_streaming=False,
+    )
+
+
+def test_dump_names_the_class_and_saves_the_key_as_its_variable(saved_claude):
+    assert saved_claude.model_dump(mode="json") == {
+        "class": CLAUDE_TOOL,
+        "tool_id": saved_claude.tool_id,
         "name": "TestClaude",
         "type": "ClaudeTool",
         "oi_span_type": "LLM",
         "system_message": "You are helpful",
-        "model": "claude-haiku-4-5",
-        "max_tokens": 2048,
+        "api_key": {"env": "ANTHROPIC_API_KEY"},
+        "model": "claude-sonnet-4-5",
         "chat_params": {"temperature": 0.7},
         "is_streaming": False,
         "structured_output": False,
+        "max_tokens": 2048,
+        "thinking": {"type": "enabled", "budget_tokens": 1024},
+        "effort": "high",
     }
 
-    tool = await ClaudeTool.from_dict(data)
+
+def test_round_trip(saved_claude):
+    data = saved_claude.model_dump(mode="json")
+
+    restored = Tool.model_validate(data)
+
+    assert type(restored) is ClaudeTool
+    assert restored.tool_id == saved_claude.tool_id
+    assert restored.api_key == "test_api_key"  # Read from ANTHROPIC_API_KEY.
+    assert restored.max_tokens == 2048
+    assert restored.thinking == {"type": "enabled", "budget_tokens": 1024}
+    assert restored.effort == "high"
+    assert restored == saved_claude
+    assert restored.model_dump(mode="json") == data
+
+
+def test_load_from_a_manifest_naming_the_class():
+    data = {
+        "class": CLAUDE_TOOL,
+        "tool_id": "test-id",
+        "name": "TestClaude",
+        "oi_span_type": "LLM",
+        "system_message": "You are helpful",
+        "model": "claude-haiku-4-5",
+        "max_tokens": 2048,
+        "thinking": {"type": "adaptive"},
+        "chat_params": {"temperature": 0.7},
+        "is_streaming": False,
+    }
+
+    tool = Tool.model_validate(data)
 
     assert isinstance(tool, ClaudeTool)
+    assert tool.tool_id == "test-id"
     assert tool.name == "TestClaude"
     assert tool.model == "claude-haiku-4-5"
     assert tool.max_tokens == 2048
+    assert tool.thinking == {"type": "adaptive"}
+    assert tool.effort is None
     assert tool.system_message == "You are helpful"
     assert tool.chat_params == {"temperature": 0.7}
     assert tool.is_streaming is False
-    assert tool.structured_output is False
 
 
-@pytest.mark.asyncio
-async def test_from_dict_roundtrip(claude_instance):
-    """Test that serialization and deserialization are consistent."""
-    # Serialize to dict
-    data = claude_instance.to_dict()
+def test_a_key_not_from_its_variable_is_never_saved(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "the_env_key")
+    tool = ClaudeTool(api_key="another_key")
 
-    # Deserialize back
-    restored = await ClaudeTool.from_dict(data)
-
-    # Verify key properties match
-    assert restored.name == claude_instance.name
-    assert restored.model == claude_instance.model
-    assert restored.max_tokens == claude_instance.max_tokens
-    assert restored.system_message == claude_instance.system_message
-    assert restored.chat_params == claude_instance.chat_params
-    assert restored.is_streaming == claude_instance.is_streaming
+    with pytest.raises(
+        PydanticSerializationError, match="ManifestError: .*ClaudeTool.api_key"
+    ):
+        tool.model_dump(mode="json")
 
 
 # --------------------------------------------------------------------------- #
@@ -346,7 +404,7 @@ def test_to_messages_refusal(claude_instance):
         stop_reason="refusal",
         stop_details=Mock(explanation="declined for policy reasons"),
     )
-    messages = claude_instance.to_messages(resp)
+    messages = claude_instance._to_messages(resp)
     assert messages[0].refusal == "declined for policy reasons"
     assert messages[0].content == ""
 
@@ -363,7 +421,9 @@ async def test_client_close_failure_does_not_fail_completed_call(
     fake_block.text = "done"
     fake_block.role = "assistant"
     mock_client = MagicMock()
-    mock_client.messages.create = AsyncMock(return_value=Mock(content=[fake_block]))
+    mock_client.messages.stream = Mock(
+        return_value=_Answering(Mock(content=[fake_block]))
+    )
 
     async def mock_aenter(self: Any) -> MagicMock:
         return mock_client
@@ -378,13 +438,9 @@ async def test_client_close_failure_does_not_fail_completed_call(
         cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
     )
 
-    result = [
-        message
-        async for batch in claude_instance.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await claude_instance.invoke(
+        invoke_context, [Message(role="user", content="Hi")]
+    )
     assert [message.content for message in result] == ["done"]
 
 
@@ -404,9 +460,15 @@ async def test_stream_close_failure_does_not_fail_the_call(
         async def __aexit__(self, *exc_info: Any) -> None:
             raise OSError("stream close failed")
 
-        async def __aiter__(self) -> Any:
+        @property
+        async def text_stream(self) -> Any:
             for text in ("a", "b"):
-                yield SimpleNamespace(type="text", text=text)
+                yield text
+
+        async def get_final_message(self) -> Any:
+            return SimpleNamespace(
+                content=[TextBlock(type="text", text="ab")], stop_reason="end_turn"
+            )
 
     mock_client = MagicMock()
     mock_client.messages.stream = Mock(return_value=FakeStream())
@@ -423,12 +485,80 @@ async def test_stream_close_failure_does_not_fail_the_call(
     monkeypatch.setattr(
         cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
     )
-    tool = ClaudeTool(api_key="test_api_key", is_streaming=True)
-    result = [
-        message.content
-        async for batch in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
+    tool = ClaudeTool(api_key="test_api_key")
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        result = [
+            message.content
+            for message in await tool.invoke(
+                invoke_context, [Message(role="user", content="Hi")]
+            )
+        ]
+    assert [delta.content for delta in received] == ["a", "b"]
+    assert result == ["ab"]
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
+    monkeypatch: pytest.MonkeyPatch, invoke_context: InvokeContext
+) -> None:
+    from types import SimpleNamespace
+
+    import grafi.tools.llms.impl.claude_tool as cl_module
+
+    class FakeStream:
+        async def __aenter__(self) -> "FakeStream":
+            return self
+
+        async def __aexit__(self, *exc_info: Any) -> None:
+            return None
+
+        @property
+        async def text_stream(self) -> Any:
+            yield "Checking."
+
+        async def get_final_message(self) -> Any:
+            return SimpleNamespace(
+                content=[
+                    TextBlock(type="text", text="Checking."),
+                    ToolUseBlock(
+                        type="tool_use",
+                        id="toolu_1",
+                        name="weather",
+                        input={"city": "Paris"},
+                    ),
+                ],
+                stop_reason="tool_use",
+            )
+
+    client = MagicMock()
+    client.messages.stream = Mock(return_value=FakeStream())
+    anthropic = MagicMock()
+    anthropic.__aenter__ = AsyncMock(return_value=client)
+    anthropic.__aexit__ = AsyncMock(return_value=None)
+    monkeypatch.setattr(cl_module, "AsyncAnthropic", MagicMock(return_value=anthropic))
+
+    tool = ClaudeTool(api_key="test_api_key")
+    received: List[Delta] = []
+    with deltas_to(received.append):
+        output = await tool.invoke(
+            invoke_context, [Message(role="user", content="Weather in Paris?")]
         )
-        for message in batch
-    ]
-    assert result == ["a", "b"]
+
+    [call] = output
+    assert [delta.content for delta in received] == ["Checking."]
+    assert call.content == "Checking."
+    assert call.tool_calls[0].id == "toolu_1"
+    assert call.tool_calls[0].function.name == "weather"
+    assert call.tool_calls[0].function.arguments == '{"city": "Paris"}'
+
+
+def test_a_reply_without_tool_use_has_no_tool_calls() -> None:
+    from types import SimpleNamespace
+
+    response = SimpleNamespace(
+        content=[TextBlock(type="text", text="Hello")], stop_reason="end_turn"
+    )
+    [message] = ClaudeTool(api_key="k")._to_messages(response)  # type: ignore[arg-type]
+    assert message.content == "Hello"
+    assert message.tool_calls is None  # Not [], which routes as a tool call.

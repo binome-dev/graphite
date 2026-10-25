@@ -24,6 +24,7 @@ from typing import AsyncIterator
 from typing import Awaitable
 from typing import Callable
 from typing import Generic
+from typing import Iterable
 from typing import Optional
 from typing import Type
 from typing import TypeVar
@@ -66,6 +67,20 @@ def cancellation_of(task: "asyncio.Task[Any]") -> asyncio.CancelledError:
     except asyncio.CancelledError as cancelled:
         return cancelled
     raise ValueError(f"{task!r} was not cancelled")
+
+
+async def wait_all(futures: Iterable["asyncio.Future[Any]"]) -> bool:
+    """Wait until ``futures`` have all ended, however often the caller is
+    cancelled meanwhile, as they must not be abandoned; and return whether it
+    was. The cancellation is not raised: the caller raises it, or its own
+    error, which a cancellation outranks."""
+    futures, cancelled = list(futures), False
+    while pending := [future for future in futures if not future.done()]:
+        try:
+            await asyncio.wait(pending)
+        except asyncio.CancelledError:
+            cancelled = True  # Still waited for.
+    return cancelled
 
 
 async def isolated(call: Callable[[], Awaitable[T]], description: str) -> T:

@@ -1,7 +1,7 @@
 """Stopping a running workflow ends its running steps before returning.
 
 One source commits A1, so the AND join waits for b; another source is still
-mid-stream when the workflow is stopped.
+running when the workflow is stopped.
 """
 
 import asyncio
@@ -11,7 +11,6 @@ from pydantic import Field
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime import GrafiRuntime
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import TopicExpr
@@ -33,12 +32,12 @@ class WaitingSource(EchoTool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         try:
-            yield [Message(role="assistant", content="A1")]
             await until_stored("a", "A1")  # The other source's A1 committed.
             self.streaming.set()
-            await asyncio.Event().wait()
+            await asyncio.Event().wait()  # Still working when stopped.
+            return [Message(role="assistant", content="A1")]
         finally:
             self.closed.set()
 

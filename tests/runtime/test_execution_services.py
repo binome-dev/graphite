@@ -152,3 +152,11 @@ class TestBinding:
                 assert current_services() is inner
             # Inner scope restored the previous (outer) binding.
             assert current_services() is outer
+
+
+def test_a_tracer_provider_given_as_the_tracer_is_refused() -> None:
+    """As 0.0.36's setup_tracing() returned a tracer, and now the provider."""
+    from opentelemetry.sdk.trace import TracerProvider
+
+    with pytest.raises(TypeError, match="not a TracerProvider: setup_tracing"):
+        ExecutionServices(tracer=TracerProvider())  # type: ignore[arg-type]

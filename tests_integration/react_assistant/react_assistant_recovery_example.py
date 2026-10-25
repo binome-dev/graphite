@@ -4,6 +4,7 @@ import os
 import uuid
 from pathlib import Path
 
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
@@ -57,9 +58,7 @@ async def load_events_from_json() -> InvokeContext:
 
     # Convert each event dict to Event object and store it
     for event_dict in events_data:
-        event = event_store._create_event_from_dict(event_dict)
-        if event is None:
-            raise ValueError(f"Failed to create event from dict: {event_dict}")
+        event = default_event_codec.decode(event_dict)  # Stored by grafi 0.0.x.
         await event_store.record_event(event)
         invoke_context = event.invoke_context
 

@@ -8,14 +8,12 @@ Docs: https://api-docs.deepseek.com – call the API with the OpenAI SDK by
 setting ``base_url="https://api.deepseek.com"``.
 """
 
-import os
-from typing import Any
 from typing import ClassVar
-from typing import Dict
 from typing import Optional
 
 from pydantic import Field
 
+from grafi.common.manifest import env_secret
 from grafi.tools.llms.impl.openai_compatible import OpenAICompatibleTool
 from grafi.tools.llms.impl.openai_compatible import OpenAICompatibleToolBuilder
 
@@ -25,9 +23,7 @@ class DeepseekTool(OpenAICompatibleTool):
 
     name: str = Field(default="DeepseekTool")
     type: str = Field(default="DeepseekTool")
-    api_key: Optional[str] = Field(
-        default_factory=lambda: os.getenv("DEEPSEEK_API_KEY")
-    )
+    api_key: Optional[str] = env_secret("DEEPSEEK_API_KEY")
     base_url: Optional[str] = Field(default="https://api.deepseek.com")
     model: str = Field(default="deepseek-chat")  # or deepseek-reasoner
 
@@ -37,27 +33,6 @@ class DeepseekTool(OpenAICompatibleTool):
     def builder(cls) -> "DeepseekToolBuilder":
         """Return a builder for DeepseekTool."""
         return DeepseekToolBuilder(cls)
-
-    # to_dict (with base_url) is inherited from OpenAICompatibleTool.
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "DeepseekTool":
-        """Create a DeepseekTool instance from a dictionary representation."""
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "DeepseekTool"))
-            .type(data.get("type", "DeepseekTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .chat_params(data.get("chat_params", {}))
-            .is_streaming(data.get("is_streaming", False))
-            .system_message(data.get("system_message", ""))
-            .model(data.get("model", "deepseek-chat"))
-            .api_key(os.getenv("DEEPSEEK_API_KEY"))
-            .base_url(data.get("base_url", "https://api.deepseek.com"))
-            .build()
-        )
 
 
 class DeepseekToolBuilder(OpenAICompatibleToolBuilder[DeepseekTool]):

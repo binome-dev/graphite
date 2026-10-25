@@ -1,189 +1,159 @@
 {
-    "assistant_id": "58797cd5370a480184c00c3f95c93312",
+  "apiVersion": "grafi/v2",
+  "kind": "Assistant",
+  "spec": {
+    "class": "tests_integration.function_call_assistant.simple_function_call_assistant:SimpleFunctionCallAssistant",
+    "assistant_id": "43b33d9e56154b6cbc9e7e41e081881d",
     "name": "SimpleFunctionCallAssistant",
     "type": "SimpleFunctionCallAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "a02dd4da319e4d348b3b9f374d91932c",
-        "name": "simple_function_call_workflow",
-        "type": "EventDrivenWorkflow",
-        "oi_span_type": "AGENT",
-        "nodes": {
-            "OpenAIInputNode": {
-                "class": "Node",
-                "node_id": "2d783e3eb0734260ae134dc91715befd",
-                "name": "OpenAIInputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "dcabaa3d5ecd4349947dd556974c5e7e",
-                    "name": "UserInputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "agent_input_topic"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "function_call_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_tool_call"
-                            },
-                            "from_stage": null
-                        },
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_text_response"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+      "class": "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow",
+      "oi_span_type": "AGENT",
+      "workflow_id": "999521f703874ce5b7c02b1681afd4c4",
+      "name": "simple_function_call_workflow",
+      "type": "EventDrivenWorkflow",
+      "nodes": {
+        "OpenAIInputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "14af1b2c8b82457eb697c1a7a2471287",
+          "name": "OpenAIInputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "cdef9db7421f48bba45b097a9c26f281",
+            "name": "UserInputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "FunctionCallNode": {
-                "class": "Node",
-                "node_id": "1331e5794e15407c89c04f03e0b473e0",
-                "name": "FunctionCallNode",
-                "type": "FunctionCallNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "LocalFileMock",
-                    "base_class": "FunctionCallTool",
-                    "tool_id": "14d155c5b1f649f0a09e317b192b1279",
-                    "name": "LocalFileMock",
-                    "type": "FunctionCallTool",
-                    "oi_span_type": "TOOL",
-                    "function_specs": [
-                        {
-                            "name": "delete_files",
-                            "description": "Function to delete files from a given root path.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "files": {
-                                        "description": "A list of file names to delete.",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "root_path": {
-                                        "description": "The root directory path from which to delete files.",
-                                        "anyOf": [
-                                            {
-                                                "type": "string"
-                                            },
-                                            {
-                                                "type": "null"
-                                            }
-                                        ]
-                                    }
-                                },
-                                "required": [
-                                    "files"
-                                ]
-                            },
-                            "output_schema": {
-                                "type": "string"
-                            }
-                        }
-                    ],
-                    "functions": {}
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_call_topic"
-                    }
-                ],
-                "command": {
-                    "class": "FunctionCallCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "function_result_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
-            },
-            "OpenAIOutputNode": {
-                "class": "Node",
-                "node_id": "b3589ee794b94e0b93b9de9785da0028",
-                "name": "OpenAIOutputNode",
-                "type": "LLMNode",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "f35d5c0434c84c1099b9600619af6842",
-                    "name": "UserOutputLLM",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "function_result_topic"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_text_response"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "agent_input_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_call_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_tool_call"
+                }
+              },
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         },
-        "topics": {
-            "agent_input_topic": {
-                "name": "agent_input_topic",
-                "type": "AgentInputTopic"
-            },
-            "function_call_topic": {
-                "name": "function_call_topic",
-                "type": "Topic"
-            },
-            "agent_output_topic": {
-                "name": "agent_output_topic",
-                "type": "AgentOutputTopic"
-            },
-            "function_result_topic": {
-                "name": "function_result_topic",
-                "type": "Topic"
+        "FunctionCallNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "a49e267b8114472a8d32b4aa59ec07f1",
+          "name": "FunctionCallNode",
+          "type": "FunctionCallNode",
+          "tool": {
+            "class": "tests_integration.function_call_assistant.simple_function_call_assistant_complex_function_example:LocalFileMock",
+            "tool_id": "caf084d76517422bb82e899c163ed7e8",
+            "name": "LocalFileMock",
+            "type": "FunctionCallTool",
+            "oi_span_type": "TOOL",
+            "functions": {},
+            "on_error": "return"
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_call_topic"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "function_result_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
+        },
+        "OpenAIOutputNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "2e97d5e01c81465e90da9446678407f9",
+          "name": "OpenAIOutputNode",
+          "type": "LLMNode",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "8db1b889c65a45d1bd421e2aef435dc2",
+            "name": "UserOutputLLM",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": null,
+            "api_key": {
+              "env": "OPENAI_API_KEY"
+            },
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "function_result_topic"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
         }
+      },
+      "topics": {
+        "agent_input_topic": {
+          "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+          "name": "agent_input_topic",
+          "type": "AgentInputTopic"
+        },
+        "function_call_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_call_topic",
+          "type": "Topic"
+        },
+        "agent_output_topic": {
+          "class": "grafi.topics.topic_impl.output_topic:OutputTopic",
+          "name": "agent_output_topic",
+          "type": "AgentOutputTopic"
+        },
+        "function_result_topic": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "function_result_topic",
+          "type": "Topic"
+        }
+      }
     }
+  }
 }

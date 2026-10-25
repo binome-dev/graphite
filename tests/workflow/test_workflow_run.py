@@ -10,6 +10,7 @@ after the workflow).
 
 import asyncio
 import contextlib
+import json
 import re
 import sys
 import uuid
@@ -29,6 +30,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
 from grafi.common.events.event import Event
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -39,11 +41,12 @@ from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
+from grafi.runtime import Delta
 from grafi.runtime import GrafiRuntime
+from grafi.runtime import emit_delta
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import SubExpr
@@ -62,7 +65,8 @@ Script = Callable[[int, list[str]], AsyncIterator[Messages]]
 
 
 class ScriptedTool(Tool):
-    """Runs an async script per call; the script yields message batches."""
+    """Runs an async script per call: the tool's output is every message the
+    script yields, once it ends."""
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
     script: Any = Field(default=None, exclude=True)
@@ -70,11 +74,14 @@ class ScriptedTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         contents = [str(message.content) for message in input_data]
         self.calls.append(contents)
-        async for batch in self.script(len(self.calls), contents):
-            yield batch
+        return [
+            message
+            async for batch in self.script(len(self.calls), contents)
+            for message in batch
+        ]
 
 
 class Interrupt(BaseException):
@@ -384,7 +391,7 @@ async def test_steps_finishing_together_commit_in_one_write(
     assert [step for step in steps if step] == [{"a", "b"}]
     # Concurrent producers get contiguous positions on their shared topic, and
     # the sink takes everything one commit published as one batch.
-    assert sorted(event.offset for event in writes.published("mid")) == [0, 1, 2, 3]
+    assert sorted(event.offset for event in writes.published("mid")) == [0, 1]
     [batch] = calls(definition, "sink")
     assert sorted(batch) == ["a1", "a2", "b1", "b2"]
 
@@ -408,7 +415,11 @@ async def test_downstream_never_reads_an_unstored_publication(
 
     async def sink(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
         sink_started.set()
-        stored = {str(event.data[0].content) for event in writes.published("mid")}
+        stored = {
+            str(message.content)
+            for event in writes.published("mid")
+            for message in event.data
+        }
         unstored.extend(text for text in inputs if text not in stored)
         yield reply("|".join(inputs))
 
@@ -444,7 +455,9 @@ async def test_node_failure_raises_node_execution_error(sequential: bool) -> Non
 @pytest.mark.asyncio
 async def test_store_failure_while_starting_is_a_workflow_error() -> None:
     class BoomStore:
-        async def get_agent_events(self, assistant_request_id: str) -> list[Event]:
+        async def get_agent_events(
+            self, assistant_request_id: str, **kwargs: Any
+        ) -> list[Event]:
             raise RuntimeError("store down")
 
     definition = workflow(
@@ -812,19 +825,20 @@ async def test_timeout_around_the_close_bounds_it_when_a_step_ignores_cancel() -
     stopping = asyncio.Event()
 
     async def stubborn(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
+        emit_delta("a")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
             stopping.set()
             await asyncio.Event().wait()  # Ignores the first cancellation.
+        yield reply("never")
 
     definition = workflow(
         node("stubborn", stubborn, InputTopic(name="input"), OutputTopic(name="out"))
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "a"
+        assert await anext(outputs) == Delta("a", "stubborn", 1)
         closing = asyncio.create_task(outputs.aclose())
         await stopping.wait()  # The close waits for a step that will not end.
         closing.cancel()  # A timeout around the close.
@@ -845,17 +859,22 @@ async def test_coordinator_cancelled_from_outside_ends_without_the_close(
     writes = Writes(monkeypatch, event_store)
 
     async def emit(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
         if stage == "running":
+            emit_delta("a")
             await asyncio.Event().wait()
+        yield reply("a")
 
     definition = workflow(
         node("emit", emit, InputTopic(name="input"), OutputTopic(name="out"))
     )
     event = input_event()
-    outputs = definition.invoke(event)
+    outputs = definition.invoke(event, stream=True)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "a"
+        first = await anext(outputs)
+        if stage == "running":  # Streamed by the step, which is still running.
+            assert first == Delta("a", "emit", 1)
+        else:
+            assert not isinstance(first, Delta) and first.data[0].content == "a"
         if stage == "finished":  # Nothing is left to run; the run awaits the close.
             await until(lambda: writes.published("out"))
         [coordinator] = tasks_named(definition.name)
@@ -880,7 +899,7 @@ async def test_coordinator_cancelled_from_outside_while_steps_stop_ends_at_once(
     received, stopping = asyncio.Event(), asyncio.Event()
 
     async def slow_to_stop(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("a")
+        emit_delta("a")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
@@ -898,7 +917,7 @@ async def test_coordinator_cancelled_from_outside_while_steps_stop_ends_at_once(
         node("slow", slow_to_stop, source, OutputTopic(name="out")),
         node("fails", fail, source, Topic(name="side")),
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         received.set()
@@ -1070,7 +1089,9 @@ def test_the_coordinator_does_not_start_in_the_callers_frame() -> None:
     from grafi.runtime.execution_services import bind_services
 
     class ExitingStore(EventStoreInMemory):
-        async def get_agent_events(self, assistant_request_id: str) -> list[Event]:
+        async def get_agent_events(
+            self, assistant_request_id: str, **kwargs: Any
+        ) -> list[Event]:
             raise SystemExit("store shut down")
 
     definition = workflow(
@@ -1383,15 +1404,16 @@ async def test_a_failed_steps_cleanup_is_not_cut_short_when_the_caller_sees_it(
         ) -> PublishToTopicEvent:
             raise ValueError("invalid publication")
 
-    class Bad(Tool):
-        oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    class Bad(Node):
+        """A node whose stream cleans up as it is closed."""
 
         async def invoke(
-            self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+            self, invoke_context: InvokeContext, node_input: list[Any]
+        ) -> AsyncIterator[PublishToTopicEvent]:
             await received.wait()
             try:
-                yield reply("x")
+                async for publication in super().invoke(invoke_context, node_input):
+                    yield publication
             finally:
                 try:
                     await asyncio.sleep(0.05)  # Releasing a client, say.
@@ -1401,9 +1423,9 @@ async def test_a_failed_steps_cleanup_is_not_cut_short_when_the_caller_sees_it(
                     raise
 
     source = InputTopic(name="input")
-    bad = Node(
+    bad = Bad(
         name="bad",
-        tool=Bad(),
+        tool=ScriptedTool(script=emits("x")),
         subscribed_expressions=[TopicExpr(topic=source)],
         publisher_router=PublisherRouter(
             routes=[PublishRoute(topic=Rejecting(name="mid"))]
@@ -1553,8 +1575,8 @@ async def test_outputs_of_one_topic_are_delivered_again_in_position_order(
     # one. The store returns history by timestamp, as EventStorePostgres does.
     get_agent_events = event_store.get_agent_events
 
-    async def by_timestamp(assistant_request_id: str) -> list[Event]:
-        events = await get_agent_events(assistant_request_id)
+    async def by_timestamp(assistant_request_id: str, **kwargs: Any) -> list[Event]:
+        events = await get_agent_events(assistant_request_id, **kwargs)
         return sorted(events, key=lambda event: event.timestamp)
 
     monkeypatch.setattr(event_store, "get_agent_events", by_timestamp)
@@ -1609,7 +1631,7 @@ async def test_a_topic_keeps_only_what_its_readers_have_not_taken(
         outputs = [o async for o in run.run(input_event())]
     assert len(outputs) == 2
     log = run._topics["mid"]
-    assert (log.start, log.size, log.events) == (2, 2, [])  # Both readers took them.
+    assert (log.start, log.size, log.events) == (1, 1, [])  # Both readers took it.
     assert run._topics["out"].events == []  # Read by the caller, not by a node.
 
 
@@ -1638,10 +1660,10 @@ async def test_a_topic_keeps_what_a_reader_has_not_taken(
         outputs = [o.data[0].content async for o in run.run(input_event())]
     assert outputs == ["1|2"]
     log = run._topics["mid"]
-    assert log.next_position == {"b": 2}
-    # b took both, but c has not: both are kept for c.
-    assert (log.start, log.size) == (0, 2)
-    assert [event.data[0].content for event in log.events] == ["1", "2"]
+    assert log.next_position == {"b": 1}
+    # b took it, but c has not: it is kept for c.
+    assert (log.start, log.size) == (0, 1)
+    assert [[m.content for m in event.data] for event in log.events] == [["1", "2"]]
 
 
 @pytest.mark.asyncio
@@ -1650,7 +1672,7 @@ async def test_a_caller_leaving_early_cancels_each_step_once() -> None:
     counts: list[int] = []
 
     async def waits(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
-        yield reply("first")
+        emit_delta("first")
         started.set()
         try:
             await asyncio.Event().wait()
@@ -1664,7 +1686,7 @@ async def test_a_caller_leaving_early_cancels_each_step_once() -> None:
     definition = workflow(
         node("waits", waits, InputTopic(name="input"), OutputTopic(name="out"))
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         await started.wait()
@@ -1695,15 +1717,16 @@ async def test_an_abort_during_a_commit_still_cancels_a_closing_step(
         ) -> PublishToTopicEvent:
             raise ValueError("invalid publication")
 
-    class SlowClose(Tool):
-        oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    class SlowClose(Node):
+        """A node whose stream takes long to clean up as it is closed."""
 
         async def invoke(
-            self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+            self, invoke_context: InvokeContext, node_input: list[Any]
+        ) -> AsyncIterator[PublishToTopicEvent]:
             await committing.wait()
             try:
-                yield reply("x")
+                async for publication in super().invoke(invoke_context, node_input):
+                    yield publication
             finally:
                 try:
                     await asyncio.sleep(3)
@@ -1713,20 +1736,26 @@ async def test_an_abort_during_a_commit_still_cancels_a_closing_step(
                     raise
 
     source = InputTopic(name="input")
-    bad = Node(
+    bad = SlowClose(
         name="bad",
-        tool=SlowClose(),
+        tool=ScriptedTool(script=emits("x")),
         subscribed_expressions=[TopicExpr(topic=source)],
         publisher_router=PublisherRouter(
             routes=[PublishRoute(topic=Rejecting(name="mid"))]
         ),
     )
+
+    async def early(call: int, inputs: list[str]) -> AsyncIterator[Messages]:
+        emit_delta("first")
+        emit_delta("second")
+        yield reply("done")
+
     definition = workflow(
-        node("early", emits("first", "second"), source, OutputTopic(name="out")),
+        node("early", early, source, OutputTopic(name="out")),
         node("c", emits("side"), source, Topic(name="side")),
         bad,
     )
-    outputs = definition.invoke(input_event())
+    outputs = definition.invoke(input_event(), stream=True)
     async with asyncio.timeout(5):
         await anext(outputs)
         await until(
@@ -1849,10 +1878,12 @@ async def test_a_run_stopped_while_its_history_loads_does_nothing(
     loading = asyncio.Event()
     get_agent_events = event_store.get_agent_events
 
-    async def slow_get_agent_events(assistant_request_id: str) -> list[Event]:
+    async def slow_get_agent_events(
+        assistant_request_id: str, **kwargs: Any
+    ) -> list[Event]:
         loading.set()
         await asyncio.sleep(0.01)
-        return await get_agent_events(assistant_request_id)
+        return await get_agent_events(assistant_request_id, **kwargs)
 
     monkeypatch.setattr(event_store, "get_agent_events", slow_get_agent_events)
     definition = workflow(
@@ -2049,14 +2080,15 @@ async def test_a_later_stop_cancels_a_failed_step_still_closing() -> None:
         ) -> PublishToTopicEvent:
             raise ValueError("invalid publication")
 
-    class HangingClose(Tool):
-        oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    class HangingClose(Node):
+        """A node whose stream's cleanup never ends unless cancelled."""
 
         async def invoke(
-            self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+            self, invoke_context: InvokeContext, node_input: list[Any]
+        ) -> AsyncIterator[PublishToTopicEvent]:
             try:
-                yield reply("x")
+                async for publication in super().invoke(invoke_context, node_input):
+                    yield publication
             finally:
                 closing.set()
                 try:
@@ -2066,9 +2098,9 @@ async def test_a_later_stop_cancels_a_failed_step_still_closing() -> None:
                     raise
 
     definition = workflow(
-        Node(
+        HangingClose(
             name="bad",
-            tool=HangingClose(),
+            tool=ScriptedTool(script=emits("x")),
             subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
             publisher_router=PublisherRouter(
                 routes=[PublishRoute(topic=Rejecting(name="mid"))]
@@ -2140,19 +2172,17 @@ async def test_recovery_rejects_incomplete_history(
 
 @pytest.mark.asyncio
 async def test_outputs_not_handed_over_are_delivered_again_on_resume() -> None:
-    source, out = InputTopic(name="input"), OutputTopic(name="out")
-    definition = workflow(
-        node("reply", emits("one", "two"), source, out),
-        # A second producer keeps "out" from streaming, so both outputs are
-        # committed before the caller takes the first.
-        node("unused", echo, Topic(name="never"), out),
-    )
+    source = InputTopic(name="input")
+    first, second = OutputTopic(name="first"), OutputTopic(name="second")
+    # One step, two outputs: both committed before the caller takes the first.
+    definition = workflow(node("reply", emits("one"), source, first, second))
     event = input_event()
     outputs = definition.invoke(event)
     async with asyncio.timeout(5):
-        assert (await anext(outputs)).data[0].content == "one"
-        await outputs.aclose()  # Acknowledges what was handed over: "one".
-    assert await drain(definition, event) == ["two"]
+        assert (await anext(outputs)).name == "first"
+        await outputs.aclose()  # Acknowledges what was handed over: the first.
+    async with asyncio.timeout(5):
+        assert [o.name async for o in definition.invoke(event)] == ["second"]
     assert await drain(definition, event) == []
     assert calls(definition, "reply") == [["hello"]]
 
@@ -2412,4 +2442,6 @@ async def test_a_node_that_publishes_nothing_is_not_a_failure(
         e for e in history if isinstance(e, NodeRespondEvent) and e.name == "quiet"
     ]
     assert responded.output_data is None
-    assert NodeRespondEvent.from_dict(responded.to_dict()).output_data is None
+    stored = json.loads(json.dumps(default_event_codec.encode(responded)))
+    assert stored["output_data"] is None
+    assert default_event_codec.decode(stored) == responded

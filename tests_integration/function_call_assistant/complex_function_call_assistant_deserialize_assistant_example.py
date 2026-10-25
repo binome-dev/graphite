@@ -1,23 +1,19 @@
 import asyncio
-import json
 import uuid
 from pathlib import Path
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.import_ref import trust_modules
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.runtime import current_services
-from grafi.tools.tool_factory import ToolFactory
-from tests_integration.function_call_assistant.simple_function_call_assistant_complex_function_example import (  # noqa: E501
-    LocalFileMock,
-)
 
-# The custom FunctionCallTool subclass must be registered so the manifest's
-# "LocalFileMock" tool reconstructs with its @llm_function method (defined by the
-# class, not serialized).
-ToolFactory.register_tool_class("LocalFileMock", LocalFileMock)
+# The manifest names classes of tests_integration: the assistant's, and the
+# LocalFileMock tool's, which brings its @llm_function method. Loading imports
+# classes only from trusted modules.
+trust_modules("tests_integration")
 
 
 def get_invoke_context() -> InvokeContext:
@@ -32,13 +28,10 @@ event_store = current_services().event_store
 
 
 async def test_deserialized_assistant() -> None:
-    """Test the deserialized assistant using the new load_from_manifest method."""
-    # Read the manifest JSON file
-    with open(Path(__file__).parent / "complex_function_manifest.json", "r") as f:
-        manifest_json = f.read()
-
-    # Deserialize the assistant using the new method
-    assistant = await Assistant.from_dict(json.loads(manifest_json))
+    """Load the assistant from its manifest, and run it."""
+    assistant = Assistant.from_manifest(
+        Path(__file__).parent / "complex_function_manifest.json"
+    )
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")

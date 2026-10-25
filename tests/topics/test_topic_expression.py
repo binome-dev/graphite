@@ -1,13 +1,15 @@
 import pytest
+from pydantic import TypeAdapter
+from pydantic import ValidationError
 
-from grafi.topics.expressions.topic_expression import (
-    CombinedExpr,  # Replace `your_module` with the actual module
-)
+from grafi.topics.expressions.topic_expression import CombinedExpr
 from grafi.topics.expressions.topic_expression import LogicalOp
+from grafi.topics.expressions.topic_expression import Subscription
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.expressions.topic_expression import evaluate_subscription
 from grafi.topics.expressions.topic_expression import extract_topics
 from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_types import TopicType
 
 
 @pytest.fixture
@@ -20,24 +22,43 @@ def mock_topics(monkeypatch) -> tuple[TopicBase, TopicBase, TopicBase]:
     return topic1, topic2, topic3
 
 
-def test_topic_expr_to_dict(mock_topics: tuple[TopicBase, TopicBase, TopicBase]):
+def _topics_context(*topics: TopicBase) -> dict:
+    """The validation context a workflow loads its nodes' expressions in."""
+    return {"topics": {topic.name: topic for topic in topics}}
+
+
+def test_topic_expr_dump(mock_topics: tuple[TopicBase, TopicBase, TopicBase]):
     """Test serialization of TopicExpr."""
     topic_expr = TopicExpr(topic=mock_topics[0])
-    result = topic_expr.to_dict()
 
-    # The to_dict() now returns just the topic name
-    assert result == {"topic": "topic_1"}
+    # The topic is saved by its name in JSON
+    assert topic_expr.model_dump(mode="json") == {"topic": "topic_1"}
+    # and in full in a python-mode dump, which loads back on its own.
+    data = topic_expr.model_dump()
+    assert data == {
+        "topic": {
+            "class": TopicBase,
+            "name": "topic_1",
+            "type": TopicType.DEFAULT_TOPIC_TYPE,
+        }
+    }
+    restored = TopicExpr.model_validate(data)
+    assert type(restored.topic) is TopicBase
+    assert restored.topic.name == "topic_1"
+    # Among a workflow's topics, it is the one of its name.
+    in_scope = TopicExpr.model_validate(data, context=_topics_context(*mock_topics))
+    assert in_scope.topic is mock_topics[0]
 
 
-def test_combined_expr_to_dict(mock_topics):
+def test_combined_expr_dump(mock_topics):
     """Test serialization of CombinedExpr."""
     left_expr = TopicExpr(topic=mock_topics[0])
     right_expr = TopicExpr(topic=mock_topics[1])
     combined_expr = CombinedExpr(op=LogicalOp.AND, left=left_expr, right=right_expr)
 
-    result = combined_expr.to_dict()
+    result = combined_expr.model_dump(mode="json")
 
-    # The to_dict() now returns just the topic names
+    # The topics are saved by their names
     assert result == {
         "op": "AND",
         "left": {"topic": "topic_1"},
@@ -100,57 +121,36 @@ def test_extract_topics(mock_topics):
     ]  # Extract all topics
 
 
-@pytest.mark.asyncio
-async def test_topic_expr_from_dict(mock_topics):
-    """Test deserialization of TopicExpr."""
-    topics_dict = {
-        "topic_1": mock_topics[0],
-        "topic_2": mock_topics[1],
-        "topic_3": mock_topics[2],
-    }
-
+def test_topic_expr_model_validate(mock_topics):
+    """Test deserialization of TopicExpr: the name resolves through the context."""
     data = {"topic": "topic_1"}
 
-    expr = await TopicExpr.from_dict(data, topics_dict)
+    expr = TopicExpr.model_validate(data, context=_topics_context(*mock_topics))
 
     assert isinstance(expr, TopicExpr)
-    assert expr.topic.name == "topic_1"
+    assert expr.topic is mock_topics[0]
 
 
-@pytest.mark.asyncio
-async def test_combined_expr_from_dict(mock_topics):
+def test_combined_expr_model_validate(mock_topics):
     """Test deserialization of CombinedExpr."""
-    topics_dict = {
-        "topic_1": mock_topics[0],
-        "topic_2": mock_topics[1],
-        "topic_3": mock_topics[2],
-    }
-
     data = {
         "op": "AND",
         "left": {"topic": "topic_1"},
         "right": {"topic": "topic_2"},
     }
 
-    expr = await CombinedExpr.from_dict(data, topics_dict)
+    expr = CombinedExpr.model_validate(data, context=_topics_context(*mock_topics))
 
     assert isinstance(expr, CombinedExpr)
     assert expr.op == LogicalOp.AND
     assert isinstance(expr.left, TopicExpr)
     assert isinstance(expr.right, TopicExpr)
-    assert expr.left.topic.name == "topic_1"
-    assert expr.right.topic.name == "topic_2"
+    assert expr.left.topic is mock_topics[0]
+    assert expr.right.topic is mock_topics[1]
 
 
-@pytest.mark.asyncio
-async def test_nested_combined_expr_from_dict(mock_topics):
+def test_nested_combined_expr_model_validate(mock_topics):
     """Test deserialization of nested CombinedExpr."""
-    topics_dict = {
-        "topic_1": mock_topics[0],
-        "topic_2": mock_topics[1],
-        "topic_3": mock_topics[2],
-    }
-
     # (topic_1 AND topic_2) OR topic_3
     data = {
         "op": "OR",
@@ -162,47 +162,102 @@ async def test_nested_combined_expr_from_dict(mock_topics):
         "right": {"topic": "topic_3"},
     }
 
-    expr = await CombinedExpr.from_dict(data, topics_dict)
+    expr = CombinedExpr.model_validate(data, context=_topics_context(*mock_topics))
 
     assert isinstance(expr, CombinedExpr)
     assert expr.op == LogicalOp.OR
     assert isinstance(expr.left, CombinedExpr)
     assert isinstance(expr.right, TopicExpr)
     assert expr.left.op == LogicalOp.AND
-    assert expr.right.topic.name == "topic_3"
+    assert expr.right.topic is mock_topics[2]
 
 
-@pytest.mark.asyncio
-async def test_topic_expr_roundtrip(mock_topics):
+def test_subscription_type_picks_expression_kind(mock_topics):
+    """The Subscription type loads a topic or a combined expression by shape."""
+    adapter = TypeAdapter(Subscription)
+    context = _topics_context(*mock_topics)
+
+    single = adapter.validate_python({"topic": "topic_3"}, context=context)
+    combined = adapter.validate_python(
+        {"op": "OR", "left": {"topic": "topic_1"}, "right": {"topic": "topic_2"}},
+        context=context,
+    )
+
+    assert isinstance(single, TopicExpr)
+    assert single.topic is mock_topics[2]
+    assert isinstance(combined, CombinedExpr)
+    assert combined.op == LogicalOp.OR
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"topic": "topic_1", "negate": True},
+        {
+            "op": "AND",
+            "left": {"topic": "topic_1"},
+            "right": {"topic": "topic_2"},
+            "x": 1,
+        },
+        {
+            "op": "OR",
+            "left": {"topic": "topic_1"},
+            "right": {"topic": "topic_2", "y": 0},
+        },
+    ],
+    ids=["topic", "combined", "nested"],
+)
+def test_a_key_an_expression_does_not_have_is_refused(mock_topics, data):
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        TypeAdapter(Subscription).validate_python(
+            data, context=_topics_context(*mock_topics)
+        )
+
+
+def test_unknown_topic_name_fails_loudly(mock_topics):
+    """A name that is not one of the context's topics is an error, never None."""
+    with pytest.raises(ValidationError, match="Unknown topic 'missing'"):
+        TopicExpr.model_validate(
+            {"topic": "missing"}, context=_topics_context(*mock_topics)
+        )
+
+    with pytest.raises(ValidationError, match="Unknown topic 'topic_2'"):
+        CombinedExpr.model_validate(
+            {"op": "AND", "left": {"topic": "topic_1"}, "right": {"topic": "topic_2"}},
+            context=_topics_context(mock_topics[0]),
+        )
+
+
+def test_topic_name_without_context_fails(mock_topics):
+    """Loading a topic name needs the topics, in the validation context."""
+    with pytest.raises(ValidationError, match="Unknown topic 'topic_1'"):
+        TopicExpr.model_validate({"topic": "topic_1"})
+
+
+def test_topic_expr_roundtrip(mock_topics):
     """Test serialization and deserialization roundtrip for TopicExpr."""
-    topics_dict = {"topic_1": mock_topics[0]}
-
     original = TopicExpr(topic=mock_topics[0])
-    data = original.to_dict()
+    data = original.model_dump(mode="json")
 
-    # to_dict() returns just the topic name, can use directly with from_dict
-    restored = await TopicExpr.from_dict(data, topics_dict)
+    restored = TopicExpr.model_validate(data, context=_topics_context(mock_topics[0]))
 
-    assert restored.topic.name == original.topic.name
+    assert restored.topic is original.topic
+    assert restored.model_dump(mode="json") == data
 
 
-@pytest.mark.asyncio
-async def test_combined_expr_roundtrip(mock_topics):
+def test_combined_expr_roundtrip(mock_topics):
     """Test serialization and deserialization roundtrip for CombinedExpr."""
-    topics_dict = {
-        "topic_1": mock_topics[0],
-        "topic_2": mock_topics[1],
-    }
-
     left_expr = TopicExpr(topic=mock_topics[0])
     right_expr = TopicExpr(topic=mock_topics[1])
     original = CombinedExpr(op=LogicalOp.AND, left=left_expr, right=right_expr)
 
-    data = original.to_dict()
+    data = original.model_dump(mode="json")
 
-    # to_dict() returns just the topic names, can use directly with from_dict
-    restored = await CombinedExpr.from_dict(data, topics_dict)
+    restored = CombinedExpr.model_validate(
+        data, context=_topics_context(mock_topics[0], mock_topics[1])
+    )
 
     assert restored.op == original.op
-    assert restored.left.topic.name == original.left.topic.name
-    assert restored.right.topic.name == original.right.topic.name
+    assert restored.left.topic is original.left.topic
+    assert restored.right.topic is original.right.topic
+    assert restored.model_dump(mode="json") == data

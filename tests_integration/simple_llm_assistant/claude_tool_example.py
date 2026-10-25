@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from typing import List
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -8,9 +9,11 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.nodes.node import Node
+from grafi.runtime import Delta
 from grafi.runtime import current_services
+from grafi.runtime import deltas_to
 from grafi.tools.llms.impl.claude_tool import ClaudeTool
-from grafi.tools.tool_factory import ToolFactory
+from grafi.tools.tool import Tool
 from grafi.topics.topic_types import TopicType
 
 # --------------------------------------------------------------------------- #
@@ -38,16 +41,24 @@ async def test_claude_tool_stream() -> None:
     await event_store.clear_events()
     claude = ClaudeTool.builder().is_streaming(True).api_key(api_key).build()
 
+    deltas: List[Delta] = []
     content = ""
-    async for messages in claude.invoke(
-        get_invoke_context(),
-        [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
+    with deltas_to(deltas.append):
+        messages = await claude.invoke(
+            get_invoke_context(),
+            [
+                Message(
+                    role="user", content="Hello, my name is Grafi, how are you doing?"
+                )
+            ],
+        )
         for msg in messages:
             assert msg.role == "assistant"
             if isinstance(msg.content, str):
                 content += msg.content
-                print(msg.content + "_", end="", flush=True)
+    streamed = "".join(delta.content for delta in deltas)
+    print(streamed)
+    assert len(deltas) > 1 and streamed == content  # The text, as it came.
 
     assert "Grafi" in content
     assert len(await event_store.get_events()) == 2
@@ -69,18 +80,18 @@ async def test_claude_tool_with_chat_param() -> None:
         .build()
     )
 
-    async for messages in claude.invoke(
+    messages = await claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            assert msg.content and "Grafi" in msg.content
-            print(msg.content)
-            # 30 tokens ≈ < 250 chars for normal prose
-            if isinstance(msg.content, str):
-                # Ensure the content length is within the expected range
-                assert len(msg.content) < 250
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        assert msg.content and "Grafi" in msg.content
+        print(msg.content)
+        # 30 tokens ≈ < 250 chars for normal prose
+        if isinstance(msg.content, str):
+            # Ensure the content length is within the expected range
+            assert len(msg.content) < 250
 
     assert len(await event_store.get_events()) == 2
 
@@ -93,14 +104,14 @@ async def test_claude_tool_async() -> None:
     claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in claude.invoke(
+    messages = await claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            if isinstance(msg.content, str):
-                content += msg.content
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        if isinstance(msg.content, str):
+            content += msg.content
 
     print(content)
     assert "Grafi" in content
@@ -155,24 +166,27 @@ async def test_claude_tool_serialization() -> None:
     # Create original tool
     original_tool = ClaudeTool.builder().api_key(api_key).build()
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
     print(f"Serialized: {serialized}")
+    assert serialized["api_key"] == {"env": "ANTHROPIC_API_KEY"}
 
-    # Deserialize back using ToolFactory
-    ToolFactory.register_tool_class("ClaudeTool", ClaudeTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, ClaudeTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            if isinstance(msg.content, str):
-                content += msg.content
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        if isinstance(msg.content, str):
+            content += msg.content
 
     print(content)
     assert "Grafi" in content
@@ -194,24 +208,27 @@ async def test_claude_tool_with_chat_param_serialization() -> None:
         .build()
     )
 
-    # Serialize to dict
-    serialized = original_tool.to_dict()
+    # Save it as data: its fields, and its class by import path. The key
+    # is saved as the name of the variable it comes from, never as itself.
+    serialized = original_tool.model_dump(mode="json")
+    assert serialized["api_key"] == {"env": "ANTHROPIC_API_KEY"}
 
-    # Deserialize back
-    ToolFactory.register_tool_class("ClaudeTool", ClaudeTool)
-    restored_tool = await ToolFactory.from_dict(serialized)
+    # Load it back, as the class it names
+    restored_tool = Tool.model_validate(serialized)
+    assert isinstance(restored_tool, ClaudeTool)
+    assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            assert msg.content and "Grafi" in msg.content
-            print(msg.content)
-            if isinstance(msg.content, str):
-                assert len(msg.content) < 250
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        assert msg.content and "Grafi" in msg.content
+        print(msg.content)
+        if isinstance(msg.content, str):
+            assert len(msg.content) < 250
 
     assert len(await event_store.get_events()) == 2
 

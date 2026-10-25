@@ -2,38 +2,30 @@
 
 from datetime import datetime
 from datetime import timezone
-from typing import Any
-from typing import Dict
 
 import pytest
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.event import Event
 from grafi.common.events.event import EventType
+from grafi.common.events.event_codec import EventCodec
+from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import EventSerializationError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.topics.topic_types import TopicType
+from tests.events.event_fixtures import every_event
 
 
 class SampleEvent(Event):
-    """Test event implementation."""
+    """An event of a type of its own, which only a store that keeps events as
+    they are (not strict) can hold."""
 
     event_type: EventType = EventType.NODE_INVOKE
     test_data: str = "test"
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {**self.event_dict(), "data": {"test_data": self.test_data}}
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "SampleEvent":
-        base = cls.event_base(data)
-        return cls(
-            **base,
-            test_data=data.get("data", {}).get("test_data", "test"),
-            invoke_context=InvokeContext.model_validate(data.get("invoke_context", {})),
-        )
 
 
 @pytest.fixture
@@ -371,26 +363,227 @@ class TestEventStoreInMemory:
         assert len(topic_0_events) == 2
 
 
-class TestEventDeserializationQuarantine:
-    """Malformed stored events are skipped (None), not raised, on retrieval."""
+class TestEventDecodingIsLoud:
+    """A stored event that cannot be decoded raises: it is never skipped, as a
+    store is the record a workflow is recovered from."""
 
-    def test_missing_event_type_returns_none(self):
+    def test_missing_event_type_raises(self):
         store = EventStoreInMemory()
-        assert store._create_event_from_dict({"event_id": "x"}) is None
+        with pytest.raises(EventSerializationError):
+            store.codec.decode({"event_id": "x", "event_version": 2})
 
-    def test_unknown_event_type_returns_none(self):
+    def test_unknown_event_type_raises(self):
         store = EventStoreInMemory()
-        assert (
-            store._create_event_from_dict(
-                {"event_id": "x", "event_type": "NotARealType"}
+        with pytest.raises(EventSerializationError, match="NotARealType"):
+            store.codec.decode(
+                {"event_id": "x", "event_version": 2, "event_type": "NotARealType"}
             )
-            is None
+
+    def test_corrupt_payload_raises(self):
+        store = EventStoreInMemory()
+        # A valid type, but missing the fields its class requires.
+        with pytest.raises(EventSerializationError, match="cannot be decoded"):
+            store.codec.decode(
+                {"event_id": "x", "event_version": 2, "event_type": "NodeInvoke"}
+            )
+
+    def test_newer_version_raises(self, topic_events):
+        store = EventStoreInMemory()
+        stored = {**store.codec.encode(topic_events[0]), "event_version": 3}
+        with pytest.raises(EventSerializationError, match="version 3"):
+            store.codec.decode(stored)
+
+
+class TestEventStoreCodec:
+    """A store encodes and decodes events with its codec: the default, shared by
+    every store, or one of its own."""
+
+    def test_a_store_uses_the_default_codec(self):
+        assert EventStore.codec is default_event_codec
+        assert EventStoreInMemory().codec is default_event_codec
+
+    @pytest.mark.asyncio
+    async def test_a_store_given_a_codec_of_its_own_uses_it(self, sample_event):
+        store = EventStoreInMemory(strict=True)
+        with pytest.raises(EventSerializationError, match="SampleEvent"):
+            await store.record_event(sample_event)  # Decoded as NodeInvoke's.
+
+        store.codec = EventCodec({EventType.NODE_INVOKE.value: SampleEvent})
+        await store.record_event(sample_event)
+
+        assert await store.get_events() == [sample_event]
+        assert EventStoreInMemory().codec is default_event_codec  # Unchanged.
+        assert default_event_codec.event_class("NodeInvoke") is not SampleEvent
+
+
+class TestStrictEventStore:
+    """A strict store keeps each event as a durable store does: encoded as JSON,
+    and decoded back."""
+
+    @pytest.mark.asyncio
+    async def test_every_event_type_round_trips(self):
+        store = EventStoreInMemory(strict=True)
+        events = every_event()
+        await store.record_events(events)
+
+        stored = await store.get_events()
+        assert stored == events
+        assert [type(event) for event in stored] == [type(event) for event in events]
+        # Rebuilt from their JSON form, not the very objects recorded.
+        assert all(kept is not event for kept, event in zip(stored, events))
+
+    @pytest.mark.asyncio
+    async def test_history_is_read_of_the_types_asked_for(self):
+        store = EventStoreInMemory(strict=True)
+        events = every_event()
+        await store.record_events(events)
+        request = events[0].invoke_context
+        topic_events = [e for e in events if e.event_type in TOPIC_EVENT_TYPES]
+        responds = [e for e in events if e.event_type == EventType.ASSISTANT_RESPOND]
+        assert topic_events and responds
+
+        assert (
+            await store.get_agent_events(
+                request.assistant_request_id, event_types=TOPIC_EVENT_TYPES
+            )
+            == topic_events
+        )
+        assert (
+            await store.get_conversation_events(
+                request.conversation_id, event_types=[EventType.ASSISTANT_RESPOND]
+            )
+            == responds
         )
 
-    def test_corrupt_payload_returns_none(self):
-        store = EventStoreInMemory()
-        # Valid type but missing all the fields from_dict needs -> skipped, not raised.
-        result = store._create_event_from_dict(
-            {"event_id": "x", "event_type": "NodeInvoke"}
+    @pytest.mark.asyncio
+    async def test_record_event_round_trips(self, topic_events):
+        store = EventStoreInMemory(strict=True)
+        await store.record_event(topic_events[0])
+        assert await store.get_event(topic_events[0].event_id) == topic_events[0]
+
+    @pytest.mark.asyncio
+    async def test_queries_find_the_decoded_events(self, topic_events):
+        store = EventStoreInMemory(strict=True)
+        await store.record_events(topic_events)
+        assert await store.get_topic_events("topic-0", [0, 2]) == [
+            topic_events[0],
+            topic_events[2],
+        ]
+        assert await store.get_conversation_events("conv-1") == [topic_events[1]]
+        assert await store.get_agent_events("assist-2") == [topic_events[2]]
+
+    @pytest.mark.asyncio
+    async def test_a_batch_with_an_unencodable_event_records_nothing(
+        self, topic_events
+    ):
+        store = EventStoreInMemory(strict=True)
+        unencodable = topic_events[1].model_copy(
+            update={
+                "invoke_context": topic_events[1].invoke_context.model_copy(
+                    update={"kwargs": {"client": object()}}
+                )
+            }
         )
-        assert result is None
+        # Encoding fails (as model_dump(mode="json") does), before any is kept.
+        with pytest.raises(EventSerializationError, match="cannot be encoded"):
+            await store.record_events([topic_events[0], unencodable, topic_events[2]])
+        assert await store.get_events() == []
+
+        # The store still takes the events that can be recorded.
+        await store.record_events([topic_events[0], topic_events[2]])
+        assert await store.get_events() == [topic_events[0], topic_events[2]]
+
+    @pytest.mark.asyncio
+    async def test_a_batch_with_an_undecodable_event_records_nothing(
+        self, topic_events, sample_event
+    ):
+        # SampleEvent says it is a NodeInvoke, which it cannot be decoded as:
+        # refused as it is encoded, before any is kept.
+        store = EventStoreInMemory(strict=True)
+        with pytest.raises(EventSerializationError, match="SampleEvent"):
+            await store.record_events([topic_events[0], sample_event])
+        assert await store.get_events() == []
+
+    @pytest.mark.asyncio
+    async def test_an_unencodable_event_is_not_recorded(self, topic_events):
+        store = EventStoreInMemory(strict=True)
+        unencodable = topic_events[0].model_copy(
+            update={
+                "invoke_context": topic_events[0].invoke_context.model_copy(
+                    update={"kwargs": {"client": object()}}
+                )
+            }
+        )
+        with pytest.raises(EventSerializationError, match="cannot be encoded"):
+            await store.record_event(unencodable)
+        assert await store.get_events() == []
+        # Its id was not taken: the event, made encodable, can be recorded.
+        await store.record_event(topic_events[0])
+        assert await store.get_events() == [topic_events[0]]
+
+    @pytest.mark.asyncio
+    async def test_recording_is_idempotent(self, topic_events):
+        store = EventStoreInMemory(strict=True)
+        await store.record_events(topic_events)
+        await store.record_events(topic_events + [topic_events[0]])
+        assert await store.get_events() == topic_events
+
+    @pytest.mark.asyncio
+    async def test_a_datetime_in_invoke_context_kwargs_is_kept_as_iso_text(
+        self, topic_events
+    ):
+        store = EventStoreInMemory(strict=True)
+        at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+        event = topic_events[0].model_copy(
+            update={
+                "invoke_context": topic_events[0].invoke_context.model_copy(
+                    update={"kwargs": {"at": at}}
+                )
+            }
+        )
+        await store.record_event(event)
+        [kept] = await store.get_events()
+        assert kept.invoke_context.kwargs == {"at": "2026-01-02T03:04:05Z"}
+
+    @pytest.mark.asyncio
+    async def test_message_tools_given_as_a_generator_are_kept(self, topic_events):
+        store = EventStoreInMemory(strict=True)
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "search",
+                    "description": "Search the web.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ]
+        message = Message(role="user", content="hi", tools=(tool for tool in tools))
+        event = topic_events[0].model_copy(update={"data": [message]})
+        await store.record_event(event)
+        [kept] = await store.get_events()
+        assert kept == event
+        assert kept.data[0].tools == tools
+
+    def test_a_store_is_not_strict_by_default(self):
+        assert EventStoreInMemory().strict is False
+
+
+def test_a_store_whose_reads_take_no_event_types_fails_loudly() -> None:
+    """Written before grafi passed them, it would fail on every run."""
+    with pytest.raises(TypeError, match="get_agent_events\\(\\) takes no event_types"):
+
+        class Old(EventStoreInMemory):
+            async def get_agent_events(self, assistant_request_id):  # type: ignore
+                return []
+
+
+def test_a_store_reading_history_through_an_old_mixin_fails_loudly() -> None:
+    class OldReads:
+        async def get_conversation_events(self, conversation_id):  # type: ignore
+            return []
+
+    with pytest.raises(TypeError, match="takes no event_types"):
+
+        class Mixed(OldReads, EventStoreInMemory):  # type: ignore[misc]
+            pass

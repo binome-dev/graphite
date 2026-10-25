@@ -10,7 +10,6 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime import GrafiRuntime
 from grafi.topics.expressions.topic_expression import TopicExpr
 from grafi.topics.topic_impl.input_topic import InputTopic
@@ -26,12 +25,12 @@ from tests_integration.async_execution.support import make_node
 class FlakyStream(EchoTool):
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append(["call"])
-        yield [Message(role="assistant", content="part-1", is_streaming=True)]
+        output = [Message(role="assistant", content="part-1")]
         if len(self.calls) == 1:
-            raise RuntimeError("stream dropped")
-        yield [Message(role="assistant", content="part-2", is_streaming=True)]
+            raise RuntimeError("stream dropped")  # Partway through its output.
+        return [*output, Message(role="assistant", content="part-2")]
 
 
 async def main() -> None:

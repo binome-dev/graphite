@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from typing import AsyncGenerator
+from typing import Literal
 from typing import Optional
+from typing import TypeVar
+from typing import Union
+from typing import overload
 
 from grafi.common.async_lifecycle import cleanup_on_exit
 from grafi.common.async_lifecycle import close_iterator
@@ -17,12 +21,15 @@ from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.runtime.deltas import Delta
 from grafi.runtime.execution_services import ExecutionServices
 from grafi.runtime.execution_services import bind_services
 from grafi.runtime.execution_services import current_services
 
 if TYPE_CHECKING:
     from grafi.assistants.assistant_base import AssistantBase
+
+T = TypeVar("T")
 
 
 class GrafiRuntime:
@@ -38,14 +45,36 @@ class GrafiRuntime:
     def services(self) -> ExecutionServices:
         return self._services or current_services()
 
+    @overload
     def invoke(
         self,
         assistant: "AssistantBase",
         input_data: PublishToTopicEvent,
         is_sequential: bool = False,
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+        *,
+        stream: Literal[False] = False,
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]: ...
+
+    @overload
+    def invoke(
+        self,
+        assistant: "AssistantBase",
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
+
+    def invoke(
+        self,
+        assistant: "AssistantBase",
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
         """Stream the assistant's output with this runtime's services, resolved
-        where ``invoke`` is called.
+        where ``invoke`` is called; with ``stream``, its tools' deltas too.
 
         The services are bound around each read and the close (and inherited by
         tasks the stream starts), never in the caller's context between reads.
@@ -56,13 +85,13 @@ class GrafiRuntime:
         """
         services = self.services
         with bind_services(services):
-            stream = assistant.invoke(input_data, is_sequential)
-        return _bound(services, stream)
+            outputs = assistant.invoke(input_data, is_sequential, stream=stream)
+        return _bound(services, outputs)
 
 
 async def _bound(
-    services: ExecutionServices, stream: AsyncGenerator[ConsumeFromTopicEvent, None]
-) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
+    services: ExecutionServices, stream: AsyncGenerator[T, None]
+) -> AsyncGenerator[T, None]:
     """``stream`` with ``services`` bound around each step: a generator's body
     runs in the context of whoever iterates it, so not across a yield."""
 
@@ -74,7 +103,7 @@ async def _bound(
         while True:
             with bind_services(services):
                 try:
-                    event = await anext(stream)
+                    item = await anext(stream)
                 except StopAsyncIteration:
                     return
-            yield event
+            yield item

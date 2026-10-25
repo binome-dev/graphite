@@ -12,7 +12,6 @@ from pydantic import Field
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -37,17 +36,17 @@ from tests_integration.async_execution.support import until_stored
 class GatedSource(EchoTool):
     """Emits one message once an earlier source's message on a is stored."""
 
-    join: EchoTool = Field(exclude=True)
+    join: EchoTool = Field(default_factory=EchoTool, exclude=True)
     content: str
     after: str | None = None
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         if self.after is not None:
             await until_stored("a", self.after)
             assert self.join.calls == [], "An AND join ran without B"
-        yield [Message(role="assistant", content=self.content)]
+        return [Message(role="assistant", content=self.content)]
 
 
 async def main() -> None:

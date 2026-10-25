@@ -167,7 +167,6 @@ Just like before we create an assistant that will act as an interface to be call
 
 ```python
 # assistant.py
-import os
 from typing import Optional
 from typing import Self
 
@@ -176,10 +175,14 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
-from grafi.topics.subscription_builder import SubscriptionBuilder
-from grafi.topics.topic import Topic
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
+from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic_impl.topic import Topic
 from grafi.nodes.node import Node
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -207,11 +210,14 @@ class StockAssistant(Assistant):
     )
     name: str = Field(default="StockAssistant")
     type: str = Field(default="StockAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default="gpt-4o-mini")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionCallTool
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase). The key is read from
+    # OPENAI_API_KEY; the tools in the workflow save their own references to it.
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "StockAssistantBuilder":
@@ -220,18 +226,9 @@ class StockAssistant(Assistant):
 
     def _construct_workflow(self) -> "StockAssistant":
 
-        mcp_tool_call_topic = Topic(
-            name="mcp_tool_call_topic",
-            condition=lambda event: event.data[-1].tool_calls
-            is not None,  # Checking if the
-        )
+        mcp_tool_call_topic = Topic(name="mcp_tool_call_topic")
 
-        assistant_output_topic = OutputTopic(name="assistant_output_topic",
-                    condition = (
-            lambda event: event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != ""
-        ))
+        assistant_output_topic = OutputTopic(name="assistant_output_topic")
 
         assistant_root_topic = InputTopic(name="assistant_root_topic")
 
@@ -243,13 +240,13 @@ class StockAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIQueryStockOverview")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.function_call_llm_system_message)
                 .build()
             )
-            .publish_to(mcp_tool_call_topic)
-            .publish_to(assistant_output_topic)
+            .publish_to(mcp_tool_call_topic, when=has_tool_call)
+            .publish_to(assistant_output_topic, when=has_text_response)
             .build()
         )
 
@@ -258,6 +255,7 @@ class StockAssistant(Assistant):
         mcp_server_response_topic = Topic(name="mcp_server_response_topic")
 
 
+        assert self.function_tool is not None, "build it with a function_tool"
         mcp_node = (
             Node.builder()
             .name("MCPServerQuery")
@@ -279,7 +277,7 @@ class StockAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIQuerySummary")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -309,7 +307,7 @@ class StockAssistantBuilder(
     This builder allows setting the API key, model, system messages, and function tool.
     """
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 
@@ -514,15 +512,16 @@ and subsequentially the final node has to be an instance of `OutputTopic`
 
 
 ```python
-assistant_output_topic = OutputTopic(name="assistant_output_topic",
-                    condition = (
-            lambda event: event.data[-1].content is not None
-            and isinstance(event.data[-1].content, str)
-            and event.data[-1].content.strip() != ""
-        ))
+assistant_output_topic = OutputTopic(name="assistant_output_topic")
 ```
 
-Topics can have conditions attached to them to trigger them, in the case of `InputTopic` it has no condition, so anything that is invoked on it will push through the workflow, but the final topic of type `OutputTopic` is filtering that there is an actual response and a non empty string before returning output. You can configure this to your heart's desire to tune your workflow as you wish.
+A topic is a queue with no condition of its own: what reaches it is decided by the node publishing to it. Each `publish_to` route of a node can take a `when` predicate, a function of the event the node publishes, and the event goes to that route's topic only when it returns `True`. Everything the assistant is invoked with goes to the `InputTopic`, but the LLM node publishes to the `OutputTopic` only when it answers with a non-empty string, using the `has_text_response` predicate from `grafi.nodes.conditions`:
+
+```python
+.publish_to(assistant_output_topic, when=has_text_response)
+```
+
+You can write your own predicate, taking the `PublishToTopicEvent` and returning a `bool`, to tune your workflow as you wish.
 
 
 
@@ -532,17 +531,15 @@ When you call the assistant's `invoke()` method from `main.py`
 async for output in assistant.invoke(publish_event):
 ```
 
-The `input_data` gets published on the assistants `InputTopic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/0b6b666b6f0e122ac970f437ee24f5d87c30a81a/grafi/workflows/impl/event_driven_workflow.py#L681-L687) but we are outlying it here so you can follow the flow of data.
+The `input_data` gets published on the assistants `InputTopic` during workflow initialization. This is done [within the framework](https://github.com/binome-dev/graphite/blob/main/grafi/workflows/impl/workflow_run.py) but we are outlying it here so you can follow the flow of data.
 
 ```python
-for input_topic in input_topics:
-    event = input_topic.publish_data(
-        invoke_context=invoke_context,
-        publisher_name=self.name,
-        publisher_type=self.type,
-        data=input,
-        consumed_events=[],
-    )
+# Published by the workflow; prepare_publication() copies it per topic.
+source = input_data.model_copy(
+    update={"publisher_name": self.name, "publisher_type": self.type}
+)
+for name in input_topics:
+    publication = self._topics[name].topic.prepare_publication(source)
 ```
 
 This means that the `input_data` is published to all `InputTopic` declared within the workflow,  during workflow creation, and subsequentially will act as input for the first node in the workflow, in our case the `assistant_root_topic`. The flow of all topics and nodes is that they have an input and an output, a topic's output is a node's input and a node's output becomes the topic's input.
@@ -617,18 +614,14 @@ output_data:
             arguments: '{"ticker":"TSLA"}'
             name: company_overview
           type: function
-      is_streaming: false
 ```
 You can view this using our internal tool called `grafi-dev` which we will demonstrate in future guides.
 
-This is the reason why when we declare the topic `mcp_tool_call_topic` we add a condition that it can only publish to it if the `tool_calls` field is set on the response from OpenAI
+This is the reason why the LLM node publishes to `mcp_tool_call_topic` only when the `tool_calls` field is set on the response from OpenAI, and to the output topic only when it answers with text: each route's `when` is a condition on what the node publishes.
 
 ```python
- mcp_tool_call_topic = Topic(
-    name="mcp_tool_call_topic",
-    condition=lambda event: event.data[-1].tool_calls
-    is not None,
-)
+.publish_to(mcp_tool_call_topic, when=has_tool_call)
+.publish_to(assistant_output_topic, when=has_text_response)
 ```
 
 ## Conclusion

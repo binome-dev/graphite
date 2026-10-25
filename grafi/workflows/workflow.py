@@ -1,27 +1,54 @@
+import inspect
 from typing import Any
 from typing import AsyncGenerator
+from typing import ClassVar
 from typing import Dict
+from typing import FrozenSet
+from typing import Mapping
+from typing import Optional
 from typing import Self
+from typing import Set
 from typing import TypeVar
+from typing import Union
 
 from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
 from pydantic import Field
+from pydantic import ModelWrapValidatorHandler
 from pydantic import PrivateAttr
+from pydantic import ValidationInfo
+from pydantic import computed_field
+from pydantic import model_validator
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions.duplicate_node_error import DuplicateNodeError
+from grafi.common.manifest import Component
+from grafi.common.manifest import ManifestError
 from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.nodes.node_base import NodeBase
+from grafi.runtime.deltas import Delta
+from grafi.topics.expressions.topic_expression import extract_topics
+from grafi.topics.topic_base import TopicBase
+from grafi.topics.topic_base import topics_in_scope
 
 
-class Workflow(BaseModel):
-    """Abstract base class for workflows in a graph-based agent system."""
+class Workflow(Component):
+    """Abstract base class for workflows in a graph-based agent system.
+
+    It is saved with its topics, once, and its nodes name them.
+    """
+
+    manifest_kind: ClassVar[Optional[str]] = "Workflow"
+    loads_computed: ClassVar[FrozenSet[str]] = frozenset({"topics"})
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        refuse_invoke_without_stream(cls)
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.AGENT
     workflow_id: str = default_id
@@ -31,6 +58,40 @@ class Workflow(BaseModel):
 
     # Stop flag to control workflow execution
     _stop_requested: bool = PrivateAttr(default=False)
+
+    @computed_field(repr=False)  # type: ignore[prop-decorator]
+    @property
+    def topics(self) -> Dict[str, TopicBase]:
+        """The workflow's topics, by name: those its nodes subscribe and
+        publish to."""
+        topics: Dict[str, TopicBase] = {}
+        for node in self.nodes.values():
+            for expr in node.subscribed_expressions:
+                topics.update((topic.name, topic) for topic in extract_topics(expr))
+            topics.update((topic.name, topic) for topic in node.publish_to)
+        return topics
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _load_topics(
+        cls, data: Any, handler: ModelWrapValidatorHandler[Self], info: ValidationInfo
+    ) -> Self:
+        """Load the topics a saved workflow holds before its nodes, which name
+        them."""
+        if not (isinstance(data, Mapping) and "topics" in data):
+            return handler(data)
+        data = dict(data)
+        if not isinstance(data["topics"], Mapping):
+            raise ManifestError("A workflow's topics are an object, by name.")
+        topics = {
+            name: TopicBase.model_validate(topic, context=info.context)
+            for name, topic in data.pop("topics").items()
+        }
+        for name, topic in topics.items():
+            if topic.name != name:
+                raise ManifestError(f"The topic {topic.name!r} is keyed as {name!r}.")
+        with topics_in_scope(topics):
+            return handler(data)
 
     def stop(self) -> None:
         """
@@ -49,9 +110,14 @@ class Workflow(BaseModel):
         self._stop_requested = False
 
     async def invoke(
-        self, input_data: PublishToTopicEvent, is_sequential: bool = False
-    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]:
-        """Invokes the workflow with the given initial inputs parallelly."""
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        """Run the workflow on ``input_data``, yielding its outputs, and, if
+        ``stream``, the deltas its tools emit as they emit them."""
         yield None  # type: ignore
         raise NotImplementedError
 
@@ -59,20 +125,32 @@ class Workflow(BaseModel):
         """Initial workflow state, and replays events from an unfinished request to resume invoke."""
         raise NotImplementedError
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the workflow to a dictionary."""
-        return {
-            "workflow_id": self.workflow_id,
-            "name": self.name,
-            "type": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "nodes": {name: node.to_dict() for name, node in self.nodes.items()},
-        }
 
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "Workflow":
-        """Create a Workflow instance from a dictionary representation."""
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
+def refuse_invoke_without_stream(cls: type) -> None:
+    """Raise TypeError unless ``cls.invoke`` takes ``stream`` by keyword: a
+    caller streaming passes it, and grafi passes it to every invoke. A wrapper
+    taking ``**kwargs`` passes it to what it wraps, which must take it."""
+    function: Any = cls.invoke  # type: ignore[attr-defined]
+    seen: Set[int] = set()
+    while function is not None and id(function) not in seen:
+        seen.add(id(function))
+        try:
+            parameters = inspect.signature(function, follow_wrapped=False).parameters
+        except (TypeError, ValueError):
+            return  # Not one Python can read; its calls will tell.
+        stream = parameters.get("stream")
+        if stream is not None and stream.kind in (
+            stream.POSITIONAL_OR_KEYWORD,
+            stream.KEYWORD_ONLY,
+        ):
+            return
+        if not any(p.kind is p.VAR_KEYWORD for p in parameters.values()):
+            raise TypeError(
+                f"{cls.__name__}.invoke() takes no stream by keyword: add `*, "
+                "stream: bool = False` and pass it on, declaring the overloads "
+                "the Assistant guide shows."
+            )
+        function = getattr(function, "__wrapped__", None)
 
 
 T_W = TypeVar("T_W", bound="Workflow")  # the Workflow subclass

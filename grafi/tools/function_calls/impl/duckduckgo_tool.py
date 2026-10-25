@@ -1,5 +1,4 @@
 import json
-from typing import Any
 from typing import Optional
 from typing import Self
 
@@ -59,40 +58,6 @@ class DuckDuckGoTool(FunctionCallTool):
                 keywords=query, max_results=(self.fixed_max_results or max_results)
             ),
             indent=2,
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "fixed_max_results": self.fixed_max_results,
-            "headers": self.headers,
-            "proxy": self.proxy,
-            "timeout": self.timeout,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "DuckDuckGoTool":
-        """
-        Create a DuckDuckGoTool instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the DuckDuckGoTool.
-
-        Returns:
-            DuckDuckGoTool: A DuckDuckGoTool instance created from the dictionary.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            cls.builder()
-            .name(data.get("name", "DuckDuckGoTool"))
-            .type(data.get("type", "DuckDuckGoTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .fixed_max_results(data.get("fixed_max_results"))
-            .headers(data.get("headers"))
-            .proxy(data.get("proxy"))
-            .timeout(data.get("timeout", 10))
-            .build()
         )
 
 

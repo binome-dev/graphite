@@ -1,280 +1,265 @@
 {
-    "assistant_id": "4a235c7afa7b447dab275f3d33aa2679",
+  "apiVersion": "grafi/v2",
+  "kind": "Assistant",
+  "spec": {
+    "class": "tests_integration.react_assistant.react_assistant:ReActAssistant",
+    "assistant_id": "c266bcd33274492ea72dd97fad714942",
     "name": "ReActAssistant",
     "type": "ReActAssistant",
     "oi_span_type": "AGENT",
     "workflow": {
-        "workflow_id": "590e24e083934cd89effdbd17c1572d5",
-        "name": "ReActAssistantWorkflow",
-        "type": "EventDrivenWorkflow",
-        "oi_span_type": "AGENT",
-        "nodes": {
-            "ThoughtNode": {
-                "class": "Node",
-                "node_id": "54895c4578bb4588a1fea5da05ed0a7a",
-                "name": "ThoughtNode",
-                "type": "Node",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "2d75c6c79e994be48455d86837384960",
-                    "name": "ThoughtLLMTool",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "op": "OR",
-                        "left": {
-                            "topic": "agent_input_topic"
-                        },
-                        "right": {
-                            "topic": "observation_result"
-                        }
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "thought_result",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+      "class": "grafi.workflows.impl.event_driven_workflow:EventDrivenWorkflow",
+      "oi_span_type": "AGENT",
+      "workflow_id": "1595ea5d0ced43fe89f8e055a46436c7",
+      "name": "ReActAssistantWorkflow",
+      "type": "EventDrivenWorkflow",
+      "nodes": {
+        "ThoughtNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "41c0322116044b6198947815d6ded8b4",
+          "name": "ThoughtNode",
+          "type": "Node",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "8469794e5c76415e946cfa98aa74587c",
+            "name": "ThoughtLLMTool",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": "\nYou are an AI assistant tasked with analyzing the user's question and considering the provided observation to determine the next logical step required to answer the question.\nYour response should describe what would be the most effective action to take based on the information gathered.\nIf the information is sufficient to answer the question, return the answer with confirmation the answer is ready.\n",
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "ActionNode": {
-                "class": "Node",
-                "node_id": "357c9a150aae41b6b90ddd54af926d2c",
-                "name": "ActionNode",
-                "type": "Node",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "182a8a8547f043248e31dd538d3bb95e",
-                    "name": "ActionLLMTool",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "thought_result"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "action_search_result",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_tool_call"
-                            },
-                            "from_stage": null
-                        },
-                        {
-                            "topic": "action_finish_result",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:has_text_response"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
-            },
-            "SearchNode": {
-                "class": "Node",
-                "node_id": "25fd8a4ec36147c48d3204b63478706d",
-                "name": "SearchNode",
-                "type": "Node",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "TavilyTool",
-                    "base_class": "FunctionCallTool",
-                    "tool_id": "39ff7947c835497a847c404e8c5f8739",
-                    "name": "TavilyTestTool",
-                    "type": "TavilyTool",
-                    "oi_span_type": "TOOL",
-                    "function_specs": [
-                        {
-                            "name": "web_search_using_tavily",
-                            "description": "Function to search online given a query using the Tavily API. The query can be anything.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "query": {
-                                        "description": "The query to search for.",
-                                        "type": "string"
-                                    },
-                                    "max_results": {
-                                        "description": "The maximum number of results to return (default is 5).",
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": [
-                                    "query"
-                                ]
-                            },
-                            "output_schema": {
-                                "type": "string"
-                            }
-                        }
-                    ],
-                    "functions": {},
-                    "api_key": "****************",
-                    "search_depth": "advanced",
-                    "max_tokens": 6000
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "action_search_result"
-                    }
-                ],
-                "command": {
-                    "class": "FunctionCallCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "search_function_result",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
-            },
-            "ObservationNode": {
-                "class": "Node",
-                "node_id": "bfc1f6b339124b7cbe6115f7819dd2c8",
-                "name": "ObservationNode",
-                "type": "Node",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "c4ac988f82154ee2a321f5c35a84d1da",
-                    "name": "ObservationLLMTool",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "search_function_result"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "observation_result",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
-            },
-            "SummariesNode": {
-                "class": "Node",
-                "node_id": "f69849aac04e4af4a1ee7096c7e5235b",
-                "name": "SummariesNode",
-                "type": "Node",
-                "oi_span_type": "CHAIN",
-                "tool": {
-                    "class": "OpenAITool",
-                    "base_class": "LLMTool",
-                    "tool_id": "a488c01f40a24ed6a8f7b736546e472e",
-                    "name": "SummariesLLMTool",
-                    "type": "OpenAITool",
-                    "oi_span_type": "LLM",
-                    "system_message": null,
-                    "api_key": "****************",
-                    "model": "gpt-4o-mini",
-                    "chat_params": {},
-                    "is_streaming": false,
-                    "structured_output": false
-                },
-                "subscribed_expressions": [
-                    {
-                        "topic": "action_finish_result"
-                    }
-                ],
-                "command": {
-                    "class": "LLMCommand"
-                },
-                "publisher_router": {
-                    "routes": [
-                        {
-                            "topic": "agent_output_topic",
-                            "when": {
-                                "ref": "grafi.nodes.conditions:always_true"
-                            },
-                            "from_stage": null
-                        }
-                    ]
-                }
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "op": "OR",
+              "left": {
+                "topic": "agent_input_topic"
+              },
+              "right": {
+                "topic": "observation_result"
+              }
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "thought_result",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
         },
-        "topics": {
-            "agent_input_topic": {
-                "name": "agent_input_topic",
-                "type": "AgentInputTopic"
+        "ActionNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "543084bf67ca408795a862420035760d",
+          "name": "ActionNode",
+          "type": "Node",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "95edc5e2a42f4925b8496f06c7636d19",
+            "name": "ActionLLMTool",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": "\nYou are an AI assistant responsible for executing actions based on a given plan to retrieve information.\nSpecify the appropriate action to take, such as performing a search query or accessing a specific resource, to gather the necessary data.\nIf answer is ready, return **FINISH REACT**.\n",
+            "api_key": {
+              "env": "OPENAI_API_KEY"
             },
-            "observation_result": {
-                "name": "observation_result",
-                "type": "Topic"
-            },
-            "thought_result": {
-                "name": "thought_result",
-                "type": "Topic"
-            },
-            "action_search_result": {
-                "name": "action_search_result",
-                "type": "Topic"
-            },
-            "action_finish_result": {
-                "name": "action_finish_result",
-                "type": "Topic"
-            },
-            "search_function_result": {
-                "name": "search_function_result",
-                "type": "Topic"
-            },
-            "agent_output_topic": {
-                "name": "agent_output_topic",
-                "type": "AgentOutputTopic"
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "thought_result"
             }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "action_search_result",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_tool_call"
+                }
+              },
+              {
+                "topic": "action_finish_result",
+                "when": {
+                  "ref": "grafi.nodes.conditions:has_text_response"
+                }
+              }
+            ]
+          }
+        },
+        "SearchNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "1a88822f3760448396c26e5161107ea9",
+          "name": "SearchNode",
+          "type": "Node",
+          "tool": {
+            "class": "grafi.tools.function_calls.impl.tavily_tool:TavilyTool",
+            "tool_id": "0f0da5bf68c9493885914bc9766b7e07",
+            "name": "TavilyTestTool",
+            "type": "TavilyTool",
+            "oi_span_type": "TOOL",
+            "functions": {},
+            "on_error": "return",
+            "api_key": {
+              "env": "TAVILY_API_KEY"
+            },
+            "search_depth": "advanced",
+            "max_tokens": 6000
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "action_search_result"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "search_function_result",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
+        },
+        "ObservationNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "f8220c63bf1c413c82251d45e06c648b",
+          "name": "ObservationNode",
+          "type": "Node",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "6110eec6e79d475b85016f9fa281732b",
+            "name": "ObservationLLMTool",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": "\nYou are an AI assistant that records and reports the results obtained from invoked actions.\nAfter performing an action, provide a clear and concise summary of the findings relevant to the user's question.\n",
+            "api_key": {
+              "env": "OPENAI_API_KEY"
+            },
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "search_function_result"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "observation_result",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
+        },
+        "SummariesNode": {
+          "class": "grafi.nodes.node:Node",
+          "node_id": "c7bde75e677049eda0fdbd710b48870d",
+          "name": "SummariesNode",
+          "type": "Node",
+          "tool": {
+            "class": "grafi.tools.llms.impl.openai_tool:OpenAITool",
+            "tool_id": "76a6a9fae2e840aabbbfa4da4b0e7cdd",
+            "name": "SummariesLLMTool",
+            "type": "OpenAITool",
+            "oi_span_type": "LLM",
+            "system_message": "\nYou are an AI assistant tasked with summarizing the findings from previous observations to provide a clear and accurate answer to the user's question.\nEnsure the summary directly addresses the query based on the information gathered.\n",
+            "api_key": {
+              "env": "OPENAI_API_KEY"
+            },
+            "model": "gpt-4o-mini",
+            "chat_params": {},
+            "is_streaming": true,
+            "structured_output": false,
+            "base_url": null,
+            "reasoning_effort": null,
+            "verbosity": null
+          },
+          "oi_span_type": "CHAIN",
+          "subscribed_expressions": [
+            {
+              "topic": "action_finish_result"
+            }
+          ],
+          "publisher_router": {
+            "routes": [
+              {
+                "topic": "agent_output_topic",
+                "when": {
+                  "ref": "grafi.nodes.conditions:always_true"
+                }
+              }
+            ]
+          }
         }
+      },
+      "topics": {
+        "agent_input_topic": {
+          "class": "grafi.topics.topic_impl.input_topic:InputTopic",
+          "name": "agent_input_topic",
+          "type": "AgentInputTopic"
+        },
+        "observation_result": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "observation_result",
+          "type": "Topic"
+        },
+        "thought_result": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "thought_result",
+          "type": "Topic"
+        },
+        "action_search_result": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "action_search_result",
+          "type": "Topic"
+        },
+        "action_finish_result": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "action_finish_result",
+          "type": "Topic"
+        },
+        "search_function_result": {
+          "class": "grafi.topics.topic_impl.topic:Topic",
+          "name": "search_function_result",
+          "type": "Topic"
+        },
+        "agent_output_topic": {
+          "class": "grafi.topics.topic_impl.output_topic:OutputTopic",
+          "name": "agent_output_topic",
+          "type": "AgentOutputTopic"
+        }
+      }
     }
+  }
 }

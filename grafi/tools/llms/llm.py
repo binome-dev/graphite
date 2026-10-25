@@ -1,167 +1,136 @@
-import inspect
 import json
-from copy import deepcopy
 from typing import Any
 from typing import Dict
+from typing import Literal
 from typing import Optional
 from typing import Self
 from typing import TypeVar
-from typing import Union
+from typing import overload
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
-from pydantic import BaseModel
 from pydantic import Field
-from pydantic import PrivateAttr
 
+from grafi.common.exceptions import LLMToolException
+from grafi.common.legacy import warn_never_called
+from grafi.common.manifest import ModelRef
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.function_spec import GivenSpecs
+from grafi.common.models.function_spec import once_each
 from grafi.common.models.message import Messages
+from grafi.runtime.deltas import streaming
+from grafi.runtime.wiring import wiring
 from grafi.tools.command import use_command
 from grafi.tools.llms.llm_command import LLMCommand
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
-Json = Dict[str, Any]
+# The methods grafi's provider tools called in 0.0.36 and earlier, in their
+# invoke, which they no longer have: their removed_methods.
+_PROVIDER_REMOVED_METHODS: Dict[str, str] = {
+    name: "a provider makes its answer in invoke(), streamed or not: "
+    "post-process the answer by overriding invoke(), decorated with "
+    "@record_tool_invoke, calling super().invoke(); build the tool with "
+    ".is_streaming(False) to keep the raw text from streaming."
+    for name in ("to_messages", "to_stream_messages")
+}
 
-
-def add_additional_properties(
-    schema: Json,
-    value: Union[bool, dict] = False,
-    *,
-    only_when_missing: bool = True,
-    skip_when_unevaluated_present: bool = True,
-) -> Json:
-    """
-    Return a new schema dict where every object schema has `additionalProperties`
-    set to `value` (default False).
-
-    - only_when_missing: if True, do not overwrite an existing `additionalProperties`.
-    - skip_when_unevaluated_present: if True, do not add AP when `unevaluatedProperties`
-      is present on the same schema node (common in Pydantic v2 when extra='forbid').
-    """
-    schema = deepcopy(schema)
-
-    def _is_object_schema(node: Json) -> bool:
-        # Treat as object if type explicitly "object" OR it has properties-like keys
-        if node.get("type") == "object":
-            return True
-        return any(
-            k in node
-            for k in (
-                "properties",
-                "required",
-                "patternProperties",
-                "additionalProperties",
-            )
-        )
-
-    # JSON Schema keywords that contain nested schema(s)
-    SCHEMA_KEYS_SINGLE = ("contains", "propertyNames", "if", "then", "else", "not")
-    SCHEMA_KEYS_ARRAY = ("allOf", "anyOf", "oneOf")
-
-    # keys that can hold a schema or array of schemas
-    def _recurse(node: Any) -> None:
-        if isinstance(node, dict):
-            # Dive into $defs/definitions first (Pydantic v2 uses $defs)
-            for defs_key in ("$defs", "definitions"):
-                if defs_key in node and isinstance(node[defs_key], dict):
-                    for _, sub in node[defs_key].items():
-                        _recurse(sub)
-
-            # Recurse common composition keys
-            for k in SCHEMA_KEYS_SINGLE:
-                if k in node:
-                    _recurse(node[k])
-            for k in SCHEMA_KEYS_ARRAY:
-                if k in node and isinstance(node[k], list):
-                    for sub in node[k]:
-                        _recurse(sub)
-
-            # items can be schema or list of schemas (tuple validation)
-            if "items" in node:
-                items = node["items"]
-                if isinstance(items, list):
-                    for sub in items:
-                        _recurse(sub)
-                else:
-                    _recurse(items)
-            # prefixItems (2020-12)
-            if "prefixItems" in node and isinstance(node["prefixItems"], list):
-                for sub in node["prefixItems"]:
-                    _recurse(sub)
-            # properties / patternProperties values are schemas
-            if "properties" in node and isinstance(node["properties"], dict):
-                for sub in node["properties"].values():
-                    _recurse(sub)
-            if "patternProperties" in node and isinstance(
-                node["patternProperties"], dict
-            ):
-                for sub in node["patternProperties"].values():
-                    _recurse(sub)
-            # additionalProperties itself can be a schema; recurse into it if dict
-            if "additionalProperties" in node and isinstance(
-                node["additionalProperties"], dict
-            ):
-                _recurse(node["additionalProperties"])
-
-            # Now, possibly inject at this node if it's an object schema
-            if _is_object_schema(node):
-                has_ap = "additionalProperties" in node
-                has_uneval = "unevaluatedProperties" in node
-                if (not has_ap or not only_when_missing) and not (
-                    skip_when_unevaluated_present and has_uneval
-                ):
-                    # Don’t overwrite explicitly set AP if only_when_missing=True
-                    if not (has_ap and only_when_missing):
-                        node["additionalProperties"] = value
-        elif isinstance(node, list):
-            for sub in node:
-                _recurse(sub)
-
-    _recurse(schema)
-    return schema
+# Methods of an LLM that grafi called as hooks in 0.0.36, and no longer does.
+_HOOKS_NEVER_CALLED = {
+    "add_function_specs": "a workflow no longer gives an LLM its functions "
+    "with it. Read those it is offered with self.get_function_specs() in "
+    "invoke(), where its step binds them (to a copy of the tool too), or "
+    "workflow.offered_to(node_name) beforehand.",
+}
 
 
 @use_command(LLMCommand)
 class LLM(Tool):
+    """A tool that calls a language model, and returns its answer as one
+    message. While a caller streams the run, it streams the answer's text too,
+    as the provider produces it (see :mod:`grafi.runtime.deltas`), unless
+    ``is_streaming`` is off."""
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        warn_never_called(cls, LLM, lambda _: _HOOKS_NEVER_CALLED)
+
     system_message: Optional[str] = Field(default=None)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.LLM
-    api_key: Optional[str] = Field(
-        default=None, description="API key for the LLM service."
-    )
+    api_key: Optional[str] = env_secret(description="API key for the LLM service.")
     model: str = Field(
         default="",
         description="The name of the LLM model to use (e.g., 'gpt-4o-mini').",
     )
-    chat_params: Dict[str, Any] = Field(default_factory=dict)
+    # Request parameters, such as ``temperature``; a pydantic model class in
+    # them, such as a ``response_format``, is saved as its import path.
+    chat_params: ModelRef[Dict[str, Any]] = Field(default_factory=dict)
 
-    is_streaming: bool = Field(default=False)
+    # Whether to stream the answer to a caller that streams the run.
+    is_streaming: bool = Field(default=True)
 
     structured_output: bool = Field(
         default=False,
         description="Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text).",
     )
 
-    _function_specs: FunctionSpecs = PrivateAttr(default_factory=list)
+    # The specs of functions it is offered besides those its workflow wires
+    # to it, such as those whose calls the app answers itself.
+    function_specs: GivenSpecs = Field(
+        default_factory=list, exclude_if=lambda specs: not specs
+    )
+
+    @overload
+    def sdk_api_key(self, *, required: Literal[True] = True) -> str: ...
+
+    @overload
+    def sdk_api_key(self, *, required: bool) -> Optional[str]: ...
+
+    def sdk_api_key(self, *, required: bool = True) -> Optional[str]:
+        """The API key to give the provider's SDK: the one it holds (read from
+        its variable when the tool was made, or given in code); else, holding
+        none, its variable's, read now (see ``Component.secret_value``).
+
+        It is ``required`` where the SDK, given none, would read a variable
+        other than the tool's own, as an OpenAI-compatible SDK reads
+        ``OPENAI_API_KEY`` whatever the provider. Where it reads only its
+        provider's credentials (Claude's, Gemini's, Ollama's), pass
+        ``required=False``; a key read from another variable than the tool's
+        own, a tenant's, is required still.
+
+        Raises:
+            LLMToolException: If it has none, naming the variable to set, or
+                holds what is not a key.
+        """
+        try:
+            return self.secret_value("api_key", required=required)
+        except (ValueError, TypeError) as error:
+            raise LLMToolException(
+                tool_name=self.name or type(self).__name__,
+                model=self.model,
+                message=str(error),
+            ) from error
 
     def add_function_specs(self, function_spec: FunctionSpecs) -> None:
-        """Add function specifications to the LLM, deduplicated by name.
-
-        This is idempotent: the workflow links function specs into LLM tools in
-        ``model_post_init`` (which Pydantic re-runs on every reconstruction /
-        ``from_dict`` round-trip), so without dedup the same specs would
-        accumulate, bloating prompts and confusing the model.
-        """
-        if not function_spec:
-            return
-        existing = {spec.name for spec in self._function_specs}
-        for spec in function_spec:
-            if spec.name not in existing:
-                self._function_specs.append(spec)
-                existing.add(spec.name)
+        """Add function specifications to the LLM's ``function_specs``, once
+        each by name: functions it is offered beside those its workflow wires
+        to it, whose calls the app answers. A workflow does not call it."""
+        self.function_specs = once_each([*self.function_specs, *(function_spec or [])])
 
     def get_function_specs(self) -> FunctionSpecs:
-        """Return the function specifications for this LLM."""
-        return self._function_specs.copy()
+        """The functions the LLM is offered: in a step of its node, those its
+        workflow wires to it, of the function-call nodes reading its calls
+        (see :mod:`grafi.runtime.wiring` and ``EventDrivenWorkflow.offered_to``),
+        which answer them; then its ``function_specs``; once each by name. A
+        provider reads them here, in its invoke."""
+        return once_each([*wiring(self.tool_id).functions, *self.function_specs])
+
+    def should_stream(self) -> bool:
+        """Whether to ask the provider for a stream: a caller streams the run,
+        and ``is_streaming`` is on."""
+        return self.is_streaming and streaming()
 
     @staticmethod
     def parse_tool_arguments(arguments: Optional[str]) -> Dict[str, Any]:
@@ -182,89 +151,20 @@ class LLM(Tool):
         """Prepare input data for API consumption."""
         raise NotImplementedError
 
-    def _serialize_chat_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Serialize chat_params to ensure JSON compatibility.
-
-        Converts Pydantic v2 model instances and classes to their dict representation.
-        """
-        serialized_params: Dict[str, Any] = {}
-        for key, value in params.items():
-            if isinstance(value, BaseModel):
-                # Use model_dump() for Pydantic v2 model instances
-                serialized_params[key] = value.model_dump()
-            elif inspect.isclass(value) and issubclass(value, BaseModel):
-                # Handle Pydantic v2 model classes by getting their schema
-                serialized_params[key] = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": value.__name__,
-                        "strict": True,
-                        "schema": add_additional_properties(value.model_json_schema()),
-                    },
-                }
-            elif isinstance(value, dict):
-                # Recursively serialize nested dictionaries
-                serialized_params[key] = self._serialize_chat_params(value)
-            elif isinstance(value, list):
-                # Handle lists that might contain Pydantic models or classes
-                serialized_params[key] = [
-                    (
-                        item.model_dump()
-                        if isinstance(item, BaseModel)
-                        else (
-                            {
-                                "type": f"{item.__module__}.{item.__name__}",
-                                "json_schema": add_additional_properties(
-                                    item.model_json_schema()
-                                ),
-                            }
-                            if (inspect.isclass(item) and issubclass(item, BaseModel))
-                            else item
-                        )
-                    )
-                    for item in value
-                ]
-            else:
-                # Keep other types as-is (they should be JSON serializable)
-                serialized_params[key] = value
-        return serialized_params
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "base_class": "LLMTool",
-            "system_message": self.system_message,
-            "api_key": "****************",
-            "model": self.model,
-            "chat_params": self._serialize_chat_params(self.chat_params),
-            "is_streaming": self.is_streaming,
-            "structured_output": self.structured_output,
-        }
-
-    @classmethod
-    async def from_dict(cls, data: dict[str, Any]) -> "LLM":
-        """
-        Create an LLM instance from a dictionary representation.
-
-        Args:
-            data (dict[str, Any]): A dictionary representation of the LLM.
-
-        Returns:
-            LLM: An LLM instance created from the dictionary.
-
-        Note:
-            The api_key is masked in to_dict() for security, so from_dict()
-            will need to retrieve it from environment or other sources.
-        """
-        raise NotImplementedError("from_dict must be implemented in subclasses.")
-
 
 T_L = TypeVar("T_L", bound=LLM)
 
 
 class LLMBuilder(ToolBuilder[T_L]):
     """Builder for LLM instances."""
+
+    def api_key(self, api_key: SecretInput) -> Self:
+        """Set the API key, or the variable to read it from, ``{"env":
+        "VAR"}``, as ``secret_reference()`` gives it: one read from a variable
+        is saved as that variable; saving any other raises (see
+        :func:`~grafi.common.manifest.env_secret`)."""
+        self.kwargs["api_key"] = api_key
+        return self
 
     def model(self, model: str) -> Self:
         """Set the LLM model identifier.
@@ -294,10 +194,11 @@ class LLMBuilder(ToolBuilder[T_L]):
         return self
 
     def is_streaming(self, is_streaming: bool) -> Self:
-        """Enable or disable streaming responses.
+        """Stream the answer, token by token, to a caller that streams the run
+        (the default), or not.
 
         Args:
-            is_streaming: True to stream responses token-by-token.
+            is_streaming: False to send a streaming caller the whole answer only.
 
         Returns:
             Self for method chaining.

@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
@@ -165,3 +166,30 @@ async def test_offset_updates_correctly(topic: Topic, invoke_context: InvokeCont
 
     # Consumer 2 has no more messages to consume
     assert not await topic.can_consume("consumer_2")
+
+
+def test_a_topics_condition_is_refused_naming_routes() -> None:
+    """0.0.36's topic condition; a node's route holds it now."""
+    with pytest.raises(ValidationError, match="publish_to\\(topic, when=...\\)"):
+        Topic(name="t", condition=lambda event: True)  # type: ignore[call-arg]
+
+
+def test_a_topic_of_ones_own_may_have_a_condition_field() -> None:
+    class Filtered(Topic):
+        condition: str = "all"
+
+    topic = Filtered(name="t", condition="urgent")
+
+    assert Filtered.model_validate(topic.model_dump()).condition == "urgent"
+
+
+def test_the_builders_condition_names_routes() -> None:
+    with pytest.raises(AttributeError, match="publish_to\\(topic, when=...\\)"):
+        Topic.builder().condition(lambda event: True)
+
+
+def test_the_builder_sets_a_condition_of_a_topic_of_ones_own() -> None:
+    class Gated(Topic):
+        condition: str = "all"
+
+    assert Gated.builder().name("g").condition("urgent").build().condition == "urgent"

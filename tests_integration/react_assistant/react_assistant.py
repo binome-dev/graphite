@@ -4,7 +4,6 @@
 #                |               search tool
 #                |--- observation <-|
 
-import os
 from typing import Optional
 from typing import Self
 
@@ -13,6 +12,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
@@ -31,13 +32,15 @@ class ReActAssistant(Assistant):
     )
     name: str = Field(default="ReActAssistant")
     type: str = Field(default="ReActAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    thought_llm_system_message: Optional[str] = Field(default=None)
-    action_llm_system_message: Optional[str] = Field(default=None)
-    observation_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    search_tool: FunctionCallTool
-    model: str = Field(default="gpt-4o-mini")
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    thought_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    action_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    observation_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    search_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
 
     @classmethod
     def builder(cls) -> "ReActAssistantBuilder":
@@ -45,6 +48,7 @@ class ReActAssistant(Assistant):
         return ReActAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "ReActAssistant":
+        assert self.search_tool is not None  # Given when built in code.
         workflow_dag_builder = EventDrivenWorkflow.builder().name(
             "ReActAssistantWorkflow"
         )
@@ -67,7 +71,7 @@ class ReActAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("ThoughtLLMTool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.thought_llm_system_message)
                 .build()
@@ -88,7 +92,7 @@ class ReActAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("ActionLLMTool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.action_llm_system_message)
                 .build()
@@ -120,7 +124,7 @@ class ReActAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("ObservationLLMTool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.observation_llm_system_message)
                 .build()
@@ -138,7 +142,7 @@ class ReActAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("SummariesLLMTool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -157,7 +161,7 @@ class ReActAssistant(Assistant):
 class ReActAssistantBuilder(AssistantBaseBuilder[ReActAssistant]):
     """Concrete builder for ReActAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

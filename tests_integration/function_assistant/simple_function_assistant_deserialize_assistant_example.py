@@ -1,5 +1,4 @@
 import asyncio
-import json
 import uuid
 from pathlib import Path
 
@@ -7,15 +6,20 @@ from dotenv import load_dotenv
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.import_ref import trust_modules
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.runtime import current_services
 
 # Load API keys (e.g. OPENAI_API_KEY) from .env before the assistant is
-# deserialized; OpenAITool.from_dict() reads the key from the environment since
-# the manifest stores it masked.
+# loaded: the manifest holds no key, only the variable each is read from.
 load_dotenv()
+
+# The manifest names the assistant's class, its function and its
+# response_format model, all of tests_integration. Loading imports classes and
+# functions only from trusted modules.
+trust_modules("tests_integration")
 
 
 def get_invoke_context() -> InvokeContext:
@@ -30,15 +34,10 @@ event_store = current_services().event_store
 
 
 async def test_deserialized_assistant() -> None:
-    """Test the deserialized assistant using the new load_from_manifest method."""
-    # Read the manifest JSON file
-    with open(
-        Path(__file__).parent / "SimpleFunctionLLMAssistant_manifest.json", "r"
-    ) as f:
-        manifest_json = f.read()
-
-    # Deserialize the assistant using the new method
-    assistant = await Assistant.from_dict(json.loads(manifest_json))
+    """Load the assistant from its manifest, and run it."""
+    assistant = Assistant.from_manifest(
+        Path(__file__).parent / "SimpleFunctionLLMAssistant_manifest.json"
+    )
 
     print(f"Successfully deserialized assistant: {assistant.name}")
     print(f"Workflow: {assistant.workflow.name}")

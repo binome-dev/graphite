@@ -1,13 +1,13 @@
-import json
 from typing import Any
-from typing import AsyncGenerator
 from typing import Dict
+from typing import Iterable
 from typing import List
 
-from loguru import logger
+from pydantic import BaseModel
 from pydantic import Field
+from pydantic import SerializationInfo
+from pydantic import field_serializer
 
-from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.mcp_connections import Connection
@@ -15,14 +15,14 @@ from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
+from grafi.tools.mcp_config import MCPConnected
 
 try:
-    from fastmcp import Client
+    import fastmcp  # noqa: F401 - what connect() connects with.
 except (ImportError, ModuleNotFoundError):
     raise ImportError("`fastmcp` not installed. Please install using `uv add fastmcp`")
 
 try:
-    from mcp.types import CallToolResult
     from mcp.types import EmbeddedResource
     from mcp.types import ImageContent
     from mcp.types import Prompt
@@ -33,28 +33,76 @@ except (ImportError, ModuleNotFoundError):
     raise ImportError("`mcp` not installed. Please install using `uv add mcp`")
 
 
-class MCPTool(FunctionCallTool):
-    """
-    MCPTool extends FunctionCallTool to provide functionality using the MCP API.
+def content_text(contents: Iterable[Any]) -> str:
+    """An MCP result's content as text, a line per item: text as it is, an
+    image as its base64 data, an embedded resource as its JSON."""
+    lines = []
+    for content in contents:
+        if isinstance(content, TextContent):
+            lines.append(content.text)
+        elif isinstance(content, ImageContent):
+            lines.append(content.data)
+        elif isinstance(content, EmbeddedResource):
+            lines.append(f"[Embedded resource: {content.resource.model_dump_json()}]")
+        else:
+            lines.append(f"[Unsupported content type: {content.type}]")
+    return "\n".join(lines)
+
+
+def mcp_spec(tool: Tool) -> FunctionSpec:
+    """An MCP server's tool, as the function it offers an LLM."""
+    return FunctionSpec.model_validate(
+        {
+            "name": tool.name,
+            "description": tool.description or "",
+            "parameters": tool.inputSchema,
+        }
+    )
+
+
+class MCPTool(MCPConnected, FunctionCallTool):
+    """A tool that answers an LLM's tool calls with the tools of MCP servers.
+
+    Building one (``await MCPTool.builder()...build()``) lists the servers'
+    tools, resources and prompts; it is saved with them, so loading one does
+    not connect. A secret in ``mcp_config`` is given as a reference to an
+    environment variable, ``"${VAR}"`` (see :mod:`grafi.tools.mcp_config`).
+    Each call connects anew, so calls hold no state in common: calls made at
+    once to a stdio server each start its process.
     """
 
-    # Set up API key and MCP client
     name: str = "MCPTool"
     type: str = "MCPTool"
 
-    mcp_config: Dict[str, Any] = Field(default_factory=dict)
+    # What its servers offer, listed when it is built, and saved (its
+    # function_specs too).
     resources: List[Resource] = Field(default_factory=list)
     prompts: List[Prompt] = Field(default_factory=list)
 
+    @field_serializer("resources", "prompts")
+    def _save_by_alias(
+        self, items: List[BaseModel], info: SerializationInfo
+    ) -> List[Dict[str, Any]]:
+        """MCP's models, as MCP names their fields (``_meta``), which is how
+        they load."""
+        return [item.model_dump(mode=info.mode, by_alias=True) for item in items]
+
     @classmethod
     async def initialize(cls, **kwargs: Any) -> "MCPTool":
-        """
-        Initialize the MCPTool with the given keyword arguments.
-        """
-        mcp_tool = cls(**kwargs)
-        await mcp_tool._get_function_specs()
+        """An MCPTool offering what its servers do -- their tools, resources and
+        prompts, listed now -- beside any specs it is given; a function of its
+        own wins over a server's tool of the same name (and is warned of)."""
+        given = kwargs["function_specs"] = kwargs.get("function_specs") or []
 
-        return mcp_tool
+        async def listing(client: Any) -> Dict[str, Any]:
+            tools = await client.list_tools()
+            return {
+                "function_specs": [*given, *map(mcp_spec, tools)],
+                "resources": await client.list_resources(),
+                "prompts": await client.list_prompts(),
+            }
+
+        return await cls._listed(kwargs, listing)
 
     @classmethod
     def builder(cls) -> "MCPToolBuilder":
@@ -63,85 +111,13 @@ class MCPTool(FunctionCallTool):
         """
         return MCPToolBuilder(cls)
 
-    async def _get_function_specs(self) -> None:
-        if not self.mcp_config:
-            raise ValueError("mcp_config are not set.")
-
-        all_tools: list[Tool] = []
-
-        async with Client(self.mcp_config) as client:
-            all_tools.extend(await client.list_tools())
-            self.resources = await client.list_resources()
-            self.prompts = await client.list_prompts()
-
-        for tool in all_tools:
-            func_spec = {
-                "name": tool.name,
-                "description": tool.description or "",
-                "parameters": tool.inputSchema,
-            }
-
-            self.function_specs.append(FunctionSpec.model_validate(func_spec))
-
-    @record_tool_invoke
-    async def invoke(
-        self,
-        invoke_context: InvokeContext,
-        input_data: Messages,
-    ) -> AsyncGenerator[Messages, None]:
-        """
-        Invoke the MCPTool with the provided input data.
-
-        Args:
-            invoke_context (InvokeContext): The context for executing the function.
-            input_data (Message): The input data for the function.
-
-        Returns:
-            List[Message]: The output messages from the function invoke.
-        """
-        input_message = input_data[0]
-        if input_message.tool_calls is None:
-            logger.warning("Function call is None.")
-            raise ValueError("Function call is None.")
-
-        messages: List[Message] = []
-
-        for tool_call in input_message.tool_calls:
-            if any(
-                tool_call.function.name == spec.name for spec in self.function_specs
-            ):
-                tool_name = tool_call.function.name
-                kwargs = json.loads(tool_call.function.arguments)
-
-                async with Client(self.mcp_config) as client:
-                    logger.info(f"Calling MCP Tool '{tool_name}' with args: {kwargs}")
-
-                    result: CallToolResult = await client.call_tool(tool_name, kwargs)
-
-                    # Process the result content
-                    response_str = ""
-                    for content in result.content:
-                        if isinstance(content, TextContent):
-                            response_str += content.text + "\n"
-                        elif isinstance(content, ImageContent):
-                            response_str = getattr(content, "data", "")
-
-                        elif isinstance(content, EmbeddedResource):
-                            # Handle embedded resources
-                            response_str += f"[Embedded resource: {content.resource.model_dump_json()}]\n"
-                        else:
-                            # Handle other content types
-                            response_str += (
-                                f"[Unsupported content type: {content.type}]\n"
-                            )
-
-                    messages.extend(
-                        self.to_messages(
-                            response=response_str, tool_call_id=tool_call.id
-                        )
-                    )
-
-        yield messages
+    async def call_function(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> str:
+        """Call the MCP server's tool ``name``, and return its result as text."""
+        async with self._connect() as client:
+            result = await client.call_tool(name, arguments)
+        return content_text(result.content)
 
     async def get_prompt(
         self,
@@ -152,7 +128,7 @@ class MCPTool(FunctionCallTool):
         if not any(prompt.name == prompt_name for prompt in self.prompts):
             raise ValueError(f"Prompt '{prompt_name}' not found")
 
-        async with Client(self.mcp_config) as client:
+        async with self._connect() as client:
             prompt = await client.get_prompt(prompt_name, arguments=arguments)
             return [
                 Message(
@@ -166,42 +142,8 @@ class MCPTool(FunctionCallTool):
         if not any(resource.uri.encoded_string() == uri for resource in self.resources):
             raise ValueError(f"Resource with URI '{uri}' not found")
 
-        async with Client(self.mcp_config) as client:
+        async with self._connect() as client:
             return await client.read_resource(uri)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "mcp_config": self.mcp_config,
-            "resources": [resource.model_dump_json() for resource in self.resources],
-            "prompts": [prompt.model_dump_json() for prompt in self.prompts],
-        }
-
-    @classmethod
-    async def from_dict(cls, data: Dict[str, Any]) -> "MCPTool":
-        """
-        Create an MCPTool instance from a dictionary representation.
-
-        Args:
-            data (Dict[str, Any]): A dictionary representation of the MCPTool.
-
-        Returns:
-            MCPTool: An MCPTool instance created from the dictionary.
-
-        Note:
-            This method cannot fully reconstruct the MCP connections.
-            The tool needs to be re-initialized with proper MCP configuration.
-        """
-        from openinference.semconv.trace import OpenInferenceSpanKindValues
-
-        return (
-            await cls.builder()
-            .name(data.get("name", "MCPTool"))
-            .type(data.get("type", "MCPTool"))
-            .oi_span_type(OpenInferenceSpanKindValues(data.get("oi_span_type", "TOOL")))
-            .connections(data.get("mcp_config", {}).get("mcpServers", {}))
-            .build()
-        )
 
 
 class MCPToolBuilder(FunctionCallToolBuilder[MCPTool]):

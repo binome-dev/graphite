@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from chromadb import Collection
@@ -8,6 +7,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
+from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -35,15 +35,17 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     )
     name: str = Field(default="SimpleEmbeddingRetrievalAssistant")
     type: str = Field(default="SimpleEmbeddingRetrievalAssistant")
-    api_key: Optional[str] = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-    embedding_model: Optional[OpenAIEmbedding] = Field(default=None)
-    n_results: int = Field(default=30)
-
-    collection: Collection
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    embedding_model: Optional[OpenAIEmbedding] = Field(default=None, exclude=True)
+    n_results: int = Field(default=30, exclude=True)
+    collection: Optional[Collection] = Field(default=None, exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _construct_workflow(self) -> "SimpleEmbeddingRetrievalAssistant":
+        assert self.collection is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
 

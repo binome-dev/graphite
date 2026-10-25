@@ -78,7 +78,15 @@ async def test_simple_function_call_assistant() -> None:
     print(output)
     assert output is not None
     assert "12345" in str(output[0].data[0].content)
-    assert "bad" in str(output[0].data[0].content)
+    # The function's own words, not the LLM's rewording of them.
+    tool_results = [
+        message.content
+        for event in await event_store.get_events()
+        if isinstance(event, PublishToTopicEvent)
+        for message in event.data
+        if message.role == "tool"
+    ]
+    assert any("bad" in str(result) for result in tool_results)
     print(len(await event_store.get_events()))
     assert len(await event_store.get_events()) == 24
 
@@ -107,8 +115,7 @@ async def test_simple_function_call_assistant() -> None:
     # assistant.generate_manifest()
 
 
-# Guard top-level execution so this module can be imported (e.g. to resolve and
-# register the LocalInfoMock tool class when deserializing the manifest) without
-# running the agent.
+# Guard top-level execution so this module can be imported (e.g. when loading
+# the manifest imports the LocalInfoMock tool class) without running the agent.
 if __name__ == "__main__":
     asyncio.run(test_simple_function_call_assistant())

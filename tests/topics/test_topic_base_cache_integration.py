@@ -382,11 +382,13 @@ class TestTopicBaseCacheIntegration:
         assert topic.event_queue._committed["consumer1"] == 3
 
     def test_topic_serialization(self, topic):
-        # Test to_dict method
-        topic_dict = topic.to_dict()
+        # A topic saves its class, name and type, never its events
+        topic_dict = topic.model_dump(mode="json")
+        assert topic_dict["class"] == "grafi.topics.topic_impl.topic:Topic"
         assert topic_dict["name"] == "test_topic"
         assert topic_dict["type"] == "Topic"
         assert "condition" not in topic_dict
+        assert "event_queue" not in topic_dict
 
     @pytest.mark.asyncio
     async def test_async_reset(self, topic: Topic, invoke_context, sample_messages):

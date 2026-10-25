@@ -1,3 +1,6 @@
+import json
+from typing import Any
+from typing import Dict
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -9,13 +12,17 @@ from mcp.types import Prompt
 from mcp.types import Resource
 from mcp.types import TextContent
 from mcp.types import TextResourceContents
+from pydantic_core import PydanticSerializationError
 
+from grafi.common.decorators.llm_function import llm_function
+from grafi.common.manifest import ManifestError
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParameterSchema
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
+from grafi.tools.tool import Tool
 
 
 @pytest.fixture
@@ -75,32 +82,62 @@ def dummy_input_message():
     ]
 
 
-@pytest.mark.asyncio
-async def test_get_function_specs_adds_specs(dummy_connections):
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
-        instance = MockClient.return_value.__aenter__.return_value
+def _server_offering(client_class: MagicMock, *names: str) -> None:
+    """Make the servers offer tools of these names, and nothing else."""
+    instance = client_class.return_value.__aenter__.return_value
+    offered = []
+    for name in names:
+        tool = MagicMock()
+        tool.name, tool.description, tool.inputSchema = name, "desc", {}
+        offered.append(tool)
+    instance.list_tools = AsyncMock(return_value=offered)
+    instance.list_resources = AsyncMock(return_value=[])
+    instance.list_prompts = AsyncMock(return_value=[])
 
+
+@pytest.mark.asyncio
+async def test_building_offers_what_the_servers_offer(dummy_connections):
+    with patch("fastmcp.Client") as client_class:
+        _server_offering(client_class, "test_tool")
         tool = await MCPTool.builder().connections(dummy_connections).build()
-        tool.function_specs = []
-        mock_tool = MagicMock()
-        mock_tool.name = "test_tool"
-        mock_tool.description = "desc"
-        mock_tool.inputSchema = {}
-        instance.list_tools = AsyncMock(return_value=[mock_tool])
-        instance.list_resources = AsyncMock(return_value=[])
-        instance.list_prompts = AsyncMock(return_value=[])
-        await tool._get_function_specs()
-        assert any(fs.name == "test_tool" for fs in tool.function_specs)
+
+    assert [spec.name for spec in tool.get_function_specs()] == ["test_tool"]
+
+
+@llm_function
+def search(q: str) -> str:
+    """Search here."""
+    return q
+
+
+@pytest.mark.asyncio
+async def test_a_server_tool_named_like_its_own_function_saves_and_loads(
+    dummy_connections,
+):
+    """The tool's own function wins, warned of, and what it saves loads."""
+    with patch("fastmcp.Client") as client_class, pytest.warns(UserWarning):
+        _server_offering(client_class, "search", "fetch")
+        tool = await (
+            MCPTool.builder().connections(dummy_connections).function(search).build()
+        )
+
+    with pytest.warns(UserWarning, match=r"its own functions \['search'\]"):
+        loaded = Tool.from_manifest(json.loads(json.dumps(tool.to_manifest())))
+
+    for built in (tool, loaded):
+        offered = {s.name: s.description for s in built.get_function_specs()}
+        assert offered == {"search": "Search here.", "fetch": "desc"}
+    assert loaded.to_manifest() == tool.to_manifest()
 
 
 @pytest.mark.asyncio
 async def test_invoke_text_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
-    tool = MCPTool(connections=dummy_connections)
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
     tool.function_specs = [dummy_function_spec]
 
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+    with patch("fastmcp.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
         # Create a mock CallToolResult with content attribute
@@ -108,20 +145,18 @@ async def test_invoke_text_content(
         mock_result.content = [TextContent(type="text", text="hello")]
         instance.call_tool = AsyncMock(return_value=mock_result)
 
-        result = [
-            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
-        ]
-        assert "hello" in result[0][0].content
+        result = await tool.invoke(dummy_invoke_context, dummy_input_message)
+        assert "hello" in result[0].content
 
 
 @pytest.mark.asyncio
 async def test_invoke_image_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
-    tool = MCPTool(connections=dummy_connections)
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
     tool.function_specs = [dummy_function_spec]
 
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+    with patch("fastmcp.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
         # Create a mock CallToolResult with content attribute
@@ -131,20 +166,18 @@ async def test_invoke_image_content(
         ]
         instance.call_tool = AsyncMock(return_value=mock_result)
 
-        result = [
-            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
-        ]
-        assert result[0][0].content == "imgdata"
+        result = await tool.invoke(dummy_invoke_context, dummy_input_message)
+        assert result[0].content == "imgdata"
 
 
 @pytest.mark.asyncio
 async def test_invoke_embedded_resource(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
-    tool = MCPTool(connections=dummy_connections)
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
     tool.function_specs = [dummy_function_spec]
 
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+    with patch("fastmcp.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
         # Create a mock CallToolResult with content attribute
@@ -161,23 +194,21 @@ async def test_invoke_embedded_resource(
         ]
         instance.call_tool = AsyncMock(return_value=mock_result)
 
-        result = [
-            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
-        ]
-        assert "Embedded resource" in result[0][0].content
+        result = await tool.invoke(dummy_invoke_context, dummy_input_message)
+        assert "Embedded resource" in result[0].content
 
 
 @pytest.mark.asyncio
 async def test_invoke_unsupported_content(
     dummy_connections, dummy_function_spec, dummy_invoke_context, dummy_input_message
 ):
-    tool = MCPTool(connections=dummy_connections)
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
     tool.function_specs = [dummy_function_spec]
 
     class DummyOtherContent:
         type = "other"
 
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+    with patch("fastmcp.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
 
         # Create a mock CallToolResult with content attribute
@@ -185,27 +216,22 @@ async def test_invoke_unsupported_content(
         mock_result.content = [DummyOtherContent()]
         instance.call_tool = AsyncMock(return_value=mock_result)
 
-        result = [
-            m async for m in tool.invoke(dummy_invoke_context, dummy_input_message)
-        ]
-        assert "Unsupported content type" in result[0][0].content
+        result = await tool.invoke(dummy_invoke_context, dummy_input_message)
+        assert "Unsupported content type" in result[0].content
 
 
 @pytest.mark.asyncio
-async def test_invoke_no_tool_calls(dummy_connections, dummy_invoke_context):
-    tool = MCPTool(connections=dummy_connections)
-
-    class DummyInputMessage:
-        tool_calls = None
-
-    with pytest.raises(ValueError):
-        async for _ in tool.invoke(dummy_invoke_context, [DummyInputMessage()]):
-            pass
+async def test_invoke_without_tool_calls_yields_nothing(
+    dummy_connections, dummy_invoke_context
+):
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections})
+    message = Message(role="user", content="no calls")
+    assert await tool.invoke(dummy_invoke_context, [message]) == []
 
 
 @pytest.mark.asyncio
 async def test_get_prompt_and_resources(dummy_connections):
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
+    with patch("fastmcp.Client") as MockClient:
         instance = MockClient.return_value.__aenter__.return_value
         instance.get_prompt = AsyncMock(
             return_value=MagicMock(messages=[Message(role="user", content="hi")])
@@ -223,54 +249,311 @@ async def test_get_prompt_and_resources(dummy_connections):
         assert res == ["res1"]
 
 
-@pytest.mark.asyncio
-async def test_from_dict(dummy_connections):
-    """Test deserialization from dictionary."""
-    data = {
-        "class": "MCPTool",
-        "tool_id": "test-id",
-        "name": "TestMCP",
-        "type": "MCPTool",
-        "oi_span_type": "TOOL",
-        "mcp_config": {
-            "mcpServers": dummy_connections,
-        },
+# --------------------------------------------------------------------------- #
+#  Saving and loading                                                          #
+# --------------------------------------------------------------------------- #
+MCP_TOOL = "grafi.tools.function_calls.impl.mcp_tool:MCPTool"
+CLIENT = "fastmcp.Client"
+
+
+def _offering(client_class: MagicMock) -> None:
+    """Make the servers the client connects to offer a tool, a resource and a
+    prompt."""
+    client = client_class.return_value.__aenter__.return_value
+    offered = MagicMock()
+    offered.name = "get_weather"
+    offered.description = "Get weather"
+    offered.inputSchema = {
+        "type": "object",
+        "properties": {"location": {"type": "string"}},
+    }
+    client.list_tools = AsyncMock(return_value=[offered])
+    client.list_resources = AsyncMock(
+        return_value=[Resource(uri="user://resource/uri1", name="res1")]
+    )
+    client.list_prompts = AsyncMock(
+        return_value=[Prompt(name="prompt1", description="Test prompt")]
+    )
+
+
+def _server(headers: Dict[str, str]) -> Dict[str, Any]:
+    return {
+        "mcpServers": {
+            "github": {
+                "transport": "streamable_http",
+                "url": "https://mcp.example/mcp",
+                "headers": headers,
+            }
+        }
     }
 
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
-        instance = MockClient.return_value.__aenter__.return_value
-        instance.list_tools = AsyncMock(return_value=[])
-        instance.list_resources = AsyncMock(return_value=[])
-        instance.list_prompts = AsyncMock(return_value=[])
 
-        tool = await MCPTool.from_dict(data)
+@pytest.mark.asyncio
+async def test_dump_saves_what_the_servers_offer(dummy_connections):
+    with patch(CLIENT) as client_class:
+        _offering(client_class)
+        tool = await (
+            MCPTool.builder().name("TestMCP").connections(dummy_connections).build()
+        )
 
-        assert isinstance(tool, MCPTool)
-        assert tool.name == "TestMCP"
-        assert tool.type == "MCPTool"
-        assert tool.mcp_config is not None
+    data = tool.model_dump(mode="json")
+
+    assert data["class"] == MCP_TOOL
+    assert data["name"] == "TestMCP"
+    assert data["mcp_config"] == {"mcpServers": dummy_connections}
+    assert [spec["name"] for spec in data["function_specs"]] == ["get_weather"]
+    assert data["functions"] == {}
+    assert [resource["uri"] for resource in data["resources"]] == [
+        "user://resource/uri1"
+    ]
+    assert [prompt["name"] for prompt in data["prompts"]] == ["prompt1"]
+    json.dumps(data)  # Plain JSON.
 
 
 @pytest.mark.asyncio
-async def test_from_dict_roundtrip(dummy_connections):
-    """Test serialization and deserialization roundtrip."""
-    with patch("grafi.tools.function_calls.impl.mcp_tool.Client") as MockClient:
-        instance = MockClient.return_value.__aenter__.return_value
-        instance.list_tools = AsyncMock(return_value=[])
-        instance.list_resources = AsyncMock(return_value=[])
-        instance.list_prompts = AsyncMock(return_value=[])
-
-        # Create original tool
+async def test_round_trip_does_not_connect(dummy_connections):
+    with patch(CLIENT) as client_class:
+        _offering(client_class)
         original = await MCPTool.builder().connections(dummy_connections).build()
+        data = original.model_dump(mode="json")
+        client_class.reset_mock()
 
-        # Serialize to dict
-        data = original.to_dict()
+        restored = Tool.model_validate(data)
 
-        # Deserialize back
-        restored = await MCPTool.from_dict(data)
+        client_class.assert_not_called()
+    assert type(restored) is MCPTool
+    assert restored.tool_id == original.tool_id
+    assert restored.mcp_config == original.mcp_config
+    assert restored.get_function_specs() == original.get_function_specs()
+    assert [resource.uri for resource in restored.resources] == [
+        resource.uri for resource in original.resources
+    ]
+    assert [prompt.name for prompt in restored.prompts] == ["prompt1"]
+    assert restored.model_dump() == original.model_dump()
+    assert restored.model_dump(mode="json") == data
+    # Saving and loading again offers the same, once each.
+    again = Tool.model_validate(Tool.model_validate(data).model_dump(mode="json"))
+    assert [spec.name for spec in again.get_function_specs()] == ["get_weather"]
 
-        # Verify key properties match
-        assert isinstance(restored, MCPTool)
-        assert restored.name == original.name
-        assert restored.type == original.type
-        assert restored.mcp_config == original.mcp_config
+
+def test_load_from_a_manifest_naming_the_class(dummy_connections):
+    data = {
+        "class": MCP_TOOL,
+        "tool_id": "test-id",
+        "name": "TestMCP",
+        "oi_span_type": "TOOL",
+        "mcp_config": {"mcpServers": dummy_connections},
+        "function_specs": [
+            {
+                "name": "get_weather",
+                "description": "Get weather",
+                "parameters": {"type": "object", "properties": {}},
+            }
+        ],
+    }
+
+    with patch(CLIENT) as client_class:
+        tool = Tool.model_validate(data)
+
+    client_class.assert_not_called()
+    assert isinstance(tool, MCPTool)
+    assert tool.tool_id == "test-id"
+    assert tool.name == "TestMCP"
+    assert tool.mcp_config == {"mcpServers": dummy_connections}
+    assert [spec.name for spec in tool.get_function_specs()] == ["get_weather"]
+
+
+@pytest.mark.parametrize(
+    "headers,name",
+    [
+        ({"Authorization": "Bearer ghp_literal"}, "Authorization"),
+        ({"X-API-Key": "literal"}, "X-API-Key"),
+    ],
+)
+def test_a_secret_header_set_to_a_value_is_never_saved(headers, name):
+    tool = MCPTool(mcp_config=_server(headers))
+
+    with pytest.raises(
+        PydanticSerializationError,
+        match=f"ManifestError: .*The MCP server 'github' has '{name}' set to a value",
+    ):
+        tool.model_dump(mode="json")
+    with pytest.raises(ManifestError, match=f"has '{name}' set to a value"):
+        tool.to_manifest()
+
+
+def test_a_secret_environment_variable_set_to_a_value_is_never_saved():
+    config = {
+        "mcpServers": {
+            "local": {"command": "server", "env": {"GITHUB_TOKEN": "ghp_literal"}}
+        }
+    }
+
+    with pytest.raises(
+        PydanticSerializationError,
+        match="has 'GITHUB_TOKEN' set to a value",
+    ):
+        MCPTool(mcp_config=config).model_dump(mode="json")
+
+
+@pytest.mark.parametrize(
+    "server,name",
+    [
+        # Nested in a setting of the connection.
+        (
+            {
+                "url": "https://mcp.example/mcp",
+                "auth": {"oauth": {"client_secret": "literal"}},
+            },
+            "auth",  # The outer name, which all within it is under.
+        ),
+        # A URL's query parameter, reported under the URL's name.
+        ({"url": "https://mcp.example/mcp?api_key=literal"}, "url"),
+        # A setting named like a token, as a header.
+        (
+            {"url": "https://mcp.example/mcp", "headers": {"X-Auth-Token": "t"}},
+            "X-Auth-Token",
+        ),
+        # In a list of settings.
+        ({"command": "srv", "args": [{"password": "hunter2"}]}, "password"),
+    ],
+)
+def test_a_secret_anywhere_in_a_connection_is_never_saved(server, name):
+    tool = MCPTool(mcp_config={"mcpServers": {"s": server}})
+
+    with pytest.raises(ManifestError, match=f"The MCP server 's' has '{name}'"):
+        tool.to_manifest()
+
+
+def test_a_python_dump_keeps_the_configuration_as_it_is():
+    """The secret rules are for JSON: a python-mode dump holds the values."""
+    config = _server({"Authorization": "Bearer ghp_literal"})
+    tool = MCPTool(mcp_config=config)
+
+    data = tool.model_dump()
+
+    assert data["class"] is MCPTool
+    assert data["mcp_config"] == config
+    assert MCPTool.model_validate(data).mcp_config == config
+
+
+def test_a_manifest_reads_only_the_variables_it_is_allowed(dummy_function_spec):
+    config = _server({"Authorization": "Bearer ${GITHUB_TOKEN}"})
+    manifest = MCPTool(
+        mcp_config=config, function_specs=[dummy_function_spec]
+    ).to_manifest()
+
+    with pytest.raises(ManifestError, match=r"env=\['GITHUB_TOKEN'\]"):
+        MCPTool.from_manifest(manifest)
+
+    with patch(CLIENT) as client_class:
+        restored = MCPTool.from_manifest(manifest, allow_env=["GITHUB_TOKEN"])
+
+    client_class.assert_not_called()
+    assert restored.mcp_config == config
+    assert restored.get_function_specs() == [dummy_function_spec]
+
+
+@pytest.mark.asyncio
+async def test_a_secret_saved_as_a_reference_is_expanded_when_connecting(
+    monkeypatch, dummy_function_spec, dummy_invoke_context, dummy_input_message
+):
+    config = _server(
+        {"Authorization": "Bearer ${GITHUB_TOKEN}", "Accept": "application/json"}
+    )
+    tool = MCPTool(mcp_config=config, function_specs=[dummy_function_spec])
+    data = tool.model_dump(mode="json")
+    assert data["mcp_config"] == config  # The reference, never the value.
+    restored = Tool.from_manifest(tool.to_manifest(), allow_env=["GITHUB_TOKEN"])
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+
+    with patch(CLIENT) as client_class:
+        client = client_class.return_value.__aenter__.return_value
+        client.call_tool = AsyncMock(
+            return_value=MagicMock(content=[TextContent(type="text", text="sunny")])
+        )
+        [answer] = await restored.invoke(dummy_invoke_context, dummy_input_message)
+
+    assert answer.content == "sunny"
+    [connected] = client_class.call_args.args
+    assert connected["mcpServers"]["github"]["headers"] == {
+        "Authorization": "Bearer ghp_secret",
+        "Accept": "application/json",
+    }
+    assert restored.mcp_config == config  # Expanded for the client only.
+
+
+def _calls(count: int) -> list[Message]:
+    calls = [
+        {
+            "id": f"call_{n}",
+            "type": "function",
+            "function": {"name": "get_weather", "arguments": '{"location": "Oslo"}'},
+        }
+        for n in range(count)
+    ]
+    return [Message(role="assistant", content=None, tool_calls=calls)]
+
+
+@pytest.mark.asyncio
+async def test_each_call_connects_anew(
+    dummy_connections, dummy_function_spec, dummy_invoke_context
+):
+    """Calls hold no state in common, whichever conversation, task or event
+    loop makes them; a connection failing to close fails no call answered."""
+    tool = MCPTool(
+        mcp_config={"mcpServers": dummy_connections},
+        function_specs=[dummy_function_spec],
+    )
+    with patch(CLIENT) as client_class:
+        client = client_class.return_value.__aenter__.return_value
+        client.call_tool = AsyncMock(
+            return_value=MagicMock(content=[TextContent(type="text", text="sunny")])
+        )
+        client_class.return_value.__aexit__.side_effect = RuntimeError("exited")
+        answers = await tool.invoke(dummy_invoke_context, _calls(3))
+
+    assert [answer.content for answer in answers] == ["sunny"] * 3
+    assert client_class.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_a_connection_that_cannot_open_is_each_calls_error(
+    dummy_connections, dummy_function_spec, dummy_invoke_context
+):
+    """Each call answers the LLM with its error, as any failing call does,
+    rather than failing the node."""
+    tool = MCPTool(
+        mcp_config={"mcpServers": dummy_connections},
+        function_specs=[dummy_function_spec],
+    )
+    with patch(CLIENT) as client_class:
+        client_class.return_value.__aenter__.side_effect = OSError("refused")
+        answers = await tool.invoke(dummy_invoke_context, _calls(2))
+
+    assert [answer.content for answer in answers] == ["Error: OSError: refused"] * 2
+
+
+def test_a_server_tools_parameters_named_like_secrets_are_saved(dummy_connections):
+    """A JSON Schema names its parameters: pagination's pageToken, a login
+    tool's password, are no secrets held."""
+    spec = FunctionSpec.model_validate(
+        {
+            "name": "list_files",
+            "description": "List files.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pageToken": {"type": "string", "description": "Next page."},
+                    "password": {"type": "string"},
+                    "api_key": {"type": "string", "default": ""},
+                },
+                "required": ["pageToken"],
+            },
+        }
+    )
+    tool = MCPTool(mcp_config={"mcpServers": dummy_connections}, function_specs=[spec])
+
+    loaded = Tool.from_manifest(json.loads(json.dumps(tool.to_manifest())))
+
+    assert loaded.get_function_specs() == [spec]

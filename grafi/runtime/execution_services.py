@@ -1,7 +1,8 @@
 """The services an invocation runs with, and how it finds them.
 
-``ExecutionServices`` holds the three live runtime dependencies an invocation
-needs -- the event store, the tracer, and the error reporter. Components read
+``ExecutionServices`` holds the live runtime dependencies an invocation needs
+-- the event store, the tracer, the error reporter, and the executor sync tool
+code runs in. Components read
 them through :func:`current_services`: those bound for the invocation, by
 :func:`bind_services` or :class:`~grafi.runtime.runtime.GrafiRuntime`, else the
 process default, which :func:`set_default_services` sets once at startup, as
@@ -16,6 +17,7 @@ strictly separate.
 from __future__ import annotations
 
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
 from contextvars import Token
 from dataclasses import dataclass
@@ -81,6 +83,25 @@ class ExecutionServices:
     event_store: EventStore = field(default_factory=EventStoreInMemory, repr=False)
     tracer: Tracer = field(default_factory=partial(get_tracer, "grafi"), repr=False)
     error_reporter: ErrorReporter = field(default_factory=ErrorReporter, repr=False)
+    # Where sync tool code runs (see grafi.tools.results): a thread pool, as it
+    # runs in this process; None for grafi's own, one for each event loop. Its
+    # owner shuts it down.
+    executor: Optional[ThreadPoolExecutor] = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if not hasattr(self.tracer, "start_span"):
+            provider = hasattr(self.tracer, "get_tracer")
+            raise TypeError(
+                f"ExecutionServices.tracer is a tracer, not a "
+                f"{type(self.tracer).__name__}"
+                + (
+                    ": setup_tracing() returns the provider it sets for the "
+                    "process, which grafi's default tracer uses, so leave tracer "
+                    "out (or pass provider.get_tracer(...))."
+                    if provider
+                    else "."
+                )
+            )
 
     async def aclose(self) -> None:
         """Release what the services hold, such as the event store's pool, at

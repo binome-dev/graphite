@@ -1,18 +1,24 @@
-"""Registry-based decoding of stored event dicts into :class:`Event` objects.
+"""Encoding and decoding the events a store keeps.
 
-The codec owns event-type registration and decoding so that persistence
-backends (``EventStore`` implementations) do not need to know concrete event
-classes, and new event types can be registered without editing the store
-(Open/Closed). Built-ins are registered here, at the composition boundary,
-rather than imported into the persistence layer.
+The codec knows the event classes, by their ``event_type``, so that a store
+need not: it encodes an event to store, and decodes a stored one. grafi's own
+event types are registered here; another is registered with ``register()``.
+
+An event is stored as its JSON form, ``model_dump(mode="json")``, whose
+``event_version`` names its revision (see ``EVENT_VERSION``). Decoding upgrades
+an event of an earlier revision first, as ``grafi.common.events.event_v1``
+does; but one of version 1 of a type of yours, stored by its own
+``to_dict()``, reaches its class as stored, to read in a before-validator.
+Decoding fails loudly on an event it cannot read: an event store is the
+record a workflow is recovered from, so an event is never skipped.
 """
 
 from typing import Any
+from typing import Callable
 from typing import Dict
+from typing import Mapping
 from typing import Optional
 from typing import Type
-
-from loguru import logger
 
 from grafi.common.events.component_events import AssistantFailedEvent
 from grafi.common.events.component_events import AssistantInvokeEvent
@@ -27,17 +33,40 @@ from grafi.common.events.component_events import ToolRespondEvent
 from grafi.common.events.component_events import WorkflowFailedEvent
 from grafi.common.events.component_events import WorkflowInvokeEvent
 from grafi.common.events.component_events import WorkflowRespondEvent
+from grafi.common.events.event import EVENT_VERSION
 from grafi.common.events.event import Event
 from grafi.common.events.event import EventType
+from grafi.common.events.event_v1 import upcast_v1
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.topic_event import TopicEvent
+from grafi.common.exceptions.event_exceptions import EventSerializationError
+
+# Each earlier revision's upgrade to the next, by revision (version 1's, of
+# grafi's own event types only; from version 2 on, of every type, so one
+# changes only what Event defines, or checks event_type).
+_UPCASTERS: Dict[int, Callable[[Mapping[str, Any]], Dict[str, Any]]] = {1: upcast_v1}
+_GRAFI_TYPES = frozenset(event_type.value for event_type in EventType)
+
+
+def _version(value: Any) -> Optional[int]:
+    """An event's revision: an integer, or ``"1.0"`` for the first."""
+    if value == "1.0":
+        return 1
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 class EventCodec:
-    """Maps event-type strings to event classes and decodes stored dicts."""
+    """Maps event-type strings to event classes, and encodes and decodes the
+    events stored."""
 
     def __init__(self, registry: Optional[Dict[str, Type[Event]]] = None) -> None:
         self._registry: Dict[str, Type[Event]] = dict(registry) if registry else {}
+
+    def copy(self) -> "EventCodec":
+        """A codec of the same types, registered apart from this one's: a
+        store's own, ``default_event_codec.copy()``, decodes grafi's events
+        and the types registered on it alone."""
+        return EventCodec(self._registry)
 
     def register(self, event_type: str, event_class: Type[Event]) -> None:
         """Register (or override) the class used to decode ``event_type``."""
@@ -47,37 +76,81 @@ class EventCodec:
         """Return the registered class for ``event_type``, or ``None``."""
         return self._registry.get(event_type)
 
-    def decode(self, event_dict: Dict[str, Any]) -> Optional[Event]:
-        """Decode one stored event dict into an :class:`Event`.
+    def encode(self, event: Event) -> Dict[str, Any]:
+        """``event`` as stored: its JSON form.
 
-        Returns ``None`` (with a logged warning) instead of raising when an event
-        is malformed or of an unknown type. Retrieval methods skip ``None``
-        results, so one corrupt row cannot abort an entire ``get_agent_events`` /
-        ``get_events`` call -- which would otherwise make a whole conversation
-        (and any recovery that depends on it) unreadable.
+        Raises:
+            EventSerializationError: If it holds a value JSON cannot hold, or is
+                not of the class its type decodes as, so it could not be read
+                back.
         """
-        event_id = event_dict.get("event_id", "<unknown>")
-        event_type: Any = event_dict.get("event_type")
-        if not isinstance(event_type, str):
-            logger.warning(
-                "Skipping event {} with missing/invalid event_type", event_id
+        event_type = str(getattr(event.event_type, "value", event.event_type))
+        if self.event_class(event_type) is not type(event):
+            raise EventSerializationError(
+                f"Event {event.event_id} is a {type(event).__name__}, which this "
+                f"codec does not decode {event_type!r} as; register it with "
+                "EventCodec.register(), so it can be read back."
             )
-            return None
-
-        event_class = self.event_class(event_type)
-        if event_class is None:
-            logger.warning(
-                "Skipping event {} with unknown event type: {}", event_id, event_type
-            )
-            return None
-
         try:
-            return event_class.from_dict(data=event_dict)
-        except Exception as e:
-            logger.error(
-                "Skipping event {} that failed to deserialize: {}", event_id, e
+            return event.model_dump(mode="json")
+        except Exception as error:
+            raise EventSerializationError(
+                f"Event {event.event_id} ({event_type}) cannot be encoded: {error}",
+                cause=error,
+            ) from error
+
+    def decode(self, event_dict: Mapping[str, Any]) -> Event:
+        """Decode one stored event, upgrading it from an earlier revision.
+
+        Raises:
+            EventSerializationError: For an event of a revision newer than this
+                grafi's, or of no known revision or type, or that does not
+                match its class; the cause, if any, is chained.
+        """
+        if not isinstance(event_dict, Mapping):
+            raise EventSerializationError(
+                f"A stored event is a JSON object, not {type(event_dict).__name__}."
             )
-            return None
+        event_id = event_dict.get("event_id", "<unknown>")
+        version = _version(event_dict.get("event_version"))
+        if version is None or version > EVENT_VERSION:
+            raise EventSerializationError(
+                f"Event {event_id} has version {event_dict.get('event_version')!r}; "
+                f"this grafi reads versions up to {EVENT_VERSION}."
+            )
+        event_type = event_dict.get("event_type")
+        event_class = (
+            self.event_class(event_type) if isinstance(event_type, str) else None
+        )
+        if event_class is None:
+            raise EventSerializationError(
+                f"Event {event_id} has an unknown event type {event_type!r}; "
+                "register its class with EventCodec.register(), on the codec "
+                "the store reads with, its self.codec."
+            )
+        # Version 1 of a type of yours is the layout its to_dict() chose, which
+        # its class reads, in a before-validator; from version 2 on, every
+        # event is stored with the fields grafi's Event gives it, and upgraded
+        # alike.
+        as_stored = version == 1 and event_type not in _GRAFI_TYPES
+        try:
+            if not as_stored:
+                while version < EVENT_VERSION:
+                    event_dict = _UPCASTERS[version](event_dict)
+                    version += 1
+            return event_class.model_validate(event_dict)
+        except Exception as error:
+            hint = (
+                f": give {event_class.__name__} a model_validator(mode='before') "
+                "that reads the layout its to_dict() stored (see Custom Event "
+                "Types)"
+                if as_stored
+                else ""
+            )
+            raise EventSerializationError(
+                f"Event {event_id} ({event_type}) cannot be decoded{hint}",
+                cause=error,
+            ) from error
 
 
 # The default codec, pre-registered with the framework's built-in event types.

@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 from typing import Self
 
@@ -7,6 +6,8 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
@@ -40,11 +41,13 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleDeepseekFunctionCallAssistant")
     type: str = Field(default="SimpleDeepseekFunctionCallAssistant")
-    api_key: str = Field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY", ""))
-    model: str = Field(default="deepseek-chat")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionCallTool
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("DEEPSEEK_API_KEY", exclude=True)
+    model: str = Field(default="deepseek-chat", exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleDeepseekFunctionCallAssistantBuilder":
@@ -52,6 +55,7 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
         return SimpleDeepseekFunctionCallAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleDeepseekFunctionCallAssistant":
+        assert self.function_tool is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(name="function_call_topic")
@@ -65,7 +69,7 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
             .tool(
                 DeepseekTool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.function_call_llm_system_message)
                 .build()
@@ -99,7 +103,7 @@ class SimpleDeepseekFunctionCallAssistant(Assistant):
             .tool(
                 DeepseekTool.builder()
                 .name("UserOutputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -129,7 +133,7 @@ class SimpleDeepseekFunctionCallAssistantBuilder(
     This class provides methods to set the API key, model, system messages, and function tool.
     """
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

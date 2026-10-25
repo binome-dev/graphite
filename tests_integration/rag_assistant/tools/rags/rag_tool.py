@@ -1,13 +1,12 @@
-from typing import Any
-from typing import Dict
+from typing import Optional
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
+from pydantic import Field
 
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.tools.command import use_command
 from grafi.tools.tool import Tool
 from tests_integration.rag_assistant.tools.rags.rag_response_command import (
@@ -29,28 +28,23 @@ except ImportError:
 class RagTool(Tool):
     name: str = "RagTool"
     type: str = "RagTool"
-    index: BaseIndex
+    # A live index, not data: left out of the tool's manifest, so given again
+    # to a tool loaded from one.
+    index: Optional[BaseIndex] = Field(default=None, exclude=True)
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.RETRIEVER
 
     @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
+        if self.index is None:
+            raise ValueError(f"{self.name} has no index.")
         query_engine = self.index.as_query_engine(use_async=True)
         response = await query_engine.aquery(input_data[-1].content)
-        yield self.to_messages(response)
+        return self.to_messages(response)
 
     def to_messages(self, response: RESPONSE_TYPE) -> Messages:
         if isinstance(response, Response) or isinstance(response, PydanticResponse):
             return [Message(role="assistant", content=str(response.response))]
         else:
             return [Message(role="assistant", content=str(response))]
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            **super().to_dict(),
-            "name": self.name,
-            "text": self.type,
-            "oi_span_type": self.oi_span_type.value,
-            "index": self.index.__class__.__name__,
-        }
