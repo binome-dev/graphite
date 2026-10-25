@@ -123,17 +123,22 @@ class NodeBase(Component):
 
     @property
     def command(self) -> Optional[Command]:
-        """Access the internal command (for backward compatibility).
-
-        Returns ``None`` for a node without a tool (no command is created), so
-        callers must null-check before invoking it.
-        """
+        """The command the node runs its tool through, which the tool's class
+        names (see :func:`~grafi.tools.command.use_command`); None without a
+        tool. Made from the tool when read, again once the node holds
+        another."""
+        if self.tool is None:
+            return None
+        if self._command is None or self._command.tool is not self.tool:
+            self._command = Command.for_tool(self.tool)
         return self._command
 
     @command.setter
-    def command(self, value: Command) -> None:
-        """Set the internal command."""
-        self._command = value
+    def command(self, command: Command) -> None:
+        raise AttributeError(
+            "A node's command cannot be set: it follows from its tool's class, "
+            "which names it with @use_command."
+        )
 
     @property
     def subscribed_topics(self) -> List[TopicBase]:

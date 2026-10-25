@@ -14,14 +14,13 @@ from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.runtime import Delta
 from grafi.runtime import current_services
-from grafi.runtime import deltas_for
 from grafi.runtime import deltas_to
 from grafi.runtime import emit_delta
 from grafi.runtime import streaming
+from grafi.runtime.deltas import deltas_for
 from grafi.tools.tool import Tool
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -81,14 +80,14 @@ class Speaker(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.streamed.append(streaming())
         if self.inner is not None:  # As a tool calling another agent does.
             async for _ in self.inner.invoke(input_event()):
                 pass
         for word in self.words:
             emit_delta(word)
-        yield [Message(role="assistant", content="".join(self.words))]
+        return [Message(role="assistant", content="".join(self.words))]
 
 
 def _workflow(tool: Tool, name: str = "speaker") -> EventDrivenWorkflow:

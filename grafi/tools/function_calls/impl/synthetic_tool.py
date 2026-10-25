@@ -12,6 +12,7 @@ from pydantic import field_validator
 from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.exceptions import LLMToolException
 from grafi.common.manifest import ModelRef
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
@@ -77,24 +78,18 @@ class SyntheticTool(FunctionCallTool):
             f"Got: {type(v).__name__}"
         )
 
-    def model_post_init(self, _context: Any) -> None:
-        super().model_post_init(_context)
-        if any(spec.name == self.tool_name for spec in self.function_specs):
-            return  # A copy of a tool already set up.
-        if self.input_model:
-            # Handle both dict schemas and Pydantic models
-            if isinstance(self.input_model, dict):
-                input_schema = self.input_model
-            else:
-                input_schema = self.input_model.model_json_schema()
-
-            self.function_specs.append(
-                FunctionSpec(
-                    name=self.tool_name,
-                    description=self.description,
-                    parameters=ParametersSchema(**input_schema),
-                )
-            )
+    def derived_specs(self) -> Dict[str, FunctionSpec]:
+        """Its functions' specs, and, with an input model, the tool's, made
+        from its fields."""
+        functions = super().derived_specs()
+        if not self.input_model:
+            return functions
+        tool = FunctionSpec(
+            name=self.tool_name,
+            description=self.description,
+            parameters=ParametersSchema(**self.input_schema),
+        )
+        return {self.tool_name: tool, **functions}  # Its own functions win.
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -126,6 +121,8 @@ class SyntheticTool(FunctionCallTool):
         self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
     ) -> str:
         """Have the LLM produce the tool's output for ``arguments``."""
+        if name != self.tool_name:  # Another given spec's: not this tool's.
+            return await super().call_function(invoke_context, name, arguments)
         return await self._call_llm(self._make_prompt(arguments))
 
     def _make_prompt(self, user_input: Dict[str, Any]) -> str:
@@ -184,7 +181,7 @@ class SyntheticTool(FunctionCallTool):
             if not self.output_model:
                 raise ValueError("output_model must be set to call LLM")
 
-            client = AsyncOpenAI(api_key=self.openai_api_key)
+            client = AsyncOpenAI(api_key=self.secret_value("openai_api_key"))
             # Created per call, so closed per call.
             async with best_effort_exit(client, "OpenAI client"):
                 # If output model is json (dict)
@@ -319,8 +316,9 @@ class SyntheticToolBuilder(FunctionCallToolBuilder[SyntheticTool]):
         self.kwargs["model"] = model
         return self
 
-    def openai_api_key(self, openai_api_key: str) -> "SyntheticToolBuilder":
-        """Set the OpenAI API key.
+    def openai_api_key(self, openai_api_key: SecretInput) -> "SyntheticToolBuilder":
+        """Set the OpenAI API key, or the variable to read it from,
+        ``{"env": "VAR"}``, as LLMBuilder.api_key() takes it.
 
         Args:
             openai_api_key: The API key for OpenAI authentication.

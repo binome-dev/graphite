@@ -8,6 +8,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
@@ -48,11 +49,13 @@ class MultiFunctionsCallAssistant(Assistant):
     )
     name: str = Field(default="MultiFunctionsCallAssistant")
     type: str = Field(default="MultiFunctionsCallAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    model: str = Field(default="gpt-4o-mini")
-    function_tools: List[FunctionCallTool] = Field(default=[])
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
+    function_tools: List[FunctionCallTool] = Field(default=[], exclude=True)
 
     @classmethod
     def builder(cls) -> "MultiFunctionsCallAssistantBuilder":
@@ -78,7 +81,7 @@ class MultiFunctionsCallAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.function_call_llm_system_message)
                 .build()
@@ -118,7 +121,7 @@ class MultiFunctionsCallAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserOutputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -141,7 +144,7 @@ class MultiFunctionsCallAssistantBuilder(
     Builder for MultiFunctionsCallAssistant.
     """
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

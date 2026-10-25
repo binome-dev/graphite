@@ -28,7 +28,6 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -48,7 +47,8 @@ MAX_ATTEMPTS = 12
 
 
 class FlakyTool(Tool):
-    """Streams and outputs a few pieces, and fails partway on some attempts."""
+    """Streams a few pieces, then outputs them; fails partway on some
+    attempts."""
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
     chunks: int = 2
@@ -57,14 +57,16 @@ class FlakyTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
+        output: Messages = []
         for index in range(self.chunks):
             await asyncio.sleep(0)
             if self.failures_left and self.rng.random() < 0.5:
                 self.failures_left -= 1
                 raise RuntimeError(f"{self.name} failed")
             emit_delta(f"{self.name}-{index}")
-            yield [Message(role="assistant", content=f"{self.name}-{index}")]
+            output.append(Message(role="assistant", content=f"{self.name}-{index}"))
+        return output
 
 
 def make_node(name: str, tool: Tool, source: TopicBase, destination: TopicBase) -> Node:

@@ -24,10 +24,21 @@ All event store implementations inherit from the base `EventStore` class, which 
 | `clear_events` | `() -> None` | Clear all events from the store |
 | `get_events` | `() -> List[Event]` | Retrieve all events from the store |
 | `get_event` | `(event_id: str) -> Optional[Event]` | Get a specific event by ID |
-| `get_agent_events` | `(assistant_request_id: str) -> List[Event]` | Get events for an assistant request |
-| `get_conversation_events` | `(conversation_id: str) -> List[Event]` | Get events for a conversation |
+| `get_agent_events` | `(assistant_request_id: str, *, event_types: Optional[Collection[EventType]] = None) -> List[Event]` | Get the events of an assistant request, oldest first; only those of `event_types`, unless it is `None` |
+| `get_conversation_events` | `(conversation_id: str, *, event_types: Optional[Collection[EventType]] = None) -> List[Event]` | Get the events of a conversation, oldest first; only those of `event_types`, unless it is `None` |
 | `get_topic_events` | `(name: str, offsets: List[int]) -> List[Event]` | Get the publications to a topic at the given offsets |
 | `aclose` | `() -> None` | Release what the store holds, such as a connection pool |
+
+grafi reads only the events it needs: a workflow resuming a request asks for its
+topic events (`TOPIC_EVENT_TYPES`, from `grafi.common.events.event`), and an LLM
+for the conversation's `AssistantRespond` events and the request's topic events.
+A store of your own must accept `event_types` by keyword: a store class whose
+reads, its own or a mixin's, take none raises `TypeError` when it is defined; it may
+return more events than asked for, as grafi's callers check each event's type
+again, but filtering in the query saves reading and decoding the rest. Both
+reads return events oldest first: by timestamp in Postgres, as recorded in
+memory. A reader needing an order of its own sorts them, as grafi sorts a
+topic's events by offset.
 
 A workflow stores the consumptions and publications of the steps that finish
 together with one `record_events()` call, and resumes a request from those
@@ -46,7 +57,19 @@ A store does not know the event classes: it encodes and decodes events through a
 |---------------------|-----------|-------------|
 | `codec` | `EventCodec` | The store's codec: `default_event_codec` unless another is given. A store writes `codec.encode(event)` and reads with `codec.decode(data)`, which raises `EventSerializationError` for an event it cannot read |
 
-`default_event_codec` is shared by every store in the process, so `default_event_codec.register(...)` affects them all. For a registry of its own, a store subclass assigns `self.codec = EventCodec({...})` in its constructor.
+`default_event_codec` is shared by every store in the process, so `default_event_codec.register(...)` affects them all. For a registry of its own, a store subclass assigns `self.codec = default_event_codec.copy()` in its constructor and registers its types on that: it decodes grafi's events and its own, apart from every other store's. (`EventCodec({...})` starts with only the types given.) A store needs no codec set up otherwise. One written for grafi 0.0.36 and earlier that set `self._codec`, which nothing reads now, sets `self.codec` only for a registry of its own; it writes `self.codec.encode(event)` where it wrote `event.to_dict()`, and reads with `self.codec.decode(data)` where it called `self._create_event_from_dict(data)`.
+
+```python
+from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.common.events.event_codec import default_event_codec
+
+
+class AuditedStore(EventStoreInMemory):
+    def __init__(self) -> None:
+        super().__init__()
+        self.codec = default_event_codec.copy()
+        self.codec.register("Audit", AuditEvent)  # AuditEvent: an Event of yours
+```
 
 ## In-Memory Event Store
 
@@ -93,7 +116,7 @@ By default the store keeps the event objects it is given. With `strict=True`, it
 event_store = EventStoreInMemory(strict=True)
 ```
 
-An event that a durable store could not record, or not read back as it was, then fails here too, with `EventSerializationError`, and nothing of its batch is stored. The store keeps the decoded copy, equal to the event recorded but not the same object. grafi's own tests run with a strict store (see `tests/conftest.py`); use one in yours.
+An event that a durable store could not record, or not decode, then fails here too, with `EventSerializationError`, and nothing of its batch is stored. The store keeps the decoded copy, as a durable store would give it back: a new object, not compared with the event recorded, so a value JSON does not keep, such as a `datetime` in `invoke_context.kwargs`, comes back as its ISO text. grafi's own tests run with a strict store (see `tests/conftest.py`); use one in yours.
 
 ### Implementation Details
 
@@ -254,10 +277,10 @@ An event's timestamp is converted to UTC and stored without its time zone; a nai
 ### Deserialization Process
 
 1. **Type Resolution**: The `event_type` in `event_data` chooses the class registered with the codec
-2. **Upgrade**: An event of version `"1.0"` is upgraded to version 2
+2. **Upgrade**: An event of an earlier version is upgraded to the current one: of grafi's own types, from version `"1.0"`; of a type of yours, from version 2 on, as its version 1 reaches its class as stored (see [Custom Event Types](events.md#custom-event-types))
 3. **Validation**: The class validates the event; any failure raises `EventSerializationError`
 
-Rows written before version 2 hold `event_data` in the version 1 form, with the topic's or component's fields under `event_context`. They are read as they are, never rewritten: decoding upgrades them, and `get_topic_events` finds a topic event's `name` and `offset` in either form.
+Rows written before version 2 hold `event_data` in the version 1 form, with the topic's or component's fields under `event_context`. They are read as they are, never rewritten: decoding upgrades grafi's own events, and `get_topic_events` finds a topic event's `name` and `offset` in either form.
 
 ## Supported Event Types
 

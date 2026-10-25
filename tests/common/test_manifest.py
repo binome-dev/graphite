@@ -16,18 +16,22 @@ from pathlib import Path
 from typing import Any
 from typing import ClassVar
 from typing import Dict
+from typing import FrozenSet
 from typing import List
 from typing import Optional
 from typing import Type
 
 import pytest
+from pydantic import AliasChoices
+from pydantic import AliasPath
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import ValidationError
+from pydantic import computed_field
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.callable_ref import CallableRef
-from grafi.common.callable_ref import CallableSerializationError
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.exceptions import GrafiError
 from grafi.common.import_ref import UntrustedImportError
 from grafi.common.manifest import API_VERSION
@@ -103,7 +107,7 @@ def test_model_reference_to_a_non_model_raises() -> None:
 
 def test_model_reference_to_an_untrusted_module_raises() -> None:
     reference = {"ref": "json:JSONDecoder"}
-    with pytest.raises(UntrustedImportError, match="trust_modules"):
+    with pytest.raises(UntrustedImportError, match="outside the trusted modules"):
         Formatted.model_validate({"params": {"response_format": reference}})
 
 
@@ -229,10 +233,9 @@ def test_manifest_loads_from_a_path(tmp_path: Path) -> None:
     path = tmp_path / "widget.json"
     path.write_text(json.dumps(widget.to_manifest()))
 
-    for source in (path, str(path)):
-        loaded = Gadget.from_manifest(source)
-        assert type(loaded) is Widget
-        assert loaded.color == "blue"
+    loaded = Gadget.from_manifest(path)
+    assert type(loaded) is Widget
+    assert loaded.color == "blue"
 
 
 @pytest.mark.parametrize("version", ["grafi/v1", "grafi/v3", None])
@@ -307,21 +310,12 @@ class Derived(Component):
             "Derived.double",
         ),
         (
-            "Tool",
-            {
-                "class": "grafi.tools.function_calls.function_call_tool:"
-                "FunctionCallTool",
-                "function_specs": [],
-            },
-            "FunctionCallTool.function_specs",
-        ),
-        (
             "Topic",
             {"class": "grafi.topics.topic_impl.topic:Topic", "event_queue": {}},
             "Topic.event_queue",
         ),
     ],
-    ids=["own", "function specs", "event queue"],
+    ids=["own", "event queue"],
 )
 def test_a_manifest_never_holds_a_field_that_is_never_saved(
     kind: str, spec: Dict[str, Any], unsaved: str
@@ -437,3 +431,227 @@ def test_a_manifest_holds_only_json() -> None:
 
     with pytest.raises(ManifestError, match="holds only JSON"):
         Formatted.from_manifest(manifest)
+
+
+class Connected(Component):
+    """A component holding what is made at run time, saved by mistake."""
+
+    client: Any = None
+
+
+def test_a_value_json_cannot_hold_is_a_manifest_error() -> None:
+    with pytest.raises(
+        ManifestError, match="Connected.client cannot be saved.*exclude"
+    ):
+        Connected(client=object()).to_manifest()
+
+
+def test_the_field_named_unsaveable_is_the_innermost() -> None:
+    """Not the outer field holding it, which the advice would have excluded."""
+    holder = Holder(item=Gadget())
+    holder.item.__dict__["size"] = object()  # As a client set at run time.
+
+    with pytest.raises(ManifestError, match=r"^\[ERROR\] Gadget.size cannot be saved"):
+        holder.to_manifest()
+
+
+def test_a_str_is_json_never_a_path(tmp_path: Path) -> None:
+    """Text from a database or a request never names a file to read: only a
+    pathlib.Path does."""
+    manifest = Gadget(name="g").to_manifest()
+    text = json.dumps(manifest)
+    path = tmp_path / "gadget.json"
+    path.write_text("\ufeff" + text, encoding="utf-8")  # With a BOM.
+
+    for source in (text, f"\ufeff  {text}", text.encode(), path):
+        assert Component.from_manifest(source) == Gadget(name="g")
+    for refused in ("{not json", str(path), "/etc/passwd", "", "[1, 2]"):
+        with pytest.raises(ManifestError, match="pathlib.Path|JSON object"):
+            Component.from_manifest(refused)
+
+
+class Cycle(Component):
+    """A component that can hold itself."""
+
+    other: Optional["Cycle"] = None
+
+
+class BuildsOnly(Component):
+    """A required field saving leaves out."""
+
+    client: Any = Field(exclude=True)
+
+
+def test_a_cycle_is_refused_as_a_manifest_error() -> None:
+    cycle = Cycle()
+    cycle.other = cycle
+
+    with pytest.raises(ManifestError, match="Circular reference"):
+        cycle.to_manifest()
+
+
+class Aliased(Component):
+    """A field named as BaseModel's attribute is, by its alias."""
+
+    schema_: str = Field("public", alias="schema")
+
+
+class HiddenByAlias(Component):
+    """A field saving leaves out, with an alias."""
+
+    retries: int = Field(3, alias="maxRetries", exclude=True)
+
+
+class HiddenByChoices(Component):
+    """A field saving leaves out, with alias choices."""
+
+    cache: int = Field(
+        0, exclude=True, validation_alias=AliasChoices("cache", AliasPath("c", 0))
+    )
+
+
+def test_a_manifest_holds_no_field_saving_leaves_out_by_its_alias_either() -> None:
+    spec = {"class": import_path(HiddenByAlias), "maxRetries": 9}
+
+    with pytest.raises(ManifestError, match="HiddenByAlias.retries is never saved"):
+        Component.from_manifest(spec)
+    saved = HiddenByChoices(cache=5).to_manifest()
+    assert Component.from_manifest(saved).cache == 0
+    with pytest.raises(ManifestError, match="HiddenByChoices.cache is never saved"):
+        Component.from_manifest({"class": import_path(HiddenByChoices), "c": [5]})
+
+
+def test_a_field_with_an_alias_saves_and_loads_by_its_name() -> None:
+    saved = Aliased(schema="private").to_manifest()
+
+    assert Component.from_manifest(saved).schema_ == "private"
+    assert Aliased.model_validate({"schema": "by-alias"}).schema_ == "by-alias"
+
+
+class SometimesLeftOut(Component):
+    """A required field saving may leave out."""
+
+    count: int = Field(exclude_if=lambda count: count == 0)
+
+
+def test_a_required_field_saving_leaves_out_is_refused() -> None:
+    """What is saved could not be loaded."""
+    with pytest.raises(ManifestError, match="BuildsOnly.client is never saved"):
+        BuildsOnly(client=object()).to_manifest()
+    with pytest.raises(ManifestError, match="SometimesLeftOut.count is left out"):
+        SometimesLeftOut(count=0).to_manifest()
+
+
+class LeftOutAtZero(Component):
+    """A field saving leaves out at a value other than its default."""
+
+    retries: int = Field(3, exclude_if=lambda retries: retries == 0)
+
+
+def test_a_field_left_out_holding_other_than_its_default_is_refused() -> None:
+    """Loading would give it its default, 3, not the 0 it held."""
+    with pytest.raises(ManifestError, match="LeftOutAtZero.retries is left out"):
+        LeftOutAtZero(retries=0).to_manifest()
+    assert LeftOutAtZero(retries=5).to_manifest()["spec"]["retries"] == 5
+
+
+def test_a_container_holding_itself_is_refused_as_a_manifest_error() -> None:
+    held: Dict[str, Any] = {}
+    held["self"] = held
+
+    tool = OpenAITool()
+    tool.chat_params = held
+
+    with pytest.raises(ManifestError, match="OpenAITool.chat_params cannot be saved"):
+        tool.to_manifest()
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        {"workflow": 5},
+        {"workflow": {"topics": [1]}},
+        {"class": ["a"], "base_class": "Tool"},
+        {"apiVersion": API_VERSION, "kind": "Gadget", "spec": {"class": 1}},
+        "[" * 100_000,
+    ],
+    ids=["workflow", "topics", "class", "spec class", "deep"],
+)
+def test_whatever_a_manifest_holds_is_refused_as_a_manifest_error(
+    manifest: Any,
+) -> None:
+    """A web handler need catch ManifestError and ValidationError only."""
+    with pytest.raises((ManifestError, ValidationError)):
+        Component.from_manifest(manifest)
+
+
+def test_a_partial_dump_of_a_tool_given_specs_is_not_refused() -> None:
+    """The exclude_if rule looks at the value, not at what a dump includes."""
+    from grafi.common.models.function_spec import FunctionSpec
+    from grafi.tools.function_calls.function_call_tool import FunctionCallTool
+
+    spec = FunctionSpec.model_validate(
+        {
+            "name": "remote",
+            "description": "Elsewhere.",
+            "parameters": {"type": "object", "properties": {}},
+        }
+    )
+    tool = FunctionCallTool(function_specs=[spec])
+
+    assert tool.model_dump(mode="json", include={"name"})["name"] == tool.name
+    assert "function_specs" not in tool.model_dump(
+        mode="json", exclude={"function_specs"}
+    )
+
+
+class TokenAndClient(Component):
+    """A held secret, then a client."""
+
+    token: Optional[str] = None
+    client: Any = None
+
+
+def test_a_refusal_met_while_naming_the_field_is_raised_as_it_is() -> None:
+    """Not blamed on another field's value: the secret is the problem named."""
+    holder = TokenAndClient(token="hunter2-hunter2", client=object())
+
+    with pytest.raises(ManifestError) as raised:
+        holder.to_manifest()
+
+    assert "Unable to serialize" not in str(raised.value)
+    assert "token" in str(raised.value)
+
+
+class WithEndpoint(Component):
+    """A computed field, saved, which follows from the others."""
+
+    host: str = "example.com"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def endpoint(self) -> str:
+        return f"https://{self.host}/v1"
+
+
+def test_a_computed_field_follows_from_the_fields_saved() -> None:
+    """Not saved, so an edited one cannot disagree with them; a python dump,
+    which holds it, loads without it."""
+    component = WithEndpoint(host="api.example.com")
+    saved = component.to_manifest()
+
+    assert "endpoint" not in saved["spec"]
+    assert Component.from_manifest(saved).endpoint == component.endpoint
+    assert "endpoint" not in component.model_dump()  # Nor in a python dump.
+    assert WithEndpoint.model_validate(component.model_dump()).host == component.host
+    saved["spec"]["endpoint"] = "https://elsewhere/v1"
+    with pytest.raises(ValidationError, match="endpoint"):
+        Component.from_manifest(saved)
+
+
+def test_loads_computed_names_only_computed_fields() -> None:
+    """A misspelt one would leave the field out of what is saved."""
+    with pytest.raises(TypeError, match=r"names \['endpont'\], which are not"):
+
+        class Misspelt(WithEndpoint):
+            loads_computed: ClassVar[FrozenSet[str]] = frozenset({"endpont"})

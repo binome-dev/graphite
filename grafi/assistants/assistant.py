@@ -1,6 +1,7 @@
 import json
 import os
-import re
+import uuid
+from pathlib import Path
 from typing import AsyncGenerator
 from typing import Literal
 from typing import Union
@@ -36,7 +37,7 @@ class Assistant(AssistantBase):
         input_data: PublishToTopicEvent,
         is_sequential: bool = False,
         *,
-        stream: bool,
+        stream: bool = False,
     ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
 
     @record_assistant_invoke
@@ -56,24 +57,26 @@ class Assistant(AssistantBase):
             async for output in outputs:
                 yield output
 
-    def generate_manifest(self, output_dir: str = ".") -> str:
+    def generate_manifest(self, output_dir: "str | os.PathLike[str]" = ".") -> Path:
         """Write the assistant's manifest (see ``to_manifest()``) to
         ``<name>_manifest.json`` in ``output_dir``, and return its path. Load
         it back with ``Assistant.from_manifest(path)``."""
-        if not re.fullmatch(r"\w[\w .-]*", self.name) or ".." in self.name:
+        if any(char in self.name for char in "/\\:\0"):
             raise ManifestError(
                 f"The assistant's name {self.name!r} names its manifest's file, "
-                "so it holds no path."
+                "so it holds no '/', '\\', ':' or NUL."
             )
         text = json.dumps(self.to_manifest(), indent=2) + "\n"
-        output_path = os.path.join(output_dir, f"{self.name}_manifest.json")
-        # Written beside it, then moved over it, so a failure leaves it whole.
-        partial = f"{output_path}.{os.getpid()}.tmp"
+        output_path = Path(output_dir) / f"{self.name}_manifest.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Written beside it, then moved over it, so a failure leaves it whole,
+        # and a link there is replaced, never followed; made as open() makes a
+        # file, as the umask allows.
+        partial = output_path.with_name(f".{uuid.uuid4().hex}.partial")
         try:
-            with open(partial, "w") as f:
-                f.write(text)
+            with open(partial, "x", encoding="utf-8") as file:
+                file.write(text)
             os.replace(partial, output_path)
         finally:
-            if os.path.exists(partial):
-                os.remove(partial)
+            partial.unlink(missing_ok=True)
         return output_path

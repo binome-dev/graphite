@@ -302,3 +302,15 @@ def test_invoke_context_kwargs_with_a_datetime_encode():
     decoded = default_event_codec.decode(encoded)
     assert decoded.invoke_context.kwargs == encoded["invoke_context"]["kwargs"]
     assert decoded.model_copy(update={"invoke_context": context}) == event
+
+
+def test_a_copy_of_the_default_codec_reads_grafis_events_and_its_own() -> None:
+    from grafi.common.events.event_codec import default_event_codec
+    from tests.events.event_fixtures import every_event
+
+    codec = default_event_codec.copy()
+    codec.register("NodeInvoke", NodeInvokeEvent)  # Its own, apart.
+
+    for event in every_event():
+        assert codec.decode(codec.encode(event)) == event
+    assert codec._registry is not default_event_codec._registry

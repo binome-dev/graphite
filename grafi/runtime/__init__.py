@@ -1,5 +1,5 @@
-"""The services invocations run with: the event store, the tracer and the error
-reporter; and the deltas they stream.
+"""The services invocations run with: the event store, the tracer, the error
+reporter and the executor of sync tool code; and the deltas they stream.
 
 Every invocation runs with the process default services, which
 :func:`set_default_services` sets once at startup (in-process ones until then),
@@ -9,7 +9,6 @@ invocation receives each :class:`Delta` its tools emit, as they emit it.
 """
 
 from grafi.runtime.deltas import Delta
-from grafi.runtime.deltas import deltas_for
 from grafi.runtime.deltas import deltas_to
 from grafi.runtime.deltas import emit_delta
 from grafi.runtime.deltas import streaming
@@ -27,7 +26,6 @@ __all__ = [
     "GrafiRuntime",
     "bind_services",
     "current_services",
-    "deltas_for",
     "deltas_to",
     "emit_delta",
     "set_default_services",

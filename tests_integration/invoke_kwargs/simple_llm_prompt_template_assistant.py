@@ -6,8 +6,10 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
+from grafi.tools.command import use_command
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
@@ -15,6 +17,13 @@ from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 from tests_integration.invoke_kwargs.llm_prompt_template_command import (
     LLMPromptTemplateCommand,
 )
+
+
+@use_command(LLMPromptTemplateCommand)
+class PromptTemplateOpenAITool(OpenAITool):
+    """An OpenAI tool whose node renders the request's prompt template, from
+    its ``prompt_template`` kwarg, before calling the model. The tool's class
+    names the command, so a saved node loads with it."""
 
 
 class SimpleLLMPromptTemplateAssistant(Assistant):
@@ -35,9 +44,11 @@ class SimpleLLMPromptTemplateAssistant(Assistant):
     )
     name: str = Field(default="SimpleLLMPromptTemplateAssistant")
     type: str = Field(default="SimpleLLMPromptTemplateAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    system_message: Optional[str] = Field(default=None)
-    model: str = Field(default="gpt-4o-mini")
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    system_message: Optional[str] = Field(default=None, exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleLLMPromptTemplateAssistantBuilder":
@@ -52,16 +63,15 @@ class SimpleLLMPromptTemplateAssistant(Assistant):
             Node.builder()
             .name("OpenAINode")
             .subscribe(agent_input_topic)
+            .tool(
+                PromptTemplateOpenAITool.builder()
+                .name("OpenAITool")
+                .api_key(self.secret_reference("api_key"))
+                .model(self.model)
+                .system_message(self.system_message)
+                .build()
+            )
             .publish_to(agent_output_topic)
-            .build()
-        )
-
-        llm_node.command = LLMPromptTemplateCommand(
-            tool=OpenAITool.builder()
-            .name("OpenAITool")
-            .api_key(self.api_key)
-            .model(self.model)
-            .system_message(self.system_message)
             .build()
         )
 
@@ -81,7 +91,7 @@ class SimpleLLMPromptTemplateAssistantBuilder(
 ):
     """Concrete builder for SimpleLLMPromptTemplateAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

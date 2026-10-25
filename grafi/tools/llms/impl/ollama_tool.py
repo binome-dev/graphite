@@ -1,6 +1,8 @@
+import inspect
 import json
 import uuid
 from typing import Any
+from typing import ClassVar
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -9,6 +11,7 @@ from typing import Sequence
 
 from ollama import ChatResponse
 from pydantic import Field
+from pydantic import model_validator
 
 from grafi.common.async_lifecycle import best_effort_exit
 from grafi.common.async_lifecycle import owned_iterator
@@ -18,9 +21,9 @@ from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime.deltas import emit_delta
 from grafi.tools.llms.impl.openai_adapter import to_openai_tool
+from grafi.tools.llms.llm import _PROVIDER_REMOVED_METHODS
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -32,12 +35,23 @@ except ImportError:
     )
 
 
+# The model settings ollama's chat() takes in its options, as a chat_params key.
+_OPTIONS = frozenset(ollama.Options.model_fields)
+# The keys chat_params may hold: chat()'s arguments, and those settings.
+_CHAT_KEYS = (
+    frozenset(inspect.signature(ollama.AsyncClient.chat).parameters)
+    - {"self", "messages", "tools", "stream"}  # The tool's own.
+) | _OPTIONS
+
+
 class OllamaTool(LLM):
     """
     A class representing the Ollama language model implementation.
 
     This class provides methods to interact with Ollama's API for natural language processing tasks.
     """
+
+    removed_methods: ClassVar[Dict[str, str]] = _PROVIDER_REMOVED_METHODS
 
     name: str = Field(default="OllamaTool")
     type: str = Field(default="OllamaTool")
@@ -53,6 +67,36 @@ class OllamaTool(LLM):
         This method allows for the construction of an OllamaTool instance with specified parameters.
         """
         return OllamaToolBuilder(cls)
+
+    @model_validator(mode="after")
+    def _known_chat_params(self) -> Self:
+        """A key ollama's chat() takes neither as an argument nor as an option,
+        such as OpenAI's max_tokens, is refused when the tool is made."""
+        unknown = sorted(set(self.chat_params) - _CHAT_KEYS)
+        if unknown:
+            raise ValueError(
+                f"OllamaTool.chat_params holds {unknown}, which ollama's chat() "
+                "takes neither as an argument nor as an option, or the tool "
+                "sets itself (messages, tools, stream); max_tokens is "
+                "num_predict, and an option the server takes that "
+                'ollama.Options does not name goes in chat_params={"options": '
+                "{...}}."
+            )
+        return self
+
+    def _chat_params(self) -> Dict[str, Any]:
+        """``chat_params`` as ``chat()`` takes them: a model setting, such as
+        ``temperature``, in its ``options``, where one given there replaces
+        it; any other key as an argument (unknown keys are refused when the
+        tool is made)."""
+        params = dict(self.chat_params)
+        options = {k: params.pop(k) for k in list(params) if k in _OPTIONS}
+        given = params.get("options") or {}
+        if isinstance(given, ollama.Options):
+            given = given.model_dump(exclude_none=True)
+        if options:
+            params["options"] = {**options, **given}
+        return params
 
     def prepare_api_input(
         self, input_data: Messages
@@ -114,7 +158,7 @@ class OllamaTool(LLM):
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> MsgsAGen:
+    ) -> Messages:
         """
         Invoke a request to the Ollama API asynchronously.
         """
@@ -124,10 +168,12 @@ class OllamaTool(LLM):
             "model": self.model,
             "messages": api_messages,
             "tools": api_functions,
-            **self.chat_params,
+            **self._chat_params(),
         }
-        # Its own key, if any: the SDK would read OLLAMA_API_KEY otherwise.
-        headers = {"authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        # Its own key, if any: the SDK would read OLLAMA_API_KEY otherwise. A
+        # local Ollama takes none; one read from another variable is required.
+        key = self.sdk_api_key(required=False)
+        headers = {"authorization": f"Bearer {key}"} if key else {}
         client = ollama.AsyncClient(self.api_url, headers=headers)
         # Created per call, so closed per call.
         async with best_effort_exit(client, "Ollama client"):
@@ -147,7 +193,7 @@ class OllamaTool(LLM):
                     message = self._message("".join(text), tool_calls)
                 else:
                     response = await client.chat(**chat_kwargs)
-                    [message] = self.to_messages(response)
+                    [message] = self._to_messages(response)
             except Exception as e:
                 # The lifecycle decorator emits the authoritative record; raise a
                 # domain error with a stable message and the original cause attached.
@@ -158,9 +204,9 @@ class OllamaTool(LLM):
                     invoke_context=invoke_context,
                     cause=e,
                 ) from e
-        yield [message]
+        return [message]
 
-    def to_messages(self, response: ChatResponse) -> Messages:
+    def _to_messages(self, response: ChatResponse) -> Messages:
         """A response as a message: its text, and its tool calls if any."""
         return [
             self._message(

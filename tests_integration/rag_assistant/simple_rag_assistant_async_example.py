@@ -15,10 +15,12 @@ api_key = os.getenv("OPENAI_API_KEY", "")
 event_store = current_services().event_store
 
 try:
+    from llama_index.core import Settings
     from llama_index.core import SimpleDirectoryReader
     from llama_index.core import StorageContext
     from llama_index.core import VectorStoreIndex
     from llama_index.core import load_index_from_storage
+    from llama_index.llms.openai import OpenAI
 except ImportError:
     raise ImportError(
         "`llama_index` not installed. Please install using `pip install llama-index-core llama-index-readers-file llama-index-embeddings-openai llama-index-llms-openai`"
@@ -26,6 +28,9 @@ except ImportError:
 
 
 os.environ["OPENAI_API_KEY"] = api_key
+
+# The model answering queries; llama-index's default is retired.
+Settings.llm = OpenAI(model="gpt-4o-mini")
 
 CURRENT_DIR = Path(__file__).parent
 PERSIST_DIR = CURRENT_DIR / "storage"

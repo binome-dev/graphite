@@ -16,12 +16,11 @@ The fields of the EventDrivenWorkflow are:
 | `type`              | `str`                             | The type identifier for the workflow, typically matching the class name (`"EventDrivenWorkflow"`).    |
 | `oi_span_type`      | `OpenInferenceSpanKindValues`     | Semantic attribute from OpenInference used for tracing and observability (default: `AGENT`).         |
 | `workflow_id`       | `str`                             | Unique identifier for the workflow instance, auto-generated UUID.                                     |
-| `nodes`             | `Dict[str, Node]`                 | Collection of all nodes defined within this workflow, keyed by node name.                             |
-| `_topics`           | `Dict[str, TopicBase]`            | Private dictionary storing all event topics managed by the workflow.                                  |
-| `_topic_nodes`      | `Dict[str, List[str]]`            | Private mapping of topic names to lists of node names subscribed to each topic.                       |
+| `nodes`             | `Dict[str, NodeBase]`             | Collection of all nodes defined within this workflow, keyed by node name.                             |
+| `topics`            | `Dict[str, TopicBase]`            | Computed from the nodes: the topics they subscribe and publish to, by name, which the workflow saves and loads back before its nodes. |
 | `_active_runs`      | `Dict[int, WorkflowRun]`          | The runs in flight, which `stop()` stops. (The inherited `_stop_requested` flag only records that `stop()` was called; runs do not read it.) |
 
-The workflow is an immutable *definition*. Each `invoke()` runs on its own
+The workflow is a *definition*. Each `invoke()` runs on its own
 `WorkflowRun`, which holds all of that invocation's state, so concurrent
 invocations of one workflow share no state but the registry of runs in flight
 that `stop()` uses.
@@ -30,11 +29,13 @@ that `stop()` uses.
 
 | Method Name                      | Description                                                                                  |
 |----------------------------------|----------------------------------------------------------------------------------------------|
-| `model_post_init`                | Validates subscriptions, sets up topics and links function-calling nodes after creation.    |
+| `model_post_init`                | Wires the workflow from its nodes (`_wire`), which checks them, and warns of a spec given to an LLM for a function a function-call node answers. |
+| `_wire`                          | The workflow wired from its nodes as they are: its topics, each one's readers and each node's wiring, after checking the nodes' keys and subscriptions; as the workflow is built, and as each run starts. |
 | `builder`                        | Class method that returns a WorkflowBuilder for fluent workflow construction.               |
-| `_add_topics`                    | Sets up topic subscriptions and node-to-topic mappings.                                     |
-| `_handle_function_calling_nodes` | Links function-calling nodes with LLM nodes to share function specifications, and makes one function-call node on each topic carrying calls answer the calls there naming a function no LLM calling there was offered. |
-| `invoke`                         | Runs the workflow on a new `WorkflowRun`, yielding its outputs as their steps commit, and, with `stream=True`, the deltas its tools emit. |
+| `_checked_topics`                | The workflow's topics and each one's readers, checked.                                       |
+| `_wire_function_calls`           | Offers each LLM node the functions of the function-call nodes reading its calls, and has one function-call node on each topic carrying calls answer the calls there naming a function no LLM calling there was offered. |
+| `invoke`                         | Runs the workflow on a new `WorkflowRun`, yielding its outputs as their steps commit, and, with `stream=True`, the deltas its tools emit. The run first wires the workflow from its nodes as they are now. |
+| `offered_to`                     | The functions the LLM of a node is offered in its steps: those of the function-call nodes reading its calls, then those it is given. |
 | `stop`                           | Stops every run in flight.                                                                   |
 | `model_dump(mode="json")` / `model_validate` | Saves the workflow, with its nodes and topics, as data, and loads it back. See [Manifests](manifests.md). |
 
@@ -52,16 +53,16 @@ graph TD
 
 ## Workflow Initialization
 
-When an EventDrivenWorkflow instance is initialized, the `model_post_init` method performs several critical setup tasks:
+When an EventDrivenWorkflow instance is initialized, and as each run starts, `_wire` performs these setup tasks:
 
-1. **Topic Setup** (`_add_topics`): Constructs the workflow graph by analyzing each node's subscription expressions and publish destinations
-2. **Function Calling Integration** (`_handle_function_calling_nodes`): Links function-calling nodes with LLM nodes to enable tool recognition
+1. **Node Check**: Refuses a node keyed by another name, without a subscription, or whose subscriptions name other topics than when it was built
+2. **Topic Setup** (`_checked_topics`): Constructs the workflow graph by analyzing each node's subscription expressions and publish destinations
+3. **Function Calling Integration** (`_wire_function_calls`): Wires function-calling nodes to the LLM nodes calling them
 
 The topic setup process:
 
-- Extracts topics from node subscription expressions using `extract_topics`
-- Maps topic names to subscribing node names in `_topic_nodes`
-- Registers all topics in the `_topics` dictionary
+- Collects the topics the nodes subscribe and publish to (`workflow.topics`), and
+  each topic's readers, which `_wire` returns to the run (nothing is stored)
 - Rejects a topic that overrides a method runs do not call, or that has a custom
   `event_queue` (see [Topic Base](topics/topic_base.md))
 - Validates that required `InputTopic` and `OutputTopic` exist
@@ -69,9 +70,23 @@ The topic setup process:
 For function calling capabilities:
 
 - Identifies nodes using `FunctionCallTool`
-- Links them with LLM nodes that publish to the topics they read (or, for an in-workflow output topic, to a topic paired with it)
-- Enables LLMs to recognize and invoke available function tools
-- On each topic carrying LLM calls, the first function-call node reading it (one answering errors, if any does) also answers, with an error, the calls there naming a function no LLM calling there was offered, so that every call reaching a function-call node gets a result. Such a node belongs to one workflow
+- Offers their functions to each LLM node that publishes to a topic they read, or to an in-workflow output topic paired with a topic they read
+- On each topic carrying LLM calls, the first function-call node reading it (preferring one with `on_error="return"`) also answers, with an error, the calls there naming a function no LLM calling there was offered, so that every call reaching a function-call node gets a result.
+
+Each run works out this wiring as it starts, which nodes read each topic, the
+functions each LLM node is offered and the calls each function-call node
+answers, and binds each node's wiring to that node's steps (see `grafi.runtime.wiring`),
+where only the node's tool, or a copy of it (same `tool_id`), reads it: the
+LLM's `get_function_specs()`, the function-call command. So a workflow stores
+none of it in the tools and nodes it shares with another workflow, or with a
+copy of itself; a node added, removed, replaced or changed reaches the next
+run, and a run in flight keeps the wiring it started with.
+`workflow.offered_to(node_name)` says what an LLM node is offered.
+
+A node's subscriptions are fixed when the node is built: to change them, build a
+new node, with its builder or constructor. A run refuses a node whose
+subscriptions name other topics than when it was built (changed in place, or
+copied with `model_copy(update=...)`).
 
 ## How a Run Executes
 

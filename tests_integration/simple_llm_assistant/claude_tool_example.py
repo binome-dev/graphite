@@ -44,18 +44,18 @@ async def test_claude_tool_stream() -> None:
     deltas: List[Delta] = []
     content = ""
     with deltas_to(deltas.append):
-        async for messages in claude.invoke(
+        messages = await claude.invoke(
             get_invoke_context(),
             [
                 Message(
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        ):
-            for msg in messages:
-                assert msg.role == "assistant"
-                if isinstance(msg.content, str):
-                    content += msg.content
+        )
+        for msg in messages:
+            assert msg.role == "assistant"
+            if isinstance(msg.content, str):
+                content += msg.content
     streamed = "".join(delta.content for delta in deltas)
     print(streamed)
     assert len(deltas) > 1 and streamed == content  # The text, as it came.
@@ -80,18 +80,18 @@ async def test_claude_tool_with_chat_param() -> None:
         .build()
     )
 
-    async for messages in claude.invoke(
+    messages = await claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            assert msg.content and "Grafi" in msg.content
-            print(msg.content)
-            # 30 tokens ≈ < 250 chars for normal prose
-            if isinstance(msg.content, str):
-                # Ensure the content length is within the expected range
-                assert len(msg.content) < 250
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        assert msg.content and "Grafi" in msg.content
+        print(msg.content)
+        # 30 tokens ≈ < 250 chars for normal prose
+        if isinstance(msg.content, str):
+            # Ensure the content length is within the expected range
+            assert len(msg.content) < 250
 
     assert len(await event_store.get_events()) == 2
 
@@ -104,14 +104,14 @@ async def test_claude_tool_async() -> None:
     claude = ClaudeTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in claude.invoke(
+    messages = await claude.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            if isinstance(msg.content, str):
-                content += msg.content
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        if isinstance(msg.content, str):
+            content += msg.content
 
     print(content)
     assert "Grafi" in content
@@ -179,14 +179,14 @@ async def test_claude_tool_serialization() -> None:
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            if isinstance(msg.content, str):
-                content += msg.content
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        if isinstance(msg.content, str):
+            content += msg.content
 
     print(content)
     assert "Grafi" in content
@@ -219,16 +219,16 @@ async def test_claude_tool_with_chat_param_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for msg in messages:
-            assert msg.role == "assistant"
-            assert msg.content and "Grafi" in msg.content
-            print(msg.content)
-            if isinstance(msg.content, str):
-                assert len(msg.content) < 250
+    )
+    for msg in messages:
+        assert msg.role == "assistant"
+        assert msg.content and "Grafi" in msg.content
+        print(msg.content)
+        if isinstance(msg.content, str):
+            assert len(msg.content) < 250
 
     assert len(await event_store.get_events()) == 2
 

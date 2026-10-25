@@ -183,50 +183,6 @@
           "type": "Topic"
         }
       }
-    },
-    "api_key": {
-      "env": "OPENAI_API_KEY"
-    },
-    "model": "gpt-4o-mini",
-    "function_call_llm_system_message": null,
-    "summary_llm_system_message": null,
-    "function_tool": {
-      "class": "grafi.tools.function_calls.impl.mcp_tool:MCPTool",
-      "tool_id": "0e2639d16a8d4574ab532dc50e8db166",
-      "name": "MCPTool",
-      "type": "MCPTool",
-      "oi_span_type": "TOOL",
-      "function_specs": [
-        {
-          "name": "hello",
-          "description": "",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "description": "",
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ]
-          },
-          "output_schema": null
-        }
-      ],
-      "functions": {},
-      "on_error": "return",
-      "mcp_config": {
-        "mcpServers": {
-          "hello": {
-            "url": "http://localhost:8000/mcp/",
-            "transport": "http"
-          }
-        }
-      },
-      "resources": [],
-      "prompts": []
     }
   }
 }

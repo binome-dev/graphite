@@ -24,7 +24,6 @@ from grafi.common.exceptions import FunctionCallException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
@@ -44,6 +43,7 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from tests.wiring import answered_by
 from tests_integration.async_execution.support import input_event
 
 CONTEXT = InvokeContext(conversation_id="c", invoke_id="i", assistant_request_id="r")
@@ -65,7 +65,7 @@ def _calls(*calls: tuple) -> Message:
 
 
 async def _results(tool: FunctionCallTool, messages: Messages) -> List[Message]:
-    return [m async for batch in tool.invoke(CONTEXT, messages) for m in batch]
+    return await tool.invoke(CONTEXT, messages)
 
 
 class Weather(BaseModel):
@@ -107,9 +107,7 @@ async def test_every_call_of_every_message_gets_one_result_in_order():
 
 @pytest.mark.asyncio
 async def test_without_tool_calls_the_tool_yields_nothing():
-    assert [
-        m async for m in WeatherTool().invoke(CONTEXT, [Message(role="user")])
-    ] == []
+    assert await WeatherTool().invoke(CONTEXT, [Message(role="user")]) == []
 
 
 @pytest.mark.parametrize(
@@ -119,7 +117,7 @@ async def test_without_tool_calls_the_tool_yields_nothing():
 @pytest.mark.asyncio
 async def test_a_result_is_always_text(returned: Any, content: str):
     tool = FunctionCallTool.builder().function(lambda: returned).build()
-    name = tool.function_specs[0].name
+    name = tool.get_function_specs()[0].name
     [result] = await _results(tool, [_calls(("a", name, {}))])
     assert result.content == content
 
@@ -177,7 +175,7 @@ async def test_a_parameter_typed_invoke_context_is_passed_it_and_hidden_from_the
         return f"{greeting} {ctx.conversation_id}"
 
     tool = FunctionCallTool.builder().function(who).build()
-    assert list(tool.function_specs[0].parameters.properties) == ["greeting"]
+    assert list(tool.get_function_specs()[0].parameters.properties) == ["greeting"]
     [result] = await _results(tool, [_calls(("a", "who", {"greeting": "hi"}))])
     assert result.content == "hi c"
 
@@ -314,8 +312,11 @@ def test_a_subclass_inherits_its_bases_functions_and_may_override_them():
     class Grandchild(Child):
         pass
 
-    assert sorted(spec.name for spec in Grandchild().function_specs) == ["ping", "pong"]
-    assert Grandchild().functions["ping"] is Child.__dict__["ping"]
+    assert sorted(spec.name for spec in Grandchild().get_function_specs()) == [
+        "ping",
+        "pong",
+    ]
+    assert Grandchild()._functions()["ping"] is Child.__dict__["ping"]
 
 
 @pytest.mark.asyncio
@@ -342,7 +343,7 @@ def extra() -> str:
 @pytest.mark.asyncio
 async def test_the_builder_adds_functions_beside_the_classs_own():
     tool = WeatherTool.builder().function(extra).build()
-    assert [spec.name for spec in tool.function_specs] == [
+    assert [spec.name for spec in tool.get_function_specs()] == [
         "forecast",
         "report",
         "extra",
@@ -356,12 +357,12 @@ async def test_the_builder_adds_functions_beside_the_classs_own():
     assert data["functions"] == {"extra": {"ref": f"{__name__}:extra"}}
     restored = FunctionCallTool.model_validate(data)
     assert type(restored) is WeatherTool
-    assert restored.functions == {
+    assert restored._functions() == {
         "forecast": WeatherTool.forecast,
         "report": WeatherTool.report,
         "extra": extra,
     }
-    assert restored.function_specs == tool.function_specs
+    assert restored.get_function_specs() == tool.get_function_specs()
 
 
 def test_an_agent_calling_tool_rebuilt_from_its_fields_keeps_one_spec():
@@ -374,7 +375,7 @@ def test_an_agent_calling_tool_rebuilt_from_its_fields_keeps_one_spec():
         .build()
     )
     rebuilt = AgentCallingTool(**dict(tool))  # Its specs already hold its own.
-    assert [spec.name for spec in rebuilt.function_specs] == ["helper"]
+    assert [spec.name for spec in rebuilt.get_function_specs()] == ["helper"]
 
 
 class _CustomCommand(Command):
@@ -429,9 +430,9 @@ class ScriptedLLM(LLM):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         answered = any(message.role == "tool" for message in input_data)
-        yield [
+        return [
             (
                 Message(role="assistant", content="done")
                 if answered
@@ -526,8 +527,8 @@ async def test_a_call_to_a_function_the_llm_was_not_offered_gets_one_error():
         ("c1", "A:1"),
         ("c2", "Error: LookupError: No function 'invented'"),
     ]
-    first, second = (workflow.nodes[name]._command for name in ("a", "b"))
-    assert first.offered == {"calls": {"fa", "fb"}} and second.offered == {}
+    assert answered_by(workflow, "a") == {"calls": {"fa", "fb"}}
+    assert answered_by(workflow, "b") == {}
 
 
 @pytest.mark.parametrize("shared_first", [False, True])
@@ -643,7 +644,7 @@ async def test_a_parameter_typed_optional_invoke_context_is_passed_it():
         return ctx.conversation_id
 
     tool = FunctionCallTool.builder().function(who).build()
-    assert tool.function_specs[0].parameters.properties == {}
+    assert tool.get_function_specs()[0].parameters.properties == {}
     [result] = await _results(tool, [_calls(("a", "who", {}))])
     assert result.content == "c"
 
@@ -656,8 +657,11 @@ async def test_the_builder_replaces_a_function_of_the_same_name():
 
     tool = WeatherTool.builder().function(forecast).build()
     # In the class's place, offered once, with the new function's spec.
-    assert [spec.name for spec in tool.function_specs] == ["forecast", "report"]
-    assert tool.function_specs[0].description == "Tomorrow's weather, from elsewhere."
-    assert tool.functions["forecast"] is forecast
+    assert [spec.name for spec in tool.get_function_specs()] == ["forecast", "report"]
+    assert (
+        tool.get_function_specs()[0].description
+        == "Tomorrow's weather, from elsewhere."
+    )
+    assert tool._functions()["forecast"] is forecast
     [result] = await _results(tool, [_calls(("a", "forecast", {"city": "Rome"}))])
     assert result.content == "rain in Rome"

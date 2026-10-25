@@ -38,7 +38,7 @@ class _EchoTool:
     async def invoke(self, invoke_context, input_data):
         if input_data[0].content == "fail":
             raise ValueError("cannot echo")
-        yield [Message(role="assistant", content=f"echo {input_data[0].content}")]
+        return [Message(role="assistant", content=f"echo {input_data[0].content}")]
 
 
 class _EchoNode:
@@ -54,15 +54,13 @@ class _EchoNode:
     @record_node_invoke
     async def invoke(self, invoke_context, input_data):
         messages = [message for event in input_data for message in event.data]
-        async for _ in _EchoTool().invoke(invoke_context, messages):
-            pass
+        await _EchoTool().invoke(invoke_context, messages)
         return
         yield  # pragma: no cover - makes this an async generator
 
 
-async def _run(component, content: str = "hi") -> None:
-    async for _ in component.invoke(_CONTEXT, [Message(role="user", content=content)]):
-        pass
+async def _run(tool, content: str = "hi") -> None:
+    await tool.invoke(_CONTEXT, [Message(role="user", content=content)])
 
 
 async def _run_node(content: str = "hi") -> None:

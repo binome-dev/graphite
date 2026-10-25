@@ -97,10 +97,14 @@ def resolve_import_ref(ref: str) -> Any:
             f"{ref!r} names a special module, such as a package's __main__."
         )
     if not is_trusted(module_path):
-        raise UntrustedImportError(
-            f"{ref!r} is outside the trusted modules; trust its module first, "
-            f"with grafi.common.import_ref.trust_modules({module_path.split('.')[0]!r})."
+        package = module_path.split(".")[0]
+        hint = (
+            "do not trust the standard library: a manifest must not name it"
+            if package in sys.stdlib_module_names
+            else "if it is your code, trust it before loading, with "
+            f"grafi.common.import_ref.trust_modules({package!r})"
         )
+        raise UntrustedImportError(f"{ref!r} is outside the trusted modules: {hint}.")
     attrs = qualname.split(".")
     for attr in attrs:
         if attr.startswith("__") and attr.endswith("__"):

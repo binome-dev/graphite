@@ -18,7 +18,6 @@ from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -37,10 +36,11 @@ from tests_integration.async_execution.support import input_event
 class StreamTool(EchoTool):
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append(["seed"])
-        for text in ("one", "two", "three"):
-            yield [Message(role="assistant", content=text)]
+        return [
+            Message(role="assistant", content=text) for text in ("one", "two", "three")
+        ]
 
 
 class InterruptedStreamTool(EchoTool):
@@ -48,14 +48,14 @@ class InterruptedStreamTool(EchoTool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append(["seed"])
         for text in ("one", "two", "three"):
             emit_delta(text)
             if len(self.calls) == 1 and text == "two":
                 await self.partial_received.wait()
                 raise RuntimeError("stream interrupted")
-        yield [Message(role="assistant", content="one two three")]
+        return [Message(role="assistant", content="one two three")]
 
 
 async def check_recovery(sequential: bool) -> None:
@@ -86,10 +86,11 @@ async def check_recovery(sequential: bool) -> None:
         for record in history
         if isinstance(record, PublishToTopicEvent) and record.name in ("a", "b")
     ]
-    assert len(outputs) == len({record.event_id for record in outputs}) == 6
+    # One output, at each destination: the topic named twice is routed once.
+    assert len(outputs) == len({record.event_id for record in outputs}) == 2
     for name in ("a", "b"):
         published = [record for record in outputs if record.name == name]
-        assert [record.offset for record in published] == [0, 1, 2]
+        assert [record.offset for record in published] == [0]
         consumed = [
             record
             for record in history
@@ -97,12 +98,10 @@ async def check_recovery(sequential: bool) -> None:
             and record.name == name
             and record.consumer_name == workflow.name
         ]
-        assert [record.offset for record in consumed] == [0, 1, 2]
-    for offset in range(3):
-        pair = [record for record in outputs if record.offset == offset]
-        assert pair[0].emission_id == pair[1].emission_id
-        stored = json.loads(json.dumps(default_event_codec.encode(pair[0])))
-        assert default_event_codec.decode(stored) == pair[0]
+        assert [record.offset for record in consumed] == [0]
+    assert outputs[0].emission_id == outputs[1].emission_id
+    stored = json.loads(json.dumps(default_event_codec.encode(outputs[0])))
+    assert default_event_codec.decode(stored) == outputs[0]
 
     # Simulate later, persisted outputs still awaiting delivery. Restore from a
     # deliberately reordered history to exercise the recorded topic positions.
@@ -114,7 +113,7 @@ async def check_recovery(sequential: bool) -> None:
                 "emission_id": tail.event_id,
                 "name": topic.name,
                 "type": topic.type,
-                "offset": 3,
+                "offset": 1,
                 "invoke_context": event.invoke_context,
             }
         )

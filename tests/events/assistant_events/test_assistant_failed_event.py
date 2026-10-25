@@ -39,7 +39,6 @@ def assistant_failed_event_json() -> dict:
         "id": "test_id",
         "name": "test_assistant",
         "type": "test_type",
-        "model": None,
         "input_data": request_json(),
         "error": "error",
         "error_details": None,

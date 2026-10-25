@@ -45,7 +45,11 @@ from grafi.common.models.message import Message
 event = PublishToTopicEvent(
     publisher_name="ProcessorNode",
     publisher_type="node",
-    invoke_context=InvokeContext(session_id="session-123"),
+    invoke_context=InvokeContext(
+        conversation_id="conversation-1",
+        invoke_id="invoke-1",
+        assistant_request_id="request-1",
+    ),
     consumed_event_ids=["evt_1", "evt_2"],  # Events that led to this publication
     data=[Message(role="assistant", content="Processed result")]
 )
@@ -53,19 +57,24 @@ event = PublishToTopicEvent(
 
 ### ConsumeFromTopicEvent
 
-Created when data is consumed from a topic:
+Created when data is consumed from a topic. It names its consumer, and the
+publication it took by its topic and offset:
 
 ```python
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
+from grafi.topics.topic_types import TopicType
 
 event = ConsumeFromTopicEvent(
-    name="output_topic",
+    name="output_topic",  # Topic consumed from
     type=TopicType.DEFAULT_TOPIC_TYPE,
-    offset=42,
-    publisher_name="ProcessorNode",  # Original publisher
-    publisher_type="node",
-    invoke_context=InvokeContext(session_id="session-123"),
-    consumed_event_ids=["evt_1", "evt_2"],
+    offset=42,  # Offset of the publication consumed
+    consumer_name="SummaryNode",  # The node (or workflow) consuming it
+    consumer_type="node",
+    invoke_context=InvokeContext(
+        conversation_id="conversation-1",
+        invoke_id="invoke-1",
+        assistant_request_id="request-1",
+    ),
     data=[Message(role="assistant", content="Processed result")]
 )
 ```
@@ -74,53 +83,49 @@ event = ConsumeFromTopicEvent(
 
 ### Assistant Implementation
 
-```python
-from grafi.assistants.assistant import Assistant
-from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
-from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
-from grafi.runtime import Delta
-from typing import AsyncGenerator, Union
-
-class MyAssistant(Assistant):
-    async def invoke(
-        self,
-        input_data: PublishToTopicEvent,
-        is_sequential: bool = False,
-        *,
-        stream: bool = False,
-    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
-        """Asynchronous streaming of events."""
-        async for output in self.workflow.invoke(
-            input_data, is_sequential, stream=stream
-        ):
-            yield output
-```
+An `Assistant` runs its workflow and records its invoke and respond events,
+from which an LLM's history is read on the next turn. An `invoke` of your own
+calls `super().invoke(input_data, is_sequential, stream=stream)`, so those
+events are recorded, and declares `Assistant.invoke`'s two overloads: see
+[Assistant](assistant.md#invoke) for the whole override. One calling
+`self.workflow.invoke(...)` itself records no assistant events, so the LLM
+loses every earlier turn.
 
 ### Node Implementation
 
 ```python
 from grafi.nodes.node import Node
+from grafi.common.exceptions import NodeExecutionError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.decorators.record_decorators import record_node_invoke
 from typing import List, AsyncGenerator
 
 class ProcessorNode(Node):
+    @record_node_invoke
     async def invoke(
         self,
         invoke_context: InvokeContext,
         node_input: List[ConsumeFromTopicEvent]
     ) -> AsyncGenerator[PublishToTopicEvent, None]:
-        """Process consumed events and publish result."""
-        # Execute command on input data
-        async for response in self.command.invoke(invoke_context, node_input):
-            # Wrap response in PublishToTopicEvent
+        """Process consumed events and publish the result, if any."""
+        command = self.command  # None for a node without a tool.
+        if command is None:
+            raise NodeExecutionError(
+                node_name=self.name,
+                message="Cannot invoke a node without a tool.",
+                invoke_context=invoke_context,
+            )
+        # Run the tool, through its command, on the input
+        messages = await command.invoke(invoke_context, node_input)
+        if messages:  # No output: nothing to publish.
             yield PublishToTopicEvent(
                 publisher_name=self.name,
                 publisher_type=self.type,
                 invoke_context=invoke_context,
                 consumed_event_ids=[event.event_id for event in node_input],
-                data=response
+                data=messages
             )
 ```
 
@@ -162,8 +167,13 @@ Components don't need direct references to each other - they communicate through
 ### 2. Traceability
 Every event carries:
 - `invoke_context`: Request correlation information
+
+A `PublishToTopicEvent` also carries:
 - `consumed_event_ids`: Chain of events that led to this event
 - Publisher information: Source component details
+
+A `ConsumeFromTopicEvent` names its consumer, and the topic and offset it
+consumed.
 
 ### 3. Flexibility
 - Easy to add new components without modifying existing ones
@@ -190,7 +200,8 @@ def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Message
     return self.workflow.invoke(invoke_context, input_data)
 ```
 
-**New Pattern:**
+**New Pattern** (with `Assistant.invoke`'s two overloads above it, as
+[Assistant](assistant.md#invoke) shows):
 ```python
 async def invoke(
     self,
@@ -199,7 +210,9 @@ async def invoke(
     *,
     stream: bool = False,
 ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
-    async for output in self.workflow.invoke(input_data, is_sequential, stream=stream):
+    # Through Assistant.invoke, which records the events an LLM's history is
+    # read from.
+    async for output in super().invoke(input_data, is_sequential, stream=stream):
         yield output
 ```
 
@@ -208,11 +221,11 @@ Key changes:
 2. Output is an async generator yielding `ConsumeFromTopicEvent` objects
 3. Context and data are embedded within the event objects
 4. Method is now async and uses `async for` for streaming responses
-4. Event IDs enable tracing the full processing chain
+5. Event IDs enable tracing the full processing chain
 
 ## Best Practices
 
-1. **Always preserve event chains**: Include `consumed_event_ids` when creating new events
+1. **Always preserve event chains**: Include `consumed_event_ids` when creating a `PublishToTopicEvent`
 2. **Use descriptive names**: Set meaningful `publisher_name` values for debugging
 3. **Type your components**: Use proper type hints for event interfaces
 4. **Handle streaming properly**: Use async generators for streaming responses

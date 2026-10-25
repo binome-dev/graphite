@@ -47,7 +47,9 @@ class MCPFunctionToolAssistant(Assistant):
     )
     name: str = Field(default="MCPFunctionToolAssistant")
     type: str = Field(default="MCPFunctionToolAssistant")
-    mcp_function_tool: Optional[MCPFunctionTool] = Field(default=None)
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    mcp_function_tool: Optional[MCPFunctionTool] = Field(default=None, exclude=True)
 
     def _construct_workflow(self) -> "MCPFunctionToolAssistant":
         agent_input_topic = InputTopic(name="agent_input_topic")
@@ -113,11 +115,8 @@ async def test_mcp_function_tool_direct_invocation() -> None:
     # Verify the tool was initialized correctly
     assert mcp_tool.name == "HelloMCPTool"
     assert mcp_tool.function_name == "hello"
-    assert mcp_tool._function_spec is not None
-    assert mcp_tool._function_spec.name == "hello"
 
     print(f"Initialized MCPFunctionTool: {mcp_tool.name}")
-    print(f"Function spec: {mcp_tool._function_spec}")
 
     # Create serialized input message
     # The message content should be JSON with the function arguments
@@ -132,7 +131,7 @@ async def test_mcp_function_tool_direct_invocation() -> None:
     print(f"Input message: {input_message}")
 
     # Invoke the MCP function
-    results = [await mcp_tool.function([input_message])]
+    results = [await mcp_tool.invoke_mcp_function([input_message])]
 
     # Verify the response
     assert len(results) == 1
@@ -232,7 +231,7 @@ async def test_mcp_function_tool_serialization_roundtrip() -> None:
         content=json.dumps(input_kwargs),
     )
 
-    results = [await restored_tool.function([input_message])]
+    results = [await restored_tool.invoke_mcp_function([input_message])]
 
     print(f"Restored tool response: {results[0]}")
     assert "Hello, Restored!" in results[0]

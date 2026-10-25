@@ -1,18 +1,18 @@
 from functools import partial
 from typing import Any
 from typing import Callable
+from typing import ClassVar
+from typing import Dict
 from typing import Self
 from typing import TypeVar
 
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.callable_ref import CallableRef
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.tools.results import as_messages
 from grafi.tools.results import function_results
 from grafi.tools.tool import Tool
@@ -38,8 +38,15 @@ class FunctionTool(Tool):
     function: CallableRef
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
+    removed_methods: ClassVar[Dict[str, str]] = {
+        "to_messages": "a function's result becomes the tool's output as "
+        "grafi.tools.results.as_messages() makes it: shape the output in the "
+        "function instead (one using the tool's settings is a "
+        "CallableComponent, or the tool overrides invoke()).",
+    }
+
     @classmethod
-    def builder(cls) -> "FunctionToolBuilder":
+    def builder(cls) -> "FunctionToolBuilder[Self]":
         """
         Return a builder for FunctionTool.
 
@@ -47,16 +54,16 @@ class FunctionTool(Tool):
         """
         return FunctionToolBuilder(cls)
 
+    def _function(self) -> Callable[[Messages], Any]:
+        """What the tool calls with its messages: its function."""
+        return self.function
+
     @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
-        results = function_results(partial(self.function, input_data))
+    ) -> Messages:
         try:
-            async with owned_iterator(results):
-                async for result in results:
-                    if messages := as_messages(result, self.role):
-                        yield messages
+            results = await function_results(partial(self._function(), input_data))
         except Exception as e:
             raise FunctionToolException(
                 tool_name=self.name,
@@ -65,6 +72,9 @@ class FunctionTool(Tool):
                 invoke_context=invoke_context,
                 cause=e,
             ) from e
+        return [
+            message for result in results for message in as_messages(result, self.role)
+        ]
 
 
 T_FT = TypeVar("T_FT", bound=FunctionTool)

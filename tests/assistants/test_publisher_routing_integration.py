@@ -17,7 +17,6 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.tools.command import Command
 from grafi.tools.command import use_command
@@ -41,9 +40,9 @@ class MockTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.invoked += 1
-        yield self.fn(input_data)
+        return self.fn(input_data)
 
 
 def _ctx() -> InvokeContext:

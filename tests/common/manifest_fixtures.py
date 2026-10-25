@@ -117,17 +117,31 @@ HELD_SECRETS = [
 # Settings holding no secret's value: references to variables, ways to
 # authenticate, empty values, and names that only look like a secret's.
 UNHELD_SETTINGS = [
+    {"api_key": "", "access_token": None, "secret": 0},
+    {"max_tokens": 10, "eos_token": "</s>", "cache_key": "k", "tokens": ["a"]},
+    {"pad_token": "<pad>", "mask_token": "<mask>", "maxTokens": 5},
+    {"url": "https://user@example.com/x", "home": "https://example.com/@me"},
+    # A JSON Schema names its properties: they are not settings.
+    {
+        "response_format": {
+            "type": "object",
+            "properties": {"pageToken": {"type": "string"}, "password": {}},
+            "required": ["pageToken"],
+            "$defs": {"AccessToken": {"type": "string"}},
+        }
+    },
+]
+
+# Settings referring to a variable, as "${VAR}", which hold no secret where
+# they are expanded: in an MCP configuration.
+REFERRING_SETTINGS = [
     {"extra_headers": {"Authorization": "Bearer ${API_TOKEN}"}},
     {"api_key": "${OPENAI_API_KEY}", "nested": [{"password": "${DB_PASSWORD}"}]},
     {"Authorization": "Basic ${CREDENTIALS}", "X-Auth": "Token ${API_TOKEN}"},
     {"auth": "oauth"},  # A way to authenticate, as MCP's.
     {"extra_headers": {"Authorization": "ApiKey ${ES_API_KEY}"}},  # Any scheme.
     {"headers": [["Authorization", "Bearer ${API_TOKEN}"], ["Accept", "*/*"]]},
-    {"api_key": "", "access_token": None, "secret": 0},
-    {"max_tokens": 10, "eos_token": "</s>", "cache_key": "k", "tokens": ["a"]},
-    {"pad_token": "<pad>", "mask_token": "<mask>", "maxTokens": 5},
     {"url": "postgresql://app:${DB_PASSWORD}@db.example.com/app"},
-    {"url": "https://user@example.com/x", "home": "https://example.com/@me"},
 ]
 
 

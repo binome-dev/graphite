@@ -1,6 +1,7 @@
 from datetime import datetime
 from datetime import timezone
 from enum import Enum
+from typing import Any
 from typing import Final
 from typing import Literal
 
@@ -9,6 +10,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import field_validator
 
+from grafi.common.legacy import warn_never_called
 from grafi.common.models.default_id import default_id
 from grafi.common.models.event_id import EventId
 from grafi.common.models.invoke_context import InvokeContext
@@ -37,6 +39,21 @@ class EventType(Enum):
     CONSUME_FROM_TOPIC = "ConsumeFromTopic"
 
 
+# The types of the events of topics, which a run's history is made of.
+TOPIC_EVENT_TYPES = frozenset(
+    {EventType.TOPIC_EVENT, EventType.PUBLISH_TO_TOPIC, EventType.CONSUME_FROM_TOPIC}
+)
+
+
+# The methods an event of grafi 0.0.36 and earlier had, which nothing calls.
+_REMOVED_METHODS = {
+    name: 'an event is stored as model_dump(mode="json"), and read back with '
+    "model_validate; read rows its to_dict() stored in a "
+    'model_validator(mode="before") (see Custom Event Types).'
+    for name in ("to_dict", "from_dict")
+}
+
+
 class Event(BaseModel):
     """A fact an event store records.
 
@@ -56,7 +73,13 @@ class Event(BaseModel):
     event_version: Literal[2] = EVENT_VERSION
     invoke_context: InvokeContext
     event_type: EventType
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        warn_never_called(cls, Event, lambda _: _REMOVED_METHODS)
 
     @field_validator("event_type")
     @classmethod

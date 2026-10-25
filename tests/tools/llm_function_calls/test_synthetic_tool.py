@@ -144,8 +144,8 @@ async def test_invoke_successful(synthetic_tool, invoke_context):
         ]
 
         result = []
-        async for msg in synthetic_tool.invoke(invoke_context, input_data):
-            result.extend(msg)
+        msg = await synthetic_tool.invoke(invoke_context, input_data)
+        result.extend(msg)
 
         assert len(result) == 1
         assert result[0].role == "tool"
@@ -164,7 +164,7 @@ async def test_invoke_no_tool_calls(synthetic_tool, invoke_context):
     """Without tool calls, the tool yields nothing."""
     input_data = [Message(role="assistant", content="No tool calls here")]
 
-    outputs = [m async for m in synthetic_tool.invoke(invoke_context, input_data)]
+    outputs = await synthetic_tool.invoke(invoke_context, input_data)
     assert outputs == []
 
 
@@ -188,8 +188,8 @@ async def test_invoke_invalud_function_name(synthetic_tool, invoke_context):
     ]
 
     result = []
-    async for msg in synthetic_tool.invoke(invoke_context, input_data):
-        result.extend(msg)
+    msg = await synthetic_tool.invoke(invoke_context, input_data)
+    result.extend(msg)
 
     [answer] = result
     assert answer.content.startswith("Error: LookupError")
@@ -243,8 +243,8 @@ async def test_invoke_multiple_tool_calls(synthetic_tool, invoke_context):
         ]
 
         result = []
-        async for msg in synthetic_tool.invoke(invoke_context, input_data):
-            result.extend(msg)
+        msg = await synthetic_tool.invoke(invoke_context, input_data)
+        result.extend(msg)
 
         assert len(result) == 2
         assert result[0].tool_call_id == "call_1"
@@ -267,7 +267,7 @@ def test_dump_saves_the_model_classes_by_import_path(monkeypatch, synthetic_tool
     assert result["output_model"] == {"ref": f"{__name__}:WeatherOutput"}
     assert result["openai_api_key"] == {"env": "OPENAI_API_KEY"}
     # Its spec follows from its fields, so it is not saved.
-    assert "function_specs" not in result
+    assert "function_specs" not in result  # Those it derives follow from it.
     assert "test_api_key" not in json.dumps(result)
 
 
@@ -279,7 +279,7 @@ def test_a_python_dump_keeps_the_model_classes(synthetic_tool):
     assert data["output_model"] is WeatherOutput
     restored = SyntheticTool.model_validate(data)
     assert restored == synthetic_tool
-    assert restored.function_specs == synthetic_tool.function_specs
+    assert restored.get_function_specs() == synthetic_tool.get_function_specs()
 
 
 def test_round_trip_loads_the_same_model_classes(monkeypatch, synthetic_tool):
@@ -293,12 +293,12 @@ def test_round_trip_loads_the_same_model_classes(monkeypatch, synthetic_tool):
     assert restored.input_model is WeatherInput
     assert restored.output_model is WeatherOutput
     assert restored.openai_api_key == "test_api_key"  # Read from OPENAI_API_KEY.
-    assert restored.function_specs == synthetic_tool.function_specs
-    assert restored == synthetic_tool
+    assert restored.get_function_specs() == synthetic_tool.get_function_specs()
+    assert restored.model_dump(mode="json") == data
     assert restored.model_dump(mode="json") == data
     # Saving and loading again offers the tool once.
     again = Tool.model_validate(restored.model_dump(mode="json"))
-    assert [spec.name for spec in again.function_specs] == ["get_weather"]
+    assert [spec.name for spec in again.get_function_specs()] == ["get_weather"]
 
 
 def test_editing_the_tool_in_a_dump_changes_what_it_offers(monkeypatch, synthetic_tool):
@@ -309,7 +309,7 @@ def test_editing_the_tool_in_a_dump_changes_what_it_offers(monkeypatch, syntheti
 
     restored = Tool.model_validate(data)
 
-    [spec] = restored.function_specs
+    [spec] = restored.get_function_specs()
     assert spec.name == "get_forecast"
     assert spec.description == "An edited description."
     assert "location" in spec.parameters.properties
@@ -371,7 +371,7 @@ def test_load_from_a_manifest_naming_the_class(monkeypatch):
     assert tool.output_model is WeatherOutput
     assert tool.openai_api_key == "test_key"
     # Its spec is made from the input model, as when built.
-    [spec] = tool.function_specs
+    [spec] = tool.get_function_specs()
     assert spec.name == "get_weather"
     assert "location" in spec.parameters.properties
 
@@ -501,8 +501,8 @@ async def test_invoke_with_json_schema_output(invoke_context):
         ]
 
         result = []
-        async for msg in tool.invoke(invoke_context, input_data):
-            result.extend(msg)
+        msg = await tool.invoke(invoke_context, input_data)
+        result.extend(msg)
 
         # Verify the tool was invoked
         assert len(result) == 1

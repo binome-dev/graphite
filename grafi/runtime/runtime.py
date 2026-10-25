@@ -62,7 +62,7 @@ class GrafiRuntime:
         input_data: PublishToTopicEvent,
         is_sequential: bool = False,
         *,
-        stream: bool,
+        stream: bool = False,
     ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
 
     def invoke(

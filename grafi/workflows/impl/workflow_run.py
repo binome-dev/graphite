@@ -62,6 +62,7 @@ from grafi.common.async_lifecycle import note_on_primary
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.async_lifecycle import unexpected_cancellation
 from grafi.common.event_stores.event_store import EventStore
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -74,6 +75,8 @@ from grafi.nodes.node_base import NodeBase
 from grafi.runtime.deltas import Delta
 from grafi.runtime.deltas import deltas_to
 from grafi.runtime.execution_services import current_services
+from grafi.runtime.wiring import Wiring
+from grafi.runtime.wiring import wired
 from grafi.topics.topic_base import TopicBase
 from grafi.topics.topic_impl.in_workflow_input_topic import InWorkflowInputTopic
 from grafi.topics.topic_impl.in_workflow_output_topic import InWorkflowOutputTopic
@@ -173,13 +176,15 @@ class WorkflowRun:
     ) -> None:
         self.name: str = workflow.name
         self.type: str = workflow.type
-        self.nodes: Dict[str, NodeBase] = workflow.nodes
+        # The workflow as it is now: a change to it reaches the next run.
+        self.nodes: Dict[str, NodeBase] = dict(workflow.nodes)
+        topics, readers, self._wiring = workflow._wire()
         self.event_store = (
             event_store if event_store is not None else current_services().event_store
         )
         self._topics: Dict[str, _TopicLog] = {
-            name: _TopicLog(topic, workflow._topic_nodes.get(name, []))
-            for name, topic in workflow._topics.items()
+            name: _TopicLog(topic, readers.get(name, []))
+            for name, topic in topics.items()
         }
         self._invoke_context: Optional[InvokeContext] = None
         self._sequential = False  # One step at a time.
@@ -607,7 +612,10 @@ class WorkflowRun:
         # None unless the caller streams, so that a run a tool starts inside
         # this step (to call an agent) streams to its own caller only.
         receive = self._outputs.put_nowait if self._stream else None
-        with deltas_to(receive, node.name, number):
+        with (
+            deltas_to(receive, node.name, number),
+            wired(self._wiring.get(node.name, Wiring())),
+        ):
             async with owned_iterator(invocation):
                 while True:
                     try:
@@ -703,7 +711,8 @@ class WorkflowRun:
         history = [
             event
             for event in await self.event_store.get_agent_events(
-                input_data.invoke_context.assistant_request_id
+                input_data.invoke_context.assistant_request_id,
+                event_types=TOPIC_EVENT_TYPES,
             )
             if isinstance(event, TopicEvent)
         ]

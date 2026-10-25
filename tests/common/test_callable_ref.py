@@ -11,9 +11,9 @@ from pydantic import ValidationError
 from grafi.common import import_ref
 from grafi.common.callable_component import CallableComponent
 from grafi.common.callable_ref import CallableRef
-from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.callable_ref import deserialize_callable
 from grafi.common.callable_ref import serialize_callable
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.import_ref import UntrustedImportError
 from grafi.common.import_ref import trust_modules
 from grafi.common.manifest import API_VERSION
@@ -153,9 +153,9 @@ def test_component_in_a_manifest_follows_its_rules(
     other = manifest({**signer, "key": {"env": "GRAFI_TEST_OTHER_SECRET"}})
     with pytest.raises(ManifestError, match="GRAFI_TEST_OTHER_SECRET"):
         Hooked.from_manifest(other)
-    assert Hooked.from_manifest(other, env=["GRAFI_TEST_OTHER_SECRET"]).fn.key == (
-        "other"
-    )
+    assert Hooked.from_manifest(
+        other, allow_env=["GRAFI_TEST_OTHER_SECRET"]
+    ).fn.key == ("other")
 
 
 # --- no pickle: hard errors -----------------------------------------------
@@ -192,9 +192,18 @@ def test_an_error_names_a_callable_without_showing_what_it_holds() -> None:
 
 @pytest.mark.parametrize(
     "value",
+    ["gASVbase64blob", {"base64": "blob", "code": "lambda _: True"}],
+    ids=["pickle text", "pickle dict"],
+)
+def test_a_pickled_function_is_never_loaded(value: Any) -> None:
+    """As grafi 0.0.30 to 0.0.34 saved one: loading it would run its code."""
+    with pytest.raises(CallableSerializationError, match="saved by pickle"):
+        deserialize_callable(value)
+
+
+@pytest.mark.parametrize(
+    "value",
     [
-        "gASVbase64blob",  # A pickle, as grafi before v2 saved a lambda.
-        {"base64": "blob", "code": "lambda _: True"},
         {"component": f"{__name__}:Adder", "config": {"amount": 5}},  # Before v2.
         {"component": f"{__name__}:module_level_function"},
         {"unexpected": "value"},
@@ -204,8 +213,6 @@ def test_an_error_names_a_callable_without_showing_what_it_holds() -> None:
         [{"ref": f"{__name__}:module_level_function"}],
     ],
     ids=[
-        "pickle text",
-        "pickle dict",
         "legacy component",
         "legacy function",
         "unknown keys",
@@ -307,9 +314,9 @@ def test_reference_to_what_a_trusted_module_does_not_own_is_refused(
 
 @pytest.mark.parametrize("ref", ["os:system", "os:getcwd", "json:JSONDecoder"])
 def test_reference_to_an_untrusted_module_is_refused(ref: str) -> None:
-    with pytest.raises(UntrustedImportError, match="trust_modules"):
+    with pytest.raises(UntrustedImportError, match="do not trust the standard library"):
         deserialize_callable({"ref": ref})
-    with pytest.raises(UntrustedImportError, match="trust_modules"):
+    with pytest.raises(UntrustedImportError, match="do not trust the standard library"):
         Hooked.model_validate({"fn": {"ref": ref}})
 
 

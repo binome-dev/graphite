@@ -9,15 +9,14 @@ see :meth:`grafi.common.manifest.Component.from_manifest`.
 import json
 from typing import Any
 from typing import Dict
-from typing import List
 from typing import Mapping
 from typing import Optional
 from typing import Union
 
+from grafi.common.callable_ref import looks_pickled
 from grafi.common.manifest import API_VERSION
 from grafi.common.manifest import ManifestError
 from grafi.common.manifest import import_path
-from grafi.common.manifest import kind_of
 
 _TOOLS = "grafi.tools"
 
@@ -73,35 +72,57 @@ def upgrade_manifest(
     legacy_classes: Mapping[str, Union[str, type]],
     loading: Optional[type] = None,
 ) -> Dict[str, Any]:
-    """A manifest saved before grafi/v2, an assistant's ``to_dict()``, as a
-    grafi/v2 manifest. ``legacy_classes`` maps bare class names to classes or
-    import paths: a tool's, a node's, or the assistant's ``type``. The
-    assistant is of that class, else of the assistant class ``loading``, the
-    one loading it, else an ``Assistant``."""
-    if "workflow" not in manifest:
-        raise ManifestError(
-            "Not a manifest: neither a grafi/v2 manifest (with an apiVersion) "
-            "nor an assistant saved before it (with a workflow)."
-        )
+    """A manifest saved before grafi/v2 -- an assistant's ``to_dict()``, or a
+    tool's or a topic's -- as a grafi/v2 manifest. ``legacy_classes`` maps
+    bare class names to classes or import paths: a tool's, a node's, or the
+    assistant's ``type``. The assistant is of that class, else of the
+    assistant class ``loading``, the one loading it, else an ``Assistant``."""
     classes = {
         name: value if isinstance(value, str) else import_path(value)
         for name, value in legacy_classes.items()
     }
+    if "workflow" not in manifest:
+        return _component(manifest, classes)
     spec = {
         key: value
         for key, value in manifest.items()
         if key in ("assistant_id", "name", "type", "oi_span_type")
     }
+    from grafi.assistants.assistant_base import AssistantBase
+
     assistant = classes.get(str(manifest.get("type")), _ASSISTANT)
     if assistant == _ASSISTANT and loading is not None:
-        if kind_of(loading) == "Assistant" and loading.__name__ != "AssistantBase":
+        if issubclass(loading, AssistantBase) and loading is not AssistantBase:
             assistant = import_path(loading)
     workflow = _workflow(manifest["workflow"], classes)
     return {
-        "apiVersion": API_VERSION,
-        "kind": "Assistant",
+        **_upgraded("Assistant"),
         "spec": {"class": assistant, **spec, "workflow": workflow},
     }
+
+
+def _upgraded(kind: str) -> Dict[str, Any]:
+    """An upgraded manifest's envelope."""
+    return {"apiVersion": API_VERSION, "kind": kind}
+
+
+def _component(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, Any]:
+    """A tool's or a topic's ``to_dict()``, as a grafi/v2 manifest."""
+    if "base_class" in data or data.get("class") in {**TOOL_CLASSES, **classes}:
+        spec = _tool(data, classes)
+        return {**_upgraded("Tool"), "spec": spec}
+    if data.get("type") in TOPIC_CLASSES and "name" in data and "class" not in data:
+        if _condition(data.get("condition"), data["name"]) is not None:
+            raise ManifestError(
+                f"The topic {data['name']!r} has a condition, which routes now "
+                "hold: load the assistant holding the topic, whose routes to it "
+                "are given its condition."
+            )
+        return {**_upgraded("Topic"), "spec": _topic(data)}
+    raise ManifestError(
+        "Not a manifest: neither a grafi/v2 manifest (with an apiVersion) nor "
+        "an assistant, a tool or a topic saved before it."
+    )
 
 
 def _workflow(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, Any]:
@@ -111,10 +132,33 @@ def _workflow(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, 
         if key in ("workflow_id", "name", "type", "oi_span_type")
     }
     topics = data.get("topics", {})
+    for node in data.get("nodes", {}).values():
+        if any(isinstance(topic, Mapping) for topic in node.get("publish_to", [])):
+            raise ManifestError(
+                f"The node {node.get('name')!r} was saved by grafi 0.0.29 or "
+                "earlier, whose manifests no grafi loads: build the assistant in "
+                "code, and save it again."
+            )
     # Before routes, a topic's condition chose what it took; a route holds it.
     conditions = {
-        name: _condition(topic.get("condition")) for name, topic in topics.items()
+        name: _condition(topic.get("condition"), name) for name, topic in topics.items()
     }
+    published = {
+        route.get("topic") if isinstance(route, Mapping) else route
+        for node in data.get("nodes", {}).values()
+        for route in [
+            *node.get("publish_to", []),
+            *node.get("publisher_router", {}).get("routes", []),
+        ]
+    }
+    for name, condition in conditions.items():
+        if condition is not None and name not in published:
+            raise ManifestError(
+                f"The topic {name!r} has a condition, which the routes publishing "
+                "to a topic hold now, but no node publishes to it, as to a "
+                "workflow's input: remove the condition, or check the input "
+                "before invoking."
+            )
     return {
         "class": _WORKFLOW,
         **workflow,
@@ -126,24 +170,42 @@ def _workflow(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, 
     }
 
 
-def _condition(condition: Any) -> Any:
+def _condition(condition: Any, topic: str = "") -> Any:
     """A topic's condition, as the ``when`` of the routes to it: None for
     always, and grafi's own predicates where they now are."""
     if not isinstance(condition, Mapping) or "ref" not in condition:
-        return _callable(condition)  # None, a component, or a pickle (fails).
+        return _callable(condition, f"the condition of the topic {topic!r}")
     module, _, name = str(condition["ref"]).partition(":")
-    if condition["ref"] == "grafi.topics.topic_base:always_true":
+    if condition["ref"] in (
+        "grafi.topics.topic_base:always_true",
+        "grafi.nodes.conditions:always_true",
+    ):
         return None
     if module == "grafi.topics.conditions":
         return {"ref": f"grafi.nodes.conditions:{name}"}
     return condition
 
 
-def _callable(value: Any) -> Any:
+def _callable(value: Any, where: str = "a function") -> Any:
     """A saved callable as grafi/v2 saves it: a component saved before as
     ``{"component": path, "config": {...}}`` is ``{"class": path, ...}``."""
     if isinstance(value, Mapping) and "component" in value:
         return {"class": value["component"], **(value.get("config") or {})}
+    if looks_pickled(value):
+        raise ManifestError(
+            f"The manifest holds {where} saved by pickle, which grafi no longer "
+            "loads, as loading it would run any code it holds: build the "
+            "assistant in code and save it again, or replace it with "
+            '{"ref": "module:function"}, '
+            "a function defined in a module"
+            + (
+                ' (an accept-all condition is {"ref": '
+                '"grafi.nodes.conditions:always_true"}; remove one on an input '
+                "topic)."
+                if "condition" in where
+                else "."
+            )
+        )
     return value
 
 
@@ -170,7 +232,11 @@ def _node(
     if "publisher_router" in data:
         routes = [
             {
-                key: _callable(value) if key == "when" else value
+                key: (
+                    _callable(value, f"a route's condition of the node {name!r}")
+                    if key == "when"
+                    else value
+                )
                 for key, value in route.items()
                 if key != "from_stage"
             }
@@ -178,9 +244,12 @@ def _node(
         ]
     else:  # The list of topic names, before routes.
         routes = [
-            {"topic": topic, **_when(conditions.get(topic))}
+            {"topic": topic, "when": conditions.get(topic)}
             for topic in data.get("publish_to", [])
         ]
+        for route in routes:
+            if route["when"] is None:  # Always.
+                del route["when"]
     if data.get("tool") is not None:
         node["tool"] = _tool(data["tool"], classes)
     return {"class": node_class, **node, "publisher_router": {"routes": routes}}
@@ -193,25 +262,23 @@ def _tool(data: Mapping[str, Any], classes: Mapping[str, str]) -> Dict[str, Any]
         if key not in ("class", "base_class") and value != _MASK
     }
     for key in ("resources", "prompts"):  # MCPTool's, each as JSON text.
-        items: List[Any] = tool.get(key, [])
-        tool[key] = [_mcp_item(i) for i in items]
-    if not tool.get("resources") and not tool.get("prompts"):
-        tool.pop("resources", None)
-        tool.pop("prompts", None)
+        if tool.get(key):
+            tool[key] = [_mcp_item(item) for item in tool[key]]
+        else:
+            tool.pop(key, None)
     tool_class = _class(data.get("class"), classes, "tool")
-    if tool_class != TOOL_CLASSES["MCPTool"]:
-        tool.pop("function_specs", None)  # They follow from the functions.
+    if "mcp_config" not in data:  # 0.0.36 and earlier made them again, loading.
+        tool.pop("function_specs", None)
+    where = f"of the tool {data.get('name')!r}"
     for key in ("function", "agent_call"):  # A tool's callables.
         if key in tool:
-            tool[key] = _callable(tool[key])
+            tool[key] = _callable(tool[key], f"the {key} {where}")
     if isinstance(tool.get("functions"), Mapping):
-        tool["functions"] = {k: _callable(v) for k, v in tool["functions"].items()}
+        tool["functions"] = {
+            k: _callable(v, f"the function {k!r} {where}")
+            for k, v in tool["functions"].items()
+        }
     return {"class": tool_class, **tool}
-
-
-def _when(condition: Any) -> Dict[str, Any]:
-    """A route's ``when``, unless it is always."""
-    return {} if condition is None else {"when": condition}
 
 
 def _mcp_item(item: Any) -> Any:

@@ -3,6 +3,8 @@ from typing import List
 from loguru import logger
 
 from grafi.common.events.component_events import AssistantRespondEvent
+from grafi.common.events.event import TOPIC_EVENT_TYPES
+from grafi.common.events.event import EventType
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -27,7 +29,7 @@ class LLMCommand(Command):
 
         event_store = current_services().event_store
         conversation_events = await event_store.get_conversation_events(
-            invoke_context.conversation_id
+            invoke_context.conversation_id, event_types=[EventType.ASSISTANT_RESPOND]
         )
 
         assistant_respond_event_dict = {
@@ -49,7 +51,7 @@ class LLMCommand(Command):
 
         # Retrieve agent events related to the current assistant request
         agent_events = await event_store.get_agent_events(
-            invoke_context.assistant_request_id
+            invoke_context.assistant_request_id, event_types=TOPIC_EVENT_TYPES
         )
         topic_events = {
             event.event_id: event

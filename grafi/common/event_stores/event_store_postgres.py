@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import timezone
 from typing import Any
 from typing import AsyncIterator
+from typing import Collection
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -11,6 +12,7 @@ from typing import cast
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
+from grafi.common.events.event import EventType
 from grafi.common.exceptions import EventPersistenceError
 
 try:
@@ -63,6 +65,16 @@ class EventModel(Base):
     event_version = Column(String, nullable=False)
     event_data = Column(JSONB, nullable=False)
     timestamp = Column(DateTime, nullable=False)  # Stored as naive UTC
+
+
+def _of_types(where: Any, event_types: Optional[Collection[EventType]]) -> Any:
+    """The rows ``where`` selects, of ``event_types`` if given, by timestamp,
+    then as recorded."""
+    statement = select(EventModel).where(where)
+    if event_types is not None:
+        types = sorted(event_type.value for event_type in event_types)
+        statement = statement.where(EventModel.event_type.in_(types))
+    return statement.order_by(EventModel.timestamp, EventModel.id)
 
 
 class EventStorePostgres(EventStore):
@@ -258,21 +270,27 @@ class EventStorePostgres(EventStore):
         )
         return events[0] if events else None
 
-    async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
-        """Get all events for a given assistant_request_id asynchronously."""
+    async def get_agent_events(
+        self,
+        assistant_request_id: str,
+        *,
+        event_types: Optional[Collection[EventType]] = None,
+    ) -> List[Event]:
         return await self._select(
-            select(EventModel)
-            .where(EventModel.assistant_request_id == assistant_request_id)
-            .order_by(EventModel.timestamp, EventModel.id),
+            _of_types(
+                EventModel.assistant_request_id == assistant_request_id, event_types
+            ),
             f"get_agent_events:{assistant_request_id}",
         )
 
-    async def get_conversation_events(self, conversation_id: str) -> List[Event]:
-        """Get all events for a given conversation ID asynchronously."""
+    async def get_conversation_events(
+        self,
+        conversation_id: str,
+        *,
+        event_types: Optional[Collection[EventType]] = None,
+    ) -> List[Event]:
         return await self._select(
-            select(EventModel)
-            .where(EventModel.conversation_id == conversation_id)
-            .order_by(EventModel.timestamp, EventModel.id),
+            _of_types(EventModel.conversation_id == conversation_id, event_types),
             f"get_conversation_events:{conversation_id}",
         )
 

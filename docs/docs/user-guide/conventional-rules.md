@@ -38,11 +38,11 @@ While the platform is designed for maximum flexibility, certain conventions guid
 
 **Rationale**: Keeping partial output out of the event log keeps routing decisions and history to whole messages, and keeps the log to a few records per step rather than one per token.
 
-## LLMFunctionCall
+## Function Calls
 
-- **Agent-Like Interactions**: By calling functions, the LLM can access additional tools—making the system more agent-like.
-- **Separation of Concerns**: The LLM node focuses on generating or interpreting responses, while a separate `LLMFunctionCall` node invokes tool logic.
-- **Upstream Connections**: Each `LLMFunctionCall` must directly connect to one or more LLM node via topic(s) when want to enable upstream LLM node tool calling feature.
-- **Downstream Connections**: Each LLM node can directly connect to one or more `LLMFunctionCall` nodes. If the workflow builder detects an `LLMFunctionCall` node downstream, it attaches the relevant function specs to the LLM node’s final output message, letting the LLM know which tools are available.
+- **Agent-Like Interactions**: By calling functions, the LLM can access additional tools, making the system more agent-like.
+- **Separation of Concerns**: The LLM node focuses on generating or interpreting responses, while a separate function-call node, running a `FunctionCallTool`, invokes tool logic.
+- **Connections**: A function-call node subscribes to a topic an LLM node publishes its calls to (or, for an in-workflow output topic, to a topic paired with it), and publishes the results back to a topic the LLM node reads.
+- **Wiring**: As each run starts, the workflow offers each LLM node the functions of the function-call nodes reading its calls, and makes one function-call node on each topic carrying calls answer, with an error, a call naming a function no LLM calling there was offered. See [Event-Driven Workflow](event-driven-workflow.md#workflow-initialization).
 
 **Rationale**: Decoupling LLM operations from tool invocation keeps the graph modular, fosters reusability, and ensures that an LLM can dynamically discover and call specialized tools within a single workflow.

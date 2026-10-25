@@ -6,6 +6,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_no_tool_call
 from grafi.nodes.conditions import has_tool_call
@@ -51,11 +52,13 @@ class HumanApprovalAssistant(Assistant):
     )
     name: str = Field(default="HumanApprovalAssistant")
     type: str = Field(default="HumanApprovalAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    model: str = Field(default="gpt-4o")
-    function_tool: FunctionCallTool
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default="gpt-4o", exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "HumanApprovalAssistantBuilder":
@@ -63,6 +66,7 @@ class HumanApprovalAssistant(Assistant):
         return HumanApprovalAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "HumanApprovalAssistant":
+        assert self.function_tool is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         tool_call_topic = Topic(name="human_tool_call_topic")
@@ -89,7 +93,7 @@ class HumanApprovalAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.function_call_llm_system_message)
                 .build()
@@ -121,7 +125,7 @@ class HumanApprovalAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserOutputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -146,7 +150,7 @@ class HumanApprovalAssistant(Assistant):
 class HumanApprovalAssistantBuilder(AssistantBaseBuilder[HumanApprovalAssistant]):
     """Concrete builder for HumanApprovalAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

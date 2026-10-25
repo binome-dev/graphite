@@ -2,12 +2,14 @@ import asyncio
 import functools
 import inspect
 import json
+import warnings
 from typing import Any
 from typing import Callable
 from typing import ClassVar
 from typing import Dict
 from typing import Literal
 from typing import Self
+from typing import Set
 from typing import Tuple
 from typing import TypeVar
 from typing import get_type_hints
@@ -16,11 +18,9 @@ from loguru import logger
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import SerializerFunctionWrapHandler
-from pydantic import field_serializer
+from pydantic import model_validator
 from pydantic import validate_call
 
-from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.async_lifecycle import wait_all
 from grafi.common.callable_ref import CallableRef
 from grafi.common.decorators.llm_function import is_invoke_context
@@ -31,18 +31,18 @@ from grafi.common.exceptions import ToolInvocationError
 from grafi.common.exceptions.serialization import error_message
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import FunctionSpecs
+from grafi.common.models.function_spec import GivenSpecs
+from grafi.common.models.function_spec import once_each
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import ChatCompletionMessageToolCall
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime.deltas import deltas_for
 from grafi.tools.command import use_command
 from grafi.tools.function_calls.function_call_command import FunctionCallCommand
 from grafi.tools.results import as_text
+from grafi.tools.results import call
 from grafi.tools.results import function_results
-from grafi.tools.results import in_thread
-from grafi.tools.results import is_sync
 from grafi.tools.tool import Tool
 from grafi.tools.tool import ToolBuilder
 
@@ -62,14 +62,17 @@ class FunctionCallTool(Tool):
     typed ``InvokeContext`` is passed the request's context.
 
     It is saved with the functions its class does not define, by reference
-    (see :mod:`grafi.common.callable_ref`); what it offers follows from them.
+    (see :mod:`grafi.common.callable_ref`), and the specs it is given; the
+    specs of its functions follow from them.
     """
 
     name: str = "FunctionCallTool"
     type: str = "FunctionCallTool"
-    # What the LLM is offered: each function's, made from it, named as it is
-    # keyed. A subclass offering what it has no function for adds its own.
-    function_specs: FunctionSpecs = Field(default_factory=list, exclude=True)
+    # The specs of functions it calls elsewhere, such as an MCP server's, which
+    # it is given; those of its own it derives (see get_function_specs()).
+    function_specs: GivenSpecs = Field(
+        default_factory=list, exclude_if=lambda specs: not specs
+    )
     functions: Dict[str, CallableRef] = Field(default_factory=dict)
     # "raise" fails the call's node instead of answering the LLM with the error.
     on_error: Literal["return", "raise"] = "return"
@@ -78,8 +81,14 @@ class FunctionCallTool(Tool):
     # The class's @llm_function methods, its bases' included, by name.
     _methods: ClassVar[Dict[str, Any]] = {}
 
+    removed_methods: ClassVar[Dict[str, str]] = {
+        "to_messages": "a function's result becomes its call's answer as "
+        "grafi.tools.results.as_text() makes it: shape the answer in the "
+        "function instead.",
+    }
+
     @classmethod
-    def builder(cls) -> "FunctionCallToolBuilder":
+    def builder(cls) -> "FunctionCallToolBuilder[Self]":
         """
         Return a builder for FunctionCallTool.
 
@@ -99,43 +108,64 @@ class FunctionCallTool(Tool):
                     methods[spec.name] = attr
         cls._methods = methods
 
-    @field_serializer("functions", mode="wrap")
-    def _save_functions(
-        self, functions: Dict[str, Callable], handler: SerializerFunctionWrapHandler
-    ) -> Any:
-        """The functions the class does not define, which load with it."""
-        methods = type(self)._methods
-        return handler({n: f for n, f in functions.items() if f is not methods.get(n)})
+    @model_validator(mode="after")
+    def _check_specs(self) -> Self:
+        """Make the specs it derives now, so a function no spec can be made of
+        fails (TypeError); and warn of a spec it is given for one of its own
+        functions, which the function's own spec replaces."""
+        given = {spec.name for spec in self.function_specs}
+        shadowed = sorted(given & self.derived_specs().keys())
+        if shadowed:
+            warnings.warn(
+                f"{type(self).__name__} offers its own functions {shadowed} in "
+                "place of the specs it is given of those names. Its "
+                "function_specs are those of functions it calls elsewhere (see "
+                "call_function()), such as an MCP server's tools, which a "
+                "function of its own of the same name hides; a spec of its own "
+                "function, or made from its fields, is derived (see "
+                "derived_specs()), so code adding one, as in model_post_init, "
+                "can go.",
+                UserWarning,
+            )
+        return self
 
-    def model_post_init(self, _context: Any) -> None:
-        self.functions = {**type(self)._methods, **self.functions}
-        own = {}  # Each function's spec, named as it is keyed, in its place.
-        for name, function in self.functions.items():
+    def _functions(self) -> Dict[str, Callable]:
+        """The functions it calls itself: its class's, then those it is given,
+        which replace one of the same name."""
+        return {**type(self)._methods, **self.functions}
+
+    def derived_specs(self) -> Dict[str, FunctionSpec]:
+        """The specs the tool derives, by name, never saved: each function's,
+        named as it is keyed. A subclass offering a function it makes from its
+        fields, as AgentCallingTool does, adds its spec."""
+        derived = {}
+        for name, function in self._functions().items():
             spec = _spec(function)
-            own[name] = (
+            derived[name] = (
                 spec if spec.name == name else spec.model_copy(update={"name": name})
             )
-        given = [spec for spec in self.function_specs if spec.name not in own]
-        self.function_specs = [*own.values(), *given]
+        return derived
 
     def get_function_specs(self) -> FunctionSpecs:
-        """The specifications of the functions offered to the LLM."""
-        return self.function_specs
+        """What the LLM is offered: the specs the tool derives, then those it
+        is given, once each by name."""
+        return once_each([*self.derived_specs().values(), *self.function_specs])
 
     @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         """Answer every tool call in ``input_data``, concurrently: one tool
         message per call, in the calls' order."""
-        calls = [call for message in input_data for call in message.tool_calls or []]
-        if not calls:
-            return
+        calls = [c for message in input_data for c in message.tool_calls or []]
+        offered = {spec.name for spec in self.get_function_specs()}
+        own = self._functions()
         answering = [
-            asyncio.ensure_future(self._answer(invoke_context, call)) for call in calls
+            asyncio.ensure_future(self._answer(invoke_context, c, offered, own))
+            for c in calls
         ]
         try:
-            answers = await asyncio.gather(*answering)
+            return list(await asyncio.gather(*answering))
         except BaseException as error:
             for task in answering:
                 task.cancel()
@@ -143,22 +173,25 @@ class FunctionCallTool(Tool):
             if await wait_all(answering) and isinstance(error, Exception):
                 raise asyncio.CancelledError() from error
             raise
-        yield answers
 
     async def _answer(
-        self, invoke_context: InvokeContext, call: ChatCompletionMessageToolCall
+        self,
+        invoke_context: InvokeContext,
+        call: ChatCompletionMessageToolCall,
+        offered: Set[str],
+        own: Dict[str, Callable],
     ) -> Message:
         name = call.function.name
         try:
-            if all(spec.name != name for spec in self.function_specs):
+            if name not in offered:
                 raise LookupError(f"No function {name!r}")
             arguments = json.loads(call.function.arguments or "{}")
-            results = function_results(
-                functools.partial(self.call_function, invoke_context, name, arguments)
-            )
+            run = self._call_own if name in own else self.call_function
             with deltas_for(call.id):  # What the function streams is the call's.
-                async with owned_iterator(results):
-                    content = "\n".join([as_text(result) async for result in results])
+                results = await function_results(
+                    functools.partial(run, invoke_context, name, arguments)
+                )
+            content = "\n".join(as_text(result) for result in results)
         except Exception as error:
             if self.on_error == "raise":
                 if isinstance(error, ToolInvocationError):
@@ -177,22 +210,30 @@ class FunctionCallTool(Tool):
     async def call_function(
         self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
     ) -> Any:
-        """Call the function ``name`` with the LLM's ``arguments``, validated
-        against its signature, and return what it returns, a value or a
-        generator. A parameter typed ``InvokeContext`` is passed
-        ``invoke_context``, and ``self`` this tool. Override to call functions
-        elsewhere, such as on a server, as MCPTool does."""
-        function = self.functions[name]
+        """Call ``name``, a function the tool offers (see
+        ``get_function_specs()``) but does not have, with the LLM's
+        ``arguments``, and return what it returns, a value or a generator.
+        Override it to call functions elsewhere, as MCPTool does on a server,
+        and AgentCallingTool does an agent: the tool calls its own functions
+        itself."""
+        raise LookupError(f"No function {name!r}")
+
+    async def _call_own(
+        self, invoke_context: InvokeContext, name: str, arguments: Dict[str, Any]
+    ) -> Any:
+        """Call the tool's function ``name`` with the LLM's ``arguments``,
+        validated against its signature, and return what it returns. A
+        parameter typed ``InvokeContext`` is passed ``invoke_context``, and
+        ``self`` this tool."""
+        function = self._functions()[name]
         method = function is type(self)._methods.get(name)
         if method:  # Called as the tool's method, so an override runs.
             function = getattr(type(self), name, function)
         validated, contexts, takes_self = _calling(function)
         arguments = {**arguments, **dict.fromkeys(contexts, invoke_context)}
-        call = functools.partial(validated, self) if method or takes_self else validated
-        if is_sync(function):
-            return await in_thread(functools.partial(call, **arguments))
-        result = call(**arguments)
-        return await result if inspect.isawaitable(result) else result
+        if method or takes_self:
+            validated = functools.partial(validated, self)
+        return await call(functools.partial(validated, **arguments))
 
 
 def _spec(function: Callable) -> FunctionSpec:

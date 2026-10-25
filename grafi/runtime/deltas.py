@@ -12,12 +12,13 @@ such as an LLM that asks its provider for a stream, first checks
 """
 
 import asyncio
+from contextlib import contextmanager
 from contextvars import ContextVar
-from contextvars import Token
 from dataclasses import dataclass
 from dataclasses import replace
-from typing import Any
 from typing import Callable
+from typing import ContextManager
+from typing import Iterator
 from typing import Optional
 
 
@@ -72,47 +73,40 @@ def _running_loop() -> Optional[asyncio.AbstractEventLoop]:
         return None
 
 
-class _Binding:
-    """Binds a receiver, or none, to a block, and the tasks it starts."""
-
-    __slots__ = ("_receiver", "_token")
-
-    def __init__(self, receiver: Optional[_Receiver]) -> None:
-        self._receiver = receiver
-        self._token: Optional[Token[Optional[_Receiver]]] = None
-
-    def __enter__(self) -> None:
-        self._token = _receiver.set(self._receiver)
-
-    def __exit__(self, *exc_info: Any) -> None:
-        token, self._token = self._token, None
-        if token is not None:
-            _receiver.reset(token)
+@contextmanager
+def _bound(receiver: Optional[_Receiver]) -> Iterator[None]:
+    """Bind ``receiver``, or none, to the block, and the tasks it starts."""
+    token = _receiver.set(receiver)
+    try:
+        yield
+    finally:
+        _receiver.reset(token)
 
 
 def deltas_to(
     receive: Optional[Callable[[Delta], None]],
     node_name: Optional[str] = None,
     step: Optional[int] = None,
-) -> _Binding:
+) -> ContextManager[None]:
     """Send the deltas emitted in the block to ``receive``, called on the loop
     that made the binding; or, with None, to no one. The tasks the block
-    starts, and the threads ``asyncio.to_thread`` runs, inherit it. A workflow
+    starts inherit it, and the threads running its sync tool code, or started
+    by ``asyncio.to_thread``. A workflow
     run binds one for each step, so tests and code invoking a tool directly
     can collect its deltas the same way: ``with deltas_to(received.append):``.
     """
     if receive is None:
-        return _Binding(None)
+        return _bound(None)
     delta = Delta("", node_name=node_name, step=step)
-    return _Binding(_Receiver(receive, _running_loop(), delta))
+    return _bound(_Receiver(receive, _running_loop(), delta))
 
 
-def deltas_for(tool_call_id: str) -> _Binding:
+def deltas_for(tool_call_id: str) -> ContextManager[None]:
     """Mark the deltas emitted in the block as ``tool_call_id``'s, as the
     function answering that call emits them."""
     receiver = _receiver.get()
     if receiver is None:
-        return _Binding(None)
-    return _Binding(
+        return _bound(None)
+    return _bound(
         replace(receiver, delta=replace(receiver.delta, tool_call_id=tool_call_id))
     )

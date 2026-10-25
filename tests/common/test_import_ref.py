@@ -110,8 +110,13 @@ def test_other_modules_are_not_trusted(module: str) -> None:
     assert not is_trusted(module)
 
 
-def test_untrusted_reference_raises_and_names_trust_modules() -> None:
-    with pytest.raises(UntrustedImportError, match=r"trust_modules\('os'\)"):
+def test_untrusted_reference_raises_and_names_trust_modules(
+    package: str,
+) -> None:
+    """For your code, how to trust it; never the standard library."""
+    with pytest.raises(UntrustedImportError, match=rf"trust_modules\('{package}'\)"):
+        resolve_import_ref(f"{package}:value")
+    with pytest.raises(UntrustedImportError, match="do not trust the standard library"):
         resolve_import_ref("os.path:join")
     assert issubclass(UntrustedImportError, ImportError)
 

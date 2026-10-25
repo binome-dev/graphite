@@ -63,9 +63,9 @@ Respond events add `output_data`, what the component produced. Failed events add
 
 | Component | Classes | Extra fields | `input_data` | `output_data` |
 |-----------|---------|--------------|--------------|---------------|
-| Assistant | `AssistantInvokeEvent`, `AssistantRespondEvent`, `AssistantFailedEvent` | `model: Optional[str]` | `PublishToTopicEvent` | `List[ConsumeFromTopicEvent]` |
+| Assistant | `AssistantInvokeEvent`, `AssistantRespondEvent`, `AssistantFailedEvent` | | `PublishToTopicEvent` | `List[ConsumeFromTopicEvent]` |
 | Workflow | `WorkflowInvokeEvent`, `WorkflowRespondEvent`, `WorkflowFailedEvent` | | `PublishToTopicEvent` | `List[ConsumeFromTopicEvent]` |
-| Node | `NodeInvokeEvent`, `NodeRespondEvent`, `NodeFailedEvent` | `subscribed_topics`, `publish_to_topics`: `List[str]` | `List[ConsumeFromTopicEvent]` | `Optional[PublishToTopicEvent]`: the node's last publication, or `None` if it published nothing |
+| Node | `NodeInvokeEvent`, `NodeRespondEvent`, `NodeFailedEvent` | `subscribed_topics`, `publish_to_topics`: `List[str]` | `List[ConsumeFromTopicEvent]` | `Optional[PublishToTopicEvent]`: the node's publication, or `None` if it published nothing |
 | Tool | `ToolInvokeEvent`, `ToolRespondEvent`, `ToolFailedEvent` | | `Messages` | `Messages` |
 
 ## Topic Events
@@ -96,7 +96,7 @@ The event recorded when data is published to a topic. This is the output format 
 | `publisher_name`     | `str`               | Name of the component publishing the data.                                     |
 | `publisher_type`     | `str`               | Type of the component publishing the data.                                     |
 | `consumed_event_ids` | `List[str]`         | IDs of the events consumed before publishing.                                  |
-| `emission_id`        | `Optional[EventId]` | ID of the event this publication was emitted from; `None` in older records.    |
+| `emission_id`        | `Optional[EventId]` | ID of the event a topic copied this publication from (see `prepare_publication()`); `None` on a publication no topic copied, such as the input given to a workflow or a node's output as it emits it, which invoke and respond events record, and in older records. |
 
 ### ConsumeFromTopicEvent
 
@@ -191,7 +191,7 @@ An event store is the record a workflow is recovered from, so the codec never sk
 
 #### Version 1 Events
 
-Events stored before version 2 have `"event_version": "1.0"`. They kept the component's or topic's fields and the invoke context under `event_context`, a topic event's messages as JSON text in `data`, and a component event's input, output and error under `data`. `decode` upgrades such an event, and the events nested in it, to version 2 before validating it (`grafi.common.events.event_v1.upcast_v1`), so events already stored need no migration. That covers grafi 0.0.25 and later, 0.0.25 having named some fields otherwise (`topic_name`, `node_id`, `input_event`); an event of an earlier grafi raises `EventSerializationError`.
+Events stored before version 2 have `"event_version": "1.0"`. They kept the component's or topic's fields and the invoke context under `event_context`, a topic event's messages as JSON text in `data`, and a component event's input, output and error under `data`. `decode` upgrades such an event of grafi's own types, and the events nested in it, to version 2 before validating it (`grafi.common.events.event_v1.upcast_v1`), so events already stored need no migration. That covers grafi 0.0.25 and later, 0.0.25 having named some fields otherwise (`topic_name`, `node_id`, `input_event`); an event of an earlier grafi raises `EventSerializationError`.
 
 #### Custom Event Types
 
@@ -211,6 +211,41 @@ default_event_codec.register("Audit", AuditEvent)
 ```
 
 `default_event_codec` is shared by every store in the process; see [Event Reconstruction](event_store.md#event-reconstruction) for a registry of a store's own.
+
+An event of yours is stored as `model_dump(mode="json")`: its `to_dict()` and
+`from_dict()` are never called now, and a `UserWarning` says so where they are
+written. An event of your own that grafi 0.0.36 or earlier stored with your `to_dict()`,
+of version 1 (`"event_version": "1.0"`), reaches its class as stored: grafi
+upgrades version 1 of its own event types only, so one of yours stored in
+grafi's layout can call `grafi.common.events.event_v1.upcast_v1(data)` there.
+From version 2 on, every event, yours included, is upgraded alike. The stored
+event must carry its `event_version`, as 0.0.36's `Event.event_dict()` wrote
+it: one without it raises `EventSerializationError` ("has version None"). Read
+it in a `model_validator(mode="before")`, which returns the fields this
+grafi's `Event` has (version 2's today, as `upcast_v1` gives them):
+
+```python
+from typing import Any
+
+from pydantic import model_validator
+
+
+class AuditEvent(Event):
+    event_type: str = "Audit"  # type: ignore[assignment]
+    note: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_v1(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("event_version") == "1.0":
+            data = {  # The layout its to_dict() wrote.
+                "event_id": data["event_id"],
+                "timestamp": data["timestamp"],
+                "invoke_context": data["context"],
+                "note": data["payload"]["note"],
+            }
+        return data
+```
 
 ## Event Context and Metadata
 
@@ -242,7 +277,7 @@ All events carry an `InvokeContext` that provides:
 ### Serialization
 
 1. **JSON Compatibility**: Keep event data, `invoke_context.kwargs` included, to JSON values
-2. **Schema Versioning**: `event_version` names the stored form; decoding upgrades older versions
+2. **Schema Versioning**: `event_version` names the stored form; decoding upgrades an older version of grafi's own event types, and of yours from version 2 on (version 1 of yours reaches its class as stored)
 3. **Registration**: Register custom event types before reading a store that holds them
 4. **Testing**: Use `EventStoreInMemory(strict=True)` in tests, so events pass through JSON as in a durable store
 

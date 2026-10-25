@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 from ollama import ChatResponse
+from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.exceptions import LLMToolException
@@ -125,8 +126,8 @@ async def test_invoke(monkeypatch, invoke_context, mock_ollama_client):
 
     mock_ollama_client.return_value.chat = mock_chat
     result = []
-    async for msg in tool.invoke(invoke_context, input_data):
-        result.extend(msg)
+    msg = await tool.invoke(invoke_context, input_data)
+    result.extend(msg)
 
     assert result[0].role == "assistant"
     assert result[0].content == "Hi there!"
@@ -152,7 +153,7 @@ async def test_a_key_is_sent_as_an_authorization_header(
         )
 
     mock_ollama_client.return_value.chat = chat
-    [m async for m in tool.invoke(invoke_context, [Message(role="user", content="Hi")])]
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
 
     mock_ollama_client.assert_called_once_with(
         "https://ollama.example.com",
@@ -179,7 +180,7 @@ def test_to_messages():
             }
         }
     )
-    message = tool.to_messages(response)
+    message = tool._to_messages(response)
 
     assert message[0].role == "assistant"
     assert message[0].content == "Hi there!"
@@ -264,9 +265,9 @@ def test_a_key_is_saved_only_as_the_variable_it_was_read_from(monkeypatch):
     monkeypatch.setenv("OLLAMA_PROXY_KEY", "proxy_key")
     assert OllamaTool().api_key == "own_key"
     assert OllamaTool().model_dump(mode="json")["api_key"] == {"env": "OLLAMA_API_KEY"}
-    tool = Tool.model_validate(
-        {"class": OLLAMA_TOOL, "api_key": {"env": "OLLAMA_PROXY_KEY"}}
-    )
+    manifest = OllamaTool().to_manifest()
+    manifest["spec"]["api_key"] = {"env": "OLLAMA_PROXY_KEY"}
+    tool = Tool.from_manifest(manifest, allow_env=["OLLAMA_PROXY_KEY"])
     assert tool.api_key == "proxy_key"
     assert tool.model_dump(mode="json")["api_key"] == {"env": "OLLAMA_PROXY_KEY"}
 
@@ -324,10 +325,9 @@ async def test_a_call_cancelled_mid_stream_releases_the_stream_and_client(
 
     async def call() -> None:
         with deltas_to(lambda delta: first.set()):
-            async for _ in OllamaTool().invoke(
+            await OllamaTool().invoke(
                 invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            )
 
     task = asyncio.create_task(call())
     async with asyncio.timeout(5):
@@ -359,10 +359,7 @@ async def test_a_stream_failing_to_close_does_not_replace_the_calls_error(
 
     mock_ollama_client.return_value.chat = mock_chat
     with deltas_to(receive), pytest.raises(LLMToolException) as raised:
-        async for _ in OllamaTool().invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass
+        await OllamaTool().invoke(invoke_context, [Message(role="user", content="Hi")])
     assert isinstance(raised.value.__cause__, ValueError)
     mock_ollama_client.return_value.close.assert_awaited_once()
 
@@ -379,13 +376,7 @@ async def test_client_close_failure_does_not_fail_completed_call(
     mock_ollama_client.return_value.chat = mock_chat
     mock_ollama_client.return_value.close = AsyncMock(side_effect=OSError("close"))
     tool = OllamaTool()
-    result = [
-        message
-        async for batch in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
     assert [message.content for message in result] == ["done"]
 
 
@@ -403,11 +394,42 @@ async def test_chat_params_reach_the_client(invoke_context, mock_ollama_client):
     tool = OllamaTool(
         chat_params={"options": {"temperature": 0}, "keep_alive": "5m", "model": "m2"}
     )
-    [m async for m in tool.invoke(invoke_context, [Message(role="user", content="Hi")])]
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
 
     assert calls[0]["options"] == {"temperature": 0}
     assert calls[0]["keep_alive"] == "5m"
     assert calls[0]["model"] == "m2"  # A key chat_params sets replaces the default.
+
+
+@pytest.mark.asyncio
+async def test_a_model_setting_chat_takes_no_argument_for_is_an_option(
+    invoke_context, mock_ollama_client
+):
+    """As the docs write them, {"temperature": 0.7}, which chat() would refuse;
+    one given in options too replaces it."""
+    calls: List[dict] = []
+
+    async def chat(**kwargs: Any) -> ChatResponse:
+        calls.append(kwargs)
+        return ChatResponse.model_validate(
+            {"message": {"role": "assistant", "content": "ok"}}
+        )
+
+    mock_ollama_client.return_value.chat = chat
+    tool = OllamaTool(
+        chat_params={"temperature": 0.7, "top_k": 5, "options": {"top_k": 9}}
+    )
+    await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
+
+    assert calls[0]["options"] == {"temperature": 0.7, "top_k": 9}
+    assert "temperature" not in calls[0]
+
+
+@pytest.mark.parametrize("key", ["temprature", "max_tokens", "stream"])
+def test_a_chat_param_ollama_does_not_take_is_refused_when_made(key: str):
+    """A misspelt key, or OpenAI's, would fail every call."""
+    with pytest.raises(ValidationError, match=f"holds \\['{key}'\\]"):
+        OllamaTool(chat_params={key: 7})
 
 
 @pytest.mark.asyncio
@@ -441,14 +463,11 @@ async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
     mock_ollama_client.return_value.chat = chat
     received: List[Delta] = []
     with deltas_to(received.append):
-        batches = [
-            batch
-            async for batch in OllamaTool().invoke(
-                invoke_context, [Message(role="user", content="Weather?")]
-            )
-        ]
+        output = await OllamaTool().invoke(
+            invoke_context, [Message(role="user", content="Weather?")]
+        )
 
-    [[message]] = batches
+    [message] = output
     assert [delta.content for delta in received] == ["Checking."]
     assert message.content == "Checking."
     assert message.tool_calls[0].function.name == "weather"

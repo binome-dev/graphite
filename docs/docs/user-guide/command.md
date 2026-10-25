@@ -1,14 +1,14 @@
 # Command
 
 A node runs its tool through a **command** (the Command pattern). The command
-turns the events the node consumed into the tool's input, then streams the
-tool's output back to the node:
+turns the events the node consumed into the tool's input, then returns the
+tool's output to the node:
 
 ```
 consumed events ──▶ Command.get_tool_input ──▶ Tool.invoke ──▶ messages ──▶ node publishes
 ```
 
-This keeps tools pure: a tool takes messages and yields messages. Everything
+This keeps tools pure: a tool takes messages and returns messages. Everything
 about where those messages come from, such as conversation history in the
 event store or which tool calls are still waiting for a result, lives in the
 command.
@@ -28,11 +28,13 @@ class Command(BaseModel):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: List[ConsumeFromTopicEvent]
-    ) -> MsgsAGen:
-        """Stream the tool's output for that input."""
+    ) -> Messages:
+        """The tool's output for that input."""
 ```
 
-Most commands override only `get_tool_input`.
+Most commands override only `get_tool_input`. `invoke` is a coroutine that
+returns the tool's output: a command whose `invoke` yields, as commands once
+did, raises `TypeError` when its class is defined.
 
 ## Built-in commands
 
@@ -40,7 +42,7 @@ Most commands override only `get_tool_input`.
 |---------|---------|------------|
 | `Command` | Tools that name no command, such as `FunctionTool` | The consumed events' messages. |
 | `LLMCommand` | Every `LLM` tool | The conversation's earlier requests and answers from the event store, then this request's messages in order, each tool call followed by its result. |
-| `FunctionCallCommand` | Every `FunctionCallTool` | The tool calls no result answers yet that the tool answers, each message keeping only those calls: the calls to its own functions, and, for the node a workflow makes answer unknown calls on a topic, the calls there naming a function no LLM calling there was offered. |
+| `FunctionCallCommand` | Every `FunctionCallTool` | The tool calls no result answers yet that the tool answers, each message keeping only those calls: the calls to the functions it offers, and, for the node a workflow makes answer unknown calls on a topic, the calls there naming a function no LLM calling there was offered. |
 
 ## Choosing a tool's command
 
@@ -64,8 +66,12 @@ class MyRetrievalTool(RetrievalTool):  # Also runs through LatestMessageCommand.
     ...
 ```
 
-A node picks its command when it is built, with `Command.for_tool(tool)`: the
-command the tool's class names, or the base `Command`.
+A node makes its command from its tool when the command is read, with
+`Command.for_tool(tool)` (the command the tool's class names, or the base
+`Command`), and again once the node holds another tool. A node's command cannot be set apart from its
+tool (`node.command = ...` raises `AttributeError`, pointing to
+`@use_command`): a node is saved with its tool, so loading it always
+reproduces the command, which the tool's class names.
 
 ## When to write a command
 
@@ -76,4 +82,5 @@ other workflows. The integration examples
 [`EmbeddingResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/embedding_assistant/tools/embeddings/embedding_response_command.py)
 and
 [`RagResponseCommand`](https://github.com/binome-dev/graphite/blob/main/tests_integration/rag_assistant/tools/rags/rag_response_command.py)
-both pass their tool the latest message only.
+both pass their tool one message only: the first of the last event the node
+consumed.

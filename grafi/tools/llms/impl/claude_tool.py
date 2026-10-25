@@ -4,6 +4,7 @@ ClaudeTool - Anthropic Claude implementation of grafi.tools.llms.llm.LLM
 
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -19,8 +20,8 @@ from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime.deltas import emit_delta
+from grafi.tools.llms.llm import _PROVIDER_REMOVED_METHODS
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -43,6 +44,8 @@ class ClaudeTool(LLM):
     """
     Anthropic Claude implementation of the LLM tool interface used by *grafi*.
     """
+
+    removed_methods: ClassVar[Dict[str, str]] = _PROVIDER_REMOVED_METHODS
 
     name: str = Field(default="ClaudeTool")
     type: str = Field(default="ClaudeTool")
@@ -213,13 +216,16 @@ class ClaudeTool(LLM):
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> MsgsAGen:
+    ) -> Messages:
         system, messages, tools = self.prepare_api_input(input_data)
         request_kwargs = self._request_kwargs(system, messages, tools)
+        # Without a key in its own variable, the SDK uses Anthropic's own
+        # credentials, such as ANTHROPIC_AUTH_TOKEN behind a gateway.
+        key = self.sdk_api_key(required=False)
 
         try:
             async with best_effort_exit(
-                AsyncAnthropic(api_key=self.api_key), "Anthropic client"
+                AsyncAnthropic(api_key=key), "Anthropic client"
             ) as client:
                 # Always streamed: the SDK refuses a request that may take long
                 # (a large max_tokens) unless it is.
@@ -230,7 +236,7 @@ class ClaudeTool(LLM):
                         async for text in stream.text_stream:
                             emit_delta(text)
                     response = await stream.get_final_message()
-            messages = self.to_messages(response)
+            messages = self._to_messages(response)
         except Exception as exc:
             raise LLMToolException(
                 tool_name=self.name,
@@ -239,12 +245,12 @@ class ClaudeTool(LLM):
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc
-        yield messages
+        return messages
 
     # ------------------------------------------------------------------ #
     # Conversion helpers                                                 #
     # ------------------------------------------------------------------ #
-    def to_messages(self, resp: AnthropicMessage) -> Messages:
+    def _to_messages(self, resp: AnthropicMessage) -> Messages:
         text = ""
         tool_calls = []
         for block in resp.content:
@@ -285,10 +291,6 @@ class ClaudeToolBuilder(LLMBuilder[ClaudeTool]):
     Builder for ClaudeTool.
     This is a convenience class to create instances of ClaudeTool using a fluent interface.
     """
-
-    def api_key(self, api_key: Optional[str]) -> Self:
-        self.kwargs["api_key"] = api_key
-        return self
 
     def max_tokens(self, max_tokens: int) -> Self:
         self.kwargs["max_tokens"] = max_tokens

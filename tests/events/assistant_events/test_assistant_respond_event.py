@@ -42,7 +42,6 @@ def assistant_respond_event_json() -> dict:
         "id": "test_id",
         "name": "test_assistant",
         "type": "test_type",
-        "model": None,
         "input_data": request_json(),
         "output_data": answers_json(),
     }

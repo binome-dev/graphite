@@ -40,18 +40,18 @@ async def test_deepseek_tool_stream() -> None:
     deltas: List[Delta] = []
     content = ""
     with deltas_to(deltas.append):
-        async for messages in ds_tool.invoke(
+        messages = await ds_tool.invoke(
             get_invoke_context(),
             [
                 Message(
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        ):
-            for message in messages:
-                assert message.role == "assistant"
-                if message.content and isinstance(message.content, str):
-                    content += message.content
+        )
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content and isinstance(message.content, str):
+                content += message.content
     streamed = "".join(delta.content for delta in deltas)
     print(streamed)
     assert len(deltas) > 1 and streamed == content  # The text, as it came.
@@ -70,17 +70,17 @@ async def test_deepseek_tool_with_chat_param() -> None:
     await event_store.clear_events()
     ds_tool = DeepseekTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    async for messages in ds_tool.invoke(
+    messages = await ds_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            assert message.content
-            print(message.content)
-            assert "Grafi" in message.content
-            if isinstance(message.content, str):
-                assert len(message.content) < 70
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        assert message.content
+        print(message.content)
+        assert "Grafi" in message.content
+        if isinstance(message.content, str):
+            assert len(message.content) < 70
 
     assert len(await event_store.get_events()) == 2
 
@@ -93,14 +93,14 @@ async def test_deepseek_tool_async() -> None:
     ds_tool = DeepseekTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in ds_tool.invoke(
+    messages = await ds_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content and isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if message.content and isinstance(message.content, str):
+            content += message.content
 
     print(content)
     assert "Grafi" in content
@@ -169,14 +169,14 @@ async def test_deepseek_tool_serialization() -> None:
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content and isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if message.content and isinstance(message.content, str):
+            content += message.content
 
     print(content)
     assert "Grafi" in content
@@ -205,17 +205,17 @@ async def test_deepseek_tool_with_chat_param_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            print(message.content)
-            assert message.content
-            assert "Grafi" in message.content
-            if isinstance(message.content, str):
-                assert len(message.content) < 70
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        print(message.content)
+        assert message.content
+        assert "Grafi" in message.content
+        if isinstance(message.content, str):
+            assert len(message.content) < 70
 
     assert len(await event_store.get_events()) == 2
 

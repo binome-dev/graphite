@@ -84,8 +84,8 @@ async def test_invoke_simple_response(monkeypatch, gemini_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
-    async for msg in gemini_instance.invoke(invoke_context, input_data):
-        result.extend(msg)
+    msg = await gemini_instance.invoke(invoke_context, input_data)
+    result.extend(msg)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
@@ -140,9 +140,7 @@ async def test_invoke_function_call(monkeypatch, gemini_instance, invoke_context
 
     gemini_instance.add_function_specs(tools)
 
-    [[message]] = [
-        batch async for batch in gemini_instance.invoke(invoke_context, input_data)
-    ]
+    [message] = await gemini_instance.invoke(invoke_context, input_data)
     [call] = message.tool_calls
     assert (call.id, call.function.name) == ("function_call_id", "get_weather")
     assert call.function.arguments == '{"location": "London"}'
@@ -172,10 +170,9 @@ async def test_invoke_api_error(monkeypatch, gemini_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Failure"):
-        async for _ in gemini_instance.invoke(
+        await gemini_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass  # Exception should be raised before we get any results
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -303,8 +300,7 @@ async def test_invoke_thinking_budget(monkeypatch, invoke_context):
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
 
-    async for _ in tool.invoke(invoke_context, [Message(role="user", content="hi")]):
-        pass
+    await tool.invoke(invoke_context, [Message(role="user", content="hi")])
 
     cfg = mock_client.aio.models.generate_content.call_args[1]["config"]
     assert cfg.thinking_config is not None
@@ -333,10 +329,7 @@ async def _cancelled_after_the_first_delta(
 
     async def call() -> None:
         with deltas_to(lambda delta: first.set()):
-            async for _ in tool.invoke(
-                invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
 
     task = asyncio.create_task(call())
     async with asyncio.timeout(5):
@@ -382,10 +375,9 @@ async def test_a_stream_failing_to_close_does_not_replace_the_calls_error(
 
     mock_client = _streaming(monkeypatch, chunks())
     with deltas_to(receive), pytest.raises(LLMToolException) as raised:
-        async for _ in GeminiTool(api_key="k").invoke(
+        await GeminiTool(api_key="k").invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass
+        )
     assert isinstance(raised.value.__cause__, ValueError)
     mock_client.close.assert_called_once()
 
@@ -404,13 +396,7 @@ async def test_client_close_failure_does_not_fail_completed_call(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
     tool = GeminiTool(api_key="test_api_key")
-    result = [
-        message
-        async for batch in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
     assert [message.content for message in result] == ["done"]
     mock_client.close.assert_called_once()
 
@@ -425,10 +411,7 @@ async def test_invalid_config_creates_no_client(
     monkeypatch.setattr(gm_module, "genai", MagicMock(Client=client_factory))
     tool = GeminiTool(api_key="test_api_key", chat_params={"not_a_field": 1})
     with pytest.raises(Exception):
-        async for _ in tool.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass
+        await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
     client_factory.assert_not_called()
 
 
@@ -455,10 +438,9 @@ async def test_a_cancelled_client_close_does_not_replace_an_interrupt(
         gm_module, "genai", MagicMock(Client=MagicMock(return_value=mock_client))
     )
     with pytest.raises(KeyboardInterrupt) as raised:
-        async for _ in gemini_instance.invoke(
+        await gemini_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass
+        )
     assert any("CancelledError" in note for note in raised.value.__notes__)
 
 
@@ -498,12 +480,9 @@ async def test_a_streamed_answer_is_one_message_keeping_its_calls_signatures(
     _streaming(monkeypatch, chunks())
     received: List[Delta] = []
     with deltas_to(received.append):
-        [[message]] = [
-            batch
-            async for batch in gemini_instance.invoke(
-                invoke_context, [Message(role="user", content="Weather in Paris?")]
-            )
-        ]
+        [message] = await gemini_instance.invoke(
+            invoke_context, [Message(role="user", content="Weather in Paris?")]
+        )
 
     assert received == [Delta("Checking.")]  # Thoughts are not the answer.
     assert message.content == "Checking."
@@ -521,7 +500,7 @@ async def test_a_streamed_answer_is_one_message_keeping_its_calls_signatures(
 
 
 def test_a_reply_without_text_or_calls_is_empty_not_a_placeholder(gemini_instance):
-    [message] = gemini_instance.to_messages(GenerateContentResponse())
+    [message] = gemini_instance._to_messages(GenerateContentResponse())
     assert message.content == "" and message.tool_calls is None
 
 
@@ -532,7 +511,7 @@ def test_a_signature_survives_the_event_store_and_an_unsigned_call_gets_the_skip
         PublishToTopicEvent,
     )
 
-    [signed] = gemini_instance.to_messages(
+    [signed] = gemini_instance._to_messages(
         _response(
             Part(
                 function_call=FunctionCall(id="a", name="f", args={}),
@@ -583,9 +562,9 @@ def test_a_blocked_prompt_or_answer_is_a_refusal(gemini_instance):
     stopped = GenerateContentResponse.model_validate(
         {"candidates": [{"finish_reason": "RECITATION"}]}
     )
-    [message] = gemini_instance.to_messages(blocked)
+    [message] = gemini_instance._to_messages(blocked)
     assert message.refusal == "Prompt blocked by Gemini: SAFETY"
-    [message] = gemini_instance.to_messages(stopped)
+    [message] = gemini_instance._to_messages(stopped)
     assert message.refusal == "Answer stopped by Gemini: RECITATION"
-    [message] = gemini_instance.to_messages(_response(Part(text="fine")))
+    [message] = gemini_instance._to_messages(_response(Part(text="fine")))
     assert message.refusal is None

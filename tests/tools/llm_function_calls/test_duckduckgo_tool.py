@@ -74,8 +74,8 @@ async def test_invoke_function(duckduckgo_tool, mock_ddgs):
 
     result = []
 
-    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-        result.extend(msg)
+    msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+    result.extend(msg)
 
     assert isinstance(result[0], Message)
     assert result[0].role == "tool"
@@ -124,8 +124,8 @@ async def test_invoke_with_invalid_function_name(duckduckgo_tool):
 
     result = []
 
-    async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-        result.extend(msg)
+    msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+    result.extend(msg)
     [answer] = result  # The error, for the LLM.
     assert answer.content.startswith("Error: LookupError")
 
@@ -163,8 +163,8 @@ async def test_error_handling(duckduckgo_tool):
 
         duckduckgo_tool.on_error = "raise"
         with pytest.raises(FunctionCallException) as excinfo:
-            async for msg in duckduckgo_tool.invoke(invoke_context, input_message):
-                assert msg  # should not reach here
+            msg = await duckduckgo_tool.invoke(invoke_context, input_message)
+            assert msg  # should not reach here
         assert "Search failed" in str(excinfo.value)
 
 
@@ -193,10 +193,10 @@ def test_load_from_a_manifest_naming_the_class():
     assert tool.proxy == "http://proxy.test"
     assert tool.timeout == 15
     # Its search function is the class's, not saved, so loaded with it.
-    assert tool.functions == {
+    assert tool._functions() == {
         "web_search_using_duckduckgo": DuckDuckGoTool.web_search_using_duckduckgo
     }
-    assert [spec.name for spec in tool.function_specs] == [
+    assert [spec.name for spec in tool.get_function_specs()] == [
         "web_search_using_duckduckgo"
     ]
 
@@ -215,7 +215,7 @@ def test_round_trip():
     assert data["class"] == DUCKDUCKGO_TOOL
     assert data["functions"] == {}
     # What it offers follows from its search method, so it is not saved.
-    assert "function_specs" not in data
+    assert "function_specs" not in data  # Those it derives follow from it.
 
     restored = Tool.model_validate(data)
 
@@ -225,11 +225,11 @@ def test_round_trip():
     assert restored.headers == {"User-Agent": "test"}
     assert restored.proxy == "http://proxy.test"
     assert restored.timeout == 20
-    assert restored.functions == {
+    assert restored._functions() == {
         "web_search_using_duckduckgo": DuckDuckGoTool.web_search_using_duckduckgo
     }
-    assert restored.function_specs == original.function_specs
-    assert [spec.name for spec in restored.function_specs] == [
+    assert restored.get_function_specs() == original.get_function_specs()
+    assert [spec.name for spec in restored.get_function_specs()] == [
         "web_search_using_duckduckgo"
     ]
     assert restored == original

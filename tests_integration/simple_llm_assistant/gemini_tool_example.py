@@ -38,18 +38,18 @@ async def test_gemini_tool_stream() -> None:
     deltas: List[Delta] = []
     content = ""
     with deltas_to(deltas.append):
-        async for messages in gemini.invoke(
+        messages = await gemini.invoke(
             get_invoke_context(),
             [
                 Message(
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        ):
-            for message in messages:
-                assert message.role == "assistant"
-                if isinstance(message.content, str):
-                    content += message.content
+        )
+        for message in messages:
+            assert message.role == "assistant"
+            if isinstance(message.content, str):
+                content += message.content
     streamed = "".join(delta.content for delta in deltas)
     print(streamed)
     assert len(deltas) > 1 and streamed == content  # The text, as it came.
@@ -73,14 +73,14 @@ async def test_gemini_tool_with_chat_param() -> None:
     await event_store.clear_events()
     gemini = GeminiTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    async for messages in gemini.invoke(
+    messages = await gemini.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            assert message.content  # non-empty response (phrasing-independent)
-            print(message.content)
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        assert message.content  # non-empty response (phrasing-independent)
+        print(message.content)
 
     assert len(await event_store.get_events()) == 2
 
@@ -93,14 +93,14 @@ async def test_gemini_tool_async() -> None:
     gemini = GeminiTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in gemini.invoke(
+    messages = await gemini.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if isinstance(message.content, str):
+            content += message.content
 
     print(content)
     assert content  # non-empty natural-language response (phrasing-independent)
@@ -168,14 +168,14 @@ async def test_gemini_tool_serialization() -> None:
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if isinstance(message.content, str):
+            content += message.content
 
     print(content)
     assert content  # non-empty natural-language response (phrasing-independent)
@@ -209,14 +209,14 @@ async def test_gemini_tool_with_chat_param_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            assert message.content  # non-empty response (phrasing-independent)
-            print(message.content)
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        assert message.content  # non-empty response (phrasing-independent)
+        print(message.content)
 
     assert len(await event_store.get_events()) == 2
 

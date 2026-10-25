@@ -6,9 +6,11 @@ event types are registered here; another is registered with ``register()``.
 
 An event is stored as its JSON form, ``model_dump(mode="json")``, whose
 ``event_version`` names its revision (see ``EVENT_VERSION``). Decoding upgrades
-an event of an earlier revision first, as ``grafi.common.events.event_v1`` does,
-and fails loudly on one it cannot read: an event store is the record a
-workflow is recovered from, so an event is never skipped.
+an event of an earlier revision first, as ``grafi.common.events.event_v1``
+does; but one of version 1 of a type of yours, stored by its own
+``to_dict()``, reaches its class as stored, to read in a before-validator.
+Decoding fails loudly on an event it cannot read: an event store is the
+record a workflow is recovered from, so an event is never skipped.
 """
 
 from typing import Any
@@ -39,8 +41,11 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.events.topic_events.topic_event import TopicEvent
 from grafi.common.exceptions.event_exceptions import EventSerializationError
 
-# Each earlier revision's upgrade to the next, by revision.
+# Each earlier revision's upgrade to the next, by revision (version 1's, of
+# grafi's own event types only; from version 2 on, of every type, so one
+# changes only what Event defines, or checks event_type).
 _UPCASTERS: Dict[int, Callable[[Mapping[str, Any]], Dict[str, Any]]] = {1: upcast_v1}
+_GRAFI_TYPES = frozenset(event_type.value for event_type in EventType)
 
 
 def _version(value: Any) -> Optional[int]:
@@ -56,6 +61,12 @@ class EventCodec:
 
     def __init__(self, registry: Optional[Dict[str, Type[Event]]] = None) -> None:
         self._registry: Dict[str, Type[Event]] = dict(registry) if registry else {}
+
+    def copy(self) -> "EventCodec":
+        """A codec of the same types, registered apart from this one's: a
+        store's own, ``default_event_codec.copy()``, decodes grafi's events
+        and the types registered on it alone."""
+        return EventCodec(self._registry)
 
     def register(self, event_type: str, event_class: Type[Event]) -> None:
         """Register (or override) the class used to decode ``event_type``."""
@@ -114,16 +125,30 @@ class EventCodec:
         if event_class is None:
             raise EventSerializationError(
                 f"Event {event_id} has an unknown event type {event_type!r}; "
-                "register its class with EventCodec.register()."
+                "register its class with EventCodec.register(), on the codec "
+                "the store reads with, its self.codec."
             )
+        # Version 1 of a type of yours is the layout its to_dict() chose, which
+        # its class reads, in a before-validator; from version 2 on, every
+        # event is stored with the fields grafi's Event gives it, and upgraded
+        # alike.
+        as_stored = version == 1 and event_type not in _GRAFI_TYPES
         try:
-            while version < EVENT_VERSION:
-                event_dict = _UPCASTERS[version](event_dict)
-                version += 1
+            if not as_stored:
+                while version < EVENT_VERSION:
+                    event_dict = _UPCASTERS[version](event_dict)
+                    version += 1
             return event_class.model_validate(event_dict)
         except Exception as error:
+            hint = (
+                f": give {event_class.__name__} a model_validator(mode='before') "
+                "that reads the layout its to_dict() stored (see Custom Event "
+                "Types)"
+                if as_stored
+                else ""
+            )
             raise EventSerializationError(
-                f"Event {event_id} ({event_type}) cannot be decoded: {error}",
+                f"Event {event_id} ({event_type}) cannot be decoded{hint}",
                 cause=error,
             ) from error
 

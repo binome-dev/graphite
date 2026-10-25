@@ -22,7 +22,12 @@ def tavily_client():
 
 @pytest.fixture
 def tavily_tool(tavily_client):
-    tool = TavilyTool(name="TavilyTestTool", max_tokens=6000, search_depth="advanced")
+    tool = TavilyTool(
+        name="TavilyTestTool",
+        api_key="fake_api_key",
+        max_tokens=6000,
+        search_depth="advanced",
+    )
     tool._client = tavily_client  # The client is made on first use otherwise.
     return tool
 
@@ -34,8 +39,8 @@ def test_tavily_tool_initialization(tavily_tool):
 
 
 def test_function_registration(tavily_tool):
-    assert callable(tavily_tool.functions["web_search_using_tavily"])
-    assert "web_search_using_tavily" in tavily_tool.functions
+    assert callable(tavily_tool._functions()["web_search_using_tavily"])
+    assert "web_search_using_tavily" in tavily_tool._functions()
 
 
 def test_invoke_web_search_using_tavily(tavily_tool):
@@ -114,11 +119,23 @@ def test_the_client_is_made_on_first_use_with_the_key(monkeypatch):
     assert tool._client is None
 
     with patch(f"{TavilyTool.__module__}.TavilyClient") as client_class:
+        client_class.return_value.api_key = "env_key"
         client = tool.client
         assert tool.client is client  # Made once.
 
     client_class.assert_called_once_with("env_key")
     assert client is client_class.return_value
+
+
+def test_a_copy_with_another_key_makes_its_own_client(monkeypatch):
+    monkeypatch.setenv("TAVILY_API_KEY", "tv-A")
+    tool = TavilyTool()
+    first = tool.client
+
+    copy = tool.model_copy(update={"api_key": "tv-B"})
+
+    assert copy.client.api_key == "tv-B"
+    assert tool.client is first
 
 
 # --------------------------------------------------------------------------- #
@@ -152,7 +169,7 @@ def test_dump_saves_the_key_as_its_variable_and_no_client(saved_tavily):
     assert data["search_depth"] == "basic"
     assert data["max_tokens"] == 3000
     assert data["functions"] == {}  # web_search_using_tavily loads with the class.
-    assert "function_specs" not in data  # It follows from the functions.
+    assert "function_specs" not in data  # Those it derives follow from it.
     assert not {"client", "_client"} & data.keys()
     assert "test_key" not in json.dumps(data)
     # Nor does a python-mode dump hold the client.
@@ -170,10 +187,10 @@ def test_round_trip(saved_tavily):
     assert restored.search_depth == "basic"
     assert restored.max_tokens == 3000
     assert restored._client is None  # Made on first use.
-    assert restored.functions == {
+    assert restored._functions() == {
         "web_search_using_tavily": TavilyTool.web_search_using_tavily
     }
-    assert restored.function_specs == saved_tavily.function_specs
+    assert restored.get_function_specs() == saved_tavily.get_function_specs()
     assert restored == saved_tavily
     assert restored.model_dump(mode="json") == data
 

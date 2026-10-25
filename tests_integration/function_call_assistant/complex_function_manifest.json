@@ -154,21 +154,6 @@
           "type": "Topic"
         }
       }
-    },
-    "api_key": {
-      "env": "OPENAI_API_KEY"
-    },
-    "model": "gpt-4o-mini",
-    "function_call_llm_system_message": null,
-    "summary_llm_system_message": null,
-    "function_tool": {
-      "class": "tests_integration.function_call_assistant.simple_function_call_assistant_complex_function_example:LocalFileMock",
-      "tool_id": "caf084d76517422bb82e899c163ed7e8",
-      "name": "LocalFileMock",
-      "type": "FunctionCallTool",
-      "oi_span_type": "TOOL",
-      "functions": {},
-      "on_error": "return"
     }
   }
 }

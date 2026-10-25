@@ -109,16 +109,6 @@
           "type": "AgentOutputTopic"
         }
       }
-    },
-    "api_key": {
-      "env": "OPENAI_API_KEY"
-    },
-    "model": "gpt-4o-mini",
-    "output_format": {
-      "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:UserForm"
-    },
-    "function": {
-      "ref": "tests_integration.function_assistant.simple_function_llm_assistant_example:print_user_form"
     }
   }
 }

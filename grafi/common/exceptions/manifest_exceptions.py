@@ -15,3 +15,8 @@ class ManifestError(GrafiError):
 
 class UntrustedImportError(ManifestError, ImportError):
     """A manifest names a class or function outside the trusted modules."""
+
+
+class CallableSerializationError(ManifestError):
+    """A function cannot be saved without pickle, as a lambda or a nested
+    function cannot, or a saved one cannot be loaded."""

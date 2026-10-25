@@ -14,7 +14,9 @@ os.environ["TAVILY_API_KEY"] = "test-tavily-key"
 from grafi.agents.react_agent import ReActAgent  # noqa: E402
 from grafi.agents.react_agent import ReActAgentBuilder  # noqa: E402
 from grafi.assistants.assistant import Assistant  # noqa: E402
+from grafi.common.exceptions import LLMToolException  # noqa: E402
 from grafi.tools.function_calls.impl.tavily_tool import TavilyTool  # noqa: E402
+from tests.wiring import offered_to  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -249,9 +251,7 @@ class TestManifest:
         search = workflow.nodes["Node"].tool
         assert type(search) is TavilyTool
         assert search.api_key == "tvly-from-env"
-        assert [spec.name for spec in llm.get_function_specs()] == [
-            "web_search_using_tavily"
-        ]
+        assert offered_to(workflow, "OpenAIInputNode") == ["web_search_using_tavily"]
         assert restored.to_manifest() == manifest
 
     def test_a_python_dump_round_trips(self, agent: ReActAgent):
@@ -260,3 +260,32 @@ class TestManifest:
         assert type(restored) is ReActAgent
         assert restored.workflow.workflow_id == agent.workflow.workflow_id
         assert restored.to_manifest() == agent.to_manifest()
+
+
+def test_a_tenants_key_is_saved_as_its_variable(monkeypatch) -> None:
+    """The agent gives its LLM the variable it read, so the LLM saves as it."""
+    monkeypatch.setenv("TENANT_B_KEY", "sk-tenant-b")
+    agent = ReActAgent.model_validate({"api_key": {"env": "TENANT_B_KEY"}})
+
+    manifest = agent.to_manifest()
+
+    llm = manifest["spec"]["workflow"]["nodes"]["OpenAIInputNode"]["tool"]
+    assert llm["api_key"] == {"env": "TENANT_B_KEY"}
+    loaded = ReActAgent.from_manifest(manifest, allow_env=["TENANT_B_KEY"])
+    assert loaded.workflow.nodes["OpenAIInputNode"].tool.api_key == "sk-tenant-b"
+
+
+def test_a_tenants_unset_key_is_still_read_from_its_variable(monkeypatch) -> None:
+    """A tenant's variable not yet set at build time stays the LLM's: the LLM
+    never falls back to the default account's key."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-default-account")
+    monkeypatch.delenv("TENANT_B_KEY", raising=False)
+    agent = ReActAgent.model_validate({"api_key": {"env": "TENANT_B_KEY"}})
+    llm = agent.workflow.nodes["OpenAIInputNode"].tool
+
+    saved = agent.to_manifest()["spec"]["workflow"]["nodes"]["OpenAIInputNode"]
+    assert saved["tool"]["api_key"] == {"env": "TENANT_B_KEY"}
+    with pytest.raises(LLMToolException, match="set TENANT_B_KEY"):
+        llm.sdk_api_key()
+    monkeypatch.setenv("TENANT_B_KEY", "sk-tenant-b")
+    assert llm.sdk_api_key() == "sk-tenant-b"

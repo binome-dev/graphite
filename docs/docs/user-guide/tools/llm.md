@@ -2,7 +2,7 @@
 
 The `LLM` class is the abstract base class for all language model tools in Graphite. It provides a unified interface and common functionality for integrating various language model providers, including OpenAI, Ollama, and other LLM services. This base class handles function specifications, chat parameters, streaming configurations, and provides standardized patterns for LLM tool implementations.
 
-An LLM yields its answer as one message: its text, its refusal, if any, and its tool calls. While a caller streams the run, it also streams the answer's text as the provider produces it (see [Runtime](../runtime.md#streaming)).
+An LLM returns its answer as one message: its text, its refusal, if any, and its tool calls. While a caller streams the run, it also streams the answer's text as the provider produces it (see [Runtime](../runtime.md#streaming)).
 
 ## Fields
 
@@ -13,17 +13,18 @@ An LLM yields its answer as one message: its text, its refusal, if any, and its 
 | `api_key`          | `Optional[str]`               | API key for the LLM service, declared with `env_secret`: each provider reads it from its variable, such as `OPENAI_API_KEY`, and saves it as `{"env": "OPENAI_API_KEY"}`, never as its value (the base class has no variable, and defaults to `None`). |
 | `model`            | `str`                         | The name of the LLM model to use (e.g., `'gpt-4o-mini'`, defaults to empty string).                 |
 | `chat_params`      | `Dict[str, Any]`              | Additional chat completion parameters specific to the LLM provider (defaults to empty dict). A pydantic model class in it, such as a `response_format`, is saved by import path. |
-| `is_streaming`     | `bool`                        | Whether to stream the answer, token by token, to a caller that streams the run (defaults to `True`). The provider is asked for a stream only then. |
+| `is_streaming`     | `bool`                        | Whether to stream the answer, token by token, to a caller that streams the run (defaults to `True`). The provider is asked for a stream only then; Claude always is, as its SDK refuses a long request otherwise, and streams its text to the caller only then. |
 | `structured_output`| `bool`                        | Whether the output is structured (e.g., JSON) or unstructured (e.g., plain text, defaults to `False`). |
-| `_function_specs`  | `FunctionSpecs` (private)     | Private attribute storing function specifications for function calling capabilities.                  |
+| `function_specs`   | `FunctionSpecs`               | The specs of functions it is given, besides those its workflow wires to it: functions whose calls the app answers, routing them out of the workflow. Saved when not empty, the first of each name kept. A function-call node's function of the same name is offered with its own spec instead, and a `UserWarning` says so as the workflow is built, or when `offered_to` is called. |
 
 ## Methods
 
 | Method               | Signature                                      | Description                                                                                  |
 |----------------------|------------------------------------------------|----------------------------------------------------------------------------------------------|
-| `add_function_specs` | `(function_spec: FunctionSpecs) -> None`      | Adds function specifications to the LLM for function calling capabilities.                  |
-| `get_function_specs` | `() -> FunctionSpecs`                         | Returns a copy of the function specifications currently registered with the LLM.            |
+| `add_function_specs` | `(function_spec: FunctionSpecs) -> None`      | Adds specs to its `function_specs`, once each by name. A workflow does not call it.          |
+| `get_function_specs` | `() -> FunctionSpecs`                         | The functions the LLM is offered: in a step of its node, those its workflow wires to it, then its `function_specs`, once each by name. |
 | `prepare_api_input`  | `(input_data: Messages) -> Any`               | Abstract method that must be implemented by subclasses to prepare API input data.           |
+| `sdk_api_key`        | `(*, required: bool = True) -> Optional[str]` | The key to give the provider's SDK (a `str` when required): the one it holds, else its variable's, read now, as it may be set after the tool was made (see `secret_value` in [Manifests](../manifests.md#secrets)). With none it raises `LLMToolException`, naming the variable to set. `required=False` returns None instead, for an SDK that, given none, reads only its provider's own credentials (Claude's, Gemini's, Ollama's), not as an OpenAI-compatible SDK reads `OPENAI_API_KEY` whatever the provider; but a key read from another variable than the tool's own, a tenant's, is required still. |
 | `model_dump(mode="json")` | `() -> dict[str, Any]`                   | Saves the LLM as data. See [Manifests](../manifests.md).                                    |
 
 ## Builder Pattern
@@ -32,6 +33,7 @@ The `LLM` class uses the `LLMBuilder` base class that provides common builder me
 
 | Builder Method    | Signature                                        | Description                                                                           |
 |-------------------|--------------------------------------------------|---------------------------------------------------------------------------------------|
+| `api_key`        | `(api_key: SecretInput) -> Self` (`Union[str, Dict[str, str], None]`) | Sets the API key, or the variable to read it from, `{"env": "VAR"}`, as an assistant's `secret_reference("api_key")` gives it. One read from a variable is saved as that variable; any other cannot be saved. |
 | `model`          | `(model: str) -> Self`                          | Sets the model name for the LLM.                                                     |
 | `chat_params`    | `(params: Dict[str, Any]) -> Self`              | Sets chat completion parameters. Automatically enables `structured_output` if `response_format` is present. |
 | `is_streaming`   | `(is_streaming: bool) -> Self`                  | `False` sends a streaming caller the whole answer only, such as a router's JSON.     |
@@ -54,30 +56,49 @@ llm_tool = (
 
 ### Function Calling Setup
 
+In a workflow, an LLM node is offered the functions of the function-call nodes
+reading its calls (see [Event-Driven Workflow](../event-driven-workflow.md#workflow-initialization)),
+which answer them: build a `FunctionCallTool` node subscribed to the topic the
+LLM node publishes its calls to. Specs given to the LLM itself, its
+`function_specs`, are for functions the app answers: route those calls out of
+the workflow, and answer each in the next request of the conversation, through
+an assistant: the same `conversation_id`, a new `assistant_request_id`, and the
+input `Message(role="tool", tool_call_id=call.id, content=...)`.
+
+The workflow does not wait for the app. A reply calling both kinds of function
+at once is answered in the workflow, with an empty result for the app's call,
+and also reaches the caller, so have such an LLM make one call per reply, as
+`chat_params={"parallel_tool_calls": False}` does on OpenAI-compatible tools.
+The next request's history holds the conversation's inputs and outputs, not the
+calls answered inside the workflow before the app's call.
+
 ```python
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.function_spec import FunctionSpec
 
-# Create function specifications
-function_specs = [
-    FunctionSpec(
-        name="get_weather",
-        description="Get current weather for a location",
-        parameters={
-            "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "City name"}
-            },
-            "required": ["location"]
-        }
+# A function the app answers itself
+show_map = FunctionSpec(
+    name="show_map",
+    description="Show a map of a location to the user",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {"type": "string", "description": "City name"}
+        },
+        "required": ["location"]
+    }
+)
+llm_tool.add_function_specs([show_map])  # Saved with the tool.
+
+
+def calls_the_app(event: PublishToTopicEvent) -> bool:
+    return any(
+        call.function.name == "show_map"
+        for message in event.data
+        for call in message.tool_calls or []
     )
-]
 
-# Add to LLM
-llm_tool.add_function_specs(function_specs)
-
-# Verify function specs are registered
-registered_specs = llm_tool.get_function_specs()
-print(f"Registered {len(registered_specs)} function specifications")
+# On the LLM node: .publish_to(agent_output_topic, when=calls_the_app)
 ```
 
 ### Streaming Configuration
@@ -113,32 +134,32 @@ structured_llm = (
 
 ## Function Specification Management
 
-The LLM base class provides built-in support for managing function specifications:
-
-### Adding Function Specifications
-
-```python
-# Single function spec
-function_spec = FunctionSpec(name="calculate", description="Perform calculation")
-llm_tool.add_function_specs([function_spec])
-
-# Multiple function specs
-function_specs = [spec1, spec2, spec3]
-llm_tool.add_function_specs(function_specs)
-
-# Empty specs are safely ignored
-llm_tool.add_function_specs([])  # No operation
-llm_tool.add_function_specs(None)  # No operation
-```
-
 ### Retrieving Function Specifications
 
 ```python
-# Get a copy of all registered function specs
+# In a step of its node: those its workflow wires to it, of the
+# function-call nodes reading its calls, then those it is given; elsewhere
+# only those it is given
 specs = llm_tool.get_function_specs()
 
-# The returned list is a copy, so modifications don't affect the original
-specs.append(new_spec)  # This won't affect the LLM's internal specs
+# What the LLM of a workflow's node is offered in its steps
+specs = workflow.offered_to("LLMNode")
+```
+
+`offered_to` is a method of `EventDrivenWorkflow`; an assistant's `workflow`
+is typed `Workflow`, so narrow it first, `isinstance(workflow,
+EventDrivenWorkflow)`.
+
+A provider reads `get_function_specs()` in its `invoke()`, on the event loop
+(or in `asyncio.to_thread`, which keeps the step's context), and hands the
+specs to sync SDK code. A node's wiring is bound to its step for its tool
+alone, and copies of it (`model_copy()` keeps its `tool_id`; a copy given
+another `tool_id`, such as a summarizer, is another tool). An LLM handing its
+call to another, such as a fallback, passes its functions on:
+
+```python
+inner = self.primary.model_copy(update={"function_specs": self.get_function_specs()})
+answer = await inner.invoke(invoke_context, input_data)
 ```
 
 ## Chat Parameters
@@ -183,18 +204,30 @@ When creating a concrete LLM implementation, you must:
 
 1. **Inherit from LLM**: Extend the `LLM` base class
 2. **Implement `prepare_api_input`**: Convert `Messages` to provider-specific format
-3. **Implement `invoke`**: Call the provider, and yield its answer as one message. When `self.should_stream()` is true (a caller streams the run, and `is_streaming` is on), ask the provider for a stream and send each piece of text with `emit_delta(text)` as it arrives
+3. **Implement `invoke`**: Call the provider, offering it `self.get_function_specs()`, read in `invoke` on the event loop, and return its answer as one message. When `self.should_stream()` is true (a caller streams the run, and `is_streaming` is on), ask the provider for a stream and send each piece of text with `emit_delta(text)` as it arrives. Give its SDK the key as `self.sdk_api_key()`, called at each call, not `self.api_key`, which is None where its variable, such as a tenant's, is unset, so an SDK would read its own default variable, perhaps another account's key; pass `required=False` only if the SDK, given none, reads only its provider's own credentials
 4. **Implement response conversion**: Convert provider responses back to `Messages`
 5. **Create a builder**: Extend `LLMBuilder` with provider-specific configuration
 
 ### Example Implementation Structure
 
 ```python
+from typing import Any, Optional
+
+from pydantic import Field
+from typing_extensions import Self
+
+from grafi.common.decorators.record_decorators import record_tool_invoke
+from grafi.common.manifest import env_secret
+from grafi.common.models.invoke_context import InvokeContext
+from grafi.common.models.message import Message, Messages
 from grafi.tools.llms.llm import LLM, LLMBuilder
 
 class CustomLLM(LLM):
     name: str = Field(default="CustomLLM")
     type: str = Field(default="CustomLLM")
+    api_key: Optional[str] = env_secret("CUSTOM_API_KEY")  # Its provider's variable.
+    # A component takes only the fields it declares.
+    custom_param: str = ""
 
     @classmethod
     def builder(cls) -> "CustomLLMBuilder":
@@ -204,9 +237,12 @@ class CustomLLM(LLM):
         # Convert Messages to provider-specific format
         pass
 
-    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
-        # Asynchronous API call implementation
-        pass
+    @record_tool_invoke  # Records its invoke, answer or failure, and its span.
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
+        api_key = self.sdk_api_key()  # Raises LLMToolException without one.
+        # Call the provider with it; return its answer as one message.
+        answer = f"(answer from the provider, called with a {len(api_key)}-char key)"
+        return [Message(role="assistant", content=answer)]
 
 class CustomLLMBuilder(LLMBuilder[CustomLLM]):
     def custom_param(self, value: str) -> Self:

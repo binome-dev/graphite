@@ -4,6 +4,8 @@ Tests for the LLM base class: function specs, and how chat_params are saved.
 
 import json
 import re
+from typing import Any
+from typing import List
 from typing import Optional
 from typing import Type
 from unittest.mock import Mock
@@ -11,17 +13,21 @@ from unittest.mock import Mock
 import pytest
 from openai import Omit
 from pydantic import BaseModel
+from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.exceptions import LLMToolException
 from grafi.common.import_ref import UntrustedImportError
 from grafi.common.manifest import ManifestError
+from grafi.common.manifest import env_secret
+from grafi.common.manifest import import_path
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.function_spec import ParametersSchema
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.tools.llms.impl.deepseek_tool import DeepseekTool
 from grafi.tools.llms.impl.gemini_tool import GeminiTool
+from grafi.tools.llms.impl.openai_compatible import OpenAICompatibleTool
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.tools.llms.impl.openrouter_tool import OpenRouterTool
 from grafi.tools.llms.llm import LLM
@@ -42,8 +48,7 @@ class TestAddFunctionSpecs:
     def test_specs_deduped_across_calls(self):
         llm = LLM()
         llm.add_function_specs([_spec("get_weather")])
-        # Re-linking the same spec (as model_post_init does on every round-trip)
-        # must not duplicate it.
+        # Adding a spec of a name already given keeps the first.
         llm.add_function_specs([_spec("get_weather")])
         names = [s.name for s in llm.get_function_specs()]
         assert names == ["get_weather"]
@@ -60,6 +65,12 @@ class TestAddFunctionSpecs:
         llm.add_function_specs([_spec("b")])
         names = sorted(s.name for s in llm.get_function_specs())
         assert names == ["a", "b"]
+
+
+class Keyless(OpenAICompatibleTool):
+    """An OpenAI-compatible tool whose key has no variable of its own."""
+
+    api_key: Optional[str] = env_secret()
 
 
 class SampleModel(BaseModel):
@@ -186,9 +197,9 @@ class TestChatParamsSecrets:
         with pytest.raises(ManifestError, match=match):
             llm.to_manifest()
 
-    def test_a_reference_to_a_variable_and_names_not_of_secrets_are_saved(self):
+    def test_names_not_of_secrets_are_saved(self):
         params = {
-            "extra_headers": {"Authorization": "Bearer ${MY_TOKEN}", "X-Title": "t"},
+            "extra_headers": {"X-Title": "t"},
             "max_tokens": 100,
             "cache_key": "k",
             "eos_token": "</s>",
@@ -196,6 +207,13 @@ class TestChatParamsSecrets:
         llm = LLM(model="m", chat_params=params)
 
         assert llm.to_manifest()["spec"]["chat_params"] == params
+
+    def test_a_reference_to_a_variable_is_refused_as_never_expanded(self):
+        """Only an MCP configuration expands "${VAR}": here it would be sent."""
+        params = {"extra_headers": {"Authorization": "Bearer ${MY_TOKEN}"}}
+
+        with pytest.raises(ManifestError, match="only an MCP configuration expands"):
+            LLM(model="m", chat_params=params).to_manifest()
 
     def test_a_python_dump_keeps_the_values(self):
         params = {"extra_headers": {"Authorization": "Bearer sk-literal"}}
@@ -222,7 +240,12 @@ class TestBaseLLMKey:
     def test_a_key_named_by_its_variable_is_read_and_saved_as_it(self, monkeypatch):
         monkeypatch.setenv("MY_LLM_KEY", "from-env")
 
-        llm = LLM.model_validate({"model": "m", "api_key": {"env": "MY_LLM_KEY"}})
+        spec = {
+            "class": import_path(LLM),
+            "model": "m",
+            "api_key": {"env": "MY_LLM_KEY"},
+        }
+        llm = LLM.from_manifest(spec, allow_env=["MY_LLM_KEY"])
 
         assert llm.api_key == "from-env"
         assert llm.model_dump(mode="json")["api_key"] == {"env": "MY_LLM_KEY"}
@@ -259,18 +282,17 @@ class TestRequiredApiKey:
         sdk_client = Mock()
         monkeypatch.setattr(client, sdk_client)
         tool = tool_class()
-        match = re.escape(f"{tool_class.__name__} has no API key: set {variable}.")
+        match = re.escape(
+            f"{tool_class.__name__}.api_key has no value: set {variable}."
+        )
 
         with pytest.raises(LLMToolException, match=match) as raised:
-            async for _ in tool.invoke(
-                invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            await tool.invoke(invoke_context, [Message(role="user", content="Hi")])
         assert raised.value.tool_name == tool.name
         sdk_client.assert_not_called()
 
     def test_the_key_is_given_when_set(self) -> None:
-        assert OpenAITool(api_key="sk-given").required_api_key() == "sk-given"
+        assert OpenAITool(api_key="sk-given").sdk_api_key() == "sk-given"
 
     def test_a_key_set_after_the_tool_was_made_is_read(
         self, monkeypatch: pytest.MonkeyPatch
@@ -279,16 +301,17 @@ class TestRequiredApiKey:
         tool = OpenAITool()
         monkeypatch.setenv("OPENAI_API_KEY", "sk-later")
 
-        assert tool.required_api_key() == "sk-later"
+        assert tool.sdk_api_key() == "sk-later"
 
     def test_a_key_read_from_another_variable_is_named(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.delenv("TEAM_OPENAI_KEY", raising=False)
-        tool = OpenAITool.model_validate({"api_key": {"env": "TEAM_OPENAI_KEY"}})
+        spec = {"class": import_path(OpenAITool), "api_key": {"env": "TEAM_OPENAI_KEY"}}
+        tool = OpenAITool.from_manifest(spec, allow_env=["TEAM_OPENAI_KEY"])
 
         with pytest.raises(LLMToolException, match="set TEAM_OPENAI_KEY"):
-            tool.required_api_key()
+            tool.sdk_api_key()
 
     @pytest.mark.parametrize("tool_class", [DeepseekTool, OpenRouterTool])
     @pytest.mark.asyncio
@@ -306,10 +329,9 @@ class TestRequiredApiKey:
         monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
 
         with pytest.raises(Exception):
-            async for _ in tool_class(api_key="sk-own").invoke(
+            await tool_class(api_key="sk-own").invoke(
                 invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            )
 
         headers = dict(sdk_client.call_args.kwargs["default_headers"])
         assert headers.pop("Authorization") == "Bearer sk-own"
@@ -329,10 +351,9 @@ class TestRequiredApiKey:
         monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
 
         with pytest.raises(Exception):
-            async for _ in DeepseekTool(api_key="ds-key").invoke(
+            await DeepseekTool(api_key="ds-key").invoke(
                 invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            )
 
         headers = sdk_client.call_args.kwargs["default_headers"]
         assert headers["Authorization"] == "Bearer ds-key"
@@ -346,10 +367,9 @@ class TestRequiredApiKey:
         monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
 
         with pytest.raises(LLMToolException, match="DeepseekTool has no base_url"):
-            async for _ in DeepseekTool(api_key="ds-key", base_url=None).invoke(
+            await DeepseekTool(api_key="ds-key", base_url=None).invoke(
                 invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            )
         sdk_client.assert_not_called()
 
     @pytest.mark.asyncio
@@ -360,10 +380,9 @@ class TestRequiredApiKey:
         monkeypatch.setattr(self.OPENAI_CLIENT, sdk_client)
 
         with pytest.raises(Exception):
-            async for _ in OpenAITool(api_key="sk-own").invoke(
+            await OpenAITool(api_key="sk-own").invoke(
                 invoke_context, [Message(role="user", content="Hi")]
-            ):
-                pass
+            )
 
         assert "default_headers" not in sdk_client.call_args.kwargs
 
@@ -379,9 +398,28 @@ class TestRequiredApiKey:
 
         sdk_client.assert_called_once_with(api_key=None)
 
+    def test_a_tenants_unset_variable_never_falls_back_to_the_sdks_own(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A key read from a variable other than the tool's own is required,
+        even by a tool whose SDK works without one."""
+        monkeypatch.delenv("TENANT_KEY", raising=False)
+        monkeypatch.setenv("GOOGLE_API_KEY", "the-default-account")
+        sdk_client = Mock()
+        monkeypatch.setattr("google.genai.Client", sdk_client)
+        tool = GeminiTool.model_validate({"api_key": {"env": "TENANT_KEY"}})
+
+        with pytest.raises(LLMToolException, match="set TENANT_KEY"):
+            tool._client()
+        sdk_client.assert_not_called()
+
+        monkeypatch.setenv("TENANT_KEY", "the-tenants")
+        tool._client()
+        sdk_client.assert_called_once_with(api_key="the-tenants")
+
     def test_a_key_without_a_variable_names_none(self) -> None:
-        with pytest.raises(LLMToolException, match=r"LLM has no API key\.$"):
-            LLM(model="m").required_api_key()
+        with pytest.raises(LLMToolException, match=r"Keyless.api_key has no value\.$"):
+            Keyless(model="m").sdk_api_key()
 
 
 @pytest.mark.asyncio
@@ -445,3 +483,140 @@ async def test_a_message_consumed_from_several_topics_is_in_the_history_once() -
         context, copies
     )
     assert [message.message_id for message in messages] == [question.message_id]
+
+
+def test_a_request_parameter_given_as_a_field_is_refused() -> None:
+    """As 0.0.36 took OpenAITool(temperature=...), silently ignored."""
+    with pytest.raises(ValidationError, match="temperature"):
+        OpenAITool(temperature=0.2)  # type: ignore[call-arg]
+
+
+def test_an_llm_of_ones_own_with_an_aliased_field_loads_by_its_alias() -> None:
+    """The hint for request parameters refuses only what pydantic would."""
+    from pydantic import ConfigDict
+    from pydantic import Field
+
+    class Deployed(OpenAITool):
+        deployment: str = Field("d", alias="deploymentName")
+
+    class Open(OpenAITool):
+        model_config = ConfigDict(extra="allow")
+
+    assert Deployed(deploymentName="x").deployment == "x"  # type: ignore[call-arg]
+    assert Open(temperature=0.2).model_extra == {"temperature": 0.2}  # type: ignore[call-arg]
+
+
+def test_an_llm_of_ones_own_maps_an_old_field_before_it_is_refused() -> None:
+    """Its own before-validator runs first, as pydantic's do."""
+    from typing import Any
+
+    from pydantic import model_validator
+
+    class Migrating(OpenAITool):
+        @model_validator(mode="before")
+        @classmethod
+        def _temperature_in_chat_params(cls, data: Any) -> Any:
+            if isinstance(data, dict) and "temperature" in data:
+                data = dict(data)
+                data["chat_params"] = {"temperature": data.pop("temperature")}
+            return data
+
+    assert Migrating(temperature=0.2).chat_params == {"temperature": 0.2}  # type: ignore[call-arg]
+
+
+def test_an_llms_to_messages_of_0036_is_warned_of() -> None:
+    """It made a whole answer only, not a streamed one: never called now, so
+    an answer is the same whether its caller streams or not."""
+    with pytest.warns(UserWarning, match=r"Redacting.to_messages\(\) is never called"):
+
+        class Redacting(OpenAITool):
+            def to_messages(self, response: Any) -> List[Message]:
+                return []
+
+
+def test_a_provider_of_ones_own_may_have_its_own_to_messages() -> None:
+    """Grafi never called an LLM's to_messages: a provider's invoke did, as
+    one of yours still may; only grafi's providers' are warned of."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+
+        class MyProvider(LLM):
+            def to_messages(self, response: Any) -> List[Message]:
+                return [Message(role="assistant", content=str(response))]
+
+
+def test_a_0_0_36_add_function_specs_hook_is_warned_of() -> None:
+    # A workflow no longer calls it as it is built.
+    import warnings
+
+    from grafi.tools.llms.llm import LLM
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class Hooked(LLM):
+            def add_function_specs(self, function_spec):  # type: ignore[no-untyped-def]
+                super().add_function_specs(function_spec)
+
+    [warning] = [w for w in caught if "add_function_specs" in str(w.message)]
+    assert "get_function_specs() in invoke()" in str(warning.message)
+
+
+def test_specs_given_twice_by_name_are_kept_once() -> None:
+    from grafi.common.models.function_spec import FunctionSpec
+    from grafi.tools.llms.impl.openai_tool import OpenAITool
+
+    no_args = {"type": "object", "properties": {}}
+    first = FunctionSpec(name="show_map", description="first", parameters=no_args)
+    again = FunctionSpec(name="show_map", description="again", parameters=no_args)
+
+    llm = OpenAITool(api_key="key", function_specs=[first, again])
+
+    assert llm.function_specs == [first]
+
+
+def test_a_mixin_overriding_add_function_specs_is_warned_of() -> None:
+    import warnings
+
+    from grafi.tools.llms.impl.openai_tool import OpenAITool
+
+    class Hook:
+        def add_function_specs(self, function_spec):  # type: ignore[no-untyped-def]
+            pass
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class Mixed(Hook, OpenAITool):
+            pass
+
+        class Under(Mixed):
+            pass
+
+    assert [str(w.message).split(".")[0] for w in caught] == ["Mixed"]
+
+
+def test_a_0_0_36_method_of_an_llm_mixin_is_warned_of_where_never_called() -> None:
+    """An LLM of one's own may have to_messages; mixed into grafi's provider,
+    which never calls it, it is warned of, once."""
+    import warnings
+
+    from grafi.tools.llms.impl.openai_tool import OpenAITool
+    from grafi.tools.llms.llm import LLM
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class PostProcess(LLM):
+            def to_messages(self, response):  # type: ignore[no-untyped-def]
+                return response
+
+        class MyOpenAI(PostProcess, OpenAITool):
+            pass
+
+        class Under(MyOpenAI):
+            pass
+
+    assert [str(w.message).split(".")[0] for w in caught] == ["MyOpenAI"]

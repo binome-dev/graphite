@@ -39,11 +39,13 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleOllamaFunctionCallAssistant")
     type: str = Field(default="SimpleOllamaFunctionCallAssistant")
-    api_url: str = Field(default="http://localhost:11434")
-    model: str = Field(default="qwen3")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionCallTool
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_url: str = Field(default="http://localhost:11434", exclude=True)
+    model: str = Field(default="qwen3", exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleOllamaFunctionCallAssistantBuilder":
@@ -51,6 +53,7 @@ class SimpleOllamaFunctionCallAssistant(Assistant):
         return SimpleOllamaFunctionCallAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleOllamaFunctionCallAssistant":
+        assert self.function_tool is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(name="function_call_topic")

@@ -6,6 +6,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
@@ -40,11 +41,13 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
     )
     name: str = Field(default="SimpleGeminiFunctionCallAssistant")
     type: str = Field(default="SimpleGeminiFunctionCallAssistant")
-    api_key: Optional[str] = env_secret("GEMINI_API_KEY")
-    model: str = Field(default="gemini-3.5-flash")
-    function_call_llm_system_message: Optional[str] = Field(default=None)
-    summary_llm_system_message: Optional[str] = Field(default=None)
-    function_tool: FunctionCallTool
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("GEMINI_API_KEY", exclude=True)
+    model: str = Field(default="gemini-3.5-flash", exclude=True)
+    function_call_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    summary_llm_system_message: Optional[str] = Field(default=None, exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleGeminiFunctionCallAssistantBuilder":
@@ -52,6 +55,7 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
         return SimpleGeminiFunctionCallAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleGeminiFunctionCallAssistant":
+        assert self.function_tool is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_call_topic = Topic(name="function_call_topic")
@@ -65,7 +69,7 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
             .tool(
                 GeminiTool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.function_call_llm_system_message)
                 .build()
@@ -99,7 +103,7 @@ class SimpleGeminiFunctionCallAssistant(Assistant):
             .tool(
                 GeminiTool.builder()
                 .name("UserOutputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.summary_llm_system_message)
                 .build()
@@ -128,7 +132,7 @@ class SimpleGeminiFunctionCallAssistantBuilder(
     Builder for SimpleGeminiFunctionCallAssistant.
     """
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

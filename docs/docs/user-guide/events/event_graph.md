@@ -2,7 +2,7 @@
 
 The Graphite event graph system provides advanced event relationship modeling and topological analysis capabilities for topic-based events. It enables visualization of event dependencies, causal relationships, and proper ordering of events for replay and analysis scenarios.
 
-Graphite uses it in `LLMCommand`: for each LLM call, it builds the graph of the events that led to the node's input, in memory, and orders the LLM's history by it.
+Graphite uses it in `LLMCommand`: for each LLM call, it builds the graph of the events that led to the node's input, in memory, to gather the messages of the LLM's history. It then orders those messages by their timestamps, not by the graph, placing each tool result right after the call it answers.
 
 ## Overview
 
@@ -353,19 +353,25 @@ def validate_event_graph(graph: EventGraph):
 An event graph is not saved: it has no `to_dict()` or `from_dict()`. It is built in memory from events in the event store, so rebuild it to analyze a past request, as `LLMCommand` does:
 
 ```python
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.event_graph import EventGraph
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
-events = await event_store.get_agent_events(assistant_request_id)
+# The request to analyze: invoke_context.assistant_request_id, as LLMCommand reads it.
+events = await event_store.get_agent_events(
+    assistant_request_id, event_types=TOPIC_EVENT_TYPES
+)
 topic_events = {
     event.event_id: event
     for event in events
     if isinstance(event, (ConsumeFromTopicEvent, PublishToTopicEvent))
 }
+# The roots: here, what the request's last node consumed.
+consume_events = [e for e in events if isinstance(e, ConsumeFromTopicEvent)][-1:]
 
 graph = EventGraph()
-graph.build_graph(consume_events, topic_events)  # consume_events: the roots.
+graph.build_graph(consume_events, topic_events)
 ```
 
 ## Performance Considerations

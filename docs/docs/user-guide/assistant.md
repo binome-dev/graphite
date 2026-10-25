@@ -17,16 +17,18 @@ The `AssistantBase` class provides an abstract foundation for all assistants, de
 
 ```python
 from grafi.assistants.assistant_base import AssistantBase
+from grafi.common.decorators.record_decorators import record_assistant_invoke
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.events.topic_events.consume_from_topic_event import ConsumeFromTopicEvent
 from grafi.runtime import Delta
 from typing import AsyncGenerator, Union
 
 class MyAssistant(AssistantBase):
-    def _construct_workflow(self):
-        # Implementation required
-        pass
+    def _construct_workflow(self) -> "MyAssistant":
+        # Implementation required: build self.workflow
+        return self
 
+    @record_assistant_invoke  # An LLM reads its history from these events.
     async def invoke(
         self,
         input_data: PublishToTopicEvent,
@@ -36,7 +38,8 @@ class MyAssistant(AssistantBase):
     ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
         # Implementation required: yield the outputs, and the deltas when
         # `stream` (pass it on to the workflow).
-        ...
+        raise NotImplementedError
+        yield
 ```
 
 ### AssistantBase Fields
@@ -62,6 +65,23 @@ Subclasses must implement these abstract methods:
 
 The `AssistantBase` automatically calls `_construct_workflow()` during initialization via `model_post_init()`, ensuring the workflow is properly configured before the assistant is used. An assistant given a workflow, as one loaded from a manifest is, keeps it instead.
 
+So the fields an assistant only builds its workflow from are declared with a default and `exclude=True`, as `ReActAgent` declares its `model` and `api_key`: the manifest holds the workflow built from them, and a saved copy of them would be ignored on load.
+
+```python
+class MyAssistant(Assistant):
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
+    function_tool: Optional[FunctionCallTool] = Field(default=None, exclude=True)
+```
+
+It gives its tools the key as `.api_key(self.secret_reference("api_key"))`, as
+`ReActAgent` does: `{"env": "VAR"}` while the key is unset or that variable's
+value, so each tool reads and saves the variable the key was read from, a
+tenant's one given in code as `{"env": "VAR"}` included, where the key's value
+itself could not be saved, and never falls back to another account's.
+
 ## Assistant Class
 
 The concrete `Assistant` class extends `AssistantBase` and provides a complete implementation for workflow-based message processing. It includes automatic event recording and tracing through decorators.
@@ -78,8 +98,8 @@ The concrete `Assistant` class extends `AssistantBase` and provides a complete i
 |--------|-----------|-------------|
 | `invoke` | `(PublishToTopicEvent, is_sequential=False, *, stream=False) -> AsyncGenerator[...]` | Yields the workflow's outputs as their steps are stored, and, with `stream=True`, each `Delta` its tools emit |
 | `to_manifest` | `() -> dict[str, Any]` | The assistant's manifest: `{"apiVersion": "grafi/v2", "kind": "Assistant", "spec": ...}` |
-| `generate_manifest` | `(output_dir: str = ".") -> str` | Writes the manifest to `<name>_manifest.json` in `output_dir` |
-| `from_manifest` | `classmethod (manifest: dict \| str \| Path, *, env=(), legacy_classes=None, context=None) -> Assistant` | Loads an assistant from a manifest, a dict or a JSON file's path |
+| `generate_manifest` | `(output_dir: str \| PathLike = ".") -> Path` | Writes the manifest to `<name>_manifest.json` in `output_dir`, made if need be, and returns its `pathlib.Path` |
+| `from_manifest` | `classmethod (manifest: dict \| str \| bytes \| PathLike, *, allow_env=(), legacy_classes=None, context=None) -> Assistant` | Loads an assistant from a manifest: a dict (an envelope, or the assistant's JSON), JSON as a `str` or `bytes` (a `str` is never a path), or the file a `pathlib.Path` names; `allow_env` names the variables its secrets may read besides their own |
 
 ### Method Details
 
@@ -117,18 +137,68 @@ async for item in assistant.invoke(input_event, stream=True):
 
 See [Runtime](runtime.md#streaming) for what deltas are, and are not.
 
+An `invoke` of your own, on an `Assistant` or an `EventDrivenWorkflow`
+subclass, takes `stream` and passes it on. Declare the two overloads above it,
+as `Assistant` does, so a type checker still knows a call without `stream`
+yields only output events:
+
+```python
+from typing import AsyncGenerator, Literal, Union, overload
+
+from grafi.assistants.assistant import Assistant
+from grafi.common.events.topic_events.consume_from_topic_event import (
+    ConsumeFromTopicEvent,
+)
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.runtime import Delta
+
+
+class LoggedAssistant(Assistant):
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: Literal[False] = False,
+    ) -> AsyncGenerator[ConsumeFromTopicEvent, None]: ...
+
+    @overload
+    def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]: ...
+
+    async def invoke(
+        self,
+        input_data: PublishToTopicEvent,
+        is_sequential: bool = False,
+        *,
+        stream: bool = False,
+    ) -> AsyncGenerator[Union[ConsumeFromTopicEvent, Delta], None]:
+        print(f"Invoked with {len(input_data.data)} messages")
+        async for output in super().invoke(input_data, is_sequential, stream=stream):
+            yield output
+```
+
 #### generate_manifest() and from_manifest()
 
 `generate_manifest()` writes the assistant's manifest, `to_manifest()`, as JSON
-to `<name>_manifest.json` in `output_dir` (default: the current directory), and
-returns the file's path. `Assistant.from_manifest()` loads it back, as the
-assistant class it names, with the workflow it holds:
+to `<name>_manifest.json` in `output_dir` (default: the current directory),
+making the directory if need be, and returns the file's path, a
+`pathlib.Path`. It writes the file whole: beside it, then moved over it.
+`Assistant.from_manifest()` loads it back, as the assistant class it names,
+with the workflow it holds; given a `str`, it reads it as JSON, never as a
+path:
 
 ```python
 from grafi.assistants.assistant import Assistant
 from grafi.common.import_ref import trust_modules
 
-path = assistant.generate_manifest("manifests")
+path = assistant.generate_manifest("manifests")  # A pathlib.Path.
 
 trust_modules("my_app")  # The modules defining your assistant, tools and functions.
 assistant = Assistant.from_manifest(path)

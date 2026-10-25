@@ -17,7 +17,7 @@ class OpenAITool(OpenAICompatibleTool):
 
     Attributes:
         api_key (str): The API key for authenticating with OpenAI.
-        model (str): The name of the OpenAI model to use (default is 'gpt-4.1-nano').
+        model (str): The name of the OpenAI model to use (default is 'gpt-4o-mini').
         reasoning_effort (str): Reasoning depth for reasoning models (o-series, gpt-5).
         verbosity (str): Output verbosity control for gpt-5-class models.
     """
@@ -25,11 +25,11 @@ class OpenAITool(OpenAICompatibleTool):
     name: str = Field(default="OpenAITool")
     type: str = Field(default="OpenAITool")
     api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    # Default to the lowest-cost current chat model. Upgrade to "gpt-4.1-mini"/
+    # A small, low-cost chat model by default. Upgrade to "gpt-4.1-mini"/
     # "gpt-4.1" for harder tasks. For reasoning models (e.g. "gpt-5", "gpt-5-mini",
     # "o4-mini") set `reasoning_effort` and prefer `max_completion_tokens` over
     # `temperature`/`max_tokens` via chat_params.
-    model: str = Field(default="gpt-4.1-nano")
+    model: str = Field(default="gpt-4o-mini")
     reasoning_effort: Optional[str] = Field(
         default=None,
         description=(

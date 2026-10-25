@@ -32,14 +32,16 @@ class SimpleRagAssistant(Assistant):
     )
     name: str = Field(default="SimpleRagAssistant")
     type: str = Field(default="SimpleRagAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    model: Optional[str] = Field(default="gpt-4o-mini")
-    # A live index, not data: left out of the manifest.
-    index: BaseIndex = Field(exclude=True)
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: Optional[str] = Field(default="gpt-4o-mini", exclude=True)
+    index: Optional[BaseIndex] = Field(default=None, exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _construct_workflow(self) -> "SimpleRagAssistant":
+        assert self.index is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         # Create an LLM node

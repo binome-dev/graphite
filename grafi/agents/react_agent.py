@@ -12,6 +12,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.async_lifecycle import owned_iterator
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
@@ -90,7 +91,7 @@ class ReActAgent(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_prompt)
                 .build()
@@ -190,7 +191,9 @@ class ReActAgent(Assistant):
 class ReActAgentBuilder(AssistantBaseBuilder[ReActAgent]):
     """Concrete builder for ReActAgent."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
+        """Set the API key, or the variable to read it from, ``{"env":
+        "VAR"}``, as LLMBuilder.api_key() takes it."""
         self.kwargs["api_key"] = api_key
         return self
 
@@ -211,7 +214,7 @@ def create_react_agent(
     system_prompt: Optional[str] = None,
     function_call_tool: Optional[FunctionCallTool] = None,
     model: Optional[str] = None,
-    api_key: Optional[str] = None,
+    api_key: SecretInput = None,
 ) -> ReActAgent:
     builder = ReActAgent.builder()
 

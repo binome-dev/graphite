@@ -17,7 +17,9 @@ from sqlalchemy import delete
 
 from grafi.common.event_stores.event_store_postgres import EventModel
 from grafi.common.event_stores.event_store_postgres import EventStorePostgres
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.event import Event
+from grafi.common.events.event import EventType
 from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.exceptions import EventSerializationError
@@ -90,6 +92,28 @@ async def test_every_event_type_round_trips() -> None:
         assert await store.get_conversation_events(conversation_id) == events
         assert await store.get_agent_events(conversation_id) == events
         assert await store.get_event(events[4].event_id) == events[4]
+
+
+@pytest.mark.asyncio
+async def test_history_is_read_of_the_types_asked_for() -> None:
+    conversation_id = uuid.uuid4().hex
+    events = [in_conversation(event, conversation_id) for event in every_event()]
+    topic_events = [e for e in events if e.event_type in TOPIC_EVENT_TYPES]
+    responds = [e for e in events if e.event_type == EventType.ASSISTANT_RESPOND]
+    assert topic_events and responds
+    async with store_for(conversation_id) as store:
+        await store.record_events(events)
+
+        assert (
+            await store.get_agent_events(conversation_id, event_types=TOPIC_EVENT_TYPES)
+            == topic_events
+        )
+        assert (
+            await store.get_conversation_events(
+                conversation_id, event_types=[EventType.ASSISTANT_RESPOND]
+            )
+            == responds
+        )
 
 
 @pytest.mark.asyncio

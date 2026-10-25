@@ -17,7 +17,7 @@ The **FunctionTool** class is a `Tool` that runs a plain Python function on the 
 | Method              | Signature                                                           | Description                                                                                         |
 |---------------------|---------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> FunctionToolBuilder`                               | Returns a builder instance for constructing FunctionTool objects.                                  |
-| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Runs the function and yields its output, one batch of messages per result. A failure raises `FunctionToolException`, with the original error as its cause. |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> Messages` | Runs the function and returns its output: the messages of all its results, which the node publishes as one event. A failure raises `FunctionToolException`, with the original error as its cause. |
 | `model_dump(mode="json")` | `() -> dict[str, Any]`                                        | Saves the tool as data, its function as `{"ref": "module:qualname"}`; a lambda or a nested function cannot be saved. See [Manifests](../manifests.md). |
 
 ## Usage and Customization
@@ -30,7 +30,7 @@ The function takes the consumed messages:
 def your_function(messages: Messages) -> Any
 ```
 
-It may be sync or async, or a sync or async generator. Sync code runs in a worker thread, so a blocking function never stalls the event loop; code that uses the loop, such as `asyncio.Event.set()`, must be async. Sync code cannot be stopped midway: a stop or cancellation drops a call not yet started, and waits for one running to return.
+It may be sync or async, or a sync or async generator. Sync code runs in a worker thread, so a blocking function never stalls the event loop; code that uses the loop, such as `asyncio.Event.set()`, must be async. Sync code cannot be stopped midway: a stop or cancellation drops a call not yet started, and waits for one running to return (for a sync generator, for its step running, after which it is closed). Sync code runs in the executor of the invocation's `ExecutionServices`, a `ThreadPoolExecutor`, if it has one, else in grafi's own thread pool for the event loop, never in asyncio's default executor. grafi's pool has `min(32, cpu + 4)` workers: a sync function holds one until it returns, and a sync generator for its whole run, so give many slow ones a pool of their own (see [Runtime](../runtime.md#executionservices)). A function needing an invocation of its own should be async.
 
 ### Output
 
@@ -40,9 +40,11 @@ What the function returns becomes the tool's output (see `grafi.tools.results`):
 - **`None`**: no output; the node publishes nothing.
 - **Anything else**: one message from `role` holding it as text: a string as it is, anything else (a Pydantic model, a dict, a list, a number) as JSON.
 
+These rules replace `FunctionTool.to_messages`, which grafi no longer calls: a subclass defining it gets a `UserWarning` when it is defined. Shape the output in the function instead.
+
 ### Streaming
 
-A generator streams its output. Each string it yields reaches a caller streaming the run as a delta (see [Runtime](../runtime.md#streaming)), and its output is the text it yielded, joined, as one message. If it also yields other values, those are its outputs, each one a result as above, and its text only streams, as progress:
+A generator streams its output. Each string it yields reaches a caller streaming the run as a delta (see [Runtime](../runtime.md#streaming)), and its output is the text it yielded, joined, as one message. If it also yields other values, those are its results, each made into messages as above, and its text only streams, as progress. The tool's output is all of them, once the generator ends, published as one event:
 
 ```python
 async def summarize(messages: Messages):

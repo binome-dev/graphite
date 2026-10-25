@@ -260,28 +260,6 @@
           "type": "AgentOutputTopic"
         }
       }
-    },
-    "api_key": {
-      "env": "OPENAI_API_KEY"
-    },
-    "thought_llm_system_message": "\nYou are an AI assistant tasked with analyzing the user's question and considering the provided observation to determine the next logical step required to answer the question.\nYour response should describe what would be the most effective action to take based on the information gathered.\nIf the information is sufficient to answer the question, return the answer with confirmation the answer is ready.\n",
-    "action_llm_system_message": "\nYou are an AI assistant responsible for executing actions based on a given plan to retrieve information.\nSpecify the appropriate action to take, such as performing a search query or accessing a specific resource, to gather the necessary data.\nIf answer is ready, return **FINISH REACT**.\n",
-    "observation_llm_system_message": "\nYou are an AI assistant that records and reports the results obtained from invoked actions.\nAfter performing an action, provide a clear and concise summary of the findings relevant to the user's question.\n",
-    "summary_llm_system_message": "\nYou are an AI assistant tasked with summarizing the findings from previous observations to provide a clear and accurate answer to the user's question.\nEnsure the summary directly addresses the query based on the information gathered.\n",
-    "search_tool": {
-      "class": "grafi.tools.function_calls.impl.tavily_tool:TavilyTool",
-      "tool_id": "0f0da5bf68c9493885914bc9766b7e07",
-      "name": "TavilyTestTool",
-      "type": "TavilyTool",
-      "oi_span_type": "TOOL",
-      "functions": {},
-      "on_error": "return",
-      "api_key": {
-        "env": "TAVILY_API_KEY"
-      },
-      "search_depth": "advanced",
-      "max_tokens": 6000
-    },
-    "model": "gpt-4o-mini"
+    }
   }
 }

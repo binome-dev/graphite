@@ -86,7 +86,7 @@ Builder for constructing InWorkflowInputTopic instances.
 ### Basic Input Publishing
 
 ```python
-from grafi.topics.topic import InputTopic
+from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.common.models.message import Message
 from grafi.common.models.invoke_context import InvokeContext
 

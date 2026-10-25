@@ -38,18 +38,18 @@ async def test_openrouter_tool_stream() -> None:
     deltas: List[Delta] = []
     content = ""
     with deltas_to(deltas.append):
-        async for msgs in or_tool.invoke(
+        msgs = await or_tool.invoke(
             get_invoke_context(),
             [
                 Message(
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        ):
-            for m in msgs:
-                assert m.role == "assistant"
-                if isinstance(m.content, str):
-                    content += m.content
+        )
+        for m in msgs:
+            assert m.role == "assistant"
+            if isinstance(m.content, str):
+                content += m.content
     streamed = "".join(delta.content for delta in deltas)
     print(streamed)
     assert len(deltas) > 1 and streamed == content  # The text, as it came.
@@ -67,16 +67,16 @@ async def test_openrouter_tool_with_chat_param() -> None:
     await event_store.clear_events()
     or_tool = OpenRouterTool.builder().api_key(api_key).chat_params(chat_param).build()
 
-    async for msgs in or_tool.invoke(
+    msgs = await or_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in msgs:
-            print(m)
-            assert m.role == "assistant"
-            assert m.content and "Grafi" in m.content
-            if isinstance(m.content, str):
-                assert len(m.content) < 300
+    )
+    for m in msgs:
+        print(m)
+        assert m.role == "assistant"
+        assert m.content and "Grafi" in m.content
+        if isinstance(m.content, str):
+            assert len(m.content) < 300
 
     assert len(await event_store.get_events()) == 2
 
@@ -89,14 +89,14 @@ async def test_openrouter_tool_async() -> None:
     or_tool = OpenRouterTool.builder().api_key(api_key).build()
 
     content = ""
-    async for messages in or_tool.invoke(
+    messages = await or_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            assert m.role == "assistant"
-            if isinstance(m.content, str):
-                content += m.content
+    )
+    for m in messages:
+        assert m.role == "assistant"
+        if isinstance(m.content, str):
+            content += m.content
 
     print(content)
     assert "Grafi" in content
@@ -164,14 +164,14 @@ async def test_openrouter_tool_serialization() -> None:
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            assert m.role == "assistant"
-            if isinstance(m.content, str):
-                content += m.content
+    )
+    for m in messages:
+        assert m.role == "assistant"
+        if isinstance(m.content, str):
+            content += m.content
 
     print(content)
     assert "Grafi" in content
@@ -200,16 +200,16 @@ async def test_openrouter_tool_with_chat_param_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for m in messages:
-            print(m)
-            assert m.role == "assistant"
-            assert m.content and "Grafi" in m.content
-            if isinstance(m.content, str):
-                assert len(m.content) < 300
+    )
+    for m in messages:
+        print(m)
+        assert m.role == "assistant"
+        assert m.content and "Grafi" in m.content
+        if isinstance(m.content, str):
+            assert len(m.content) < 300
 
     assert len(await event_store.get_events()) == 2
 

@@ -1,6 +1,7 @@
 """A function's results, as the tools that call functions output them.
 
-``FunctionTool`` and ``FunctionCallTool`` call functions of any kind:
+``FunctionTool`` and ``FunctionCallTool`` call functions of any kind, with
+:func:`call`, and output their results, :func:`function_results`:
 
 * A plain function, sync or async, has one result: what it returns.
 * A generator, sync or async, streams: each string it yields reaches a
@@ -9,23 +10,27 @@
   and its text only streams.
 
 Sync code runs in a worker thread, so a blocking function never stalls the
-event loop; a sync generator runs in a thread of its own, in one context, so
-what it holds across a ``yield`` stays valid. Sync code cannot be stopped
-midway: a cancellation waits for the call or step running to return, and drops
-one not started. Sync code must not wait for the event loop, which may be
-waiting for it. A result becomes text, or messages, with :func:`as_text` and
-:func:`as_messages`.
+event loop: in the executor of the invocation's services, else in grafi's own
+pool (see :class:`~grafi.runtime.execution_services.ExecutionServices`). A sync
+generator runs whole in one thread, in one context, so what it holds across a
+``yield`` stays valid. Sync code cannot be stopped midway: a cancellation waits
+for the call, or the generator's step, running, and drops a call not started.
+Sync code must not wait for the event loop, which may be waiting for it. A
+result becomes text, or messages, with :func:`as_text` and :func:`as_messages`.
 """
 
 import asyncio
 import contextvars
 import functools
 import inspect
+import os
 import threading
+import weakref
+from concurrent.futures import Executor
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
-from typing import AsyncIterator
 from typing import Callable
+from typing import Generator
 from typing import List
 from typing import Optional
 from typing import TypeVar
@@ -41,14 +46,18 @@ from grafi.common.async_lifecycle import wait_all
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
 from grafi.runtime.deltas import emit_delta
+from grafi.runtime.execution_services import current_services
 
 T = TypeVar("T")
-_END = object()
 
 
 def is_sync(function: Callable[..., Any]) -> bool:
     """Whether calling ``function`` runs it: neither a coroutine function nor
-    a generator function, which return what runs later."""
+    a generator function, which return what runs later. A partial, or a
+    wrapper (``functools.wraps``), is judged by the function it wraps."""
+    while isinstance(function, functools.partial):
+        function = function.func
+    function = inspect.unwrap(function)
     return not (
         inspect.iscoroutinefunction(function)
         or inspect.isasyncgenfunction(function)
@@ -56,52 +65,75 @@ def is_sync(function: Callable[..., Any]) -> bool:
     )
 
 
-class _Job:
-    """A sync call for a worker thread, which can be dropped until it starts."""
-
-    def __init__(self, call: Callable[[], T], context: contextvars.Context) -> None:
-        self._call = call
-        self._context = context
-        self._lock = threading.Lock()
-        self._started = self._dropped = False
-
-    def __call__(self) -> Any:
-        with self._lock:
-            if self._dropped:
-                return None
-            self._started = True
-        return self._context.run(self._call)
-
-    def drop(self) -> bool:
-        """Drop the call unless it started; whether it was dropped."""
-        with self._lock:
-            self._dropped = not self._started
-            return self._dropped
+async def call(function: Callable[[], Any]) -> Any:
+    """What ``function()`` returns, awaited if it is awaitable, and a generator
+    unstarted. A sync function runs in a worker thread."""
+    result = await in_thread(function) if is_sync(function) else function()
+    return await result if inspect.isawaitable(result) else result
 
 
-async def in_thread(
-    call: Callable[[], T],
-    executor: Optional[ThreadPoolExecutor] = None,
-    droppable: bool = True,
-) -> T:
+async def function_results(function: Callable[[], Any]) -> List[Any]:
+    """The results of ``function()``, a function of any kind with its
+    arguments bound: see this module."""
+    result = await call(function)
+    if inspect.isasyncgen(result):
+        items = []
+        async with owned_iterator(result) as stream:
+            async for item in stream:
+                if isinstance(item, str):
+                    emit_delta(item)
+                items.append(item)
+    elif inspect.isgenerator(result):
+        items = await _drained(result)
+    else:
+        return [result]
+    text = [item for item in items if isinstance(item, str)]
+    values = [item for item in items if not isinstance(item, str)]
+    return values or (["".join(text)] if text else [])
+
+
+async def _drained(generator: Generator[Any, Any, Any]) -> List[Any]:
+    """What a sync generator yields, run whole in one worker thread, each
+    string emitted as a delta as it comes. A cancellation stops it after its
+    step running, and closes it there."""
+    stop = threading.Event()
+
+    def drain() -> List[Any]:
+        items = []
+        try:
+            for item in generator:
+                if isinstance(item, str):
+                    emit_delta(item)  # Delivered on the loop, in order.
+                items.append(item)
+                if stop.is_set():
+                    break
+        finally:
+            generator.close()
+        return items
+
+    return await in_thread(drain, stop)
+
+
+async def in_thread(call: Callable[[], T], stop: Optional[threading.Event] = None) -> T:
     """``call()``, run in a worker thread in a copy of this context.
 
-    A cancellation drops the call if it has not started, and it is
-    ``droppable``. Sync code cannot be stopped midway, so a call that has
-    started is waited for, then the cancellation is raised, unless the call
-    raised an interrupt or exit, which outranks it; anything else it raised is
-    logged.
+    A cancellation drops the call if it has not started. Sync code cannot be
+    stopped midway, so a call that has started is waited for (``stop`` is set
+    first, for a call that ends early when it is); then the cancellation is
+    raised, unless the call raised an interrupt or exit, which outranks it;
+    anything else it raised is logged.
     """
-    loop = asyncio.get_running_loop()
-    job = _Job(call, contextvars.copy_context())
-    future = loop.run_in_executor(executor, job)
+    job = _executor().submit(contextvars.copy_context().run, call)
+    future = asyncio.wrap_future(job)
     try:
         return await asyncio.shield(future)
     except asyncio.CancelledError as cancelled:
         if future.done() and not cancelling():
             # Raised by the call itself, as by a cancelled future's result().
             raise unexpected_cancellation("A sync call was cancelled", cancelled)
-        if not (droppable and job.drop()):
+        if not job.cancel():  # Started: waited for.
+            if stop is not None:
+                stop.set()
             await wait_all([future])
             error = None if future.cancelled() else future.exception()
             if isinstance(error, INTERRUPT_OR_EXIT):
@@ -111,48 +143,27 @@ async def in_thread(
         raise
 
 
-async def function_results(call: Callable[[], Any]) -> AsyncIterator[Any]:
-    """The results of ``call()``, a function with its arguments bound."""
-    result = await in_thread(call) if is_sync(call) else call()
-    if inspect.isawaitable(result):
-        result = await result
-    if not (inspect.isasyncgen(result) or inspect.isgenerator(result)):
-        yield result
-        return
-    text: List[str] = []
-    values = False
-    async with owned_iterator(_items(result)) as items:
-        async for item in items:
-            if isinstance(item, str):
-                emit_delta(item)
-                text.append(item)
-            else:
-                values = True
-                yield item
-    if text and not values:
-        yield "".join(text)
+# grafi's pools for sync code, one for each event loop running it.
+_pools: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, ThreadPoolExecutor]"
+_pools = weakref.WeakKeyDictionary()
+if hasattr(os, "register_at_fork"):  # A forked process starts afresh.
+    os.register_at_fork(after_in_child=_pools.clear)
 
 
-async def _items(generator: Any) -> AsyncIterator[Any]:
-    """What a sync or async generator yields. A sync one runs in a thread of
-    its own, in one context, and is closed there."""
-    if inspect.isasyncgen(generator):
-        async with owned_iterator(generator) as items:
-            async for item in items:
-                yield item
-        return
-    thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="grafi-generator")
-    context = contextvars.copy_context()
-    step = functools.partial(context.run, next, generator, _END)
-    try:
-        while (item := await in_thread(step, thread)) is not _END:
-            yield item
-    finally:
-        try:
-            close = functools.partial(context.run, generator.close)
-            await in_thread(close, thread, droppable=False)
-        finally:
-            thread.shutdown(wait=False)
+def _executor() -> Executor:
+    """Where sync code runs: the services' executor, else grafi's pool for this
+    event loop, never asyncio's default executor, which also resolves host
+    names: sync tools waiting there would hold up every connection the process
+    opens. A pool for each loop, as asyncio's default executor is, lives as
+    long as its loop."""
+    executor = current_services().executor
+    if executor is not None:
+        return executor
+    loop = asyncio.get_running_loop()
+    pool = _pools.get(loop)
+    if pool is None:
+        pool = _pools[loop] = ThreadPoolExecutor(thread_name_prefix="grafi-sync")
+    return pool
 
 
 def as_text(value: Any) -> str:

@@ -3,11 +3,13 @@ them from 0.0.26 on and, with other names, before."""
 
 import copy
 import json
+import warnings
 from typing import Any
 from typing import Dict
 from typing import List
 
 import pytest
+from pydantic import model_validator
 
 from grafi.common.events.component_events import AssistantFailedEvent
 from grafi.common.events.component_events import AssistantInvokeEvent
@@ -20,6 +22,7 @@ from grafi.common.events.event import Event
 from grafi.common.events.event_codec import default_event_codec
 from grafi.common.events.event_v1 import upcast_v1
 from grafi.common.exceptions import EventSerializationError
+from grafi.common.models.invoke_context import InvokeContext
 from tests.events.event_fixtures import HELLO_JSON
 from tests.events.event_fixtures import INVOKE_CONTEXT_JSON
 from tests.events.event_fixtures import INVOKE_CONTEXT_V1
@@ -130,6 +133,70 @@ def test_an_event_without_its_context_raises(context: Any):
         upcast_v1(event)
     with pytest.raises(EventSerializationError, match=match):
         default_event_codec.decode(event)
+
+
+class AuditEvent(Event):
+    """An event type of a user's, which 0.0.36 stored in a layout of its own."""
+
+    event_type: str = "Audit"  # type: ignore[assignment]
+    note: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_v1(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("event_version") == "1.0":
+            data = {
+                "event_id": data["event_id"],
+                "timestamp": data["timestamp"],
+                "invoke_context": data["context"],
+                "note": data["payload"]["note"],
+            }
+        return data
+
+
+def test_an_event_of_ones_own_in_grafis_layout_reaches_its_class_as_stored():
+    """grafi's upgrade, which renames and flattens grafi's own fields, is not
+    applied to a type of yours."""
+    codec = default_event_codec.copy()
+    codec.register("Audit", AuditEvent)
+    stored = {
+        "event_id": "audit-2",
+        "event_version": "1.0",
+        "event_type": "Audit",
+        "timestamp": "2025-01-01T00:00:00+00:00",
+        "event_context": {"tool_name": "search"},
+        "context": {
+            "conversation_id": "c",
+            "invoke_id": "i",
+            "assistant_request_id": "r",
+        },
+        "payload": {"note": "as stored"},
+    }
+
+    assert codec.decode(stored).note == "as stored"
+
+
+def test_an_event_class_of_ones_own_reads_its_v1_layout():
+    codec = default_event_codec.copy()
+    codec.register("Audit", AuditEvent)
+    stored = {
+        "event_id": "audit-1",
+        "event_version": "1.0",
+        "event_type": "Audit",
+        "timestamp": "2025-01-01T00:00:00+00:00",
+        "context": {
+            "conversation_id": "c",
+            "invoke_id": "i",
+            "assistant_request_id": "r",
+        },
+        "payload": {"note": "kept"},
+    }
+
+    event = codec.decode(stored)
+
+    assert isinstance(event, AuditEvent)
+    assert (event.note, event.invoke_context.conversation_id) == ("kept", "c")
+    assert codec.decode(codec.encode(event)) == event
 
 
 @pytest.mark.parametrize("missing", ["name", "type"])
@@ -348,3 +415,70 @@ def test_component_events_before_0_0_26_are_read(stored: Dict[str, Any], event: 
     assert stored == before
     # Stored again, it is of version 2, and reads back as itself.
     assert default_event_codec.decode(default_event_codec.encode(decoded)) == event
+
+
+def test_a_later_revision_of_ones_own_type_is_upgraded_as_grafis(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """From version 2 on, an event of a type of yours holds the fields grafi's
+    Event gives it, so grafi's next upgrade reaches it too."""
+    from grafi.common.events import event_codec
+
+    upgraded: List[str] = []
+
+    def upcast_v2(event: Dict[str, Any]) -> Dict[str, Any]:
+        upgraded.append(event["event_type"])
+        return {**event, "event_version": 2}  # As revision 3 would, simulated.
+
+    monkeypatch.setattr(event_codec, "EVENT_VERSION", 3)
+    monkeypatch.setitem(event_codec._UPCASTERS, 2, upcast_v2)
+    codec = default_event_codec.copy()
+    codec.register("Audit", AuditEvent)
+    stored = AuditEvent(
+        note="v2",
+        invoke_context=InvokeContext(
+            conversation_id="c", invoke_id="i", assistant_request_id="r"
+        ),
+    ).model_dump(mode="json")
+
+    assert codec.decode(stored).note == "v2"
+    assert upgraded == ["Audit"]
+
+
+def test_an_events_to_dict_of_0036_is_warned_of() -> None:
+    """Nothing calls it now: rows are the event's JSON form."""
+    with pytest.warns(UserWarning, match=r"Legacy.to_dict\(\) is never called"):
+
+        class Legacy(AuditEvent):
+            def to_dict(self) -> Dict[str, Any]:
+                return {}
+
+
+class _LegacyToDict:
+    """A mixin with 0.0.36's to_dict()."""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {}
+
+
+def test_an_events_to_dict_from_a_mixin_is_warned_of() -> None:
+    with pytest.warns(UserWarning, match=r"Mixed.to_dict\(\) is never called"):
+
+        class Mixed(_LegacyToDict, AuditEvent):
+            pass
+
+
+def test_an_events_from_dict_classmethod_is_warned_of_once() -> None:
+    """Not again for each subclass deriving it."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class Legacy(AuditEvent):
+            @classmethod
+            def from_dict(cls, data: Dict[str, Any]) -> "Legacy":
+                raise NotImplementedError
+
+        class Child(Legacy):
+            pass
+
+    assert [str(w.message).split("(")[0] for w in caught] == ["Legacy.from_dict"]

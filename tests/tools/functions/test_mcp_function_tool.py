@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 from mcp.types import TextContent
+from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.models.invoke_context import InvokeContext
@@ -51,9 +52,7 @@ class TestMCPFunctionToolInitialize:
     @pytest.mark.asyncio
     async def test_initialize_creates_tool_with_function_spec(self, mock_mcp_tool):
         """Test that initialize fetches function spec from MCP server."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -69,18 +68,14 @@ class TestMCPFunctionToolInitialize:
 
             assert tool.name == "MCPFunctionTool"
             assert tool.function_name == "test_tool"
-            assert tool._function_spec is not None
-            assert tool._function_spec.name == "test_tool"
-            assert tool._function_spec.description == "A test tool"
+            mock_client.list_tools.assert_awaited_once()  # It checked the server.
 
     @pytest.mark.asyncio
     async def test_initialize_without_function_name_uses_first_tool(
         self, mock_mcp_tool
     ):
         """Test that initialize uses first available tool when function_name not specified."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -92,22 +87,20 @@ class TestMCPFunctionToolInitialize:
             mcp_config = {"mcpServers": {"test": {"command": "test"}}}
             tool = await MCPFunctionTool.initialize(mcp_config=mcp_config)
 
-            assert tool._function_spec.name == "test_tool"
+            assert tool.function_name == "test_tool"
 
     @pytest.mark.asyncio
     async def test_initialize_raises_error_without_config(self):
         """Test that initialize raises error when mcp_config is empty."""
         from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
 
-        with pytest.raises(ValueError, match="mcp_config are not set"):
+        with pytest.raises(ValueError, match="has no servers"):
             await MCPFunctionTool.initialize(mcp_config={})
 
     @pytest.mark.asyncio
     async def test_initialize_raises_error_when_tool_not_found(self, mock_mcp_tool):
         """Test that initialize raises error when specified function_name not found."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -125,9 +118,7 @@ class TestMCPFunctionToolInitialize:
     @pytest.mark.asyncio
     async def test_initialize_raises_error_when_no_tools_available(self):
         """Test that initialize raises error when no tools available from server."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -145,9 +136,7 @@ class TestMCPFunctionToolBuilder:
     @pytest.mark.asyncio
     async def test_builder_creates_tool(self, mock_mcp_tool):
         """Test builder pattern for MCPFunctionTool."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.list_tools = AsyncMock(return_value=[mock_mcp_tool])
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -175,9 +164,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
     @pytest.mark.asyncio
     async def test_invoke_mcp_function_calls_tool(self, mock_mcp_tool):
         """Test invoke_mcp_function calls the correct MCP tool and returns response."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             from mcp.types import TextContent as RealTextContent
 
             mock_client = AsyncMock()
@@ -213,9 +200,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
     @pytest.mark.asyncio
     async def test_invoke_mcp_function_handles_image_content(self, mock_mcp_tool):
         """Test invoke_mcp_function handles ImageContent response."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             from mcp.types import ImageContent as RealImageContent
 
             mock_client = AsyncMock()
@@ -250,9 +235,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
     @pytest.mark.asyncio
     async def test_invoke_mcp_function_handles_embedded_resource(self, mock_mcp_tool):
         """Test invoke_mcp_function handles EmbeddedResource response."""
-        with patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client"
-        ) as mock_client_class:
+        with patch("fastmcp.Client") as mock_client_class:
             from mcp.types import EmbeddedResource as RealEmbeddedResource
             from mcp.types import TextResourceContents
 
@@ -290,7 +273,7 @@ class TestMCPFunctionToolInvokeMcpFunction:
 
 
 MCP_FUNCTION_TOOL = "grafi.tools.functions.impl.mcp_function_tool:MCPFunctionTool"
-CLIENT = "grafi.tools.functions.impl.mcp_function_tool.Client"
+CLIENT = "fastmcp.Client"
 CONFIG = {"mcpServers": {"test": {"command": "test"}}}
 
 
@@ -344,7 +327,7 @@ class TestMCPFunctionToolSerialization:
         assert tool.name == "RestoredMCPTool"
         assert tool.mcp_config == CONFIG
         assert tool.function_name == "test_tool"
-        assert tool.function == tool.invoke_mcp_function
+        assert tool._function() == tool.invoke_mcp_function
 
     @pytest.mark.asyncio
     async def test_round_trip(self, mock_mcp_tool):
@@ -364,13 +347,13 @@ class TestMCPFunctionToolSerialization:
             assert restored.name == "RoundtripTool"
             assert restored.function_name == "test_tool"  # The server's first.
             assert restored.mcp_config == original.mcp_config
-            assert restored.function == restored.invoke_mcp_function
+            assert restored._function() == restored.invoke_mcp_function
             assert restored.model_dump(mode="json") == data
             # It calls the tool it was saved with.
             mock_client.call_tool = AsyncMock(
                 return_value=MagicMock(content=[TextContent(type="text", text="ok")])
             )
-            answer = await restored.function(
+            answer = await restored._function()(
                 [Message(role="user", content='{"query": "q"}')]
             )
 
@@ -406,4 +389,26 @@ class TestMCPFunctionToolSerialization:
         data = tool.model_dump(mode="json")
 
         assert data["mcp_config"] == config
-        assert Tool.model_validate(data).mcp_config == config
+        loaded = Tool.from_manifest(
+            tool.to_manifest(), allow_env=["SEARCH_TOKEN", "SEARCH_API_KEY"]
+        )
+        assert loaded.mcp_config == config
+
+
+def test_a_copy_calls_its_own_server_tool():
+    """It has no function of its own to copy: it calls the tool it names."""
+    from grafi.tools.functions.impl.mcp_function_tool import MCPFunctionTool
+
+    tool = MCPFunctionTool(mcp_config=CONFIG, function_name="echo")
+    copy = tool.model_copy(update={"function_name": "reverse"})
+
+    assert copy._function().__self__ is copy
+
+
+def test_a_function_given_it_is_refused():
+    """It calls its server's tool, so a function given it would be ignored."""
+    with pytest.raises(ValidationError, match="function"):
+        MCPFunctionTool(mcp_config=CONFIG, function_name="echo", function=print)
+
+    tool = MCPFunctionTool(mcp_config=CONFIG, function_name="echo")
+    assert Tool.from_manifest(tool.to_manifest()).function_name == "echo"

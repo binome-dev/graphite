@@ -11,7 +11,6 @@ from grafi.common.events.topic_events.publish_to_topic_event import PublishToTop
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -29,13 +28,13 @@ class EchoTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         contents = []
         for message in input_data:
             assert isinstance(message.content, str)
             contents.append(message.content)
         self.calls.append(contents)
-        yield [Message(role="assistant", content="|".join(contents))]
+        return [Message(role="assistant", content="|".join(contents))]
 
 
 def make_node(name: str, tool: Tool, subscription: SubExpr, output: TopicBase) -> Node:

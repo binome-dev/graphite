@@ -5,10 +5,10 @@ that route's topic. These named, importable predicates cover the common content
 checks so workflows can reference them (``when=has_tool_call``) instead of
 embedding inline lambdas.
 
-Named predicates are preferred over lambdas because they:
+Named predicates are used rather than lambdas because they:
 
-* serialize as a compact, human-readable reference (``{"ref": "...:has_tool_call"}``)
-  rather than inline code,
+* are saved as a compact, human-readable reference
+  (``{"ref": "...:has_tool_call"}``), where a lambda cannot be saved at all,
 * are reusable and unit-testable in isolation, and
 * keep one source of truth for a routing rule (DRY) instead of copy-pasted lambdas.
 

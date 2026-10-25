@@ -11,6 +11,10 @@ grafi 0.0.25 wrote version 1 with other names: ``topic_name`` and
 an assistant's or workflow's input as ``input_event``, and a tool's messages
 as JSON text; those are read too. Events of grafi before 0.0.25 are not read:
 decoding one raises.
+
+Only grafi's own event types are upgraded so: an event of version 1 of a
+type of yours, which its class wrote with its own ``to_dict()``, reaches the
+class as stored (see :mod:`grafi.common.events.event_codec`).
 """
 
 import json

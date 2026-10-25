@@ -226,7 +226,7 @@ def test_a_tool_manifest_reads_its_key_from_its_own_variable_or_one_allowed(
     manifest["spec"]["api_key"] = {"env": "TEAM_OPENAI_KEY"}
     with pytest.raises(ManifestError, match=r"env=\['TEAM_OPENAI_KEY'\]"):
         Tool.from_manifest(manifest)
-    tool = Tool.from_manifest(manifest, env=["TEAM_OPENAI_KEY"])
+    tool = Tool.from_manifest(manifest, allow_env=["TEAM_OPENAI_KEY"])
     assert tool.api_key == "team-key"
     assert tool.to_manifest()["spec"]["api_key"] == {"env": "TEAM_OPENAI_KEY"}
 

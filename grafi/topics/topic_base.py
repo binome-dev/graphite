@@ -16,6 +16,7 @@ from pydantic import BeforeValidator
 from pydantic import Field
 from pydantic import PlainSerializer
 from pydantic import ValidationInfo
+from pydantic import model_validator
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
@@ -28,6 +29,14 @@ from grafi.common.models.base_builder import BaseBuilder
 from grafi.topics.queue_impl.in_mem_topic_event_queue import InMemTopicEventQueue
 from grafi.topics.topic_event_queue import TopicEventQueue
 from grafi.topics.topic_types import TopicType
+
+# Topics hold no condition since routes do; said where 0.0.36 code gives one.
+_NO_CONDITION = (
+    "The topic {name!r} has no condition: route with each node publishing to "
+    "it, Node.builder().publish_to(topic, when=...), whose predicates are in "
+    "grafi.nodes.conditions; an input topic's, which no node publishes to, is "
+    "a check of the input before invoking."
+)
 
 
 class TopicBase(Component):
@@ -52,6 +61,20 @@ class TopicBase(Component):
     event_queue: TopicEventQueue = Field(
         default_factory=InMemTopicEventQueue, exclude=True
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _refuse_a_condition(cls, data: Any) -> Any:
+        """A topic of grafi 0.0.36 had a condition, which routes hold now (a
+        topic of yours may have a field of that name)."""
+        if (
+            isinstance(data, Mapping)
+            and "condition" in data
+            and "condition" not in cls.model_fields
+        ):
+            name = data.get("name") or cls.model_fields["name"].default
+            raise ValueError(_NO_CONDITION.format(name=name))
+        return data
 
     async def publish_data(
         self, publish_event: PublishToTopicEvent
@@ -165,10 +188,11 @@ def topics_in_scope(topics: Dict[str, TopicBase]) -> Iterator[None]:
 
 def _topic(value: Any, info: ValidationInfo) -> Any:
     """A topic, from its name: one of the topics of the workflow being loaded
-    (see ``EventDrivenWorkflow``), or of the validation context's ``topics``."""
+    (see ``Workflow``), or of the validation context's ``topics``."""
     topics = _topics_in_scope.get()
     if topics is None:
-        topics = (info.context or {}).get("topics", {})
+        context = info.context if isinstance(info.context, Mapping) else {}
+        topics = context.get("topics", {})
     if isinstance(value, Mapping) and value.get("name") in topics:
         return topics[value["name"]]  # A topic dumped in full: the same one.
     if not isinstance(value, str):
@@ -176,7 +200,8 @@ def _topic(value: Any, info: ValidationInfo) -> Any:
     if value not in topics:
         raise ValueError(
             f"Unknown topic {value!r}: a topic named in a manifest must be "
-            f"one of its workflow's topics ({sorted(topics)})."
+            f"one of its workflow's topics ({sorted(topics)}), or, loading a "
+            'node alone, given as context={"topics": {name: topic, ...}}.'
         )
     return topics[value]
 
@@ -217,4 +242,16 @@ class TopicBaseBuilder(BaseBuilder[T_T]):
             Self for method chaining.
         """
         self.kwargs["type"] = type_name
+        return self
+
+    def condition(self, condition: Any) -> Self:
+        """Set the ``condition`` of a topic of yours that has one; grafi's
+        topics have none (see ``TopicBase``).
+
+        Raises:
+            AttributeError: Naming the route that holds a condition now.
+        """
+        if "condition" not in self._cls.model_fields:
+            raise AttributeError(_NO_CONDITION.format(name=self.kwargs.get("name", "")))
+        self.kwargs["condition"] = condition
         return self

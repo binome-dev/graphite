@@ -1,16 +1,13 @@
 from typing import TYPE_CHECKING
-from typing import Dict
-from typing import FrozenSet
 from typing import List
 from typing import cast
-
-from pydantic import Field
 
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Messages
+from grafi.runtime.wiring import wiring
 from grafi.tools.command import Command
 
 if TYPE_CHECKING:
@@ -18,19 +15,15 @@ if TYPE_CHECKING:
 
 
 class FunctionCallCommand(Command):
-    """Passes a function-call tool the tool calls it consumed that it answers
-    and no result answers yet, each message keeping only those calls.
+    """Passes a function-call tool the calls it should answer: those it
+    consumed that no result answers yet, and that it answers, each message
+    keeping only those calls.
 
-    A tool answers the calls to its own functions. A workflow also makes one
-    function-call node on each topic carrying calls answer there, with an
-    error, the calls naming a function no LLM calling there was offered
-    (``offered``), so that every call reaching such a node gets a result. A node
-    so set belongs to that workflow.
+    A tool answers the calls to the functions it offers. So that every call gets a
+    result, a workflow also wires one function-call node on each topic
+    carrying calls to answer, with an error, the calls naming a function no
+    LLM calling there was offered (see :mod:`grafi.runtime.wiring`).
     """
-
-    # By topic: the functions offered to the LLMs calling there, where this
-    # node also answers the calls naming another function.
-    offered: Dict[str, FrozenSet[str]] = Field(default_factory=dict)
 
     async def get_tool_input(
         self, _: InvokeContext, node_input: List[ConsumeFromTopicEvent]
@@ -38,17 +31,19 @@ class FunctionCallCommand(Command):
         answered = {
             message.tool_call_id for event in node_input for message in event.data
         }
-        own = {spec.name for spec in cast("FunctionCallTool", self.tool).function_specs}
+        tool = cast("FunctionCallTool", self.tool)
+        answers = {spec.name for spec in tool.get_function_specs()}
+        offered_by_topic = wiring(tool.tool_id).offered
         pending = []
         for event in node_input:
-            offered = self.offered.get(event.name)
+            offered = offered_by_topic.get(event.name)
             for message in event.data:
                 calls = [
                     call
                     for call in message.tool_calls or []
                     if call.id not in answered
                     and (
-                        call.function.name in own
+                        call.function.name in answers
                         or (offered is not None and call.function.name not in offered)
                     )
                 ]

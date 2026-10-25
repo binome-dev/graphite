@@ -1,3 +1,4 @@
+from typing import Self
 from typing import TypeVar
 
 from grafi.topics.topic_base import TopicBase
@@ -10,7 +11,7 @@ class Topic(TopicBase):
     """
 
     @classmethod
-    def builder(cls) -> "TopicBuilder":
+    def builder(cls) -> "TopicBuilder[Self]":
         """
         Returns a builder for Topic.
         """

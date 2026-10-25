@@ -31,7 +31,7 @@ class LabelTool(Tool):
     label: str = "?"
 
     async def invoke(self, invoke_context, input_data):
-        yield [Message(role="assistant", content=f"resp-{self.label}")]
+        return [Message(role="assistant", content=f"resp-{self.label}")]
 
 
 def _input_event(request_id: str) -> PublishToTopicEvent:

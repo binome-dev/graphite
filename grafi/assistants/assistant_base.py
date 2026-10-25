@@ -19,6 +19,7 @@ from grafi.common.models.base_builder import BaseBuilder
 from grafi.common.models.default_id import default_id
 from grafi.runtime.deltas import Delta
 from grafi.workflows.workflow import Workflow
+from grafi.workflows.workflow import refuse_invoke_without_stream
 
 
 class AssistantBase(Component):
@@ -37,6 +38,10 @@ class AssistantBase(Component):
     """
 
     manifest_kind: ClassVar[Optional[str]] = "Assistant"
+    secret_hint: ClassVar[str] = (
+        "or, for a field the assistant only builds its workflow from, declare "
+        "it exclude=True"
+    )
 
     assistant_id: str = default_id
     name: str = Field(default="Assistant")
@@ -46,6 +51,11 @@ class AssistantBase(Component):
     )
 
     workflow: Workflow = Field(default_factory=Workflow)
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        refuse_invoke_without_stream(cls)
 
     def model_post_init(self, _context: Any) -> None:
         if "workflow" not in self.model_fields_set:

@@ -21,6 +21,8 @@ manifest names only its route predicates, in ``grafi.nodes.conditions``: grafi
 has other functions, which no manifest should call.
 """
 
+import re
+import reprlib
 from typing import Annotated
 from typing import Any
 from typing import Callable
@@ -34,26 +36,20 @@ from pydantic import ValidatorFunctionWrapHandler
 from pydantic import WrapValidator
 
 from grafi.common.callable_component import CallableComponent
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.import_ref import UntrustedImportError
 from grafi.common.import_ref import reference_to
 from grafi.common.import_ref import resolve_import_ref
-from grafi.common.manifest import ManifestError
+from grafi.common.manifest import ChecksOwnSecrets
 from grafi.common.manifest import save_refused
 
 __all__ = [
     "CallableRef",
     "CallableSerializationError",
-    "deserialize_callable",
-    "serialize_callable",
 ]
 
 # grafi's modules whose functions a manifest may name.
 _GRAFI_FUNCTIONS = frozenset({"grafi.nodes.conditions"})
-
-
-class CallableSerializationError(ManifestError):
-    """Raised when a callable cannot be represented without pickle, or when a
-    manifest's serialized callable cannot be reconstructed."""
 
 
 def _resolve_reference(ref: str) -> Any:
@@ -111,7 +107,8 @@ def deserialize_callable(
 
     Raises:
         CallableSerializationError: On a value of another shape, such as one a
-            grafi before v2 saved (regenerate the manifest).
+            grafi 0.0.35 or 0.0.36 saved (load such a manifest with
+            from_manifest(), which upgrades it).
         UntrustedImportError: If it names a function outside the trusted
             modules.
     """
@@ -123,11 +120,31 @@ def deserialize_callable(
         raise CallableSerializationError(
             f'A function is saved as {{"ref": {value!r}}}, not as {value!r}.'
         )
+    if looks_pickled(value):
+        raise CallableSerializationError(
+            "A function saved by pickle, as grafi 0.0.30 to 0.0.34 saved one, is "
+            "never loaded, as loading it would run any code it holds: build it "
+            'in code and save it again, or give it as {"ref": "module:function"}.'
+        )
+    if isinstance(value, str):  # A function's name, as grafi 0.0.29 saved one.
+        raise CallableSerializationError(
+            f"A function saved by its name only, {value!r}, says not where it "
+            'is: give it as {"ref": "module:function"}, a function defined in '
+            "a module."
+        )
     raise CallableSerializationError(
-        f'Cannot load a callable from {value!r}: expected {{"ref": ...}} or a '
-        "CallableComponent. A manifest saved by a grafi before v2 is loaded with "
-        "Component.from_manifest(), which upgrades it."
+        f"Cannot load a callable from {reprlib.repr(value)}: expected "
+        '{"ref": ...} or a CallableComponent. A manifest saved by grafi 0.0.35 '
+        "or 0.0.36 is loaded with Component.from_manifest(), which upgrades it."
     )
+
+
+def looks_pickled(value: Any) -> bool:
+    """Whether ``value`` is a function saved by pickle, as base64 text (a
+    pickle's first byte, 0x80, starts it "gA"), or ``{"base64": ...}``."""
+    if isinstance(value, Mapping):
+        return "base64" in value
+    return isinstance(value, str) and bool(re.fullmatch(r"gA[A-Za-z0-9+/]+=*", value))
 
 
 def _load_callable(
@@ -144,4 +161,6 @@ CallableRef = Annotated[
     Callable[..., Any],
     PlainSerializer(serialize_callable, return_type=Dict[str, Any], when_used="json"),
     WrapValidator(_load_callable),
+    # A reference holds no secret, and a CallableComponent checks its own.
+    ChecksOwnSecrets(),
 ]

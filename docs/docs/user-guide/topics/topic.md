@@ -1,109 +1,68 @@
 # Topic
 
-The `Topic` class is a concrete implementation of `TopicBase` that provides a complete message queue system for publishing and consuming messages within Graphite applications. It includes built-in logging, event handling, and condition-based message filtering.
+The `Topic` class is a concrete implementation of `TopicBase` that provides a complete message queue system for publishing and consuming messages within Graphite applications. A topic is a named FIFO queue: it enqueues every publication it is given, and each consumer reads it from its own offset.
 
 ## Overview
 
 The `Topic` class extends `TopicBase` to provide:
 
-- **Conditional Publishing**: Messages are only published if they meet the topic's condition
-- **Event Handling**: Optional event handlers for publish operations
-- **Logging Integration**: Automatic logging of publish operations
+- **Queueing**: Publications are kept in order, and each consumer reads and commits its own offset
+- **No Conditions**: A topic never drops an event; which topics an event goes to is decided by the node publishing it (see [Routing](#routing))
 - **Builder Pattern**: Fluent API for topic configuration
 
 ## Core Components
 
 ### Topic Class
 
-A complete topic implementation with publishing logic and event handling.
+A complete topic implementation, with a builder.
 
 #### Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `topic_events` | `List[TopicEvent]` | List of all topic events (overrides base) |
-| `publish_event_handler` | `Optional[Callable[[PublishToTopicEvent], None]]` | Optional handler called after successful publishing |
-
-*Inherits all fields from `TopicBase`: `name`, `condition`, `consumption_offsets`*
+| `name` | `str` | The topic's name, by which nodes and manifests refer to it |
+| `type` | `TopicType` | `TopicType.DEFAULT_TOPIC_TYPE` (`"Topic"`) |
+| `event_queue` | `TopicEventQueue` | FIFO queue of the topic's events, for using the topic on its own (in memory by default; never saved) |
 
 #### Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `builder` | `() -> TopicBuilder` | Class method returning a TopicBuilder instance |
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publishes messages if condition is met |
+| `publish_data` | `async (publish_event: PublishToTopicEvent) -> PublishToTopicEvent` | Publishes a copy of the event to the topic and returns it |
 
-*Inherits all methods from `TopicBase`: `can_consume`, `consume`, `reset`, `restore_topic`, etc.*
+*Inherits all methods from `TopicBase`: `prepare_publication`, `can_consume`, `consume`, `commit`, `reset`, `restore_topic`, etc. See [Topic Base](topic_base.md).*
 
 ### TopicBuilder
 
-Enhanced builder for `Topic` instances with additional configuration options.
+Builder for `Topic` instances.
 
 #### Builder Methods
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `publish_event_handler` | `(handler: Callable[[PublishToTopicEvent], None]) -> Self` | Set event handler for publish operations |
-
-*Inherits all builder methods from `TopicBaseBuilder`: `name`, `condition`*
+*Inherits all builder methods from `TopicBaseBuilder`: `name`, `type`*
 
 ## Publishing Logic
 
-### Conditional Publishing
+`publish_data(publish_event)` takes the event a publisher emits and enqueues
+this topic's own copy of it, which it returns:
 
-The `publish_data` method implements condition-based publishing:
+1. **Copy**: `prepare_publication()` copies the event with this topic's name and
+   type, a fresh `event_id`, and the source event's ID in `emission_id`
+2. **Enqueue**: the copy is added to the topic's `event_queue`, with its offset
+   set
+3. **Return Result**: the enqueued publication is returned; a topic never drops
+   an event
 
-```python
-def publish_data(
-    self,
-    invoke_context: InvokeContext,
-    publisher_name: str,
-    publisher_type: str,
-    data: Messages,
-    consumed_events: List[ConsumeFromTopicEvent],
-) -> PublishToTopicEvent:
-    """
-    Publishes a message's event ID to this topic if it meets the condition.
-    """
-    if self.condition(data):
-        event = PublishToTopicEvent(
-            invoke_context=invoke_context,
-            name=self.name,
-            publisher_name=publisher_name,
-            publisher_type=publisher_type,
-            data=data,
-            consumed_event_ids=[
-                consumed_event.event_id for consumed_event in consumed_events
-            ],
-            offset=len(self.topic_events),
-        )
-        self.topic_events.append(event)
-        if self.publish_event_handler:
-            self.publish_event_handler(event)
-        logger.info(
-            f"[{self.name}] Message published with event_id: {event.event_id}"
-        )
-        return event
-    else:
-        logger.info(f"[{self.name}] Message NOT published (condition not met)")
-        return None
-```
-
-### Publishing Workflow
-
-1. **Condition Check**: Evaluate if messages meet the topic's condition
-2. **Event Creation**: Create `PublishToTopicEvent` with metadata and offset
-3. **Event Storage**: Add event to topic's event list
-4. **Handler Execution**: Call publish event handler if configured
-5. **Logging**: Log success or failure with appropriate message
-6. **Return Result**: Return event on success, `None` on condition failure
+In a workflow, the run keeps its topics' events itself and calls only
+`prepare_publication()`; `publish_data()` and the consumption methods are for
+using a topic on its own.
 
 ## Usage Examples
 
 ### Basic Topic Creation
 
 ```python
-from grafi.topics.topic import Topic
+from grafi.topics.topic_impl.topic import Topic
 
 # Create simple topic
 topic = Topic(name="notifications")
@@ -111,204 +70,129 @@ topic = Topic(name="notifications")
 # Or use builder pattern
 topic = (Topic.builder()
     .name("notifications")
-    .condition(lambda msgs: len(msgs) > 0)
-    .build())
-```
-
-### Topic with Event Handler
-
-```python
-def on_message_published(event: PublishToTopicEvent):
-    print(f"Published message to {event.name}: {event.data}")
-
-topic = (Topic.builder()
-    .name("alerts")
-    .condition(lambda msgs: any("error" in msg.content.lower() for msg in msgs))
-    .publish_event_handler(on_message_published)
     .build())
 ```
 
 ### Publishing Messages
 
 ```python
+from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 
 # Create context and messages
-context = InvokeContext()
+context = InvokeContext(
+    conversation_id="conversation_id",
+    invoke_id="invoke_id",
+    assistant_request_id="assistant_request_id",
+)
 messages = [Message(role="user", content="Hello world")]
 
 # Publish to topic
 event = await topic.publish_data(
-    invoke_context=context,
-    publisher_name="my_publisher",
-    publisher_type="application",
-    data=messages,
-    consumed_events=[]
+    PublishToTopicEvent(
+        invoke_context=context,
+        publisher_name="my_publisher",
+        publisher_type="application",
+        data=messages,
+    )
 )
 
-if event:
-    print(f"Published: {event.event_id}")
-else:
-    print("Message did not meet condition")
+print(f"Published: {event.event_id} at offset {event.offset}")
 ```
 
 ### Message Consumption
 
 ```python
 # Check for new messages
-if topic.can_consume("consumer_1"):
-    messages = topic.consume("consumer_1")
-    for message in messages:
-        print(f"Consumed: {message.data}")
+if await topic.can_consume("consumer_1"):
+    events = await topic.consume("consumer_1")
+    for event in events:
+        print(f"Consumed: {event.data}")
+    # Mark them processed
+    await topic.commit("consumer_1", events[-1].offset)
 ```
 
-## Filtering and Conditions
+## Routing
 
-### Custom Conditions
-
-```python
-# Only publish error messages
-error_topic = (Topic.builder()
-    .name("errors")
-    .condition(lambda msgs: any("error" in msg.content.lower() for msg in msgs))
-    .build())
-
-# Only publish messages from specific roles
-admin_topic = (Topic.builder()
-    .name("admin_messages")
-    .condition(lambda msgs: any(msg.role == "admin" for msg in msgs))
-    .build())
-
-# Complex business logic
-validated_topic = (Topic.builder()
-    .name("validated_messages")
-    .condition(lambda msgs: all(
-        msg.metadata.get("validated", False) for msg in msgs
-    ))
-    .build())
-```
-
-### Default Behavior
+A topic has no condition. To send only some events to a topic, give the
+publishing node's route a `when` predicate, a function of the outgoing
+`PublishToTopicEvent` returning a `bool`; the event goes to that route's topic
+only when it returns `True`. Reusable predicates live in
+`grafi.nodes.conditions`:
 
 ```python
-# Accept all messages (default condition)
-all_messages_topic = Topic(name="all_messages")
-# Equivalent to: condition=lambda _: True
-```
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
+from grafi.nodes.node import Node
 
-## Pre-configured Topics
-
-### Agent Input Topic
-
-The module provides a pre-configured topic for agent input:
-
-```python
-from grafi.topics.topic import agent_input_topic
-
-# Use the predefined agent input topic
-event = agent_input_topic.publish_data(
-    invoke_context=context,
-    publisher_name="user_interface",
-    publisher_type="input_handler",
-    data=user_messages,
-    consumed_events=[]
+llm_node = (
+    Node.builder()
+    .name("LLMNode")
+    .subscribe(agent_input_topic)
+    .tool(llm_tool)
+    .publish_to(function_call_topic, when=has_tool_call)
+    .publish_to(agent_output_topic, when=has_text_response)
+    .build()
 )
+
+
+# Or your own predicate
+def mentions_error(event: PublishToTopicEvent) -> bool:
+    return any("error" in str(msg.content).lower() for msg in event.data)
 ```
 
-## Logging Integration
+A route without `when` takes every event. See [Node](../node.md).
 
-### Log Messages
+## Input and Output Topics
 
-The Topic class automatically logs publishing operations:
-
-```python
-# Successful publishing
-logger.info(f"[{self.name}] Message published with event_id: {event.event_id}")
-
-# Condition not met
-logger.info(f"[{self.name}] Message NOT published (condition not met)")
-```
-
-### Log Format Examples
-
-```text
-INFO: [notifications] Message published with event_id: evt_123456
-INFO: [errors] Message NOT published (condition not met)
-INFO: [alerts] Message published with event_id: evt_789012
-```
+A workflow's input arrives on its `InputTopic`s, and its output is read from its
+`OutputTopic`s; both are `Topic`s. See [Input Topics](input_topics.md) and
+[Output Topics](output_topics.md).
 
 ## Best Practices
 
 ### Topic Design
 
 1. **Meaningful Names**: Use descriptive names that indicate the topic's purpose
-2. **Focused Conditions**: Keep condition functions simple and focused
-3. **Event Handlers**: Use handlers for side effects, not primary logic
-4. **Error Handling**: Handle condition evaluation errors gracefully
-
-### Performance Optimization
-
-1. **Efficient Conditions**: Optimize condition functions for frequent evaluation
-2. **Handler Performance**: Keep event handlers lightweight and fast
-3. **Memory Management**: Monitor topic event accumulation
-4. **Batch Processing**: Consider batching for high-volume scenarios
+2. **Route on the Node**: Put the condition for publishing on the publishing node's route, not on the topic
+3. **Named Predicates**: Use importable, module-level functions, such as those in `grafi.nodes.conditions`: a manifest saves them by reference, and cannot save a lambda
+4. **Memory Management**: Monitor topic event accumulation
 
 ### Error Handling
 
-```python
-def safe_condition(messages: Messages) -> bool:
-    try:
-        return any("priority" in msg.metadata for msg in messages)
-    except (AttributeError, KeyError):
-        return False
+A route predicate that raises `IndexError` or `KeyError` counts as not met;
+any other exception is logged as a warning and also counts as not met, so one
+faulty predicate cannot halt the workflow.
 
-def safe_handler(event: PublishToTopicEvent):
-    try:
-        process_event(event)
-    except Exception as e:
-        logger.error(f"Error in event handler: {e}")
+```python
+def has_priority(event: PublishToTopicEvent) -> bool:
+    return event.data[-1].content.startswith("PRIORITY")  # IndexError on no data: not met
 ```
 
 ### Testing Strategies
 
 ```python
-def test_topic_publishing():
+async def test_topic_publishing():
     # Create test topic
     topic = Topic(name="test_topic")
     messages = [Message(role="user", content="test")]
 
     # Test successful publishing
     event = await topic.publish_data(
-        invoke_context=InvokeContext(),
-        publisher_name="test",
-        publisher_type="test",
-        data=messages,
-        consumed_events=[]
+        PublishToTopicEvent(
+            invoke_context=InvokeContext(
+                conversation_id="c", invoke_id="i", assistant_request_id="a"
+            ),
+            publisher_name="test",
+            publisher_type="test",
+            data=messages,
+        )
     )
 
-    assert event is not None
-    assert len(topic.topic_events) == 1
-
-def test_condition_filtering():
-    # Create topic with condition
-    topic = (Topic.builder()
-        .name("filtered_topic")
-        .condition(lambda msgs: len(msgs) > 1)
-        .build())
-
-    # Test with single message (should be filtered)
-    single_message = [Message(role="user", content="test")]
-    event = await topic.publish_data(
-        invoke_context=InvokeContext(),
-        publisher_name="test",
-        publisher_type="test",
-        data=single_message,
-        consumed_events=[]
-    )
-
-    assert event is None
-    assert len(topic.topic_events) == 0
+    assert event.name == "test_topic"
+    assert event.offset == 0
+    assert await topic.unconsumed_count("consumer") == 1
 ```
 
-The `Topic` class provides a robust, production-ready implementation of the topic-based messaging pattern with built-in logging, event handling, and flexible configuration options for Graphite applications.
+The `Topic` class provides a robust implementation of the topic-based messaging pattern for Graphite applications.

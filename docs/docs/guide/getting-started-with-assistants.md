@@ -55,7 +55,11 @@ Set `CONVERSATION_ID` to track conversation flow.
 
 ```python
 # main.py
+import os
+
 from grafi.assistants.assistant import Assistant
+from grafi.common.manifest import SecretInput
+from grafi.common.manifest import env_secret
 from typing import Optional
 
 from pydantic import Field
@@ -65,9 +69,13 @@ class FinanceAssistant(Assistant):
 
     name: str = Field(default="FinanceAssistant")
     type: str = Field(default="FinanceAssistant")
-    api_key: Optional[str] = Field(default=os.getenv("OPENAI_API_KEY"))
-    model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"))
-    system_message: str = Field(default=os.getenv("OPENAI_SYSTEM_MESSAGE"))
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default=os.getenv("OPENAI_MODEL", "gpt-4o"), exclude=True)
+    system_message: Optional[str] = Field(
+        default=os.getenv("OPENAI_SYSTEM_MESSAGE"), exclude=True
+    )
 
 ```
 
@@ -77,6 +85,14 @@ A good practice is to use Pydantic fields for configuration with environment var
 - `api_key`: OpenAI API key with environment variable fallback
 - `model`: OpenAI model selection with default
 - `system_message`: Customizable system prompt
+
+The fields it builds its workflow from are declared `exclude=True`: saving the
+assistant saves the workflow built from them, and loading it keeps that
+workflow, so a saved copy of them would be ignored. The key is an
+`env_secret`, read from its environment variable and never saved as a value;
+the assistant gives it to its tool as `self.secret_reference("api_key")`, so the
+tool saves that variable too, while the key is that variable's value; a key
+given as a value is passed on as one, which cannot be saved.
 
 
 ### Builder Class Implementation
@@ -90,7 +106,7 @@ from grafi.assistants.assistant_base import AssistantBaseBuilder
 class FinanceAssistantBuilder(AssistantBaseBuilder[FinanceAssistant]):
     """Concrete builder for FinanceAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 
@@ -129,8 +145,8 @@ Implement the builder pattern for fluent configuration of the assistant. This pi
 
 ```python
 from grafi.nodes.node import Node
-from grafi.topics.input_topic import InputTopic
-from grafi.topics.output_topic import OutputTopic
+from grafi.topics.topic_impl.input_topic import InputTopic
+from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.tools.llms.impl.openai_tool import OpenAITool
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
 
@@ -140,13 +156,11 @@ class FinanceAssistant(Assistant):
 
     ...
 
-
-    agent_input_topic = InputTopic(name="agent_input_topic")
-
-    agent_output_topic = OutputTopic(name="agent_output_topic")
-
     def _construct_workflow(self) -> "FinanceAssistant":
         """Construct the workflow for the assistant."""
+        agent_input_topic = InputTopic(name="agent_input_topic")
+        agent_output_topic = OutputTopic(name="agent_output_topic")
+
         llm_node = (
             Node.builder()
             .name("OpenAINode")
@@ -154,7 +168,7 @@ class FinanceAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAITool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_message)
                 .build()
@@ -166,7 +180,7 @@ class FinanceAssistant(Assistant):
         self.workflow = (
             EventDrivenWorkflow.builder()
             .name("FinanceWorkflow")
-            .node(finance_llm_node)
+            .node(llm_node)
             .build()
         )
 
@@ -174,6 +188,7 @@ class FinanceAssistant(Assistant):
 ```
 
 Here we implement the `_construct_workflow` method to create the internal workflow using the same pattern as the simple workflow guide, but now encapsulated within the assistant class. This method:
+- Creates the input and output topics. They are local to the method, not class attributes: the workflow finds them through the nodes that subscribe and publish to them.
 - Creates an OpenAI node with instance-specific configuration.
 - Builds the event-driven workflow.
 - Stores the workflow as an instance variable.
@@ -216,7 +231,7 @@ class FinanceAssistant(Assistant):
         ]
 
         return PublishToTopicEvent(
-            invoke_context=execution_context, data=input_messages
+            invoke_context=invoke_context, data=input_data
         )
 ```
 

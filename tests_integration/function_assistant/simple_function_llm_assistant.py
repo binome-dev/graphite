@@ -11,6 +11,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.callable_ref import CallableRef
 from grafi.common.manifest import ModelRef
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.functions.function_tool import FunctionTool
@@ -45,11 +46,12 @@ class SimpleFunctionLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleFunctionLLMAssistant")
     type: str = Field(default="SimpleFunctionLLMAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    model: str = Field(default="gpt-4o-mini")
-    # Saved by import path, so a manifest loads them back.
-    output_format: ModelRef[OutputType]
-    function: CallableRef
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
+    output_format: Optional[ModelRef[OutputType]] = Field(default=None, exclude=True)
+    function: Optional[CallableRef] = Field(default=None, exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleFunctionLLMAssistantBuilder":
@@ -57,6 +59,7 @@ class SimpleFunctionLLMAssistant(Assistant):
         return SimpleFunctionLLMAssistantBuilder(cls)
 
     def _construct_workflow(self) -> "SimpleFunctionLLMAssistant":
+        assert self.function is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         function_topic = Topic(name="function_call_topic")
@@ -69,7 +72,7 @@ class SimpleFunctionLLMAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("UserInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .chat_params({"response_format": self.output_format})
                 .build()
@@ -111,7 +114,7 @@ class SimpleFunctionLLMAssistantBuilder(
     This class provides methods to set the API key, model, output format, and function for the assistant.
     """
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

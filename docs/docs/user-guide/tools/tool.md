@@ -15,7 +15,7 @@ The `Tool` class is the fundamental base class for all tools in the Graphite fra
 
 | Method       | Signature                                                                  | Description                                                                                    |
 |--------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Asynchronous method to process input data and yield its output in batches of messages; the node publishes each batch as one event. |
+| `invoke`   | `async (invoke_context: InvokeContext, input_data: Messages) -> Messages` | Asynchronous method to process input data and return its output, a list of messages, which the node publishes as one event; no messages, and it publishes nothing. With `@record_tool_invoke`, returning anything else is the tool's recorded failure, a `TypeError`. |
 | `model_dump(mode="json")` | `() -> Dict[str, Any]`                                        | Saves the tool as data: its fields, and its class by import path, as `"class"`. See [Manifests](../manifests.md). |
 | `model_validate` | `classmethod (data: Dict[str, Any]) -> Tool`                          | Loads a tool from that data, as the class it names, which must be this class or a subclass of it. |
 
@@ -56,34 +56,34 @@ Tools use asynchronous execution patterns:
 #### Asynchronous Execution
 
 ```python
-# Asynchronous processing with generator
-async for message_batch in tool.invoke(invoke_context, input_messages):
-    process_messages(message_batch)
+# A tool returns its output once it has it all
+messages = await tool.invoke(invoke_context, input_messages)
+process_messages(messages)
 ```
 
 ### Message Conversion
 
-A tool yields `Message` objects. To turn a value into messages the way `FunctionTool` does (messages as they are, `None` as none, anything else as one message holding it as text, JSON unless a string), use `grafi.tools.results.as_messages`:
+A tool returns `Message` objects. To turn a value into messages the way `FunctionTool` does (messages as they are, `None` as none, anything else as one message holding it as text, JSON unless a string), use `grafi.tools.results.as_messages`:
 
 ```python
 from grafi.tools.results import as_messages
 
-yield as_messages(result)
+return as_messages(result)
 ```
 
 ### Streaming
 
-A tool that produces its output piece by piece, such as an LLM's tokens, can send the pieces to a caller streaming the run with `emit_delta`, then yield the whole output. The pieces are never published or stored; `streaming()` says whether anyone receives them (see [Runtime](../runtime.md#streaming)):
+A tool that produces its output piece by piece, such as an LLM's tokens, can send the pieces to a caller streaming the run with `emit_delta`, then return the whole output. The pieces are never published or stored; `streaming()` says whether anyone receives them (see [Runtime](../runtime.md#streaming)):
 
 ```python
 from grafi.runtime import emit_delta
 
-async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
     text = []
     async for token in self.client.stream(input_data):
         emit_delta(token)
         text.append(token)
-    yield [Message(role="assistant", content="".join(text))]
+    return [Message(role="assistant", content="".join(text))]
 ```
 
 Plain functions need no subclass: `FunctionTool` and `FunctionCallTool` take a function, sync or async, that returns its result or, as a generator, streams it.
@@ -98,19 +98,35 @@ When creating a concrete tool implementation, you must:
 from grafi.tools.tool import Tool
 
 class MyCustomTool(Tool):
-    # Tool-specific fields
+    # Tool-specific fields: a tool takes only the fields it declares.
+    custom_parameter: str = ""
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 ```
 
 ### 2. Implement Core Methods
 
 ```python
-async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+from grafi.common.decorators.record_decorators import record_tool_invoke
+
+@record_tool_invoke
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
     """Asynchronous processing implementation."""
     # Process input_data asynchronously
     result = await self.async_process_data(input_data)
-    yield [Message(role="assistant", content=result)]
+    return [Message(role="assistant", content=result)]
 ```
+
+`@record_tool_invoke` records the call's events and its span (see
+[Invoke Decorators](../invoke-decorators.md)), and makes returning anything
+but a list of messages the tool's recorded failure. `invoke` is an `async def`
+that returns the tool's output: a class whose `invoke` is a sync `def`, or
+yields, as tools once did, raises `TypeError` when it is defined. A subclass
+having a method grafi no longer calls, its own or a mixin's, which a base
+lists in `removed_methods`, gets a `UserWarning` when it is defined:
+`FunctionTool`'s and `FunctionCallTool`'s `to_messages`, and the
+`to_messages` and `to_stream_messages` of grafi's LLM providers (OpenAI and
+OpenAI-compatible, Claude, Gemini, Ollama). A helper of that name the tool calls
+itself still works.
 
 ### 3. Create Builder Class
 
@@ -143,9 +159,11 @@ from typing import Self
 from pydantic import Field
 from openinference.semconv.trace import OpenInferenceSpanKindValues
 
-from grafi.tools.tool import Tool, ToolBuilder
+from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.models.invoke_context import InvokeContext
-from grafi.common.models.message import Message, Messages, MsgsAGen
+from grafi.common.models.message import Messages
+from grafi.tools.results import as_messages
+from grafi.tools.tool import Tool, ToolBuilder
 
 class TextProcessorTool(Tool):
     """A tool for processing text data."""
@@ -162,15 +180,15 @@ class TextProcessorTool(Tool):
     def builder(cls) -> "TextProcessorToolBuilder":
         return TextProcessorToolBuilder(cls)
 
-    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+    @record_tool_invoke
+    async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
         """Process text asynchronously."""
         if not input_data:
-            yield []
-            return
+            return []  # No output: the node publishes nothing.
 
-        content = input_data[0].content or ""
-        processed = self._process_text(content)
-        yield self.to_messages(processed)
+        content = input_data[0].content
+        text = content if isinstance(content, str) else ""  # Text content only.
+        return as_messages(self._process_text(text))
 
     def _process_text(self, text: str) -> str:
         """Internal text processing logic."""
@@ -182,10 +200,6 @@ class TextProcessorTool(Tool):
             result = text
 
         return f"{self.prefix}{result}"
-
-    def to_messages(self, response: str) -> Messages:
-        """Convert processed text to Messages."""
-        return [Message(role="assistant", content=response)]
 
 class TextProcessorToolBuilder(ToolBuilder[TextProcessorTool]):
     """Builder for TextProcessorTool instances."""
@@ -224,9 +238,12 @@ trust_modules("my_app")  # Loading imports classes from trusted modules only.
 restored = Tool.model_validate(data)  # A TextProcessorTool.
 ```
 
-A field holding something that is not data, such as a client or an index, is
-left out with `Field(exclude=True)`, and a secret is declared with
-`env_secret("VAR")`. See [Manifests](../manifests.md).
+`model_validate` trusts its data, as code; load data you did not write with
+`Tool.from_manifest(data)`, which checks it (see
+[Manifests](../manifests.md)). A field holding something that is not data, such
+as a client or an index, is left out with a default,
+`Field(default=None, exclude=True)`, so what is saved can be loaded, and a
+secret is declared with `env_secret("VAR")`.
 
 ## OpenInference Integration
 
@@ -317,7 +334,7 @@ should see and recover from is a function call's, answered by
 from grafi.common.exceptions import FunctionToolException
 from grafi.tools.results import as_messages
 
-async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen:
+async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> Messages:
     try:
         result = await self.async_process(input_data)
     except Exception as e:
@@ -327,7 +344,7 @@ async def invoke(self, invoke_context: InvokeContext, input_data: Messages) -> M
             invoke_context=invoke_context,
             cause=e,
         ) from e
-    yield as_messages(result)
+    return as_messages(result)
 ```
 
 ## Testing Tools
@@ -342,12 +359,14 @@ from grafi.common.models.invoke_context import InvokeContext
 @pytest.mark.asyncio
 async def test_tool_invoke():
     tool = MyCustomTool()
-    context = InvokeContext()
+    context = InvokeContext(
+        conversation_id="test-conversation",
+        invoke_id="test-invoke",
+        assistant_request_id="test-request",
+    )
     input_messages = [Message(role="user", content="test input")]
 
-    results = []
-    async for batch in tool.invoke(context, input_messages):
-        results.extend(batch)
+    results = await tool.invoke(context, input_messages)
 
     assert len(results) > 0
 ```
@@ -376,7 +395,7 @@ Tools participate in event-driven workflows through:
 
 - **InvokeContext**: Carries workflow context and metadata
 - **Message passing**: Standardized communication via Messages
-- **Async generators**: A tool yields its output in batches, each one event, and can stream pieces of it to a caller with `emit_delta`
+- **Async calls**: A tool returns its output, which its node publishes as one event, and can stream pieces of it to a caller with `emit_delta` as it works
 
 ## Best Practices
 
@@ -389,7 +408,7 @@ Tools participate in event-driven workflows through:
 
 ### Performance Considerations
 
-1. **Async Support**: Implement both sync and async methods for flexibility
+1. **Never block the loop**: `invoke` is async; run blocking work in a thread, or give a `FunctionTool` a sync function, which runs in a worker thread
 2. **Resource Management**: Clean up resources in finally blocks or context managers
 3. **Batching**: Process multiple messages efficiently when possible
 4. **Caching**: Cache expensive operations when appropriate

@@ -89,8 +89,8 @@ async def test_invoke_successful(agent_calling_tool):
         )
     ]
     result = []
-    async for msg in agent_calling_tool.invoke(invoke_context, input_data):
-        result.extend(msg)
+    msg = await agent_calling_tool.invoke(invoke_context, input_data)
+    result.extend(msg)
 
     assert result[0].role == "tool"
     assert result[0].content == "mocked response"
@@ -120,11 +120,7 @@ async def test_invoke_invalid_function_name(agent_calling_tool):
         )
     ]
 
-    [answer] = [
-        message
-        async for messages in agent_calling_tool.invoke(invoke_context, input_data)
-        for message in messages
-    ]
+    [answer] = await agent_calling_tool.invoke(invoke_context, input_data)
     assert answer.content.startswith("Error: LookupError: No function 'wrong_agent'")
 
 
@@ -137,7 +133,7 @@ async def test_invoke_none_function_call(agent_calling_tool):
     )
     input_data = [Message(role="assistant")]
 
-    outputs = [m async for m in agent_calling_tool.invoke(invoke_context, input_data)]
+    outputs = await agent_calling_tool.invoke(invoke_context, input_data)
     assert outputs == []  # No tool call, no result.
 
 
@@ -156,7 +152,7 @@ def test_dump(serializable_agent_tool: AgentCallingTool):
     # agent_call serializes as an import reference, no pickle blob.
     assert result["agent_call"] == {"ref": f"{__name__}:sample_agent_call"}
     # Its spec follows from its fields, so it is not saved.
-    assert "function_specs" not in result
+    assert "function_specs" not in result  # Those it derives follow from it.
     assert result["functions"] == {}
 
 
@@ -183,7 +179,7 @@ def test_load_from_a_manifest_naming_the_class():
     assert tool.argument_description == "Test args"
     assert tool.agent_call is sample_agent_call
     # The agent's spec is made from its fields.
-    [spec] = tool.function_specs
+    [spec] = tool.get_function_specs()
     assert spec.name == "test_agent"
     assert spec.description == "Test description"
 
@@ -197,7 +193,7 @@ async def test_round_trip(serializable_agent_tool, invoke_context):
     assert type(restored) is AgentCallingTool
     assert restored.tool_id == serializable_agent_tool.tool_id
     assert restored.agent_call is sample_agent_call
-    assert restored.function_specs == serializable_agent_tool.function_specs
+    assert restored.get_function_specs() == serializable_agent_tool.get_function_specs()
     assert restored == serializable_agent_tool
     assert restored.model_dump(mode="json") == data
     calls = Message(
@@ -210,7 +206,7 @@ async def test_round_trip(serializable_agent_tool, invoke_context):
             }
         ],
     )
-    [[answer]] = [batch async for batch in restored.invoke(invoke_context, [calls])]
+    [answer] = await restored.invoke(invoke_context, [calls])
     assert answer.content == "sample response"
 
 
@@ -229,7 +225,7 @@ def test_renaming_the_agent_in_a_dump_offers_only_the_new_name(
 
     restored = Tool.model_validate(data)
 
-    [spec] = restored.function_specs
+    [spec] = restored.get_function_specs()
     assert spec.name == "renamed_agent"
     assert spec.description == "An edited description."
     assert list(spec.parameters.properties) == ["prompt"]
@@ -242,5 +238,134 @@ def test_saving_and_loading_again_does_not_grow_the_specs(serializable_agent_too
         tool = Tool.model_validate(tool.model_dump(mode="json"))
         tool = AgentCallingTool.model_validate(tool.model_dump())
 
-    assert tool.function_specs == serializable_agent_tool.function_specs
-    assert [spec.name for spec in tool.function_specs] == ["test_agent"]
+    assert tool.get_function_specs() == serializable_agent_tool.get_function_specs()
+    assert [spec.name for spec in tool.get_function_specs()] == ["test_agent"]
+
+
+def test_an_agent_renamed_after_it_was_built_is_saved_by_its_new_name(
+    serializable_agent_tool: AgentCallingTool,
+) -> None:
+    """Its spec is derived from its fields when read, never saved: a renamed
+    agent offers one function, under its new name, before and after loading."""
+    serializable_agent_tool.agent_name = "renamed"
+
+    manifest = serializable_agent_tool.to_manifest()
+    loaded = Tool.from_manifest(manifest)
+
+    assert "function_specs" not in manifest["spec"]
+    for tool in (serializable_agent_tool, loaded):
+        assert [spec.name for spec in tool.get_function_specs()] == ["renamed"]
+
+
+def get_weather(city: str) -> str:
+    """The weather in a city."""
+    return f"Sunny in {city}"
+
+
+@pytest.mark.asyncio
+async def test_a_function_given_beside_the_agent_is_called_itself(
+    serializable_agent_tool: AgentCallingTool,
+) -> None:
+    """Calling functions elsewhere, the tool still calls its own functions."""
+    tool = (
+        AgentCallingTool.builder()
+        .agent_name("helper")
+        .agent_call(sample_agent_call)
+        .function(get_weather)
+        .build()
+    )
+    call = Message.model_validate(
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Oslo"}',
+                    },
+                }
+            ],
+        }
+    )
+    context = InvokeContext(
+        conversation_id="c", invoke_id=uuid.uuid4().hex, assistant_request_id="r"
+    )
+
+    [answer] = await tool.invoke(context, [call])
+
+    assert answer.content == "Sunny in Oslo"
+    assert sorted(s.name for s in tool.get_function_specs()) == [
+        "get_weather",
+        "helper",
+    ]
+
+
+def helper(question: str) -> str:
+    """Answers here."""
+    return f"here: {question}"
+
+
+@pytest.mark.asyncio
+async def test_a_function_named_like_the_agent_is_offered_and_called_itself() -> None:
+    """One precedence for what is offered and what is called: the tool's own."""
+    tool = (
+        AgentCallingTool.builder()
+        .agent_name("helper")
+        .agent_call(sample_agent_call)
+        .function(helper)
+        .build()
+    )
+    [spec] = tool.get_function_specs()
+    call = Message.model_validate(
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "helper", "arguments": '{"question": "q"}'},
+                }
+            ],
+        }
+    )
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+
+    [answer] = await tool.invoke(context, [call])
+
+    assert spec.description == "Answers here."
+    assert answer.content == "here: q"
+
+
+@pytest.mark.asyncio
+async def test_only_the_agents_name_asks_the_agent() -> None:
+    """A spec it is given under another name is no agent's to answer."""
+    from grafi.common.models.function_spec import FunctionSpec
+
+    tool = AgentCallingTool(
+        agent_name="helper",
+        agent_call=sample_agent_call,
+        function_specs=[FunctionSpec(name="rm", description="Remove.", parameters={})],
+    )
+    call = Message.model_validate(
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "rm", "arguments": "{}"},
+                }
+            ],
+        }
+    )
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+
+    [answer] = await tool.invoke(context, [call])
+
+    assert answer.content == "Error: LookupError: No function 'rm'"

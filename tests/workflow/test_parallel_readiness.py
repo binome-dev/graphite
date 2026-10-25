@@ -19,7 +19,6 @@ from grafi.common.exceptions import WorkflowError
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -40,22 +39,23 @@ class RecordingTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append([str(message.content) for message in input_data])
         if self.fail_first and len(self.calls) == 1:
             raise RuntimeError("join failed")
-        yield [Message(role="assistant", content="joined")]
+        return [Message(role="assistant", content="joined")]
 
 
-class PairTool(RecordingTool):
-    """Publishes A1 and B1 in one step."""
+class SourceTool(RecordingTool):
+    """Publishes its text."""
+
+    text: str
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         self.calls.append([str(message.content) for message in input_data])
-        yield [Message(role="assistant", content="A1")]
-        yield [Message(role="assistant", content="B1")]
+        return [Message(role="assistant", content=self.text)]
 
 
 def join_node(tool: Tool, op: LogicalOp = LogicalOp.AND) -> Node:
@@ -94,18 +94,18 @@ async def test_inputs_of_a_failed_join_step_are_replayed(
     event_store: EventStore, sequential: bool
 ) -> None:
     a, b = Topic(name="a"), Topic(name="b")
-    source_tool, join_tool = PairTool(), RecordingTool(fail_first=True)
-    source = Node(
-        name="source",
-        tool=source_tool,
-        subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
-        publisher_router=PublisherRouter(
-            routes=[
-                PublishRoute(topic=a, when=lambda e: e.data[0].content == "A1"),
-                PublishRoute(topic=b, when=lambda e: e.data[0].content == "B1"),
-            ]
-        ),
-    )
+    seed = InputTopic(name="input")
+    source_tools = [SourceTool(text="A1"), SourceTool(text="B1")]
+    join_tool = RecordingTool(fail_first=True)
+    sources = [
+        Node(
+            name=f"source_{topic.name}",
+            tool=tool,
+            subscribed_expressions=[TopicExpr(topic=seed)],
+            publisher_router=PublisherRouter(routes=[PublishRoute(topic=topic)]),
+        )
+        for topic, tool in zip((a, b), source_tools)
+    ]
     join = Node(
         name="join",
         tool=join_tool,
@@ -118,7 +118,9 @@ async def test_inputs_of_a_failed_join_step_are_replayed(
             routes=[PublishRoute(topic=OutputTopic(name="output"))]
         ),
     )
-    workflow = EventDrivenWorkflow.builder().node(source).node(join).build()
+    workflow = (
+        EventDrivenWorkflow.builder().node(sources[0]).node(sources[1]).node(join)
+    ).build()
     input_event = event("seed")
     async with asyncio.timeout(5):
         with pytest.raises(NodeExecutionError, match="join failed"):
@@ -138,7 +140,8 @@ async def test_inputs_of_a_failed_join_step_are_replayed(
         ]
     assert outputs == ["joined"]
     assert join_tool.calls == [["A1", "B1"], ["A1", "B1"]]
-    assert len(source_tool.calls) == 1, "Recovery reran committed upstream work"
+    for tool in source_tools:
+        assert len(tool.calls) == 1, "Recovery reran committed upstream work"
 
 
 @pytest.mark.asyncio

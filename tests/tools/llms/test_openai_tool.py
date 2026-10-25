@@ -89,8 +89,8 @@ async def test_invoke_simple_response(monkeypatch, openai_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result_messages = []
-    async for message_batch in openai_instance.invoke(invoke_context, input_data):
-        result_messages.extend(message_batch)
+    message_batch = await openai_instance.invoke(invoke_context, input_data)
+    result_messages.extend(message_batch)
 
     assert isinstance(result_messages, List)
     assert result_messages[0].role == "assistant"
@@ -163,8 +163,8 @@ async def test_invoke_function_call(monkeypatch, openai_instance, invoke_context
     ]
     openai_instance.add_function_specs(tools)
     result_messages = []
-    async for message_batch in openai_instance.invoke(invoke_context, input_data):
-        result_messages.extend(message_batch)
+    message_batch = await openai_instance.invoke(invoke_context, input_data)
+    result_messages.extend(message_batch)
 
     assert isinstance(result_messages, List)
     assert result_messages[0].role == "assistant"
@@ -183,10 +183,9 @@ async def test_invoke_api_error(openai_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):
-        async for _ in openai_instance.invoke(
+        await openai_instance.invoke(
             invoke_context, [Message(role="user", content="Hello")]
-        ):
-            pass
+        )
 
 
 OPENAI_TOOL = "grafi.tools.llms.impl.openai_tool:OpenAITool"
@@ -226,12 +225,13 @@ def test_dump_names_the_class_and_saves_the_key_as_its_variable(saved_openai):
         "reasoning_effort": "medium",
         "verbosity": "high",
     }
-    # Not in the repr. A python-mode dump holds values, the key's too, and
-    # names the class itself: it round-trips in this process.
+    # Not in the repr. A python-mode dump holds values, but a key read from
+    # its variable, which it refers to, and names the class itself: it
+    # round-trips in this process.
     assert "test_api_key" not in repr(saved_openai)
     python_dump = saved_openai.model_dump()
     assert python_dump["class"] is OpenAITool
-    assert python_dump["api_key"] == "test_api_key"
+    assert python_dump["api_key"] == {"env": "OPENAI_API_KEY"}
     assert OpenAITool.model_validate(python_dump) == saved_openai
 
 
@@ -277,9 +277,9 @@ def test_load_from_a_manifest_naming_the_class():
 def test_a_key_read_from_another_variable_is_saved_as_that_variable(monkeypatch):
     monkeypatch.setenv("TEAM_OPENAI_KEY", "team_key")
 
-    tool = Tool.model_validate(
-        {"class": OPENAI_TOOL, "api_key": {"env": "TEAM_OPENAI_KEY"}}
-    )
+    manifest = OpenAITool().to_manifest()
+    manifest["spec"]["api_key"] = {"env": "TEAM_OPENAI_KEY"}
+    tool = Tool.from_manifest(manifest, allow_env=["TEAM_OPENAI_KEY"])
 
     assert tool.api_key == "team_key"
     assert tool.model_dump(mode="json")["api_key"] == {"env": "TEAM_OPENAI_KEY"}
@@ -449,13 +449,9 @@ async def test_client_close_failure_does_not_fail_completed_call(
         MagicMock(return_value=mock_context_manager),
     )
 
-    result = [
-        message
-        async for batch in openai_instance.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await openai_instance.invoke(
+        invoke_context, [Message(role="user", content="Hi")]
+    )
     assert [message.content for message in result] == ["done"]
 
 
@@ -523,10 +519,9 @@ async def test_stream_is_closed_and_its_close_failure_does_not_fail_the_call(
     with deltas_to(received.append):
         result = [
             message.content
-            async for batch in tool.invoke(
+            for message in await tool.invoke(
                 invoke_context, [Message(role="user", content="Hi")]
             )
-            for message in batch
         ]
     assert [delta.content for delta in received] == ["a", "b"]
     assert result == ["ab"]
@@ -595,14 +590,11 @@ async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
     )
     received: List[Delta] = []
     with deltas_to(received.append):
-        batches = [
-            batch
-            async for batch in openai_instance.invoke(
-                invoke_context, [Message(role="user", content="Weather and time?")]
-            )
-        ]
+        output = await openai_instance.invoke(
+            invoke_context, [Message(role="user", content="Weather and time?")]
+        )
 
-    [[message]] = batches
+    [message] = output
     assert [delta.content for delta in received] == ["Checking."]
     assert message.content == "Checking."
     assert [call.model_dump() for call in message.tool_calls] == [
@@ -651,12 +643,9 @@ async def test_with_is_streaming_off_the_provider_is_not_streamed(
     )
     openai_instance.is_streaming = False  # Off: whole, though the caller streams.
     with deltas_to(lambda delta: None):
-        [[message]] = [
-            batch
-            async for batch in openai_instance.invoke(
-                invoke_context, [Message(role="user", content="Hi")]
-            )
-        ]
+        [message] = await openai_instance.invoke(
+            invoke_context, [Message(role="user", content="Hi")]
+        )
     assert message.content == "whole"
     assert "stream" not in create.call_args.kwargs
 
@@ -704,12 +693,9 @@ async def test_fields_a_provider_repeats_in_every_chunk_are_not_joined(
         MagicMock(return_value=context),
     )
     with deltas_to(lambda delta: None):
-        [[message]] = [
-            batch
-            async for batch in openai_instance.invoke(
-                invoke_context, [Message(role="user", content="Weather?")]
-            )
-        ]
+        [message] = await openai_instance.invoke(
+            invoke_context, [Message(role="user", content="Weather?")]
+        )
     assert (message.role, message.content) == ("assistant", "Checking.")
     [tool_call] = message.tool_calls
     assert (tool_call.id, tool_call.function.name) == ("a", "weather")
@@ -744,10 +730,7 @@ def _streaming_client(monkeypatch: pytest.MonkeyPatch, chunks: List[Any]) -> Mag
 
 async def _streamed_answer(tool: OpenAITool, context: InvokeContext) -> Message:
     with deltas_to(lambda delta: None):
-        [[message]] = [
-            batch
-            async for batch in tool.invoke(context, [Message(role="user", content="?")])
-        ]
+        [message] = await tool.invoke(context, [Message(role="user", content="?")])
     return message
 
 

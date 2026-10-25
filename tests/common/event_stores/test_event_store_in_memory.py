@@ -7,6 +7,7 @@ import pytest
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.event_stores.event_store_in_memory import EventStoreInMemory
+from grafi.common.events.event import TOPIC_EVENT_TYPES
 from grafi.common.events.event import Event
 from grafi.common.events.event import EventType
 from grafi.common.events.event_codec import EventCodec
@@ -432,6 +433,29 @@ class TestStrictEventStore:
         assert all(kept is not event for kept, event in zip(stored, events))
 
     @pytest.mark.asyncio
+    async def test_history_is_read_of_the_types_asked_for(self):
+        store = EventStoreInMemory(strict=True)
+        events = every_event()
+        await store.record_events(events)
+        request = events[0].invoke_context
+        topic_events = [e for e in events if e.event_type in TOPIC_EVENT_TYPES]
+        responds = [e for e in events if e.event_type == EventType.ASSISTANT_RESPOND]
+        assert topic_events and responds
+
+        assert (
+            await store.get_agent_events(
+                request.assistant_request_id, event_types=TOPIC_EVENT_TYPES
+            )
+            == topic_events
+        )
+        assert (
+            await store.get_conversation_events(
+                request.conversation_id, event_types=[EventType.ASSISTANT_RESPOND]
+            )
+            == responds
+        )
+
+    @pytest.mark.asyncio
     async def test_record_event_round_trips(self, topic_events):
         store = EventStoreInMemory(strict=True)
         await store.record_event(topic_events[0])
@@ -543,3 +567,23 @@ class TestStrictEventStore:
 
     def test_a_store_is_not_strict_by_default(self):
         assert EventStoreInMemory().strict is False
+
+
+def test_a_store_whose_reads_take_no_event_types_fails_loudly() -> None:
+    """Written before grafi passed them, it would fail on every run."""
+    with pytest.raises(TypeError, match="get_agent_events\\(\\) takes no event_types"):
+
+        class Old(EventStoreInMemory):
+            async def get_agent_events(self, assistant_request_id):  # type: ignore
+                return []
+
+
+def test_a_store_reading_history_through_an_old_mixin_fails_loudly() -> None:
+    class OldReads:
+        async def get_conversation_events(self, conversation_id):  # type: ignore
+            return []
+
+    with pytest.raises(TypeError, match="takes no event_types"):
+
+        class Mixed(OldReads, EventStoreInMemory):  # type: ignore[misc]
+            pass

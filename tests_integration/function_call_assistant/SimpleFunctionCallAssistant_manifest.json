@@ -154,21 +154,6 @@
           "type": "Topic"
         }
       }
-    },
-    "api_key": {
-      "env": "OPENAI_API_KEY"
-    },
-    "model": "gpt-4o-mini",
-    "function_call_llm_system_message": null,
-    "summary_llm_system_message": null,
-    "function_tool": {
-      "class": "tests_integration.function_call_assistant.simple_function_call_assistant_multi_functions_example:LocalInfoMock",
-      "tool_id": "260793721c3c4924bac2a6665a3acb2e",
-      "name": "LocalInfoMock",
-      "type": "FunctionCallTool",
-      "oi_span_type": "TOOL",
-      "functions": {},
-      "on_error": "return"
     }
   }
 }

@@ -1,10 +1,10 @@
 """Shared base for OpenAI-compatible chat-completions providers.
 
-OpenAI, DeepSeek, and OpenRouter all speak the OpenAI chat-completions API via
-the official ``openai`` SDK, differing only in endpoint/config (base URL, extra
-headers, default model, API-key env var) and provider-specific error wording.
-This base centralizes the identical request/response mechanics; concrete
-providers specialize via a few small hooks.
+OpenAI, DeepSeek and OpenRouter all speak the OpenAI chat-completions API,
+through the official ``openai`` SDK. This base holds the request and response
+mechanics they share; a provider sets its endpoint, its default model, its key's
+variable, and a few small hooks, such as whether the SDK may send OpenAI's own
+settings (only OpenAI's endpoint receives them).
 """
 
 import os
@@ -35,15 +35,17 @@ from grafi.common.exceptions import LLMToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime.deltas import emit_delta
 from grafi.tools.llms.impl.openai_adapter import to_openai_tool
+from grafi.tools.llms.llm import _PROVIDER_REMOVED_METHODS
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
 
 class OpenAICompatibleTool(LLM):
     """Base for providers exposed through the OpenAI chat-completions API."""
+
+    removed_methods: ClassVar[Dict[str, str]] = _PROVIDER_REMOVED_METHODS
 
     # Human-readable provider name used in error messages.
     _provider_label: ClassVar[str] = "OpenAI-compatible"
@@ -112,28 +114,28 @@ class OpenAICompatibleTool(LLM):
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> MsgsAGen:
+    ) -> Messages:
         api_messages, api_tools = self.prepare_api_input(input_data)
+        # Concrete providers always name themselves; the label covers the rest.
+        tool_name = self.name or self._provider_label
 
-        key = self.required_api_key()
+        key = self.sdk_api_key()
         client_kwargs: Dict[str, Any] = {"api_key": key}
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
         if not self._openai_settings:
             if not self.base_url:  # Else the SDK would read OPENAI_BASE_URL.
                 raise LLMToolException(
-                    tool_name=self.name or self._provider_label,
+                    tool_name=tool_name,
                     model=self.model,
                     message=f"{type(self).__name__} has no base_url.",
                 )
             client_kwargs["default_headers"] = {
                 **_without_openai_settings(),
-                "Authorization": f"Bearer {key}",  # Whatever they named.
+                # Set again: OPENAI_CUSTOM_HEADERS may name it, and omitting
+                # those would drop the SDK's own.
+                "Authorization": f"Bearer {key}",
             }
-
-        # ``name`` is Optional on the base Tool; concrete providers always set it,
-        # but fall back to the provider label so the error always has a name.
-        tool_name = self.name or self._provider_label
 
         # Base/provider kwargs merged with user chat_params (chat_params last, so
         # a caller-supplied key overrides rather than collides with a duplicate
@@ -153,7 +155,7 @@ class OpenAICompatibleTool(LLM):
             ) as client:
                 if self.structured_output and self._supports_beta_parse:
                     parsed = await client.beta.chat.completions.parse(**call_kwargs)
-                    messages = self.to_messages(parsed)
+                    messages = self._to_messages(parsed)
                 elif self.should_stream() and "audio" not in call_kwargs:
                     # Audio comes whole, so only text answers stream.
                     messages = [
@@ -161,37 +163,34 @@ class OpenAICompatibleTool(LLM):
                     ]
                 else:
                     response = await client.chat.completions.create(**call_kwargs)
-                    messages = self.to_messages(response)
-        except OpenAIError as exc:
-            raise LLMToolException(
-                tool_name=tool_name,
-                model=self.model,
-                message=f"{self._provider_label} API call failed",
-                invoke_context=invoke_context,
-                cause=exc,
-            ) from exc
+                    messages = self._to_messages(response)
         except Exception as exc:
             raise LLMToolException(
                 tool_name=tool_name,
                 model=self.model,
-                message=f"Unexpected error during {self._provider_label} call",
+                message=(
+                    f"{self._provider_label} API call failed"
+                    if isinstance(exc, OpenAIError)
+                    else f"Unexpected error during {self._provider_label} call"
+                ),
                 invoke_context=invoke_context,
                 cause=exc,
             ) from exc
-        yield messages
+        return messages
 
     async def _streamed(
         self,
         client: AsyncClient,
         call_kwargs: Dict[str, Any],
-        stream_options: Optional[Dict[str, Any]] = None,
+        stream_options: Optional[Dict[str, Any]],
     ) -> Message:
         """The answer, its text emitted as deltas as it streams in.
 
         A tool call comes in fragments at its index: its id and name, then its
         arguments in pieces; a different id at the same index is another call.
         Providers differ in which fields they repeat in every chunk, such as
-        the role, so only text and arguments are joined.
+        the role, so only the text, the refusal and the arguments are joined,
+        and the annotations collected.
         """
         request: Dict[str, Any] = {
             **call_kwargs,
@@ -221,7 +220,7 @@ class OpenAICompatibleTool(LLM):
                 refusal.append(delta.refusal or "")
                 annotations += (delta.model_extra or {}).get("annotations") or []
                 for fragment in delta.tool_calls or []:
-                    index = getattr(fragment, "index", None)
+                    index = fragment.index
                     call = at_index.get(index)
                     if call is None or fragment.id not in (None, "", call["id"]):
                         call = {"id": "", "type": "function", "function": {}}
@@ -245,7 +244,7 @@ class OpenAICompatibleTool(LLM):
             }
         )
 
-    def to_messages(self, response: ChatCompletion) -> Messages:
+    def _to_messages(self, response: ChatCompletion) -> Messages:
         """A response as a message: its text, refusal and tool calls."""
         message = response.choices[0].message
         data = message.model_dump(exclude={"parsed"})
@@ -302,11 +301,6 @@ T_OAC = TypeVar("T_OAC", bound=OpenAICompatibleTool)
 
 class OpenAICompatibleToolBuilder(LLMBuilder[T_OAC]):
     """Builder for OpenAI-compatible tools."""
-
-    def api_key(self, api_key: Optional[str]) -> Self:
-        """Set the provider API key."""
-        self.kwargs["api_key"] = api_key
-        return self
 
     def base_url(self, base_url: str) -> Self:
         """Set the provider base URL (trailing slash trimmed)."""

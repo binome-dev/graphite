@@ -31,9 +31,11 @@ class SimpleOllamaAssistant(Assistant):
     )
     name: str = Field(default="SimpleOllamaAssistant")
     type: str = Field(default="SimpleOllamaAssistant")
-    api_url: str = Field(default="http://localhost:11434")
-    system_message: Optional[str] = Field(default=None)
-    model: str = Field(default="qwen3")
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_url: str = Field(default="http://localhost:11434", exclude=True)
+    system_message: Optional[str] = Field(default=None, exclude=True)
+    model: str = Field(default="qwen3", exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleOllamaAssistantBuilder":

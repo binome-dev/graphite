@@ -1,6 +1,6 @@
 # Topic Base
 
-The Graphite topic base system provides the foundational components for implementing topic-based messaging patterns. It enables publishers to send messages to named topics and consumers to receive messages based on configurable conditions, supporting decoupled communication between system components.
+The Graphite topic base system provides the foundational components for implementing topic-based messaging patterns. It enables publishers to send messages to named topics and consumers to receive them in order, supporting decoupled communication between system components.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The topic base system implements a publish-subscribe messaging pattern where:
 
 - **Publishers**: Send messages to named topics
 - **Consumers**: Subscribe to topics and receive messages
-- **Conditions**: Filter messages based on custom logic
+- **Routing**: A topic is a queue with no condition of its own; the publishing node's routes decide which topics an event goes to
 - **Offsets**: Track consumption progress for each consumer
 - **Events**: Maintain a complete audit trail of all operations
 
@@ -23,24 +23,22 @@ The base class for all topic implementations, providing core messaging functiona
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `str` | Unique identifier for the topic |
-| `type` | `str` | Topic type identifier |
-| `condition` | `Callable[[Messages], bool]` | Function to filter publishable messages |
-| `event_cache` | `TopicEventQueue` | Manages event storage and consumer offsets |
-| `publish_event_handler` | `Optional[Callable]` | Handler for publish events |
+| `type` | `TopicType` | Topic type identifier (`TopicType.DEFAULT_TOPIC_TYPE` by default) |
+| `event_queue` | `TopicEventQueue` | FIFO queue of the topic's events and consumer offsets, for using the topic on its own (in memory by default; never saved) |
 
 #### Core Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `publish_data` | `(invoke_context, publisher_name, publisher_type, data, consumed_events) -> PublishToTopicEvent` | Publish messages to the topic (abstract) |
-| `can_consume` | `(consumer_name: str) -> bool` | Check if consumer has unread messages |
-| `consume` | `(consumer_name: str) -> List[PublishToTopicEvent]` | Retrieve unread messages for consumer |
-| `consume` | `async (consumer_name: str, timeout: Optional[float]) -> List[TopicEvent]` | Async version of consume with timeout |
+| `publish_data` | `async (publish_event: PublishToTopicEvent) -> PublishToTopicEvent` | Publish a source event to the topic and return the enqueued publication |
+| `prepare_publication` | `(publish_event: PublishToTopicEvent) -> PublishToTopicEvent` | Build this topic's publication of a source event, without enqueueing it |
+| `add_event` | `async (event: TopicEvent) -> Optional[TopicEvent]` | Enqueue a publication and return it with its offset set |
+| `can_consume` | `async (consumer_name: str) -> bool` | Check if consumer has unread messages |
+| `unconsumed_count` | `async (consumer_name: str) -> int` | Number of messages the consumer has not yet consumed |
+| `consume` | `async (consumer_name: str, timeout: Optional[float] = None) -> List[TopicEvent]` | Retrieve unread messages for consumer |
 | `commit` | `async (consumer_name: str, offset: int) -> None` | Commit processed messages up to offset |
-| `reset` | `() -> None` | Reset topic to initial state |
-| `reset` | `async () -> None` | Async version of reset |
-| `restore_topic` | `(topic_event: TopicEvent) -> None` | Restore topic from event |
-| `restore_topic` | `async (topic_event: TopicEvent) -> None` | Async version of restore_topic |
+| `reset` | `async () -> None` | Reset topic to initial state |
+| `restore_topic` | `async (topic_event: TopicEvent) -> None` | Restore topic from event |
 
 #### Utility Methods
 
@@ -56,24 +54,20 @@ Builder pattern implementation for constructing topic instances.
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `name` | `(name: str) -> Self` | Set topic name with validation |
-| `condition` | `(condition: Callable[[Messages], bool]) -> Self` | Set message filtering condition |
+| `name` | `(name: str) -> Self` | Set topic name |
+| `type` | `(type_name: str) -> Self` | Set topic type |
 
-## Reserved Topics
+## Topic Types
 
-The system includes reserved topic names for internal agent operations:
+`grafi.topics.topic_types.TopicType` names what a topic is for; each topic
+class sets its own:
 
-```python
-AGENT_RESERVED_TOPICS = [
-    "agent_input_topic",
-    "agent_output_topic"
-]
-```
-
-These topics cannot be used for custom topic names to avoid conflicts with system functionality. Additionally, the system supports workflow-specific topic types:
-
-- `IN_WORKFLOW_INPUT_TOPIC_TYPE = "InWorkflowInput"`
-- `IN_WORKFLOW_OUTPUT_TOPIC_TYPE = "InWorkflowOutput"`
+- `DEFAULT_TOPIC_TYPE = "Topic"` (`Topic`)
+- `AGENT_INPUT_TOPIC_TYPE = "AgentInputTopic"` (`InputTopic`)
+- `AGENT_OUTPUT_TOPIC_TYPE = "AgentOutputTopic"` (`OutputTopic`)
+- `IN_WORKFLOW_INPUT_TOPIC_TYPE = "InWorkflowInputTopic"` (`InWorkflowInputTopic`)
+- `IN_WORKFLOW_OUTPUT_TOPIC_TYPE = "InWorkflowOutputTopic"` (`InWorkflowOutputTopic`)
+- `NONE_TOPIC_TYPE = "NoneTopic"`
 
 ## Message Publishing
 
@@ -94,40 +88,24 @@ runs before anything is stored.
 
 ## Message Consumption
 
-The topic system uses a sophisticated caching mechanism (`TopicEventQueue`) that manages consumed and committed offsets separately for reliable message processing.
+The topic's `event_queue` (a `TopicEventQueue`) manages consumed and committed offsets separately for reliable message processing.
 
 ### Consumption Check
 
 ```python
-def can_consume(self, consumer_name: str) -> bool:
+async def can_consume(self, consumer_name: str) -> bool:
     """Check if consumer has unread messages."""
-    return self.event_cache.can_consume(consumer_name)
+    return await self.event_queue.can_consume(consumer_name)
 ```
 
 ### Message Retrieval
 
 ```python
-def consume(self, consumer_name: str) -> List[PublishToTopicEvent | OutputTopicEvent]:
-    """Retrieve unread messages for consumer."""
-    # Get new events using the offset range
-    new_events = self.event_cache.fetch(consumer_name)
-
-    # Filter to only return PublishToTopicEvent instances for backward compatibility
-    return [
-        event
-        for event in new_events
-        if isinstance(event, (PublishToTopicEvent, OutputTopicEvent))
-    ]
-```
-
-### Async Message Retrieval
-
-```python
 async def consume(
     self, consumer_name: str, timeout: Optional[float] = None
 ) -> List[TopicEvent]:
-    """Asynchronously retrieve new/unconsumed messages for the given node."""
-    return await self.event_cache.fetch(consumer_name, timeout=timeout)
+    """Retrieve unread messages for this consumer."""
+    return await self.event_queue.fetch(consumer_name, timeout=timeout)
 ```
 
 ### Offset Management
@@ -140,17 +118,32 @@ The system maintains two types of offsets:
 ```python
 async def commit(self, consumer_name: str, offset: int) -> None:
     """Commit processed messages up to the specified offset."""
-    await self.event_cache.commit_to(consumer_name, offset)
+    await self.event_queue.commit_to(consumer_name, offset)
 ```
 
-## Message Filtering
+## Routing
 
-Topics support flexible message filtering through condition functions:
-
-### Default Condition
+A topic has no condition: it enqueues every publication it is given. Which
+topics an event goes to is decided by the node publishing it, whose
+`publish_to(topic, when=...)` routes each take an optional predicate on the
+outgoing `PublishToTopicEvent` (by default, every event). Reusable predicates,
+such as `has_tool_call` and `has_text_response`, live in
+`grafi.nodes.conditions`. See [Node](../node.md).
 
 ```python
-condition: Callable[[Messages], bool] = Field(default=lambda _: True)
+from grafi.nodes.conditions import has_text_response
+from grafi.nodes.conditions import has_tool_call
+from grafi.nodes.node import Node
+
+node = (
+    Node.builder()
+    .name("LLMNode")
+    .subscribe(agent_input_topic)
+    .tool(llm_tool)
+    .publish_to(function_call_topic, when=has_tool_call)
+    .publish_to(agent_output_topic, when=has_text_response)
+    .build()
+)
 ```
 
 ## Topic State Management
@@ -158,44 +151,23 @@ condition: Callable[[Messages], bool] = Field(default=lambda _: True)
 ### Reset Topic
 
 ```python
-def reset(self) -> None:
-    """Reset the topic to its initial state."""
-    self.event_cache = TopicEventQueue(self.name)
-
 async def reset(self) -> None:
     """Asynchronously reset the topic to its initial state."""
-    self.event_cache.reset()
-    self.event_cache = TopicEventQueue(self.name)
+    await self.event_queue.reset()
 ```
 
 ### Restore Topic
 
 ```python
-def restore_topic(self, topic_event: TopicEvent) -> None:
-    """Restore a topic from a topic event."""
-    if isinstance(topic_event, PublishToTopicEvent) or isinstance(
-        topic_event, OutputTopicEvent
-    ):
-        self.event_cache.put(topic_event)
-    elif isinstance(topic_event, ConsumeFromTopicEvent):
-        self.event_cache.fetch(
-            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
-        )
-        self.event_cache.commit_to(topic_event.consumer_name, topic_event.offset)
-
 async def restore_topic(self, topic_event: TopicEvent) -> None:
     """Asynchronously restore a topic from a topic event."""
-    if isinstance(topic_event, PublishToTopicEvent) or isinstance(
-        topic_event, OutputTopicEvent
-    ):
-        await self.event_cache.put(topic_event)
+    if isinstance(topic_event, PublishToTopicEvent):
+        await self.event_queue.put(topic_event)
     elif isinstance(topic_event, ConsumeFromTopicEvent):
-        # Fetch the events for the consumer and commit the offset
-        await self.event_cache.fetch(
-            consumer_id=topic_event.consumer_name, offset=topic_event.offset + 1
-        )
-        await self.event_cache.commit_to(
-            topic_event.consumer_name, topic_event.offset
+        # Restore the consumer's cursor to the recorded commit point.
+        await self.event_queue.restore_consumer(
+            consumer_id=topic_event.consumer_name,
+            committed_offset=topic_event.offset,
         )
 ```
 
@@ -218,25 +190,12 @@ Nodes refer to topics by name, and a workflow saves its topics with it. See
 ### Basic Topic Creation
 
 ```python
-from grafi.topics.topic_base import TopicBaseBuilder
+from grafi.topics.topic_impl.topic import Topic
 
 # Create topic with builder
-topic = (TopicBaseBuilder()
+topic = (Topic.builder()
     .name("processing_results")
-    .condition(lambda msgs: len(msgs) > 0)
     .build())
-```
-
-### Validation
-
-The builder includes validation for reserved topic names:
-
-```python
-def name(self, name: str) -> Self:
-    if name in AGENT_RESERVED_TOPICS:
-        raise ValueError(f"Topic name '{name}' is reserved for the agent.")
-    self.kwargs["name"] = name
-    return self
 ```
 
 The topic base system provides the foundational structure for implementing topic-based messaging patterns in Graphite applications.

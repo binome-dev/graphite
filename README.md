@@ -70,6 +70,9 @@ Install Graphite:
 pip install grafi
 ```
 
+Upgrading from 0.0.36? Follow the checklist in the
+[release notes](docs/docs/release-notes.md#upgrading-from-0036).
+
 Run a build in ReAct agent:
 
 ```mermaid
@@ -148,8 +151,8 @@ by running many stateless processes that share one event store (e.g.
 
 ### Security: loading manifests
 
-A manifest (`assistant.generate_manifest()`, `Assistant.from_manifest(path)`)
-is JSON with no code in it: it names classes and functions by import path, and
+A manifest (`assistant.generate_manifest()`, which returns its
+`pathlib.Path`, and `Assistant.from_manifest(...)`) is JSON with no code in it: it names classes and functions by import path, and
 loading imports them only from trusted modules, grafi's and those you name:
 
 ```python
@@ -159,11 +162,17 @@ trust_modules("my_app")  # at startup, before loading a manifest
 ```
 
 A manifest never holds a secret's value: an API key is saved as the name of
-the environment variable it is read from, `{"env": "OPENAI_API_KEY"}`, and
-`from_manifest` lets a manifest read no other variable unless you name it
-(`env=[...]`). A manifest still chooses the endpoints its components call, such
-as an LLM's `base_url`: load manifests from sources you trust with the secrets
-they use. See the [manifests guide](docs/docs/user-guide/manifests.md).
+the environment variable it is read from, `{"env": "OPENAI_API_KEY"}`. Load
+data you did not write yourself with `from_manifest`, the one path that checks
+it, given as a dict, JSON text or bytes (a `str` is never read as a path; pass
+a file as a `pathlib.Path`): a manifest reads only each secret's own variable
+unless `from_manifest(..., allow_env=[...])` names another, and whatever it
+holds, loading raises `ManifestError`, `pydantic.ValidationError` or, reading a
+file, `OSError`. `model_validate` and the constructors trust what they are
+given, as code. A manifest still chooses the endpoints its components call, such
+as an LLM's `base_url`, and an MCP server's command, and those receive the
+secrets its components read: never load manifests from a party you would not
+give your keys to. See the [manifests guide](docs/docs/user-guide/manifests.md).
 
 ### Observability & data-handling controls
 

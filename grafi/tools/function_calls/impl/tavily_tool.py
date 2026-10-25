@@ -8,6 +8,7 @@ from typing import Self
 from pydantic import PrivateAttr
 
 from grafi.common.decorators.llm_function import llm_function
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 from grafi.tools.function_calls.function_call_tool import FunctionCallToolBuilder
@@ -35,10 +36,12 @@ class TavilyTool(FunctionCallTool):
 
     @property
     def client(self) -> TavilyClient:
-        """The Tavily client, made on first use."""
-        if self._client is None:
-            self._client = TavilyClient(self.api_key)
-        return self._client
+        """The Tavily client, made with the tool's key on first use, and again
+        when its key changed, as a copy given another has."""
+        key, client = self.secret_value("api_key"), self._client
+        if client is None or client.api_key != key:
+            client = self._client = TavilyClient(key)
+        return client
 
     @classmethod
     def builder(cls) -> "TavilyToolBuilder":
@@ -89,7 +92,9 @@ class TavilyTool(FunctionCallTool):
 class TavilyToolBuilder(FunctionCallToolBuilder[TavilyTool]):
     """Builder for TavilyTool instances."""
 
-    def api_key(self, api_key: Optional[str]) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
+        """Set the API key, or the variable to read it from, ``{"env":
+        "VAR"}``, as LLMBuilder.api_key() takes it."""
         self.kwargs["api_key"] = api_key
         return self
 

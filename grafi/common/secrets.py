@@ -5,8 +5,9 @@ A manifest never holds a secret's value. Besides the fields declared with
 a field, header, variable or URL parameter called ``api_key``, ``clientSecret``,
 ``GITHUB_TOKEN``, ``Authorization``... (see :func:`is_secret_name`), and a
 URL's password. Text that only refers to an environment variable, as
-``"${GITHUB_TOKEN}"`` or ``"Bearer ${GITHUB_TOKEN}"``, holds no secret, and is
-expanded where it is used (see :func:`expand_env`).
+``"${GITHUB_TOKEN}"`` or ``"Bearer ${GITHUB_TOKEN}"``, holds no secret where it
+is expanded, in an MCP configuration (see :func:`expand_env`); elsewhere it
+would be sent as written, and is refused.
 """
 
 import os
@@ -26,8 +27,6 @@ __all__ = [
     "env_variables_in",
     "expand_env",
     "held_secret",
-    "is_env_reference",
-    "is_secret_name",
 ]
 
 # Names that say they hold a secret: api_key, client_secret, password,
@@ -41,6 +40,10 @@ _SECRET_NAME = re.compile(
 
 # ... but not a tokenizer's special tokens.
 _TOKENIZER_TOKEN = re.compile(r"(^|_)(eos|bos|pad|unk|sep|cls|mask)_token$", re.I)
+
+# The keys of a JSON Schema whose own keys name properties or schemas, such as
+# a parameter called pageToken, not settings.
+_SCHEMA_NAMES = frozenset({"properties", "patternProperties", "$defs", "definitions"})
 
 # Where a camelCase name's words meet, as in clientSecret and OpenAIApiKey.
 _CAMEL_HUMP = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
@@ -86,43 +89,53 @@ def env_variables_in(text: str) -> List[str]:
     return _REFERENCE.findall(text)
 
 
-def expand_env(text: str) -> str:
-    """``text`` with each ``${VAR}`` replaced by the variable's value.
+def expand_env(text: str, env: Mapping[str, str] = {}) -> str:
+    """``text`` with each ``${VAR}`` replaced by the variable's value: the one
+    ``env`` gives, else the environment's.
 
     Raises:
-        ValueError: If a variable is not set.
+        ValueError: If a variable is not set, or empty.
     """
 
     def value(reference: "re.Match[str]") -> str:
-        value = os.getenv(reference[1])
-        if value is None:
+        value = env.get(reference[1], os.getenv(reference[1]))
+        if not value:
             raise ValueError(
                 f"The environment variable {reference[1]} is referred to, "
-                "but not set."
+                f"but {'empty' if value == '' else 'not set'}."
             )
         return value
 
     return _REFERENCE.sub(value, text)
 
 
-def held_secret(name: str, value: Any) -> Optional[str]:
-    """The name of a secret ``value`` holds, itself or within it: text under a
-    name like a secret's, such as a header dict's ``Authorization``, unless it
-    only refers to a variable; or a URL's password or secret parameter. All
-    within a value held under a secret's name is under that name."""
+def held_secret(name: str, value: Any, *, expands: bool = False) -> Optional[str]:
+    """The name of the first secret ``value`` holds, itself or within it, else
+    None: text under a name like a secret's, such as a header dict's
+    ``Authorization``; or a URL holding a password or a secret parameter. All
+    nested under a secret's name is under that name, but the properties a JSON
+    Schema names are not settings. A reference to a class or function holds
+    none. Nor does a reference to a variable where it is read: ``{"env":
+    "VAR"}`` as a component's field, in its JSON, and text referring to one,
+    ``"Bearer ${VAR}"``, where it ``expands``; elsewhere either would be sent
+    as written."""
     if isinstance(value, str):
-        if value and is_secret_name(name) and not is_env_reference(value):
+        referring = expands and is_env_reference(value)
+        if value and is_secret_name(name) and not referring:
             return name
-        return name if _url_secret(value) else None
-    if env_reference(value) is not None:
+        return name if _url_secret(value, expands) else None
+    if _import_reference(value):
         return None
     under_secret = is_secret_name(name)
     items: Iterable[Any] = ()
-    if isinstance(value, Mapping):
+    if isinstance(value, Mapping) and name in _SCHEMA_NAMES and _schemas(value):
+        items = (("", item) for item in value.values())
+    elif isinstance(value, Mapping):
+        component = is_import_path(str(value.get("class", "")))  # Its JSON.
         items = (
             (name if under_secret else str(key), item)
             for key, item in value.items()
-            if not (key == "class" and is_import_path(str(item)))  # A component's.
+            if not (component and (key == "class" or env_reference(item)))
         )
     elif isinstance(value, (list, tuple)):
         items = (  # [name, value] pairs, unless under a secret's name.
@@ -130,10 +143,25 @@ def held_secret(name: str, value: Any) -> Optional[str]:
             for item in value
         )
     for key, item in items:
-        held = held_secret(str(key), item)
+        held = held_secret(str(key), item, expands=expands)
         if held is not None:
             return held
     return None
+
+
+def _schemas(value: Mapping[str, Any]) -> bool:
+    """Whether ``value``'s values are JSON Schemas, as a schema's properties
+    are: objects, or booleans."""
+    return all(isinstance(item, (Mapping, bool)) for item in value.values())
+
+
+def _import_reference(value: Any) -> bool:
+    """Whether ``value`` refers to a class or function, ``{"ref": "module:name"}``."""
+    return (
+        isinstance(value, Mapping)
+        and set(value) == {"ref"}
+        and is_import_path(str(value["ref"]))
+    )
 
 
 def _named_pair(item: Any) -> bool:
@@ -144,9 +172,9 @@ def _named_pair(item: Any) -> bool:
     )
 
 
-def _url_secret(text: str) -> bool:
+def _url_secret(text: str, expands: bool) -> bool:
     """Whether ``text`` is a URL holding a password, or a parameter named like
-    a secret, that is not a variable's reference."""
+    a secret, that is not a variable's reference where it ``expands``."""
     if "://" not in text:
         return False
     try:
@@ -154,9 +182,9 @@ def _url_secret(text: str) -> bool:
         query = parse_qsl(url.query)
     except ValueError:
         return True  # Unreadable: it may hold one, so it is refused.
-    if url.password and not is_env_reference(url.password):
+    if url.password and not (expands and is_env_reference(url.password)):
         return True
     return any(
-        value and is_secret_name(name) and not is_env_reference(value)
+        value and is_secret_name(name) and not (expands and is_env_reference(value))
         for name, value in query
     )

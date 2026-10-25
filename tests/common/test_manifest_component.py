@@ -150,7 +150,7 @@ def test_python_dump_holds_topics_in_full(monkeypatch: pytest.MonkeyPatch) -> No
         "name": "answer",
         "type": TopicType.AGENT_OUTPUT_TOPIC_TYPE,
     }
-    assert data["tool"]["api_key"] == "fake-openai-key"
+    assert data["tool"]["api_key"] == {"env": "OPENAI_API_KEY"}
     loaded = Node.model_validate(data)  # Without the topics in its context.
     assert loaded.node_id == node.node_id
     assert [(type(t), t.name) for t in loaded.subscribed_topics] == [

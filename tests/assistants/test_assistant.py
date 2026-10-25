@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 from pathlib import Path
 from typing import ClassVar
 from typing import List
@@ -12,11 +13,11 @@ from pydantic import ValidationError
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBase
-from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.exceptions import WorkflowError
 from grafi.common.manifest import ManifestError
 from grafi.common.models.invoke_context import InvokeContext
@@ -37,7 +38,7 @@ class EchoTool(Tool):
     reply: str = "echo"
 
     async def invoke(self, invoke_context, input_data):
-        yield [Message(role="assistant", content=self.reply)]
+        return [Message(role="assistant", content=self.reply)]
 
 
 def _echo_workflow(reply: str = "echo") -> EventDrivenWorkflow:
@@ -332,7 +333,7 @@ class TestAssistant:
 
         # Verify the method returns the path to the generated manifest.
         expected_path = os.path.join(output_dir, "test_assistant_manifest.json")
-        assert result_path == expected_path
+        assert result_path == Path(expected_path)
 
         # Verify file was created and contains correct data
         assert os.path.exists(expected_path)
@@ -350,7 +351,7 @@ class TestAssistant:
 
         result_path = assistant.generate_manifest()
 
-        assert result_path == os.path.join(".", "test_assistant_manifest.json")
+        assert result_path == Path("test_assistant_manifest.json")
         manifest_file = tmp_path / "test_assistant_manifest.json"
         assert json.loads(manifest_file.read_text()) == assistant.to_manifest()
 
@@ -615,9 +616,7 @@ class TestAssistant:
         expected_output = "ABCDABCEABCFGH"
         assert result_events[0].data[0].content == expected_output
 
-    @pytest.mark.parametrize(
-        "name", ["../escaped", "nested/name", "..", "a..b", "C:evil", "a\\b"]
-    )
+    @pytest.mark.parametrize("name", ["../escaped", "nested/name", "C:evil", "a\\b"])
     def test_a_name_holding_a_path_is_never_a_manifests_file(
         self, assistant, tmp_path, name
     ):
@@ -625,15 +624,54 @@ class TestAssistant:
         output_dir = tmp_path / "out"
         output_dir.mkdir()
 
-        with pytest.raises(ManifestError, match="so it holds no path"):
+        with pytest.raises(ManifestError, match="so it holds no ./."):
             assistant.generate_manifest(str(output_dir))
 
         assert list(tmp_path.rglob("*")) == [output_dir]
 
-    def test_generate_manifest_file_write_error(self, assistant, tmp_path):
-        """Test manifest generation into a directory that does not exist."""
-        with pytest.raises(FileNotFoundError):
-            assistant.generate_manifest(str(tmp_path / "missing"))
+    @pytest.mark.parametrize("name", ["Q&A Assistant (v2) #1", "..", "ReAct+Search"])
+    def test_a_name_holding_no_path_names_its_manifests_file(
+        self, assistant, tmp_path, name
+    ):
+        assistant.name = name
+
+        path = assistant.generate_manifest(tmp_path)
+
+        assert path == tmp_path / f"{name}_manifest.json"
+        assert list(tmp_path.iterdir()) == [path]
+
+    def test_a_link_at_the_manifests_path_is_replaced_never_followed(
+        self, assistant, tmp_path
+    ):
+        """One planted in a shared directory cannot redirect the write."""
+        target = tmp_path / "elsewhere"
+        target.write_text("kept")
+        link = tmp_path / f"{assistant.name}_manifest.json"
+        link.symlink_to(target)
+
+        assistant.generate_manifest(tmp_path)
+
+        assert not link.is_symlink()
+        assert json.loads(link.read_text()) == assistant.to_manifest()
+        assert target.read_text() == "kept"
+
+    def test_generate_manifest_makes_its_directory(self, assistant, tmp_path):
+        path = assistant.generate_manifest(tmp_path / "manifests" / "today")
+
+        assert Assistant.from_manifest(path).to_manifest() == assistant.to_manifest()
+        assert list(path.parent.iterdir()) == [path]  # No temporary file left.
+
+    def test_a_manifest_is_readable_as_the_umask_allows(self, assistant, tmp_path):
+        """Written as open() writes a file, so another user may read it."""
+        previous = os.umask(0o022)
+        try:
+            path = assistant.generate_manifest(tmp_path)
+            path.chmod(0o640)
+            assistant.generate_manifest(tmp_path)
+        finally:
+            os.umask(previous)
+
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
 
     def test_failed_save_keeps_the_previous_manifest(self, assistant, tmp_path):
         """A save that fails leaves the manifest already written whole."""
@@ -749,8 +787,8 @@ class TestAssistantFromManifest:
         assert node.node_id == original.workflow.nodes["echo_node"].node_id
         assert type(node.tool) is EchoTool
         assert node.tool.reply == "hi there"
-        assert node.subscribed_topics == [workflow._topics["agent_input"]]
-        assert node.publish_to == [workflow._topics["agent_output"]]
+        assert node.subscribed_topics == [workflow.topics["agent_input"]]
+        assert node.publish_to == [workflow.topics["agent_output"]]
 
     def test_from_manifest_file(self, original: RecordingAssistant, tmp_path):
         path = original.generate_manifest(str(tmp_path))
@@ -905,8 +943,10 @@ class TestAssistantFromManifest:
             },
         }
 
-        with pytest.raises(WorkflowError, match="agent_input_topic"):
+        # A manifest's errors are ManifestError's, the workflow's its cause.
+        with pytest.raises(ManifestError, match="agent_input_topic") as raised:
             Assistant.from_manifest(manifest)
+        assert isinstance(raised.value.__cause__, WorkflowError)
 
     def test_legacy_manifest_is_upgraded(self):
         """A manifest saved by the former to_dict(), without an apiVersion,
@@ -967,8 +1007,8 @@ class TestAssistantFromManifest:
         assert node.node_id == "legacy_node_id"
         assert type(node.tool) is EchoTool
         assert node.tool.tool_id == "legacy_tool_id"
-        assert node.publish_to == [workflow._topics["agent_output"]]
-        assert type(workflow._topics["agent_input"]) is InputTopic
+        assert node.publish_to == [workflow.topics["agent_output"]]
+        assert type(workflow.topics["agent_input"]) is InputTopic
 
         # Loaded through a subclass, it is one, with the saved workflow.
         recording = RecordingAssistant.from_manifest(
@@ -979,3 +1019,58 @@ class TestAssistantFromManifest:
         assert recording.assistant_id == "legacy_id"
         assert recording.workflow.workflow_id == "legacy_workflow_id"
         assert RecordingAssistant.builds == []
+
+
+def test_concurrent_saves_of_one_manifest_never_collide(tmp_path) -> None:
+    """Each writes beside it under a name of its own, then moves it over."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    assistant = Assistant(name="shared")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        paths = list(
+            pool.map(lambda _: assistant.generate_manifest(tmp_path), range(50))
+        )
+
+    assert set(paths) == {tmp_path / "shared_manifest.json"}
+    assert list(tmp_path.iterdir()) == [tmp_path / "shared_manifest.json"]
+
+
+def test_an_invoke_taking_no_stream_is_refused_when_its_class_is_defined():
+    """Rather than when a caller, or grafi, passes stream."""
+    with pytest.raises(
+        TypeError, match="NoStream.invoke\\(\\) takes no stream by keyword"
+    ):
+
+        class NoStream(Assistant):
+            async def invoke(self, input_data, is_sequential=False):  # type: ignore[override]
+                yield input_data
+
+
+def test_a_workflow_whose_invoke_takes_stream_only_by_position_is_refused():
+    from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+
+    with pytest.raises(TypeError, match="takes no stream by keyword"):
+
+        class Positional(EventDrivenWorkflow):
+            async def invoke(self, input_data, is_sequential=False, stream=False, /):  # type: ignore[override]
+                yield input_data
+
+
+def test_an_invoke_wrapped_by_an_adapter_taking_stream_is_accepted():
+    """A wrapper passing stream on, to an invoke that predates it."""
+    import functools
+
+    def adds_stream(invoke):
+        @functools.wraps(invoke)
+        async def wrapper(self, input_data, is_sequential=False, *, stream=False):
+            async for output in invoke(self, input_data, is_sequential):
+                yield output
+
+        return wrapper
+
+    class Adapted(Assistant):
+        @adds_stream
+        async def invoke(self, input_data, is_sequential=False):  # type: ignore[override]
+            yield input_data
+
+    assert Adapted.invoke.__wrapped__ is not None

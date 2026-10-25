@@ -30,7 +30,6 @@ from grafi.common.exceptions import FunctionToolException
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.tools.command import Command
 from grafi.tools.command import use_command
@@ -71,25 +70,17 @@ class LLMMockTool(Tool):
     @record_tool_invoke
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         try:
             response = self.function(input_data)
             if inspect.isasyncgen(response):
+                output: Messages = []
                 async for item in response:
-                    # Ensure item is always a list
-                    if isinstance(item, list):
-                        yield item
-                    else:
-                        yield [item]
-                return
+                    output.extend(item if isinstance(item, list) else [item])
+                return output
             if inspect.isawaitable(response):
                 response = await response
-
-            # Ensure response is always a list
-            if isinstance(response, list):
-                yield response
-            else:
-                yield [response]
+            return response if isinstance(response, list) else [response]
         except Exception as e:
             raise FunctionToolException(
                 tool_name=self.name,

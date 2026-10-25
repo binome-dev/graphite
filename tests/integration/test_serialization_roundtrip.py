@@ -33,16 +33,15 @@ from pydantic_core import PydanticSerializationError
 
 from grafi.assistants.assistant import Assistant
 from grafi.common.callable_component import CallableComponent
-from grafi.common.callable_ref import CallableSerializationError
 from grafi.common.decorators.llm_function import llm_function
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.manifest import ManifestError
 from grafi.common.manifest import env_secret
 from grafi.common.models.function_spec import FunctionSpec
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.conditions import has_text_response
 from grafi.nodes.conditions import has_tool_call
 from grafi.nodes.node import Node
@@ -65,6 +64,8 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from tests.wiring import answered_by
+from tests.wiring import offered_to
 
 ENV = {
     "OPENAI_API_KEY": "fake-openai-key",
@@ -168,18 +169,17 @@ class GreetTool(FunctionCallTool):
 class ScriptedLLM(OpenAITool):
     """An LLM that calls each function it is offered, with the ``arguments``
     given for it, then answers with their results. What it calls is what the
-    workflow linked to it."""
+    workflow wires to it."""
 
     name: str = "ScriptedLLM"
     arguments: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         results = sorted(str(m.content) for m in input_data if m.role == "tool")
         if results:
-            yield [Message(role="assistant", content=" | ".join(results))]
-            return
+            return [Message(role="assistant", content=" | ".join(results))]
         calls = [
             ChatCompletionMessageToolCall(
                 id=f"call_{spec.name}",
@@ -191,7 +191,7 @@ class ScriptedLLM(OpenAITool):
             )
             for spec in self.get_function_specs()
         ]
-        yield [Message(role="assistant", content=None, tool_calls=calls or None)]
+        return [Message(role="assistant", content=None, tool_calls=calls or None)]
 
 
 def _runnable_workflow(
@@ -423,7 +423,7 @@ MCP_ENV = ["HELLO_MCP_TOKEN"]
 def _reload(assistant: Assistant) -> Assistant:
     """The assistant's manifest, as JSON text, loaded back."""
     manifest = json.loads(json.dumps(assistant.to_manifest()))
-    return Assistant.from_manifest(manifest, env=MCP_ENV)
+    return Assistant.from_manifest(manifest, allow_env=MCP_ENV)
 
 
 def _ids(assistant: Assistant) -> Dict[str, Any]:
@@ -448,9 +448,9 @@ def _offered(assistant: Assistant) -> Dict[str, Any]:
     offered: Dict[str, Any] = {}
     for name, node in assistant.workflow.nodes.items():
         if isinstance(node.tool, LLM):
-            offered[name] = sorted(s.name for s in node.tool.get_function_specs())
+            offered[name] = sorted(offered_to(assistant.workflow, name))
         elif isinstance(node.command, FunctionCallCommand):
-            offered[name] = node.command.offered
+            offered[name] = answered_by(assistant.workflow, name)
     return offered
 
 
@@ -473,11 +473,11 @@ async def test_restored_assistant_runs_as_the_original() -> None:
 
 
 @pytest.mark.asyncio
-async def test_function_calls_are_linked_again_on_load() -> None:
+async def test_function_calls_are_wired_again_on_load() -> None:
     assistant = WeatherAssistant()
     manifest = assistant.to_manifest()
     llm = manifest["spec"]["workflow"]["nodes"]["LLMNode"]["tool"]
-    assert "function_specs" not in llm  # Linked by the workflow, not saved.
+    assert "function_specs" not in llm  # Wired by the workflow, not saved.
 
     restored = Assistant.from_manifest(manifest)
 
@@ -486,10 +486,10 @@ async def test_function_calls_are_linked_again_on_load() -> None:
         "LLMNode": ["get_weather", "greet"],
         "FunctionCallNode": {"function_call": frozenset({"get_weather", "greet"})},
     }
-    # A restored copy of a restored copy is linked once, not twice.
+    # A restored copy of a restored copy is offered the same.
     again = _reload(restored)
-    assert again.workflow.nodes["LLMNode"].tool.get_function_specs() == (
-        assistant.workflow.nodes["LLMNode"].tool.get_function_specs()
+    assert offered_to(again.workflow, "LLMNode") == (
+        offered_to(assistant.workflow, "LLMNode")
     )
     assert await _run(again, "How is it?") == [">> Hi, Ada! | Sunny at 2000"]
 
@@ -526,7 +526,7 @@ async def test_callable_forms_in_the_manifest() -> None:
     # Its @llm_function method loads with its class; only what it was given
     # is saved, by reference. What it offers follows from them, unsaved.
     assert helper["functions"] == {"get_weather": {"ref": f"{__name__}:get_weather"}}
-    assert "function_specs" not in helper
+    assert "function_specs" not in helper  # Those it derives follow from it.
     assert nodes["FormatNode"]["tool"]["function"] == {
         "class": f"{__name__}:Prefixer",
         "prefix": ">> ",
@@ -573,11 +573,9 @@ def restored(kitchen_sink: Assistant) -> Assistant:
     servers."""
     no_connection = AssertionError("loading connected to an MCP server")
     with (
+        patch("fastmcp.Client", side_effect=no_connection),
         patch(
-            "grafi.tools.function_calls.impl.mcp_tool.Client", side_effect=no_connection
-        ),
-        patch(
-            "grafi.tools.functions.impl.mcp_function_tool.Client",
+            "fastmcp.Client",
             side_effect=no_connection,
         ),
     ):
@@ -643,7 +641,7 @@ def test_tool_fields_are_restored(restored: Assistant) -> None:
 
     helper = tools["HelperNode"]
     assert (helper.greeting, helper.on_error) == ("Hi", "raise")
-    assert helper.functions == {
+    assert helper._functions() == {
         "greet": GreetTool.greet,
         "get_weather": get_weather,
     }
@@ -664,7 +662,7 @@ def test_tool_fields_are_restored(restored: Assistant) -> None:
     assert (agent.agent_name, agent.agent_description) == ("expert", "Ask an expert.")
 
     mcp = tools["MCPNode"]
-    assert [spec.name for spec in mcp.function_specs] == ["hello"]
+    assert [spec.name for spec in mcp.get_function_specs()] == ["hello"]
     assert [(r.name, str(r.uri)) for r in mcp.resources] == [
         ("notes", "file:///notes.txt")
     ]
@@ -674,8 +672,8 @@ def test_tool_fields_are_restored(restored: Assistant) -> None:
 
     mcp_function = tools["MCPFunctionNode"]
     assert mcp_function.function_name == "hello"
-    assert mcp_function.function.__self__ is mcp_function
-    assert mcp_function.function.__func__ is MCPFunctionTool.invoke_mcp_function
+    assert mcp_function._function().__self__ is mcp_function
+    assert mcp_function._function().__func__ is MCPFunctionTool.invoke_mcp_function
 
     assert tools["ShoutNode"].function is shout
     assert (tools["ReviewerNode"].name, tools["ReviewerNode"].system_message) == (
@@ -718,7 +716,7 @@ def test_routes_and_subscriptions_are_restored(restored: Assistant) -> None:
             assert topic is workflow.topics[topic.name]
 
 
-def test_function_calls_of_every_kind_are_linked_again_on_load(
+def test_function_calls_of_every_kind_are_wired_again_on_load(
     kitchen_sink: Assistant, restored: Assistant
 ) -> None:
     offered = _offered(restored)
@@ -741,7 +739,7 @@ def test_workflow_manifest_round_trips(kitchen_sink: Assistant) -> None:
 
     with pytest.raises(ManifestError, match="HELLO_MCP_TOKEN"):
         EventDrivenWorkflow.from_manifest(manifest)
-    workflow = EventDrivenWorkflow.from_manifest(manifest, env=MCP_ENV)
+    workflow = EventDrivenWorkflow.from_manifest(manifest, allow_env=MCP_ENV)
 
     assert manifest["kind"] == "Workflow"
     assert set(manifest["spec"]["topics"]) == set(workflow.topics)
@@ -777,7 +775,7 @@ def test_python_dump_round_trips_in_process(
     nodes = data["workflow"]["nodes"]
     assert nodes["PlannerNode"]["tool"]["class"] is OpenAITool
     assert nodes["PlannerNode"]["tool"]["api_key"] == "a-literal-key"
-    assert nodes["SearchNode"]["tool"]["api_key"] == secrets["TAVILY_API_KEY"]
+    assert nodes["SearchNode"]["tool"]["api_key"] == {"env": "TAVILY_API_KEY"}
     assert nodes["PlannerNode"]["tool"]["chat_params"]["response_format"] is Weather
     assert nodes["ShoutNode"]["tool"]["function"] is shout
     assert nodes["AgentNode"]["tool"]["agent_call"] is ask_expert
@@ -787,7 +785,7 @@ def test_python_dump_round_trips_in_process(
     assert route["topic"]["name"] == "function_call"
     assert data["workflow"]["topics"]["agent_input"]["class"] is InputTopic
     with patch(
-        "grafi.tools.function_calls.impl.mcp_tool.Client",
+        "fastmcp.Client",
         side_effect=AssertionError("loading connected to an MCP server"),
     ):
         restored = Assistant.model_validate(data)
@@ -893,32 +891,32 @@ def test_secret_within_a_tool_setting_cannot_be_saved(
     with pytest.raises(PydanticSerializationError, match=match):
         kitchen_sink.model_dump(mode="json")
 
+    # A reference no one here would expand: sent as it is, so refused too.
     planner.chat_params = {"extra_headers": {"Authorization": "Bearer ${API_TOKEN}"}}
-    spec = kitchen_sink.to_manifest()["spec"]
-    saved = spec["workflow"]["nodes"]["PlannerNode"]["tool"]["chat_params"]
-    assert saved == planner.chat_params  # A reference, expanded by no one here.
+    with pytest.raises(ManifestError, match="only an MCP configuration expands"):
+        kitchen_sink.to_manifest()
 
 
 def test_a_manifest_reads_only_the_variables_it_is_allowed(
     kitchen_sink: Assistant,
 ) -> None:
     manifest = json.loads(json.dumps(kitchen_sink.to_manifest()))
-    with pytest.raises(ManifestError, match=r"HELLO_MCP_TOKEN.*env=\['HELLO_MCP"):
+    with pytest.raises(ManifestError, match=r"HELLO_MCP_TOKEN.*allow_env=\['HELLO_MCP"):
         Assistant.from_manifest(manifest)
 
     tool = manifest["spec"]["workflow"]["nodes"]["PlannerNode"]["tool"]
     tool["api_key"] = {"env": "TAVILY_API_KEY"}  # Not its own variable.
     with pytest.raises(ManifestError, match="TAVILY_API_KEY"):
-        Assistant.from_manifest(manifest, env=MCP_ENV)
+        Assistant.from_manifest(manifest, allow_env=MCP_ENV)
 
-    tool["api_key"] = "sk-literal"  # Refused by the component holding it.
-    match = "Assistant.workflow holds a secret, at 'api_key', and a manifest never"
+    tool["api_key"] = "sk-literal"  # Refused by the tool's own check.
+    match = "OpenAITool.api_key is given a value, and a manifest never holds"
     with pytest.raises(ManifestError, match=match):
-        Assistant.from_manifest(manifest, env=MCP_ENV)
+        Assistant.from_manifest(manifest, allow_env=MCP_ENV)
 
     tool["api_key"] = None  # Saving writes its variable, never null.
     with pytest.raises(ManifestError, match="OpenAITool.api_key is given a value"):
-        Assistant.from_manifest(manifest, env=MCP_ENV)
+        Assistant.from_manifest(manifest, allow_env=MCP_ENV)
 
 
 def test_nested_literal_mcp_secret_cannot_be_saved(kitchen_sink: Assistant) -> None:
@@ -935,15 +933,14 @@ def test_nested_literal_mcp_secret_cannot_be_saved(kitchen_sink: Assistant) -> N
 
 
 def test_legacy_pickle_payload_is_rejected() -> None:
-    """A pickle, as grafi before v2 saved a lambda, is of no shape a callable
-    is loaded from: refused, naming the upgrade of a manifest before v2."""
+    """A pickle, as grafi 0.0.30 to 0.0.34 saved a lambda, is never loaded,
+    as loading it would run any code it holds."""
     manifest = WeatherAssistant().to_manifest()
     tool = manifest["spec"]["workflow"]["nodes"]["FormatNode"]["tool"]
     tool["function"] = "gASVbase64legacyblob"
 
-    with pytest.raises(CallableSerializationError, match="Cannot load a callable") as e:
+    with pytest.raises(CallableSerializationError, match="saved by pickle"):
         Assistant.from_manifest(manifest)
-    assert "Component.from_manifest()" in str(e.value)
 
 
 def test_route_to_a_topic_outside_the_workflow_is_rejected() -> None:
@@ -962,8 +959,8 @@ def test_mcp_resource_and_prompt_metadata_round_trips() -> None:
     prompt = Prompt.model_validate({"name": "greeting", "_meta": {"v": 2}})
     tool = MCPTool(mcp_config=MCP_CONFIG, resources=[resource], prompts=[prompt])
 
-    loaded = MCPTool.model_validate(
-        json.loads(json.dumps(tool.model_dump(mode="json")))
+    loaded = MCPTool.from_manifest(
+        json.loads(json.dumps(tool.to_manifest())), allow_env=MCP_ENV
     )
 
     assert loaded.resources == [resource]

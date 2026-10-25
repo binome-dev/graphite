@@ -127,8 +127,8 @@ This function traverses the expression tree and collects all referenced topics, 
 ### Simple Topic Subscription
 
 ```python
-from grafi.topics.subscription_builder import SubscriptionBuilder
-from grafi.topics.topic import Topic
+from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
+from grafi.topics.topic_impl.topic import Topic
 
 # Create topics
 notifications = Topic(name="notifications")
@@ -199,7 +199,7 @@ right_expr = (SubscriptionBuilder()
     .build())
 
 # Combine manually
-from grafi.topics.topic_expression import CombinedExpr, LogicalOp
+from grafi.topics.expressions.topic_expression import CombinedExpr, LogicalOp
 complex_expr = CombinedExpr(
     op=LogicalOp.AND,
     left=left_expr,
@@ -212,7 +212,7 @@ complex_expr = CombinedExpr(
 ### Basic Evaluation
 
 ```python
-from grafi.topics.topic_expression import evaluate_subscription
+from grafi.topics.expressions.topic_expression import evaluate_subscription
 
 # Topics with new messages
 topics_with_msgs = ["notifications", "errors"]
@@ -271,6 +271,10 @@ result = evaluate_subscription(or_expr, ["other_topic"])
 An expression is saved as data, naming each topic by its name:
 
 ```python
+from grafi.topics.expressions.topic_expression import CombinedExpr
+from grafi.topics.expressions.topic_expression import LogicalOp
+from grafi.topics.expressions.topic_expression import TopicExpr
+
 # Simple topic expression
 topic_expr = TopicExpr(topic=notifications)
 serialized = topic_expr.model_dump(mode="json")

@@ -13,6 +13,7 @@ from grafi.common.secrets import held_secret
 from grafi.common.secrets import is_env_reference
 from grafi.common.secrets import is_secret_name
 from tests.common.manifest_fixtures import HELD_SECRETS
+from tests.common.manifest_fixtures import REFERRING_SETTINGS
 from tests.common.manifest_fixtures import UNHELD_SETTINGS
 
 # --------------------------------------------------------------------------- #
@@ -210,10 +211,13 @@ def test_expand_env_raises_for_an_unset_variable(
         expand_env("https://${MCP_HOST}/mcp?token=${MCP_MISSING_TOKEN}")
 
 
-def test_expand_env_expands_an_empty_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_expand_env_refuses_an_empty_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """As an empty key is none: a server given "Bearer " might fall back to
+    credentials of its own."""
     monkeypatch.setenv("MCP_EMPTY", "")
 
-    assert expand_env("a${MCP_EMPTY}b") == "ab"
+    with pytest.raises(ValueError, match="MCP_EMPTY"):
+        expand_env("a${MCP_EMPTY}b")
 
 
 # --------------------------------------------------------------------------- #
@@ -251,22 +255,33 @@ def test_a_value_held_under_a_secrets_name(name: str, value: Any) -> None:
         ("api_key", None),
         ("secret", 0),
         ("access_token", True),
-        ("api_key", "${OPENAI_API_KEY}"),
-        ("Authorization", "Bearer ${GITHUB_TOKEN}"),
-        ("Authorization", "Basic ${CREDENTIALS}"),
-        ("auth", "oauth"),
-        ("api_key", {"env": "OPENAI_API_KEY"}),  # A secret field's reference.
-        ("credentials", {"env": "GOOGLE_CREDENTIALS"}),
         ("max_tokens", "100"),
         ("eos_token", "</s>"),
         ("tokens", ["a", "b"]),
         ("api_keys", {}),
         ("api_key", []),
-        ("api_keys", {"openai": "${OPENAI_API_KEY}"}),
     ],
 )
 def test_a_value_holding_no_secret_under_a_secrets_name(name: str, value: Any) -> None:
     assert held_secret(name, value) is None
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("api_key", "${OPENAI_API_KEY}"),
+        ("Authorization", "Bearer ${GITHUB_TOKEN}"),
+        ("Authorization", "Basic ${CREDENTIALS}"),
+        ("auth", "oauth"),
+        ("api_keys", {"openai": "${OPENAI_API_KEY}"}),
+    ],
+)
+def test_a_reference_holds_no_secret_only_where_it_expands(
+    name: str, value: Any
+) -> None:
+    """Elsewhere it would be sent as it is, never reading the variable."""
+    assert held_secret(name, value, expands=True) is None
+    assert held_secret(name, value) == name
 
 
 @pytest.mark.parametrize("field, value, held", HELD_SECRETS)
@@ -283,6 +298,42 @@ def test_settings_without_a_secret_value_hold_none(params: Dict[str, Any]) -> No
     assert held_secret("params", params) is None
 
 
+@pytest.mark.parametrize("params", REFERRING_SETTINGS)
+def test_settings_referring_to_variables_hold_none_where_they_expand(
+    params: Dict[str, Any],
+) -> None:
+    assert held_secret("params", params, expands=True) is None
+    assert held_secret("params", params) is not None
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("api_key", {"env": "OPENAI_API_KEY"}),
+        ("credentials", {"env": "GOOGLE_CREDENTIALS"}),
+        ("headers", {"X-Proxy-Token": {"env": "PROXY_TOKEN"}}),
+    ],
+)
+def test_a_variables_reference_is_read_only_as_a_components_field(
+    name: str, value: Any
+) -> None:
+    """Elsewhere it would be sent as written, never reading the variable."""
+    assert held_secret(name, value) is not None
+    component = {"class": "my_app:Tool", name: value}
+    if "env" in value:
+        assert held_secret("tool", component) is None
+
+
+def test_only_schemas_have_names_for_keys() -> None:
+    """A schema's properties are names; client properties are settings."""
+    schema = {"properties": {"password": {"type": "string"}, "token": True}}
+    client = {"properties": {"user": "u", "password": "hunter2"}}
+
+    assert held_secret("response_format", schema) is None
+    assert held_secret("connection", client) == "password"
+    assert held_secret("settings", {"definitions": {"api_key": "sk-1"}}) == "api_key"
+
+
 def test_a_components_class_is_skipped_in_a_dict() -> None:
     """A dict naming a component's class, an import path, is a component: its
     "class" is no secret, but its other fields are checked."""
@@ -296,7 +347,10 @@ def test_a_components_class_is_skipped_in_a_dict() -> None:
     "pairs, held",
     [
         ([["Accept", "text/plain"], ["Authorization", "Bearer sk-1"]], "Authorization"),
-        ([["Authorization", "Bearer ${API_TOKEN}"], ["Accept", "*/*"]], None),
+        (
+            [["Authorization", "Bearer ${API_TOKEN}"], ["Accept", "*/*"]],
+            "Authorization",
+        ),
         ([["X-Api-Key", ""]], None),
         ([["Accept", "text/plain"], ["not", "a", "pair"]], None),
         ([("Cookie", "session=abc")], "Cookie"),  # A tuple is a pair too.
@@ -332,8 +386,18 @@ def test_a_url_holding_a_secret(url: str) -> None:
     [
         "postgresql://app:${DB_PASSWORD}@db.example.com/app",
         "https://bot:${MCP_PASSWORD}@example.com/mcp",
-        "https://bot@example.com/mcp",  # A user, no password.
         "https://example.com/mcp?token=${MCP_TOKEN}",
+    ],
+)
+def test_a_url_referring_to_a_variable_holds_none_where_it_expands(url: str) -> None:
+    assert held_secret("url", url, expands=True) is None
+    assert held_secret("url", url) == "url"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://bot@example.com/mcp",  # A user, no password.
         "https://example.com/mcp?page=2&q=x",
         "https://example.com/mcp?api_key=",  # Empty.
         "https://example.com/@me",

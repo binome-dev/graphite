@@ -45,6 +45,7 @@ from grafi.topics.topic_impl.input_topic import InputTopic
 from grafi.topics.topic_impl.output_topic import OutputTopic
 from grafi.topics.topic_impl.topic import Topic
 from grafi.workflows.impl.event_driven_workflow import EventDrivenWorkflow
+from tests.wiring import offered_to
 
 DATA = Path(__file__).parent / "data"
 ROUTES_MANIFEST = DATA / "legacy_simple_function_call_assistant_manifest.json"
@@ -346,6 +347,30 @@ def test_topic_conditions_move_to_the_routes_publishing_to_them(
     assert result.when is always_true
 
 
+def test_a_condition_of_a_topic_no_node_publishes_to_is_refused(
+    legacy_publish_to: Dict[str, Any],
+) -> None:
+    """An input topic's condition filtered the request's input; no route can
+    hold it, so it is not dropped silently."""
+    topics = legacy_publish_to["workflow"]["topics"]
+    topics["agent_input_topic"]["condition"] = {"ref": "my_app.routes:is_long"}
+
+    with pytest.raises(ManifestError, match="'agent_input_topic' has a condition"):
+        upgrade_manifest(legacy_publish_to, {"LocalInfoMock": LOCAL_INFO_MOCK})
+
+
+def test_a_bare_pickled_condition_is_refused_as_pickled(
+    legacy_publish_to: Dict[str, Any],
+) -> None:
+    """As grafi 0.0.30 to 0.0.34 saved one, before naming whether a node
+    publishes to its topic."""
+    topics = legacy_publish_to["workflow"]["topics"]
+    topics["agent_input_topic"]["condition"] = "gASVAAAAAAAAAACMBGJsb2KULg=="
+
+    with pytest.raises(ManifestError, match="saved by pickle"):
+        upgrade_manifest(legacy_publish_to, {"LocalInfoMock": LOCAL_INFO_MOCK})
+
+
 def test_a_topic_condition_of_your_own_is_kept(
     legacy_publish_to: Dict[str, Any],
 ) -> None:
@@ -605,7 +630,7 @@ def test_mcp_resources_and_prompts_saved_as_json_text_are_parsed(
         ("greeting", "Greet someone.")
     ]
     assert loaded.mcp_config["mcpServers"]["hello"]["transport"] == "http"
-    assert [spec.name for spec in loaded.function_specs] == ["hello"]
+    assert [spec.name for spec in loaded.get_function_specs()] == ["hello"]
 
 
 def _by_alias(text: str) -> Dict[str, Any]:
@@ -758,14 +783,14 @@ def test_legacy_classes_name_the_assistants_class(
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.parametrize("source", ["dict", "path", "str"])
+@pytest.mark.parametrize("source", ["dict", "path", "text"])
 def test_legacy_manifest_loads(
     legacy: Dict[str, Any], openai_key: str, source: str
 ) -> None:
     manifest: Any = {
         "dict": legacy,
         "path": ROUTES_MANIFEST,
-        "str": str(ROUTES_MANIFEST),
+        "text": Path(ROUTES_MANIFEST).read_text(encoding="utf-8"),
     }[source]
 
     assistant = Assistant.from_manifest(
@@ -819,13 +844,13 @@ def test_loaded_legacy_assistant_is_wired(
     assert nodes["FunctionCallNode"].publisher_router.routes[0].when is always_true
     functions = nodes["FunctionCallNode"].tool
     assert isinstance(functions, LocalInfoMock)
-    assert functions.functions == LocalInfoMock._methods
+    assert functions._functions() == LocalInfoMock._methods
     # The function-call node's functions are offered to the LLM calling it.
-    assert [spec.name for spec in llm.get_function_specs()] == [
+    assert offered_to(assistant.workflow, "OpenAIInputNode") == [
         "get_weather_mock",
         "get_population_mock",
     ]
-    assert nodes["OpenAIOutputNode"].tool.get_function_specs() == []
+    assert offered_to(assistant.workflow, "OpenAIOutputNode") == []
 
 
 def test_loaded_legacy_assistant_saves_as_grafi_v2(
@@ -845,3 +870,122 @@ def test_loaded_legacy_assistant_saves_as_grafi_v2(
         {"env": "OPENAI_API_KEY"},
     ]
     assert Assistant.from_manifest(manifest).to_manifest() == manifest
+
+
+def test_a_pickled_condition_is_refused_by_name(
+    legacy_publish_to: Dict[str, Any],
+) -> None:
+    """grafi before v2 pickled a topic condition it could not name: loading it
+    would run any code it holds, so it is refused, and not shown."""
+    pickled = "gAWVGgIAAAAAAACMF2Nsb3VkcGlja2xl" * 20
+    legacy_publish_to["workflow"]["topics"]["agent_output_topic"]["condition"] = {
+        "base64": pickled
+    }
+
+    match = "condition of the topic 'agent_output_topic' saved by pickle"
+    with pytest.raises(ManifestError, match=match) as raised:
+        upgrade_manifest(legacy_publish_to, {"LocalInfoMock": LOCAL_INFO_MOCK})
+    assert pickled not in str(raised.value)
+
+
+def test_a_tool_saved_on_its_own_before_grafi_v2_loads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As ToolFactory.from_dict() read a tool's to_dict()."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake")
+    saved = {
+        "class": "OpenAITool",
+        "base_class": "Tool",
+        "tool_id": "t1",
+        "name": "Planner",
+        "type": "OpenAITool",
+        "oi_span_type": "LLM",
+        "api_key": "****************",
+        "model": "gpt-4o-mini",
+    }
+
+    tool = Tool.from_manifest(saved)
+
+    assert type(tool) is OpenAITool
+    assert (tool.tool_id, tool.name, tool.api_key) == ("t1", "Planner", "sk-fake")
+
+
+def test_a_topic_saved_on_its_own_before_grafi_v2_loads_unless_conditioned() -> None:
+    """Routes hold a topic's condition now: alone, it has none to give it."""
+    topic = TopicBase.from_manifest({"name": "answers", "type": "Topic"})
+    assert (type(topic), topic.name) == (Topic, "answers")
+
+    conditioned = {
+        "name": "answers",
+        "type": "Topic",
+        "condition": {"ref": "my_app.routes:ok"},
+    }
+    with pytest.raises(ManifestError, match="has a condition, which routes now hold"):
+        TopicBase.from_manifest(conditioned)
+
+
+class RemoteSearch(FunctionCallTool):
+    """Calls its functions elsewhere."""
+
+
+def test_a_tool_of_your_own_saved_before_grafi_v2_is_named_by_legacy_classes() -> None:
+    """grafi before v2 wrote its base class, as LLMTool or FunctionCallTool.
+    Its specs it derived again on loading, as grafi does: a saved one stale
+    since, as of a function removed, is not offered."""
+    saved = {
+        "class": "RemoteSearch",
+        "base_class": "FunctionCallTool",
+        "name": "RemoteSearch",
+        "function_specs": [
+            {"name": "search", "description": "Search.", "parameters": {}}
+        ],
+    }
+
+    with pytest.raises(ManifestError, match="Unknown tool class 'RemoteSearch'"):
+        Tool.from_manifest(saved)
+    tool = Tool.from_manifest(saved, legacy_classes={"RemoteSearch": RemoteSearch})
+
+    assert type(tool) is RemoteSearch
+    assert tool.get_function_specs() == []
+
+
+@pytest.mark.parametrize("text", ["", "get_weather", "ABC123"])
+def test_only_pickles_text_is_taken_for_a_pickle(text: str) -> None:
+    """Other text is left as it is (a tool of yours may hold text so named);
+    one in a function's field is refused when loaded, as saved by its name
+    only, as by grafi 0.0.29."""
+    from grafi.common.callable_ref import deserialize_callable
+    from grafi.common.manifest_v1 import _callable
+
+    assert _callable(text) == text
+    with pytest.raises(ManifestError, match="saved by pickle"):
+        _callable("gASVAAAAAAAAAACMBGJsb2KULg==")
+    with pytest.raises(ManifestError, match="saved by its name only"):
+        deserialize_callable(text)
+
+
+def test_an_accept_all_condition_of_either_module_is_none(
+    legacy_publish_to: Dict[str, Any],
+) -> None:
+    """always_true, where 0.0.36 had it or where it is now: no condition, so
+    an input topic may have it."""
+    topics = legacy_publish_to["workflow"]["topics"]
+    topics["agent_input_topic"]["condition"] = {
+        "ref": "grafi.nodes.conditions:always_true"
+    }
+
+    upgraded = upgrade_manifest(legacy_publish_to, {"LocalInfoMock": LOCAL_INFO_MOCK})
+
+    upgraded_topics = upgraded["spec"]["workflow"]["topics"]
+    assert "condition" not in upgraded_topics["agent_input_topic"]
+
+
+def test_an_assistant_of_0_0_29_is_refused_up_front(
+    legacy_publish_to: Dict[str, Any],
+) -> None:
+    """Its nodes publish to whole topics, as no later grafi saved them."""
+    node = legacy_publish_to["workflow"]["nodes"]["OpenAIOutputNode"]
+    node["publish_to"] = [{"name": "agent_output_topic", "condition": {}}]
+
+    with pytest.raises(ManifestError, match="saved by grafi 0.0.29 or earlier"):
+        upgrade_manifest(legacy_publish_to, {"LocalInfoMock": LOCAL_INFO_MOCK})

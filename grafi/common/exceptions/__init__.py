@@ -16,6 +16,7 @@ from grafi.common.exceptions.event_exceptions import (
     TopicSubscriptionError,
 )
 from grafi.common.exceptions.manifest_exceptions import (
+    CallableSerializationError,
     ManifestError,
     UntrustedImportError,
 )
@@ -52,6 +53,7 @@ __all__ = [
     # Manifest errors
     "ManifestError",
     "UntrustedImportError",
+    "CallableSerializationError",
     # Domain-specific errors
     "DuplicateNodeError",
 ]

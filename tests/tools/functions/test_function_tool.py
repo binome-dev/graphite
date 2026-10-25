@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from pydantic_core import PydanticSerializationError
 
 from grafi.common.callable_component import CallableComponent
-from grafi.common.callable_ref import CallableSerializationError
+from grafi.common.exceptions import CallableSerializationError
 from grafi.common.exceptions import FunctionToolException
 from grafi.common.import_ref import UntrustedImportError
 from grafi.common.manifest import ManifestError
@@ -74,10 +74,7 @@ def function_tool():
 @pytest.mark.asyncio
 async def test_invoke_returns_message(function_tool, invoke_context):
     input_messages = [Message(role="user", content="test")]
-    agen = function_tool.invoke(invoke_context, input_messages)
-    messages = []
-    async for msg in agen:
-        messages.extend(msg)
+    messages = await function_tool.invoke(invoke_context, input_messages)
     assert isinstance(messages[0], Message)
     assert messages[0].role == "assistant"
     assert "42" in messages[0].content
@@ -88,8 +85,8 @@ async def test_invoke_with_async_function(invoke_context):
     tool = FunctionTool.builder().function(async_dummy_function).build()
     input_messages = [Message(role="user", content="test")]
     messages = []
-    async for msg in tool.invoke(invoke_context, input_messages):
-        messages.extend(msg)
+    msg = await tool.invoke(invoke_context, input_messages)
+    messages.extend(msg)
     assert isinstance(messages[0], Message)
     assert "99" in messages[0].content
 
@@ -99,8 +96,8 @@ async def test_invoke_with_async_generator_function(invoke_context):
     tool = FunctionTool.builder().function(async_generator_function).build()
     input_messages = [Message(role="user", content="test")]
     messages = []
-    async for msg in tool.invoke(invoke_context, input_messages):
-        messages.extend(msg)
+    msg = await tool.invoke(invoke_context, input_messages)
+    messages.extend(msg)
     assert len(messages) == 3
     for i, msg in enumerate(messages):
         assert isinstance(msg, Message)
@@ -114,8 +111,8 @@ async def test_invoke_with_list_output(invoke_context):
     tool = FunctionTool.builder().function(list_output_function).build()
     input_messages = [Message(role="user", content="test")]
     messages = []
-    async for msg in tool.invoke(invoke_context, input_messages):
-        messages.extend(msg)
+    msg = await tool.invoke(invoke_context, input_messages)
+    messages.extend(msg)
     assert isinstance(messages[0], Message)
     content = json.loads(messages[0].content)
     assert len(content) == 2
@@ -128,8 +125,8 @@ async def test_invoke_with_string_output(invoke_context):
     tool = FunctionTool.builder().function(string_output_function).build()
     input_messages = [Message(role="user", content="test")]
     messages = []
-    async for msg in tool.invoke(invoke_context, input_messages):
-        messages.extend(msg)
+    msg = await tool.invoke(invoke_context, input_messages)
+    messages.extend(msg)
     assert messages[0].content == "plain string response"
 
 
@@ -138,8 +135,8 @@ async def test_invoke_with_dict_output(invoke_context):
     tool = FunctionTool.builder().function(dict_output_function).build()
     input_messages = [Message(role="user", content="test")]
     messages = []
-    async for msg in tool.invoke(invoke_context, input_messages):
-        messages.extend(msg)
+    msg = await tool.invoke(invoke_context, input_messages)
+    messages.extend(msg)
     content = json.loads(messages[0].content)
     assert content["key"] == "value"
     assert content["number"] == 123
@@ -150,8 +147,7 @@ async def test_invoke_raises_function_tool_exception(invoke_context):
     tool = FunctionTool.builder().function(error_function).build()
     input_messages = [Message(role="user", content="test")]
     with pytest.raises(FunctionToolException) as exc_info:
-        async for _ in tool.invoke(invoke_context, input_messages):
-            pass
+        await tool.invoke(invoke_context, input_messages)
     assert "Function failed" in str(exc_info.value)
     assert exc_info.value.tool_name == "FunctionTool"
 
@@ -230,10 +226,11 @@ async def test_round_trip(invoke_context):
     assert restored.model_dump(mode="json") == data
     # The function still works.
     outputs = await _outputs(restored, invoke_context)
-    assert [[m.content for m in batch] for batch in outputs] == [
-        ['{"value":0}'],
-        ['{"value":1}'],
-        ['{"value":2}'],
+    # A generator's values are one output.
+    assert [m.content for m in outputs] == [
+        '{"value":0}',
+        '{"value":1}',
+        '{"value":2}',
     ]
 
 
@@ -289,7 +286,7 @@ async def test_a_callable_component_is_saved_as_its_class_and_fields(
     assert restored.function.token == "the-token"
     assert restored == original
     outputs = await _outputs(restored, invoke_context)
-    assert [[m.content for m in batch] for batch in outputs] == [["hi, 1"]]
+    assert [m.content for m in outputs] == ["hi, 1"]
 
 
 def test_a_callable_component_holding_a_secret_is_never_saved(monkeypatch):
@@ -317,8 +314,8 @@ def test_a_grafi_function_that_is_not_a_condition_is_not_loaded():
         Tool.model_validate(data)
 
 
-async def _outputs(tool: FunctionTool, context: InvokeContext) -> list[Messages]:
-    return [batch async for batch in tool.invoke(context, [Message(role="user")])]
+async def _outputs(tool: FunctionTool, context: InvokeContext) -> Messages:
+    return await tool.invoke(context, [Message(role="user")])
 
 
 @pytest.mark.asyncio
@@ -329,7 +326,7 @@ async def test_a_generator_streams_its_text_and_outputs_it_whole(invoke_context)
 
     received: list[Delta] = []
     with deltas_to(received.append, "node"):
-        [[message]] = await _outputs(FunctionTool(function=words), invoke_context)
+        [message] = await _outputs(FunctionTool(function=words), invoke_context)
     assert [delta.content for delta in received] == ["Hello, ", "world"]
     assert received[0].node_name == "node"
     assert message.content == "Hello, world"
@@ -345,7 +342,7 @@ async def test_a_generator_yielding_values_outputs_them_and_only_streams_text(
 
     received: list[Delta] = []
     with deltas_to(received.append):
-        [[message]] = await _outputs(FunctionTool(function=progress), invoke_context)
+        [message] = await _outputs(FunctionTool(function=progress), invoke_context)
     assert [delta.content for delta in received] == ["working..."]
     assert json.loads(message.content) == {"answer": 42}
 
@@ -354,7 +351,7 @@ async def test_a_generator_yielding_values_outputs_them_and_only_streams_text(
 async def test_messages_pass_as_they_are_and_none_outputs_nothing(invoke_context):
     reply = Message(role="tool", content="as is")
     assert await _outputs(FunctionTool(function=lambda _: reply), invoke_context) == [
-        [reply]
+        reply
     ]
     assert await _outputs(FunctionTool(function=lambda _: None), invoke_context) == []
 
@@ -368,5 +365,5 @@ async def test_a_sync_function_runs_off_the_event_loop(invoke_context):
         ran_in.append(threading.get_ident())
         return "done"
 
-    [[message]] = await _outputs(FunctionTool(function=blocking), invoke_context)
+    [message] = await _outputs(FunctionTool(function=blocking), invoke_context)
     assert message.content == "done" and ran_in != [loop_thread]

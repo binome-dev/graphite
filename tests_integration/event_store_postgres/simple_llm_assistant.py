@@ -6,6 +6,7 @@ from pydantic import Field
 
 from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.nodes.node import Node
 from grafi.tools.llms.impl.openai_tool import OpenAITool
@@ -33,9 +34,11 @@ class SimpleLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleLLMAssistant")
     type: str = Field(default="SimpleLLMAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    system_message: Optional[str] = Field(default=None)
-    model: str = Field(default="gpt-4o-mini")
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    system_message: Optional[str] = Field(default=None, exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
 
     @classmethod
     def builder(cls) -> "SimpleLLMAssistantBuilder":
@@ -57,7 +60,7 @@ class SimpleLLMAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAITool")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_message)
                 .build()
@@ -80,7 +83,7 @@ class SimpleLLMAssistant(Assistant):
 class SimpleLLMAssistantBuilder(AssistantBaseBuilder[SimpleLLMAssistant]):
     """Builder for SimpleLLMAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

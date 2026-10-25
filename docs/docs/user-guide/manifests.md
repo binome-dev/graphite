@@ -33,14 +33,45 @@ script being run (`__main__`) or in a function. Saving one that is not fails:
 `to_manifest()` raises `ManifestError`, and `model_dump(mode="json")` pydantic's
 `PydanticSerializationError`, with its message.
 
-The rules on this page apply to the JSON form. `model_dump()`, in python mode,
-gives a component's values as pydantic does, with the class itself as
-`"class"`, for use in the same process.
+`model_validate` and the constructors trust what they are given, as code: a
+component built from data that way reads the environment variables the data
+names. Load data you did not write yourself, such as a file or a request, with
+`from_manifest`, which checks it against a manifest's rules (see
+[Manifest Files](#manifest-files)), and only from a source you would give the
+secrets it can reach (see [Trust](#trust)). `model_dump()`, in python mode, gives a
+component's values as pydantic does, with the class itself as `"class"`, for
+use in the same process, but a dump is configuration: a secret read from a
+variable is `{"env": "VAR"}`, as in JSON, so `model_validate` of it reads that
+variable again, as `from_manifest` does, a tenant's included. Copy a component
+in use with `model_copy()` or `copy.deepcopy`, which keep the keys it holds
+(and the values its MCP `${VAR}`s were read as). A manifest is the plain JSON
+dump, `model_dump(mode="json")`: one made with pydantic's `round_trip=True` or
+`serialize_as_any=True` is not. A computed field is left out of a dump, as it
+follows from the fields that are; it is still computed and serialized while
+dumping, so a value that is not data, such as a client, is a plain
+`@property`, not a computed field. A class's `loads_computed`, merged
+with its bases', names one that is saved as its state: the class loads it back
+itself, taking it out of the data in a validator of its own, as a workflow
+does its `topics`. `manifest_kind` names the `kind` a manifest of a class and
+its subclasses has, as `"Tool"`.
 
-Nodes refer to their topics by name, and a workflow saves its topics with it,
-so a workflow or an assistant is saved whole. A node loaded on its own is given
-its topics in the validation context:
-`Node.model_validate(data, context={"topics": {topic.name: topic}})`.
+Nodes refer to their topics by name, and a workflow, of any kind, saves its
+topics with it, so a workflow or an assistant is saved whole. A node loaded on its own is given
+every topic it names, those it subscribes to and those its routes publish to, by
+name, in the validation context:
+
+```python
+node = Node.model_validate(
+    data,
+    context={
+        "topics": {
+            "agent_input_topic": agent_input_topic,
+            "function_call_topic": function_call_topic,
+            "agent_output_topic": agent_output_topic,
+        }
+    },
+)
+```
 
 ## Manifest Files
 
@@ -54,37 +85,71 @@ component's kind:
 | Method | Description |
 |--------|-------------|
 | `to_manifest()` | The component's manifest, as a dict. |
-| `SomeClass.from_manifest(manifest, *, env=(), legacy_classes=None, context=None)` | Loads the component a manifest holds, a dict or the path of a JSON file, which must be a `SomeClass`. |
-| `assistant.generate_manifest(output_dir=".")` | Writes the assistant's manifest to `<name>_manifest.json`, and returns the file's path. A failed save leaves an earlier file as it was. |
+| `SomeClass.from_manifest(manifest, *, allow_env=(), legacy_classes=None, context=None)` | Loads the component a manifest holds, which must be a `SomeClass`: a dict; JSON as a `str` or `bytes` (a `str` is always JSON, never a path; a UTF-8 BOM is fine); or the file an `os.PathLike`, such as a `pathlib.Path`, names. A component's own JSON, `model_dump(mode="json")`, loads too; keep one with `to_manifest()`, which names the format's version. |
+| `assistant.generate_manifest(output_dir=".")` | Writes the assistant's manifest to `<name>_manifest.json` in `output_dir`, made if need be, and returns the file's path, a `pathlib.Path`. A failed save leaves an earlier file as it was. |
 
 ```python
 from grafi.assistants.assistant import Assistant
 from grafi.common.import_ref import trust_modules
 
-path = assistant.generate_manifest("manifests")
+path = assistant.generate_manifest("manifests")  # A pathlib.Path.
 
 trust_modules("my_app")
 assistant = Assistant.from_manifest(path)
 ```
 
-`from_manifest` is how to load a manifest you did not write with care. It checks
-the kind before building anything, and accepts only what saving writes: every
-component in it names its class, holds no field saving leaves out (such as a
-function's spec), and gives no secret as a value (see [Secrets](#secrets)). A
-component class with an `__init__` of its own cannot be loaded this way, as
-pydantic would call it without these rules: set such a class up in
-`model_post_init`.
+A `str` is never read as a path: text from a database or a request is parsed
+as JSON, so it cannot name a file for the process to read. Text that is not
+JSON raises `ManifestError` ("A manifest is JSON (a path is given as a
+pathlib.Path)"); to read a file, pass a `pathlib.Path`.
+
+`from_manifest` is how to load data you did not write yourself, and the one
+path that checks it. It checks the envelope's kind before building anything,
+and accepts only what saving writes: every component in it names its class,
+holds no field saving leaves out, gives no secret as a value, and reads only
+each secret field's own environment variable, or one `allow_env` names (see
+[Secrets](#secrets)). A component class with an `__init__` of its own cannot be
+loaded this way, as pydantic would call it without these rules: set such a
+class up in `model_post_init`.
+
+Whatever the data holds, `from_manifest` raises `ManifestError` (an
+`UntrustedImportError` is one), `pydantic.ValidationError`, or an `OSError`
+reading a file; a workflow invalid as built, such as one with no input topic,
+is a `ManifestError` with the `WorkflowError` as its cause. So pass untrusted
+input, as text, bytes or a dict, to `from_manifest`, and handle `ManifestError`
+and `pydantic.ValidationError`. `model_validate`, by contrast, raises a
+`ManifestError` met while loading as itself, not as a `ValidationError`, so a
+web framework validating a request body would report it as a server error.
 
 A manifest holds the state of what it saves, and loading it reproduces that,
-ids included. What follows from code is not saved: a `FunctionCallTool`'s
-function specs come from its functions, and a node's command from its tool. An
-MCP tool, though, is saved with the tools its servers offered, so loading
-connects to nothing. Loading is synchronous.
+ids included. What follows from code is not saved: the function specs a
+`FunctionCallTool` derives (`derived_specs()`), one per function, and an
+`AgentCallingTool`'s or a `SyntheticTool`'s, made from its fields; and a node's
+command, which follows from its tool's class. The specs a tool is given, its
+`function_specs`, are saved, an LLM's too (not those its workflow wires to
+it, which follow from the workflow's nodes): an MCP tool saves the specs of the tools its
+servers offered, so loading it connects to nothing, and a tool that calls
+functions elsewhere saves the specs it was given. A spec given for one of the
+tool's own functions is not offered, the function's own spec is, and is warned
+of when the tool is made or loaded.
+Loading is synchronous.
 
 An assistant loaded from a manifest keeps the workflow it holds:
-`_construct_workflow()` runs only for an assistant given no workflow. Fields an
-assistant only builds its workflow from are best `Field(exclude=True)`, as
-`ReActAgent`'s are, as editing them in a manifest would change nothing.
+`_construct_workflow()` runs only for an assistant given no workflow. Declare
+the fields an assistant only builds its workflow from `exclude=True`, with a
+default, as `ReActAgent`'s are: saved, they would be a second copy of what the
+workflow holds, which loading ignores.
+
+```python
+class MyAssistant(Assistant):
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps.
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
+
+    def _construct_workflow(self) -> "MyAssistant":
+        ...
+```
 
 ## Trust
 
@@ -99,7 +164,9 @@ trust_modules("my_app")  # my_app and its submodules.
 ```
 
 A manifest naming anything else raises `UntrustedImportError`, an
-`ImportError`, before the module is imported. A name must be of something the
+`ImportError`, before the module is imported; its message says how to trust a
+package of your own, and, for the standard library, not to trust it. A name
+must be of something the
 trusted module defines: `"my_app.tools:os.system"`, reaching what it imported,
 is refused too. Of grafi's own functions, a manifest names only its route
 predicates, in `grafi.nodes.conditions`. Trust only modules whose functions are
@@ -107,7 +174,11 @@ safe for a manifest to call. Saving needs no trust.
 
 A manifest is still configuration: it chooses what its components call, such
 as an LLM's `base_url` or an MCP server's URL or command, and those receive the
-secrets the components use. Load manifests from sources you trust with them.
+secrets the components use. A tool taking its endpoint from data you did not
+write can send its key there whatever rules apply, and an MCP stdio command
+runs as you: `from_manifest` stops untrusted imports and reads of variables not
+allowed, not that. Never load components from a party you would not give your
+keys to.
 
 ## Functions and Model Classes
 
@@ -130,20 +201,51 @@ A field holding a pydantic model class is typed `ModelRef[...]` (from
 A manifest never holds a secret's value. A field declared with
 `env_secret("VAR")` (from `grafi.common.manifest`) reads its value from the
 environment variable `VAR` by default, and is saved as `{"env": "VAR"}`; loading
-reads the variable again. An LLM's `api_key` is one, read from its provider's
+reads the variable again. It holds the text its variable holds, typed
+`Optional[str]` (or `str`), with no constraint, which would apply to a key
+loaded but not to one read by default: another type is refused when the
+class is defined. An LLM's `api_key` is one, read from its provider's
 variable, such as `OPENAI_API_KEY`, and so is `TavilyTool.api_key`
-(`TAVILY_API_KEY`). Declare your own the same way:
+(`TAVILY_API_KEY`). Declare your own the same way, and give a client its value
+as `secret_value(field)`:
 
 ```python
 from typing import Optional
 
-from grafi.assistants.assistant import Assistant
+from weather_sdk import WeatherClient  # Your provider's SDK.
+
+from grafi.common.decorators.llm_function import llm_function
 from grafi.common.manifest import env_secret
+from grafi.tools.function_calls.function_call_tool import FunctionCallTool
 
 
-class MyAssistant(Assistant):
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
+class WeatherTool(FunctionCallTool):
+    api_key: Optional[str] = env_secret("WEATHER_API_KEY")
+
+    @llm_function
+    async def get_weather(self, city: str) -> str:
+        """The current weather in a city."""
+        client = WeatherClient(api_key=self.secret_value("api_key"))
+        return await client.current(city)
 ```
+
+`secret_value(field)` is the value the field holds, read from its variable
+when the tool was made, or given in code; else, holding none, its variable's,
+read when it is called, as the variable may be set after the tool was made;
+with none it raises `ValueError`, naming the variable to set. Passing
+the field itself, `self.api_key`, would give the client None where its
+variable, such as a tenant's, is unset, and an SDK given none reads its own
+default variable, perhaps another account's key.
+`secret_value(field, required=False)` returns None instead, for a client that
+works without a key too, but only for a field reading its own variable: one
+read from another, a tenant's, is required always. A field that is not a secret is refused
+(`ValueError`). An LLM of your own gives its SDK `self.sdk_api_key()`, which
+raises `LLMToolException` (see [LLM](tools/llm.md#implementation-requirements)).
+
+A tool keeps the key it was made with, so a variable set for another user's
+request since does not change it; rotated, a key is taken up by a tool made
+since. One read from its variable is saved as `{"env": "VAR"}` though the
+variable changed since, as is a value set in code that equals the one read.
 
 A secret set in code to a value other than its variable's cannot be saved, as
 the manifest would load a different one: saving it raises `ManifestError`. So
@@ -151,37 +253,99 @@ does saving any other field holding text under a name that says it is a
 secret, at any depth, such as `password`, `clientSecret`, `GITHUB_TOKEN`, or an
 `Authorization` header in a dict or a list of pairs, or a URL holding a
 password: declare secrets with `env_secret`. Text that only refers to a
-variable, such as `"Bearer ${TOKEN}"`, is not a secret. The names are a
-convention, so a secret under another name, such as in a command's
-arguments, is not recognized.
+variable, such as `"Bearer ${TOKEN}"`, holds no secret only in an MCP
+configuration, which expands it when connecting; anywhere else, such as an
+LLM's `chat_params` headers, it would be sent as written, so saving it is
+refused too. So is `{"env": "VAR"}` under a secret's name anywhere but a
+component's secret field, the one place it is read. The names are a
+convention, so a secret under another name, such as in a command's arguments,
+is not recognized. The names you choose are not settings: a node, topic,
+function or MCP server called `token` holds no secret by its name, as each
+component checks only its own fields. It leaves a field to its values when
+every value type checks its own: components, an MCP configuration, and
+functions (`CallableRef`, whose `CallableComponent` checks its fields); a
+field holding other values too, such as a `Dict[str, Union[Component, str]]`,
+it checks itself. Nor are the properties a JSON Schema names
+(under `properties`, `patternProperties`, `$defs` or `definitions`, whose
+values are schemas, objects or booleans): a tool parameter called `pageToken`
+or `password` is no secret. A settings mapping under one of those names, such
+as a client's `{"properties": {"password": "..."}}`, is checked as any other.
+A refusal gives the advice that fits: for an assistant's build parameter, to
+declare it `exclude=True`; for a tool's key, to read it as `{"env": "VAR"}`;
+and the MCP note only for text holding `${`.
 
-A manifest may refer to another variable, `{"env": "TEAM_OPENAI_KEY"}`, and the
-component reads that one, and saves it again. `from_manifest` lets a secret
-read only its own variable, unless you name others:
+A secret may refer to another variable, `{"env": "TEAM_OPENAI_KEY"}`, and the
+component reads that one, and saves it again. Code chooses it as it likes, as
+for a tenant's key:
 
 ```python
-assistant = Assistant.from_manifest(path, env=["TEAM_OPENAI_KEY"])
+tool = OpenAITool.model_validate({"api_key": {"env": "TENANT_B_KEY"}})
+assert tool.to_manifest()["spec"]["api_key"] == {"env": "TENANT_B_KEY"}
 ```
 
-so a manifest cannot have grafi read any other secret of yours. An
+A component gives another its secret as `secret_reference(field)` gives it:
+`{"env": "VAR"}` while it holds none (the variable may be set later) or that
+variable's value now; else the value, so the other uses this one's key though
+the variable changed since. An
+assistant building its tools from its key passes them
+`.api_key(self.secret_reference("api_key"))`, as `ReActAgent` does, so the
+tools read, and save, the variable the assistant's key came from, a tenant's
+included:
+
+```python
+from grafi.agents.react_agent import ReActAgent
+
+agent = ReActAgent.model_validate({"api_key": {"env": "TENANT_B_KEY"}})
+llm = agent.workflow.nodes["OpenAIInputNode"].tool
+assert llm is not None  # A node's tool is Optional.
+assert llm.to_manifest()["spec"]["api_key"] == {"env": "TENANT_B_KEY"}
+```
+
+A manifest reads only each secret field's own variable, unless `from_manifest`
+names others:
+
+```python
+assistant = Assistant.from_manifest(path, allow_env=["TEAM_OPENAI_KEY"])
+tool = Tool.from_manifest(data, allow_env=["TEAM_OPENAI_KEY"])  # Its JSON.
+```
+
+so a manifest cannot have grafi read another secret of yours; loading it
+otherwise raises `ManifestError`. `allow_env` is a list of names: a string, or a
+mapping such as `os.environ`, raises `TypeError`, as iterating a mapping would
+allow all its keys. An
 OpenAI-compatible tool (OpenAI, DeepSeek, OpenRouter) never calls its provider
-without its own key, and only `OpenAITool` lets the OpenAI SDK add what it
-reads from OpenAI's variables (`OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`,
-`OPENAI_CUSTOM_HEADERS`), so another provider's `base_url` receives none of
-them. Other SDKs given no key read their provider's own variables, such as
-Google's `GOOGLE_API_KEY`. A manifest that starts a program, as an MCP server's
-command, runs it as you: review such a manifest as you would a script.
+without a key of its own, as the OpenAI SDK given none would read
+`OPENAI_API_KEY`, whatever the provider; and only `OpenAITool` lets the SDK
+add what it reads from OpenAI's variables (`OPENAI_ORG_ID`,
+`OPENAI_PROJECT_ID`, `OPENAI_CUSTOM_HEADERS`), so another provider's
+`base_url` receives none of them. Claude, Gemini and Ollama call theirs with
+no key where the tool's own variable, such as `ANTHROPIC_API_KEY`, is unset,
+as their SDKs then use only their provider's own credentials, such as
+`ANTHROPIC_AUTH_TOKEN`, Google's `GOOGLE_API_KEY` or Vertex AI's, or none, for
+a local Ollama. A key read from another variable, a tenant's, each of them
+requires: unset, it raises `LLMToolException` naming it. A manifest that
+starts a program, as an MCP server's command, runs it as you: review such a
+manifest as you would a script.
 
 An MCP server's settings that hold a secret, such as its headers, environment
 variables, `auth` or URL parameters named like one, refer to an environment
-variable, as `${VAR}`, which is expanded when connecting; saving one set to a
+variable, as `${VAR}`, which is expanded when connecting, with the value the
+variable had when the tool was made (a variable unset or empty when the tool
+is made is read when it connects; unset or empty then, the connection fails),
+as a tool keeps the key it was made with; saving one set to a
 value raises `ManifestError`. A manifest's `${VAR}` references must be named in
-`from_manifest(..., env=[...])` too.
+`from_manifest(..., allow_env=[...])` too. Code gives them as it likes, as the
+example below does: an MCP configuration chooses what runs, so it is code's, or
+a manifest's you trust. Each call connects anew, so calls hold no state in
+common; calls made at once to a stdio server each start its process, with no
+cap.
 
 ```python
+from typing import Any, Dict
+
 from grafi.tools.function_calls.impl.mcp_tool import MCPTool
 
-connections = {
+connections: Dict[str, Any] = {
     "docs": {
         "transport": "http",
         "url": "https://mcp.example.com/mcp/",
@@ -196,33 +360,59 @@ mcp_tool = await MCPTool.builder().connections(connections).build()
 A tool, an assistant or a topic of your own is saved with its fields, with no
 code of its own. A field holding something that is not data, such as a client,
 an index or a database collection, is left out with `Field(exclude=True)`; such
-a component is rebuilt in code rather than loaded.
+a component is rebuilt in code rather than loaded. Saving one holding such a
+value raises `ManifestError`, naming the innermost field that holds it, such as
+`ClientTool.client`, not the workflow or node around it; a topic's, held by a
+workflow's `topics`, is named too. A field left out must have a default, as
+loading could not make it otherwise: saving a component whose excluded field is
+required raises `ManifestError` (`... is never saved, but required ... give it
+a default`). So does saving a component that holds itself, directly or not.
 
 ## Manifests Saved Before grafi/v2
 
-`from_manifest` reads a manifest saved by an earlier grafi, an assistant's
-`to_dict()`, and upgrades it. It names classes by their bare names: grafi's own
-tools are known, and `legacy_classes` maps others to their import paths:
+`from_manifest` reads a manifest saved by grafi 0.0.35 or 0.0.36 (0.0.30 to
+0.0.34 pickled every topic's condition and a function-call tool's functions,
+which loading refuses, and earlier ones no grafi loads: build such an
+assistant in code and save it again), an
+assistant's `to_dict()`, or a tool's or a topic's, and upgrades it. Any tool
+dict naming a `base_class` (`Tool`, `LLMTool`, `FunctionTool`,
+`FunctionCallTool`) is a tool. It names classes by their bare names: grafi's
+own tools are known, and `legacy_classes` maps others to their import paths:
 
 ```python
+from pathlib import Path
+
 assistant = Assistant.from_manifest(
-    "old_manifest.json",
+    Path("old_manifest.json"),
     legacy_classes={"WeatherTool": "my_app.tools:WeatherTool"},
 )
 ```
 
-Its masked keys are dropped, so they are read from their variables. A topic's
-condition, from before routes, becomes the `when` of the routes to it. The
+Its masked keys are dropped, so they are read from their variables. A tool's
+specs are dropped too, as grafi 0.0.36 and earlier derived them again on loading, but
+an MCP tool's, which its servers gave. A topic's
+condition, from before routes, becomes the `when` of the routes to it; one on
+a topic no node publishes to, such as an input topic's, which no route can
+hold, is refused: check the input before invoking instead. The
 assistant loads as the class `from_manifest` is called on, such as
 `ReActAgent.from_manifest(...)`, or one `legacy_classes` maps its `type` to,
-with the workflow it holds. A function it holds pickled, from an older grafi,
-cannot be loaded: save the manifest again with this version.
+with the workflow it holds. A topic saved on its own with a condition is
+refused, as only routes hold conditions now: load the assistant holding it. A
+function it holds pickled, from an older grafi, is refused, unread, by an error
+naming where it was, a tool's `function`, `agent_call` or one of its
+`functions`, or a route's or a topic's condition: build the assistant in code
+and save it again, or replace the function with `{"ref": "module:function"}`.
 
 ## Errors
 
 | Error | When |
 |-------|------|
-| `ManifestError` (a `GrafiError`) | A component cannot be saved, as when it holds a secret or its class cannot be imported; or a manifest is malformed, of another version or kind, names a class that is not the one expected, or breaks a rule of `from_manifest`. `to_manifest()` raises it as it is; `model_dump(mode="json")` raises pydantic's `PydanticSerializationError` with its message. |
+| `ManifestError` (a `GrafiError`) | A component cannot be saved, as when it holds a secret, a value JSON cannot hold (such as a client), or its class cannot be imported; the message names the innermost field, `Class.field cannot be saved: ...`. Or it holds itself, or leaves out a field that has no default. Or a manifest is not JSON, is malformed, of another version or kind, names a class that is not the one expected, or breaks a rule above; or it reads a variable not allowed. `to_manifest()` raises it; `model_dump(mode="json")` raises pydantic's `PydanticSerializationError` with its message. Raised while loading, it comes out of validation as itself. |
 | `CallableSerializationError` (a `ManifestError`) | A function cannot be saved or loaded. |
 | `UntrustedImportError` (a `ManifestError`, and an `ImportError`) | A manifest names a class or function outside the trusted modules. |
 | `pydantic.ValidationError` | A component's fields are invalid, missing, or unknown, or a node names a topic its workflow does not have. |
+| `OSError` | `from_manifest` cannot read the file a path names. |
+
+`from_manifest` raises only these: anything else the data makes go wrong, such
+as a `WorkflowError` building a workflow, is a `ManifestError` with it as the
+cause.

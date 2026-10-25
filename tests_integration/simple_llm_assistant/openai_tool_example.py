@@ -42,18 +42,18 @@ async def test_openai_tool_stream() -> None:
     deltas: List[Delta] = []
     content = ""
     with deltas_to(deltas.append):
-        async for messages in openai_tool.invoke(
+        messages = await openai_tool.invoke(
             get_invoke_context(),
             [
                 Message(
                     role="user", content="Hello, my name is Grafi, how are you doing?"
                 )
             ],
-        ):
-            for message in messages:
-                assert message.role == "assistant"
-                if message.content is not None and isinstance(message.content, str):
-                    content += message.content
+        )
+        for message in messages:
+            assert message.role == "assistant"
+            if message.content is not None and isinstance(message.content, str):
+                content += message.content
     streamed = "".join(delta.content for delta in deltas)
     print(streamed)
     assert len(deltas) > 1 and streamed == content  # The text, as it came.
@@ -70,20 +70,20 @@ async def test_openai_tool_with_chat_param() -> None:
     }
     openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
     await event_store.clear_events()
-    async for messages in openai_tool.invoke(
+    messages = await openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
+    )
+    for message in messages:
+        assert message.role == "assistant"
 
-            print(message.content)
+        print(message.content)
 
-            assert message.content is not None
-            assert "Grafi" in message.content
-            if isinstance(message.content, str):
-                # Ensure the content length is within the expected range
-                assert len(message.content) < 70
+        assert message.content is not None
+        assert "Grafi" in message.content
+        if isinstance(message.content, str):
+            # Ensure the content length is within the expected range
+            assert len(message.content) < 70
 
     assert len(await event_store.get_events()) == 2
 
@@ -92,17 +92,17 @@ async def test_openai_tool_with_structured_output() -> None:
     chat_param = {"response_format": UserForm}
     openai_tool = OpenAITool.builder().api_key(api_key).chat_params(chat_param).build()
     await event_store.clear_events()
-    async for messages in openai_tool.invoke(
+    messages = await openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Generate mock user with first name Grafi.")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
+    )
+    for message in messages:
+        assert message.role == "assistant"
 
-            print(message.content)
+        print(message.content)
 
-            assert message.content is not None
-            assert "Grafi" in message.content
+        assert message.content is not None
+        assert "Grafi" in message.content
 
     assert len(await event_store.get_events()) == 2
 
@@ -112,14 +112,14 @@ async def test_openai_tool_async() -> None:
     await event_store.clear_events()
 
     content = ""
-    async for messages in openai_tool.invoke(
+    messages = await openai_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content is not None and isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if message.content is not None and isinstance(message.content, str):
+            content += message.content
 
     print(content)
 
@@ -189,14 +189,14 @@ async def test_openai_tool_serialization() -> None:
 
     # Test that the restored tool works correctly
     content = ""
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            if message.content is not None and isinstance(message.content, str):
-                content += message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        if message.content is not None and isinstance(message.content, str):
+            content += message.content
 
     print(content)
     assert "Grafi" in content
@@ -228,17 +228,17 @@ async def test_openai_tool_with_chat_param_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Hello, my name is Grafi, how are you doing?")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            print(message.content)
-            assert message.content is not None
-            assert "Grafi" in message.content
-            if isinstance(message.content, str):
-                assert len(message.content) < 70
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        print(message.content)
+        assert message.content is not None
+        assert "Grafi" in message.content
+        if isinstance(message.content, str):
+            assert len(message.content) < 70
 
     assert len(await event_store.get_events()) == 2
 
@@ -270,15 +270,15 @@ async def test_openai_tool_structured_output_serialization() -> None:
     assert restored_tool.model_dump(mode="json") == serialized
 
     # Test that the restored tool works
-    async for messages in restored_tool.invoke(
+    messages = await restored_tool.invoke(
         get_invoke_context(),
         [Message(role="user", content="Generate mock user with first name Grafi.")],
-    ):
-        for message in messages:
-            assert message.role == "assistant"
-            print(message.content)
-            assert message.content is not None
-            assert "Grafi" in message.content
+    )
+    for message in messages:
+        assert message.role == "assistant"
+        print(message.content)
+        assert message.content is not None
+        assert "Grafi" in message.content
 
     assert len(await event_store.get_events()) == 2
 

@@ -9,6 +9,7 @@ import base64
 import json
 import uuid
 from typing import Any
+from typing import ClassVar
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -25,8 +26,8 @@ from grafi.common.manifest import env_secret
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.runtime.deltas import emit_delta
+from grafi.tools.llms.llm import _PROVIDER_REMOVED_METHODS
 from grafi.tools.llms.llm import LLM
 from grafi.tools.llms.llm import LLMBuilder
 
@@ -62,6 +63,8 @@ class GeminiTool(LLM):
     Google Gemini implementation of the LLM tool interface used by *grafi*.
     """
 
+    removed_methods: ClassVar[Dict[str, str]] = _PROVIDER_REMOVED_METHODS
+
     name: str = Field(default="GeminiTool")
     type: str = Field(default="GeminiTool")
     api_key: Optional[str] = env_secret("GEMINI_API_KEY")
@@ -94,9 +97,10 @@ class GeminiTool(LLM):
         Initialise a *stateless* client.  The Google SDK uses a lightweight
         Client object; it's fine to create one per request.
         """
-        # Without a key, the SDK reads Google's own (GOOGLE_API_KEY), or uses
-        # Vertex AI's credentials, as configured in the environment.
-        return genai.Client(api_key=self.api_key or None)
+        # Without a key in its own variable, the SDK reads Google's own
+        # (GOOGLE_API_KEY), or uses Vertex AI's credentials, as configured in
+        # the environment; one read from another variable is required.
+        return genai.Client(api_key=self.sdk_api_key(required=False))
 
     def prepare_api_input(
         self, input_data: Messages
@@ -193,7 +197,7 @@ class GeminiTool(LLM):
         self,
         invoke_context: InvokeContext,
         input_data: Messages,
-    ) -> MsgsAGen:  # → async generator just like OpenAITool
+    ) -> Messages:
         contents, tools, system_instruction = self.prepare_api_input(input_data)
 
         # The config is chat_params, with the tools (replacing any configured
@@ -244,7 +248,7 @@ class GeminiTool(LLM):
                     response = await client.aio.models.generate_content(
                         model=self.model, contents=contents, config=cfg
                     )
-                    [message] = self.to_messages(response)
+                    [message] = self._to_messages(response)
             except Exception as exc:
                 raise LLMToolException(
                     tool_name=self.name,
@@ -253,12 +257,12 @@ class GeminiTool(LLM):
                     invoke_context=invoke_context,
                     cause=exc,
                 ) from exc
-        yield [message]
+        return [message]
 
     # --------------------------------------------------------------------- #
     # Response conversion helpers
     # --------------------------------------------------------------------- #
-    def to_messages(self, response: GenerateContentResponse) -> Messages:
+    def _to_messages(self, response: GenerateContentResponse) -> Messages:
         """A response as a message: its text, and its function calls if any."""
         return [self._message(_parts(response), _refusal(response))]
 
@@ -298,10 +302,6 @@ class GeminiToolBuilder(LLMBuilder[GeminiTool]):
     """
     Builder for GeminiTool, allowing fluent configuration of the tool.
     """
-
-    def api_key(self, api_key: Optional[str]) -> Self:
-        self.kwargs["api_key"] = api_key
-        return self
 
     def thinking_budget(self, thinking_budget: Optional[int]) -> Self:
         """Set the Gemini 2.5 thinking budget in tokens (0 off, -1 dynamic)."""

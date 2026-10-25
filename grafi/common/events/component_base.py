@@ -81,6 +81,4 @@ class WorkflowEventBase(ComponentEvent):
 
 
 class AssistantEventBase(ComponentEvent):
-    """Base for Assistant events with model info."""
-
-    model: Optional[str] = None
+    """Base for Assistant events."""

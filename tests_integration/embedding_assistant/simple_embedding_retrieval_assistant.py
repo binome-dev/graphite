@@ -35,16 +35,17 @@ class SimpleEmbeddingRetrievalAssistant(Assistant):
     )
     name: str = Field(default="SimpleEmbeddingRetrievalAssistant")
     type: str = Field(default="SimpleEmbeddingRetrievalAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    # A live client and collection, not data: left out of the manifest.
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
     embedding_model: Optional[OpenAIEmbedding] = Field(default=None, exclude=True)
-    n_results: int = Field(default=30)
-
-    collection: Collection = Field(exclude=True)
+    n_results: int = Field(default=30, exclude=True)
+    collection: Optional[Collection] = Field(default=None, exclude=True)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _construct_workflow(self) -> "SimpleEmbeddingRetrievalAssistant":
+        assert self.collection is not None  # Given when built in code.
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
 

@@ -3,6 +3,7 @@
 import asyncio
 import json
 from typing import Any
+from typing import AsyncIterator
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -28,7 +29,6 @@ from grafi.common.models.async_result import async_func_wrapper
 from grafi.common.models.invoke_context import InvokeContext
 from grafi.common.models.message import Message
 from grafi.common.models.message import Messages
-from grafi.common.models.message import MsgsAGen
 from grafi.nodes.node import Node
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
@@ -46,7 +46,8 @@ from tests_integration.async_execution.support import input_event
 
 
 class ScriptedTool(Tool):
-    """Runs an async script per call; the script yields message batches."""
+    """Runs an async script per call: the tool's output is every message the
+    script yields, once it ends."""
 
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
     script: Any = Field(default=None, exclude=True)
@@ -54,11 +55,14 @@ class ScriptedTool(Tool):
 
     async def invoke(
         self, invoke_context: InvokeContext, input_data: Messages
-    ) -> MsgsAGen:
+    ) -> Messages:
         contents = [str(message.content) for message in input_data]
         self.calls.append(contents)
-        async for batch in self.script(len(self.calls), contents):
-            yield batch
+        return [
+            message
+            async for batch in self.script(len(self.calls), contents)
+            for message in batch
+        ]
 
 
 def reply(*texts: str) -> Messages:
@@ -167,8 +171,13 @@ async def test_failed_producer_on_shared_output_topic_leaves_no_gap(
         for r in history
         if isinstance(r, PublishToTopicEvent) and r.name == "out"
     ] == [(0, "b")]
-    retried = await drain(workflow, event)
-    assert retried == ["a1", "a2"] or sorted(retried) == ["a1", "a2", "b"]
+    async with asyncio.timeout(5):
+        retried = [
+            [str(message.content) for message in output.data]
+            async for output in workflow.invoke(event)
+        ]
+    # A's output is one publication; B's may be delivered again.
+    assert retried == [["a1", "a2"]] or sorted(retried) == [["a1", "a2"], ["b"]]
     assert len(a.calls) == 2 and len(b.calls) == 1
 
 
@@ -214,7 +223,7 @@ async def test_concurrent_producers_commit_contiguous_positions(
         for r in history
         if isinstance(r, PublishToTopicEvent) and r.name == "mid"
     )
-    assert offsets == list(range(producers * 3))
+    assert offsets == list(range(producers))  # One output each, all its pieces.
     consumed = sorted(
         r.offset
         for r in history
@@ -1577,20 +1586,24 @@ async def test_failed_step_closes_normally_while_the_others_stop_at_once(
         ) -> PublishToTopicEvent:
             raise ValueError("invalid publication")
 
-    class Closing(Tool):
-        oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+    class Closing(Node):
+        """A node whose stream cleans up as it is closed."""
 
         async def invoke(
-            self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+            self, invoke_context: InvokeContext, node_input: list[Any]
+        ) -> AsyncIterator[PublishToTopicEvent]:
             await other_started.wait()
             try:
-                yield reply("x")
+                async for publication in super().invoke(invoke_context, node_input):
+                    yield publication
             finally:
                 await other_stopped.wait()  # The other step was stopped first.
                 closes.append("closed")  # Not cut short by a cancellation.
                 if close_hangs:
                     await asyncio.Event().wait()  # A close that never finishes.
+
+    async def emits(call: int, inputs: list[str]) -> Any:
+        yield reply("x")
 
     async def waits(call: int, inputs: list[str]) -> Any:
         other_started.set()
@@ -1604,7 +1617,14 @@ async def test_failed_step_closes_normally_while_the_others_stop_at_once(
     workflow = (
         EventDrivenWorkflow.builder()
         .node(
-            node("producer", Closing(), InputTopic(name="input"), Rejecting(name="mid"))
+            Closing(
+                name="producer",
+                tool=ScriptedTool(script=emits),
+                subscribed_expressions=[TopicExpr(topic=InputTopic(name="input"))],
+                publisher_router=PublisherRouter(
+                    routes=[PublishRoute(topic=Rejecting(name="mid"))]
+                ),
+            )
         )
         .node(
             node(
@@ -1641,11 +1661,11 @@ async def test_teardown_lets_a_node_finish_its_cleanup() -> None:
 
         async def invoke(
             self, invoke_context: InvokeContext, input_data: Messages
-        ) -> MsgsAGen:
+        ) -> Messages:
             try:
                 emit_delta("a")
                 await asyncio.Event().wait()
-                yield reply("never")
+                return reply("never")
             finally:
                 await asyncio.sleep(0.05)  # For example releasing a client.
                 cleaned.set()
@@ -1788,12 +1808,12 @@ async def test_resent_answer_is_recognised_after_a_store_round_trip(
     # Return events as a JSON store would, rebuilt from their stored form.
     get_agent_events = event_store.get_agent_events
 
-    async def round_trip(request_id: str) -> list[Event]:
+    async def round_trip(request_id: str, **kwargs: Any) -> list[Event]:
         return [
             default_event_codec.decode(
                 json.loads(json.dumps(default_event_codec.encode(event)))
             )
-            for event in await get_agent_events(request_id)
+            for event in await get_agent_events(request_id, **kwargs)
         ]
 
     event_store.get_agent_events = round_trip  # type: ignore[method-assign]

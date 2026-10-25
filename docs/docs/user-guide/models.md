@@ -28,7 +28,6 @@ A message is always whole. The pieces of one in the making, such as an LLM's tok
 ### Type Aliases
 
 - `Messages = List[Message]` - A list of Message objects
-- `MsgsAGen = AsyncGenerator[Messages, None]` - An async generator yielding Messages
 
 ### Usage Example
 
@@ -90,7 +89,7 @@ context = InvokeContext(
 | Method                 | Description                                                                         |
 |------------------------|-------------------------------------------------------------------------------------|
 | `for_tool(tool)`       | Class method factory to create appropriate command for a tool type.                |
-| `invoke(context, data)` | Asynchronously invokes the tool, yielding response messages.                    |
+| `invoke(context, data)` | Asynchronously invokes the tool, returning its output messages.                 |
 | `get_tool_input(context, data)` | Processes input events and extracts messages for tool consumption.         |
 
 ### Command Usage Example
@@ -102,9 +101,8 @@ from grafi.tools.tool import Tool
 # Create command from tool
 command = Command.for_tool(my_tool)
 
-# Invoke the command
-async for response in command.invoke(invoke_context, input_datas):
-    # Process response
+# Invoke the command: the tool's output
+messages = await command.invoke(invoke_context, input_datas)
 ```
 
 ## FunctionSpec
@@ -245,13 +243,25 @@ stdio_config: StdioConnection = {
 sse_config: SSEConnection = {
     "transport": "sse",
     "url": "https://api.example.com/mcp/events",
-    "headers": {"Authorization": "Bearer token123"},
+    # Refers to the variable holding the token, with the value it had when
+    # the tool was made (one unset then is read when connecting).
+    "headers": {"Authorization": "Bearer ${MCP_API_TOKEN}"},
     "timeout": 30.0,
     "sse_read_timeout": 60.0,
     "session_kwargs": {"trust_env": True},
     "httpx_client_factory": None
 }
 ```
+
+An MCP tool's manifest never holds a secret: saving one whose configuration
+holds a header, environment variable or URL parameter named like a secret, such
+as `Authorization`, set to a value (`"Bearer token123"`) fails: `to_manifest()`
+raises `ManifestError`. Write it as a reference to the environment variable holding
+it, `"${VAR}"`, after an auth scheme if need be. The tool connects with the
+value the variable had when it was made, as a tool keeps the key it was made
+with. A variable unset or empty when the tool is made is read when it
+connects; unset or empty then, the connection fails, as an empty key is none
+(see `grafi.tools.mcp_config`).
 
 ##### WebSocket Connection Example
 

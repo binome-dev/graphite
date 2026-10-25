@@ -1,3 +1,4 @@
+import json
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -9,6 +10,7 @@ from openinference.semconv.trace import OpenInferenceSpanKindValues
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
+from grafi.common.events.component_events import NodeRespondEvent
 from grafi.common.events.topic_events.consume_from_topic_event import (
     ConsumeFromTopicEvent,
 )
@@ -23,6 +25,8 @@ from grafi.nodes.node_base import NodeBaseBuilder
 from grafi.nodes.node_base import PublisherRouter
 from grafi.nodes.node_base import PublishRoute
 from grafi.tools.command import Command
+from grafi.tools.command import use_command
+from grafi.tools.functions.function_tool import FunctionTool
 from grafi.tools.tool import Tool
 from grafi.topics.expressions.subscription_builder import SubscriptionBuilder
 from grafi.topics.expressions.topic_expression import CombinedExpr
@@ -45,9 +49,21 @@ class MockTool(Tool):
     oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
 
     async def invoke(self, invoke_context: InvokeContext, input_data: Messages):
-        yield [
+        return [
             Message(role="assistant", content=f"Mock async response from {self.name}")
         ]
+
+
+class CustomCommand(Command):
+    """Passes the tool only the last message it consumed."""
+
+    async def get_tool_input(self, invoke_context, input_data) -> Messages:
+        return input_data[-1].data[-1:]
+
+
+@use_command(CustomCommand)
+class CustomCommandTool(MockTool):
+    """A tool whose class names the command a node runs it through."""
 
 
 class MockTopic(TopicBase):
@@ -143,14 +159,14 @@ class TestNode:
         assert basic_node.subscribed_expressions == []
         assert basic_node.publish_to == []
         assert basic_node._subscribed_topics == {}
-        assert basic_node._command is None
+        assert basic_node.command is None
 
     def test_node_creation_with_tool(self, node_with_tool: Node, mock_tool: MockTool):
         """Test Node creation with a tool."""
         assert node_with_tool.name == "test_node_with_tool"
         assert node_with_tool.tool is mock_tool
-        assert node_with_tool._command is not None
-        assert isinstance(node_with_tool._command, Command)
+        assert node_with_tool.command is not None
+        assert isinstance(node_with_tool.command, Command)
 
     def test_node_creation_with_subscriptions(self, node_with_subscriptions: Node):
         """Test Node creation with subscriptions."""
@@ -174,14 +190,14 @@ class TestNode:
         """Test that model_post_init creates a command when tool is provided."""
         node = Node(name="test_node", tool=mock_tool)
 
-        assert node._command is not None
-        assert isinstance(node._command, Command)
-        assert node._command.tool is mock_tool
+        assert node.command is not None
+        assert isinstance(node.command, Command)
+        assert node.command.tool is mock_tool
 
     def test_model_post_init_no_command_without_tool(self):
         """Test that model_post_init doesn't create command without tool."""
         node = Node(name="test_node")
-        assert node._command is None
+        assert node.command is None
 
     def test_model_post_init_multiple_expressions_same_topic(
         self, mock_topic: MockTopic
@@ -216,8 +232,8 @@ class TestNode:
         node = Node.builder().name("built_node").tool(mock_tool).build()
 
         assert node.tool is mock_tool
-        assert node._command is not None
-        assert isinstance(node._command, Command)
+        assert node.command is not None
+        assert isinstance(node.command, Command)
 
     def test_builder_with_subscriptions(self, mock_topic: MockTopic):
         """Test building a Node with subscriptions."""
@@ -284,7 +300,7 @@ class TestNode:
         mock_decorator.side_effect = lambda func: func
 
         # Node without tool should not have a command
-        assert basic_node._command is None
+        assert basic_node.command is None
 
         # A node without a tool raises a clear NodeExecutionError rather than an
         # opaque AttributeError from calling .invoke() on None.
@@ -400,14 +416,20 @@ class TestNode:
     # Test Property Access
     def test_command_property_getter(self, node_with_tool: Node):
         """Test the command property getter."""
-        assert node_with_tool.command is node_with_tool._command
+        assert node_with_tool.command is node_with_tool.command
 
-    def test_command_property_setter(self, basic_node: Node, mock_tool: MockTool):
-        """Test the command property setter."""
-        command = Command(tool=mock_tool)
-        basic_node.command = command
-        assert basic_node._command is command
-        assert basic_node.command is command
+    def test_a_command_follows_from_the_tools_class(self):
+        """A node runs its tool through the command the tool's class names,
+        so a saved node loads with it; a command cannot be set apart."""
+        node = Node(name="custom", tool=CustomCommandTool())
+        assert type(node.command) is CustomCommand
+        assert node.command.tool is node.tool
+
+        restored = Node.model_validate(node.model_dump(mode="json"))
+        assert type(restored.command) is CustomCommand
+
+        with pytest.raises((AttributeError, ValueError)):
+            node.command = Command(tool=MockTool())
 
     def test_command_property_none_initially(self, basic_node: Node):
         """Test that command property is None initially for nodes without tools."""
@@ -505,7 +527,7 @@ class TestNode:
         assert node.subscribed_expressions == []
         assert node.publish_to == []
         assert node._subscribed_topics == {}
-        assert node._command is None
+        assert node.command is None
 
     def test_node_serialization_compatibility(
         self, mock_tool: MockTool, mock_topic: MockTopic
@@ -544,7 +566,7 @@ class TestNode:
         ) as mock_factory:
             node = Node(name="test_node", tool=mock_tool)
 
-            assert node._command is not None
+            assert node.command is not None
             mock_factory.assert_called_once_with(mock_tool)
 
     def test_tool_command_consistency(self, mock_tool: MockTool):
@@ -552,7 +574,7 @@ class TestNode:
         node = Node(name="test_node", tool=mock_tool)
 
         assert node.tool is mock_tool
-        assert node._command.tool is mock_tool
+        assert node.command.tool is mock_tool
 
 
 class TestNodeIdRoundTrip:
@@ -823,3 +845,99 @@ class TestNodeSerialization:
         restored = Node.from_manifest(manifest)
         assert restored.node_id == node.node_id
         assert type(restored.tool) is MockTool
+
+
+async def _progress(messages: Messages):
+    yield "working..."  # Only streams.
+    yield {"step": 1}
+    yield {"step": 2}
+
+
+@pytest.mark.asyncio
+async def test_a_node_publishes_and_records_all_its_tools_output_at_once(
+    event_store, invoke_context: InvokeContext
+):
+    """A tool's output is one batch: the node publishes it as one event, and
+    its respond event records that event, with every value the function
+    yielded (not only the last batch, as when tools yielded several)."""
+    topic = Topic(name="out")
+    node = Node(
+        name="progress",
+        tool=FunctionTool(function=_progress),
+        publisher_router=PublisherRouter(routes=[PublishRoute(topic=topic)]),
+    )
+    consumed = [
+        ConsumeFromTopicEvent(
+            name="in",
+            consumer_name="progress",
+            consumer_type="Node",
+            offset=0,
+            invoke_context=invoke_context,
+            data=[Message(role="user", content="go")],
+        )
+    ]
+
+    [published] = [event async for event in node.invoke(invoke_context, consumed)]
+
+    assert [json.loads(m.content) for m in published.data] == [
+        {"step": 1},
+        {"step": 2},
+    ]
+    [respond] = [
+        event
+        for event in await event_store.get_events()
+        if isinstance(event, NodeRespondEvent)
+    ]
+    assert respond.output_data == published
+
+
+@pytest.mark.asyncio
+async def test_a_node_whose_tool_outputs_nothing_publishes_nothing(
+    event_store, invoke_context: InvokeContext
+):
+    node = Node(name="quiet", tool=FunctionTool(function=_nothing))
+
+    assert [event async for event in node.invoke(invoke_context, [])] == []
+    [respond] = [
+        event
+        for event in await event_store.get_events()
+        if isinstance(event, NodeRespondEvent)
+    ]
+    assert respond.output_data is None
+
+
+def _nothing(messages: Messages) -> None:
+    return None
+
+
+class _Saying(Tool):
+    """Says its word."""
+
+    word: str = ""
+    oi_span_type: OpenInferenceSpanKindValues = OpenInferenceSpanKindValues.TOOL
+
+    async def invoke(self, invoke_context, input_data):
+        return [Message(role="assistant", content=self.word)]
+
+
+@pytest.mark.asyncio
+async def test_a_node_copied_with_another_tool_runs_that_tool() -> None:
+    """Its command is made from the tool it has, not copied from the original."""
+    node = Node(name="speaker", tool=_Saying(word="old"))
+    copy = node.model_copy(update={"tool": _Saying(word="new")})
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+
+    [published] = [event async for event in copy.invoke(context, [])]
+
+    assert [message.content for message in published.data] == ["new"]
+    assert copy.command is not None and copy.command.tool is copy.tool
+    assert node.command is not None and node.command.tool is node.tool
+
+
+def test_a_nodes_command_cannot_be_set() -> None:
+    node = Node(name="speaker", tool=_Saying(word="w"))
+
+    with pytest.raises(AttributeError, match="names it with @use_command"):
+        node.command = None  # type: ignore[assignment]

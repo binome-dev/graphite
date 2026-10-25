@@ -24,18 +24,32 @@ class SimpleMultiLLMAssistant(Assistant):
     )
     name: str = Field(default="SimpleMultiLLMAssistant")
     type: str = Field(default="SimpleMultiLLMAssistant")
-    api_key: Optional[str] = env_secret("OPENROUTER_API_KEY")
-    model_openai: str = Field(default="openai/gpt-4o-mini")
-    model_deepseek: str = Field(default="deepseek/deepseek-chat-v3-0324:free")
-    model_gemini: str = Field(default="google/gemini-2.0-flash-001")
-    model_qwen: str = Field(default="qwen/qwen3-235b-a22b")
-    openai_function: CallableRef
-    deepseek_function: CallableRef
-    gemini_function: CallableRef
-    qwen_function: CallableRef
-    human_request_process_function: CallableRef
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENROUTER_API_KEY", exclude=True)
+    model_openai: str = Field(default="openai/gpt-4o-mini", exclude=True)
+    model_deepseek: str = Field(
+        default="deepseek/deepseek-chat-v3-0324:free", exclude=True
+    )
+    model_gemini: str = Field(default="google/gemini-2.0-flash-001", exclude=True)
+    model_qwen: str = Field(default="qwen/qwen3-235b-a22b", exclude=True)
+    openai_function: Optional[CallableRef] = Field(default=None, exclude=True)
+    deepseek_function: Optional[CallableRef] = Field(default=None, exclude=True)
+    gemini_function: Optional[CallableRef] = Field(default=None, exclude=True)
+    qwen_function: Optional[CallableRef] = Field(default=None, exclude=True)
+    human_request_process_function: Optional[CallableRef] = Field(
+        default=None, exclude=True
+    )
 
     def _construct_workflow(self) -> "SimpleMultiLLMAssistant":
+        # Given when built in code.
+        assert (
+            self.openai_function is not None
+            and self.deepseek_function is not None
+            and self.gemini_function is not None
+            and self.qwen_function is not None
+            and self.human_request_process_function is not None
+        )
         agent_input_topic = InputTopic(name="agent_input_topic")
         agent_output_topic = OutputTopic(name="agent_output_topic")
         in_workflow_input_topic = InWorkflowInputTopic(name="in_workflow_input_topic")
@@ -57,7 +71,7 @@ class SimpleMultiLLMAssistant(Assistant):
             .tool(
                 OpenRouterTool.builder()
                 .name("OpenAIInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model_openai)
                 .build()
             )
@@ -73,7 +87,7 @@ class SimpleMultiLLMAssistant(Assistant):
             .tool(
                 OpenRouterTool.builder()
                 .name("DeepSeekInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model_deepseek)
                 .build()
             )
@@ -89,7 +103,7 @@ class SimpleMultiLLMAssistant(Assistant):
             .tool(
                 OpenRouterTool.builder()
                 .name("GeminiInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model_gemini)
                 .build()
             )
@@ -105,7 +119,7 @@ class SimpleMultiLLMAssistant(Assistant):
             .tool(
                 OpenRouterTool.builder()
                 .name("QwenInputLLM")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model_qwen)
                 .build()
             )

@@ -22,7 +22,6 @@ def assistant_invoke_event() -> AssistantInvokeEvent:
         id="test_id",
         name="test_assistant",
         type="test_type",
-        model="gpt-4o",
         invoke_context=invoke_context(),
         input_data=request(),
     )
@@ -39,7 +38,6 @@ def assistant_invoke_event_json() -> dict:
         "id": "test_id",
         "name": "test_assistant",
         "type": "test_type",
-        "model": "gpt-4o",
         "input_data": request_json(),
     }
 

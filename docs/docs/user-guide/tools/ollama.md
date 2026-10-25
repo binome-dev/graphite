@@ -9,9 +9,10 @@
 | `name`             | `str`                   | Descriptive identifier for the tool (defaults to `"OllamaTool"`).                                             |
 | `type`             | `str`                   | Tool type indicator (defaults to `"OllamaTool"`).                                                             |
 | `api_url`          | `str`                   | URL of the Ollama API endpoint (defaults to `"http://localhost:11434"`).                                      |
+| `api_key`          | `Optional[str]`         | API key for an Ollama behind authentication (defaults to the `OLLAMA_API_KEY` environment variable; saved as `{"env": "OLLAMA_API_KEY"}`). |
 | `model`            | `str`                   | Ollama model name (defaults to `"qwen3"`).                                                                    |
 | `system_message`   | `Optional[str]`         | Optional system message to include in API calls (inherited from `LLM`).                                       |
-| `chat_params`      | `Dict[str, Any]`        | Additional optional chat parameters, passed to `chat()`; a key set here replaces the tool's own, such as `model` (inherited from `LLM`). |
+| `chat_params`      | `Dict[str, Any]`        | Additional optional chat parameters for `chat()` (inherited from `LLM`): a key naming a field of `ollama.Options`, such as `temperature`, `top_k`, `num_ctx` or `seed`, goes into its `options` (an `options` given too wins where both set one); any other key is passed to `chat()` as an argument, replacing the tool's own, such as `model`, so a misspelt one is refused when the tool is made (`ValidationError`); an option the Ollama server takes that `ollama.Options` does not name, such as `min_p`, goes in `chat_params={"options": {...}}` itself; `messages`, `tools` and `stream`, which the tool sets, are refused too. |
 | `is_streaming`     | `bool`                  | Whether to stream the answer to a caller that streams the run (defaults to `True`, inherited from `LLM`).     |
 | `structured_output`| `bool`                  | Whether to use structured output mode (defaults to `False`, inherited from `LLM`).                            |
 | `oi_span_type`     | `OpenInferenceSpanKindValues` | Semantic attribute for tracing (set to `LLM`, inherited from `LLM`).                                    |
@@ -22,8 +23,7 @@
 |---------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | `builder()`         | `classmethod -> OllamaToolBuilder`                                | Returns a builder instance for constructing OllamaTool objects.                                    |
 | `prepare_api_input` | `(input_data: Messages) -> tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]` | Adapts Message objects to Ollama API format, including function specifications. |
-| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> MsgsAGen` | Calls the Ollama API and yields its answer as one message, streaming its text while a caller streams the run. |
-| `to_messages`       | `(response: ChatResponse) -> Messages`                            | Converts a complete response from Ollama's API into Message objects.                               |
+| `invoke`          | `async (invoke_context: InvokeContext, input_data: Messages) -> Messages` | Calls the Ollama API and returns its answer as one message, streaming its text while a caller streams the run. |
 | `model_dump(mode="json")` | `() -> dict[str, Any]`                                       | Saves the tool as data. See [Manifests](../manifests.md).                                         |
 
 ## How It Works
@@ -43,9 +43,9 @@ The Ollama tool processes requests through several key steps:
 
 3. **Response Processing**:
    - **Streamed responses**: The text and tool calls of every chunk are gathered into one message
-   - **Complete responses**: Processed via `to_messages`
+   - **Complete responses**: Converted into one message
    - **Function calls**: Converted to proper tool_call format with generated IDs
-   - Either way, the tool yields one `Message`: its text and its tool calls
+   - Either way, the tool returns one `Message`: its text and its tool calls; post-process it by overriding `invoke()`, decorated with `@record_tool_invoke` and calling `super().invoke()` (so what it returns is recorded once), with `.is_streaming(False)` where the raw text must not stream to a caller
 
 ## Builder Pattern
 
@@ -82,8 +82,8 @@ ollama_tool = (
 messages = [Message(role="user", content="Hello, how are you?")]
 
 # Asynchronous invocation
-async for response in ollama_tool.invoke(invoke_context, messages):
-    print(response[0].content)
+response = await ollama_tool.invoke(invoke_context, messages)
+print(response[0].content)
 ```
 
 ### Streaming Usage
@@ -96,32 +96,15 @@ from grafi.runtime import deltas_to
 async def stream_example():
     messages = [Message(role="user", content="Tell me a story")]
     with deltas_to(lambda delta: print(delta.content, end="", flush=True)):
-        async for message_batch in ollama_tool.invoke(invoke_context, messages):
-            story = message_batch[0]  # The whole answer, once it is complete.
+        [story] = await ollama_tool.invoke(invoke_context, messages)  # Once complete.
 ```
 
 ### Function Calling
 
-```python
-from grafi.common.models.function_spec import FunctionSpec
-
-# Add function specifications
-function_spec = FunctionSpec(
-    name="get_weather",
-    description="Get current weather for a location",
-    parameters={
-        "type": "object",
-        "properties": {
-            "location": {"type": "string", "description": "City name"}
-        },
-        "required": ["location"]
-    }
-)
-
-ollama_tool.add_function_specs([function_spec])
-
-# The tool will now include function specifications in API calls
-```
+In a workflow, an LLM node is offered the functions of the function-call
+nodes reading its calls, which answer them; specs given to the tool, with
+`ollama_tool.add_function_specs([...])`, are for functions the app answers. See
+[LLM](llm.md#function-calling-setup).
 
 ## Configuration Options
 

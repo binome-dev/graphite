@@ -1,11 +1,15 @@
 """Tests for the unified record decorators."""
 
+import asyncio
 import json
 from types import SimpleNamespace
 
 import pytest
 from pydantic_core import to_jsonable_python
 
+from grafi.common.decorators.record_base import ComponentConfig
+from grafi.common.decorators.record_base import EventContext
+from grafi.common.decorators.record_base import create_async_decorator
 from grafi.common.decorators.record_decorators import record_node_invoke
 from grafi.common.decorators.record_decorators import record_tool_invoke
 from grafi.common.event_stores import EventStoreInMemory
@@ -43,7 +47,6 @@ class _ExplodingTool:
             invoke_context=invoke_context,
             cause=ValueError("root boom"),
         )
-        yield  # pragma: no cover - makes this an async generator
 
 
 class TestFailedEventErrorDetails:
@@ -61,8 +64,7 @@ class TestFailedEventErrorDetails:
 
         # The original exception still propagates unchanged.
         with pytest.raises(FunctionCallException) as exc_info:
-            async for _ in tool.invoke(invoke_context, messages):
-                pass
+            await tool.invoke(invoke_context, messages)
         assert exc_info.value.function_name == "detonate"
 
         events = await event_store.get_events()
@@ -97,6 +99,7 @@ class _RecordingSpan:
 
     def __init__(self) -> None:
         self.ended = False
+        self.ends = 0
         self.attr_set_after_end: dict = {}  # attribute key -> ended-state at set
         self.exception_recorded_after_end: list = []
         self.status_set_after_end: list = []
@@ -120,6 +123,7 @@ class _RecordingSpan:
     def end(self) -> None:
         # Ending the span must happen AFTER error enrichment, never before.
         self.ended = True
+        self.ends += 1
 
 
 class _RecordingTracer:
@@ -149,10 +153,7 @@ class TestSpanErrorEnrichment:
                 assistant_request_id="r",
             )
             with pytest.raises(FunctionCallException):
-                async for _ in tool.invoke(
-                    invoke_context, [Message(role="user", content="hi")]
-                ):
-                    pass
+                await tool.invoke(invoke_context, [Message(role="user", content="hi")])
 
         span = tracer.span
         # The span was ended.
@@ -182,8 +183,7 @@ class _Node:
     @record_node_invoke
     async def invoke(self, invoke_context, input_data):
         try:
-            async for _ in _ExplodingTool().invoke(invoke_context, input_data):
-                pass
+            await _ExplodingTool().invoke(invoke_context, input_data)
         except FunctionCallException as error:
             raise NodeExecutionError(
                 node_name=self.name, message="node failed", cause=error
@@ -220,7 +220,7 @@ class _QuietTool:
 
     @record_tool_invoke
     async def invoke(self, invoke_context, input_data):
-        yield [Message(role="assistant", content="done")]
+        return [Message(role="assistant", content="done")]
 
 
 class _FrozenError(Exception):
@@ -236,7 +236,6 @@ class _FrozenFailureTool(_QuietTool):
     @record_tool_invoke
     async def invoke(self, invoke_context, input_data):
         raise _FrozenError("unresolvable $ref")
-        yield  # pragma: no cover - makes this an async generator
 
 
 @pytest.mark.asyncio
@@ -267,8 +266,7 @@ async def test_a_failure_is_logged_once_and_every_layer_records_its_id():
 async def test_failing_to_store_a_lifecycle_event_is_the_failure(failing, operation):
     with bind_services(ExecutionServices(event_store=_FailingStore(failing))):
         with pytest.raises(EventPersistenceError) as raised:
-            async for _ in _QuietTool().invoke(_CONTEXT, []):
-                pass
+            await _QuietTool().invoke(_CONTEXT, [])
 
     assert raised.value.operation == operation
     assert isinstance(raised.value.__cause__, ConnectionError)
@@ -279,8 +277,7 @@ async def test_a_failure_refusing_its_error_id_is_still_recorded_and_raised():
     store, reporter = EventStoreInMemory(), _CollectingReporter()
     with bind_services(ExecutionServices(event_store=store, error_reporter=reporter)):
         with pytest.raises(_FrozenError):
-            async for _ in _FrozenFailureTool().invoke(_CONTEXT, []):
-                pass
+            await _FrozenFailureTool().invoke(_CONTEXT, [])
 
     events = await store.get_events()
     assert len(events) == 2 and isinstance(events[-1], ToolFailedEvent)
@@ -296,7 +293,6 @@ class _UnprintableFailureTool(_QuietTool):
     @record_tool_invoke
     async def invoke(self, invoke_context, input_data):
         raise _UnprintableError()
-        yield  # pragma: no cover - makes this an async generator
 
 
 @pytest.mark.asyncio
@@ -304,8 +300,7 @@ async def test_failing_to_record_a_failure_never_replaces_it():
     reporter = _CollectingReporter()
     with bind_services(ExecutionServices(error_reporter=reporter)):
         with pytest.raises(_UnprintableError) as raised:
-            async for _ in _UnprintableFailureTool().invoke(_CONTEXT, []):
-                pass
+            await _UnprintableFailureTool().invoke(_CONTEXT, [])
 
     assert [level for level, _ in reporter.reports] == ["warning"]
     assert "cannot describe the failure" in raised.value.__notes__[0]
@@ -323,8 +318,7 @@ class _QuietNode:
 
     @record_node_invoke
     async def invoke(self, invoke_context, input_data):
-        async for _ in _QuietTool().invoke(invoke_context, []):
-            pass
+        await _QuietTool().invoke(invoke_context, [])
         return
         yield  # pragma: no cover - makes this an async generator
 
@@ -348,7 +342,7 @@ class _StreamingTool(_QuietTool):
     async def invoke(self, invoke_context, input_data):
         for text in ("Check", "ing."):
             emit_delta(text)
-        yield [Message(role="assistant", content="Checking.")]
+        return [Message(role="assistant", content="Checking.")]
 
 
 @pytest.mark.asyncio
@@ -357,8 +351,7 @@ async def test_a_streaming_tool_records_its_messages_and_not_its_deltas(
 ):
     received = []
     with deltas_to(received.append):
-        async for _ in _StreamingTool().invoke(_CONTEXT, []):
-            pass
+        await _StreamingTool().invoke(_CONTEXT, [])
 
     assert [delta.content for delta in received] == ["Check", "ing."]
     [respond] = [
@@ -370,10 +363,24 @@ async def test_a_streaming_tool_records_its_messages_and_not_its_deltas(
     assert message.content == "Checking."
 
 
+# A stream of message batches, recorded as a tool's: what it outputs is them all.
+_record_stream = create_async_decorator(
+    ComponentConfig(
+        invoke_event=ToolInvokeEvent,
+        respond_event=ToolRespondEvent,
+        failed_event=ToolFailedEvent,
+        extract_metadata=lambda self: EventContext(
+            id=self.tool_id, name=self.name, type=self.type, oi_span_type="TOOL"
+        ),
+        output_of=lambda batches: [m for batch in batches for m in batch],
+    )
+)
+
+
 class _PassingDeltasOn(_QuietTool):
     """Like an assistant streaming its run: its stream carries deltas."""
 
-    @record_tool_invoke
+    @_record_stream
     async def invoke(self, invoke_context, input_data):
         yield Delta("Check")
         yield [Message(role="assistant", content="Checking.")]
@@ -392,3 +399,277 @@ async def test_deltas_passing_through_a_recorded_stream_are_not_recorded(
         if isinstance(e, ToolRespondEvent)
     ]
     assert [message.content for message in respond.output_data] == ["Checking."]
+
+
+class _WaitingTool(_QuietTool):
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):
+        self.started.set()
+        await asyncio.Event().wait()
+
+
+def _lifecycle(events) -> list:
+    return [type(event).__name__ for event in events]
+
+
+@pytest.mark.asyncio
+async def test_a_tools_invoke_is_recorded_and_its_span_ended_once():
+    tracer, store = _RecordingTracer(), EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store, tracer=tracer)):
+        output = await _QuietTool().invoke(_CONTEXT, [])
+
+    assert [message.content for message in output] == ["done"]
+    assert _lifecycle(await store.get_events()) == [
+        "ToolInvokeEvent",
+        "ToolRespondEvent",
+    ]
+    [respond] = (await store.get_events())[1:]
+    assert respond.output_data == output
+    assert tracer.span.ends == 1
+
+
+@pytest.mark.asyncio
+async def test_a_failing_tools_invoke_is_recorded_and_its_span_ended_once():
+    tracer, store = _RecordingTracer(), EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store, tracer=tracer)):
+        with pytest.raises(FunctionCallException):
+            await _ExplodingTool().invoke(_CONTEXT, [])
+
+    assert _lifecycle(await store.get_events()) == [
+        "ToolInvokeEvent",
+        "ToolFailedEvent",
+    ]
+    assert tracer.span.ends == 1
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_tools_invoke_records_no_outcome_and_ends_its_span_once():
+    tracer, store = _RecordingTracer(), EventStoreInMemory()
+    tool = _WaitingTool()
+    with bind_services(ExecutionServices(event_store=store, tracer=tracer)):
+        task = asyncio.create_task(tool.invoke(_CONTEXT, []))
+    await tool.started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # Cancelled by its caller: neither a response nor a failure of its own.
+    assert _lifecycle(await store.get_events()) == ["ToolInvokeEvent"]
+    assert tracer.span.ends == 1
+
+
+class _NoneTool(_QuietTool):
+    @record_tool_invoke
+    async def invoke(self, invoke_context, input_data):  # type: ignore[override]
+        return None
+
+
+@pytest.mark.asyncio
+async def test_a_tool_returning_other_than_messages_is_its_recorded_failure():
+    """Its failure, recorded as any other: not an invalid respond event."""
+    tracer, store = _RecordingTracer(), EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store, tracer=tracer)):
+        with pytest.raises(TypeError, match="returns its output as a list of"):
+            await _NoneTool().invoke(_CONTEXT, [])
+
+    assert _lifecycle(await store.get_events()) == [
+        "ToolInvokeEvent",
+        "ToolFailedEvent",
+    ]
+    assert tracer.span.ends == 1
+
+
+class _FailingBeforeItStreams(_QuietTool):
+    @record_tool_invoke
+    def invoke(self, invoke_context, input_data):  # type: ignore[override]
+        raise ValueError("no stream")  # Before returning one.
+
+
+@pytest.mark.asyncio
+async def test_a_stream_failing_to_start_is_its_recorded_failure():
+    """Its function runs within the invocation, as each step of it does."""
+    tracer, store = _RecordingTracer(), EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store, tracer=tracer)):
+        stream = _FailingBeforeItStreams().invoke(_CONTEXT, [])
+        with pytest.raises(ValueError, match="no stream"):
+            [item async for item in stream]
+
+    assert _lifecycle(await store.get_events()) == [
+        "ToolInvokeEvent",
+        "ToolFailedEvent",
+    ]
+    assert tracer.span.ends == 1
+
+
+@pytest.mark.asyncio
+async def test_a_nodes_events_record_its_topics():
+    from grafi.nodes.node import Node
+    from grafi.tools.functions.function_tool import FunctionTool
+    from grafi.topics.topic_impl.input_topic import InputTopic
+    from grafi.topics.topic_impl.output_topic import OutputTopic
+
+    node = (
+        Node.builder()
+        .name("echo")
+        .subscribe(InputTopic(name="in"))
+        .tool(FunctionTool(function=_echo))
+        .publish_to(OutputTopic(name="out"))
+        .build()
+    )
+    store = EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store)):
+        [event async for event in node.invoke(_CONTEXT, [])]
+
+    node_events = [e for e in await store.get_events() if "Node" in type(e).__name__]
+    assert node_events
+    for event in node_events:
+        assert (event.subscribed_topics, event.publish_to_topics) == (["in"], ["out"])
+
+
+def _echo(messages):
+    return "echoed"
+
+
+@pytest.mark.asyncio
+async def test_an_override_calling_super_is_recorded_once_with_its_output():
+    """As an LLM's answer is post-processed: the respond event holds what
+    the override returns, and the tool is recorded once."""
+    from grafi.tools.functions.function_tool import FunctionTool
+
+    def card(_: list) -> str:
+        return "card 4111-1111"
+
+    class Redacting(FunctionTool):
+        @record_tool_invoke
+        async def invoke(self, invoke_context, input_data):
+            [answer] = await super().invoke(invoke_context, input_data)
+            return [answer.model_copy(update={"content": "card ****"})]
+
+    store = EventStoreInMemory()
+    context = InvokeContext(
+        conversation_id="c", invoke_id="i", assistant_request_id="r"
+    )
+    with bind_services(ExecutionServices(event_store=store)):
+        await Redacting(function=card).invoke(context, [])
+
+    events = await store.get_events()
+    assert [type(e) for e in events] == [ToolInvokeEvent, ToolRespondEvent]
+    assert events[1].output_data[0].content == "card ****"
+
+
+@pytest.mark.asyncio
+async def test_a_tool_invoked_again_within_its_invoke_is_recorded_each_time():
+    """As a sub-agent sharing its parent's tools reaches the same tool: each
+    call is recorded, not only the outer one."""
+    from grafi.tools.functions.function_tool import FunctionTool
+
+    calls = []
+
+    async def again(_: list) -> str:
+        calls.append(None)
+        if len(calls) == 1:
+            await tool.invoke(_CONTEXT, [])
+        return "done"
+
+    tool = FunctionTool(function=again)
+    store = EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store)):
+        await tool.invoke(_CONTEXT, [])
+
+    assert _lifecycle(await store.get_events()) == [
+        "ToolInvokeEvent",
+        "ToolInvokeEvent",
+        "ToolRespondEvent",
+        "ToolRespondEvent",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_override_calling_super_is_recorded_once():
+    """A node's, as an assistant's, decorated override calling
+    super().invoke() is recorded once."""
+    from grafi.nodes.node import Node
+    from grafi.tools.functions.function_tool import FunctionTool
+    from grafi.topics.topic_impl.input_topic import InputTopic
+    from grafi.topics.topic_impl.output_topic import OutputTopic
+
+    class Logged(Node):
+        @record_node_invoke
+        async def invoke(self, invoke_context, node_input):
+            async for publication in super().invoke(invoke_context, node_input):
+                yield publication
+
+    node = (
+        Logged.builder()
+        .name("echo")
+        .subscribe(InputTopic(name="in"))
+        .tool(FunctionTool(function=_echo))
+        .publish_to(OutputTopic(name="out"))
+        .build()
+    )
+    store = EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store)):
+        [event async for event in node.invoke(_CONTEXT, [])]
+
+    assert [
+        name for name in _lifecycle(await store.get_events()) if "Node" in name
+    ] == ["NodeInvokeEvent", "NodeRespondEvent"]
+
+
+@pytest.mark.asyncio
+async def test_a_decorator_stacked_on_a_recorded_invoke_keeps_it_recorded():
+    """As a retry decorator made with functools.wraps on a recorded invoke."""
+    import functools
+
+    from grafi.tools.functions.function_tool import FunctionTool
+
+    def logged(func):
+        @functools.wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            return await func(self, *args, **kwargs)
+
+        return wrapper
+
+    class Logged(FunctionTool):
+        @logged
+        @record_tool_invoke
+        async def invoke(self, invoke_context, input_data):
+            [answer] = await super().invoke(invoke_context, input_data)
+            return [answer.model_copy(update={"content": "logged"})]
+
+    store = EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store)):
+        await Logged(function=_echo).invoke(_CONTEXT, [])
+
+    events = await store.get_events()
+    assert _lifecycle(events) == ["ToolInvokeEvent", "ToolRespondEvent"]
+    assert events[1].output_data[0].content == "logged"
+
+
+@pytest.mark.asyncio
+async def test_a_decorator_without_wraps_never_leaves_a_call_unrecorded():
+    """A decorator hiding the override's mark: the override is recorded."""
+    from grafi.tools.functions.function_tool import FunctionTool
+
+    def timed(func):
+        async def wrapper(self, *args, **kwargs):
+            return await func(self, *args, **kwargs)
+
+        return wrapper
+
+    class Replaces(FunctionTool):
+        @timed
+        @record_tool_invoke
+        async def invoke(self, invoke_context, input_data):
+            return [Message(role="assistant", content="own")]
+
+    store = EventStoreInMemory()
+    with bind_services(ExecutionServices(event_store=store)):
+        await Replaces(function=_echo).invoke(_CONTEXT, [])
+
+    events = await store.get_events()
+    assert _lifecycle(events) == ["ToolInvokeEvent", "ToolRespondEvent"]
+    assert events[1].output_data[0].content == "own"

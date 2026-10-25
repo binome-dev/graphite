@@ -8,6 +8,7 @@ from grafi.assistants.assistant import Assistant
 from grafi.assistants.assistant_base import AssistantBaseBuilder
 from grafi.common.callable_component import CallableComponent
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
+from grafi.common.manifest import SecretInput
 from grafi.common.manifest import env_secret
 from grafi.common.models.message import Messages
 from grafi.nodes.node import Node
@@ -69,11 +70,13 @@ class MIMOLLMAssistant(Assistant):
     )
     name: str = Field(default="MIMOLLMAssistant")
     type: str = Field(default="MIMOLLMAssistant")
-    api_key: Optional[str] = env_secret("OPENAI_API_KEY")
-    system_message_greeting: Optional[str] = Field(default=None)
-    system_message_question: Optional[str] = Field(default=None)
-    system_message_merge: Optional[str] = Field(default=None)
-    model: str = Field(default="gpt-4o-mini")
+    # What it builds its workflow from. Not saved: a manifest holds the
+    # workflow, which loading keeps (see AssistantBase).
+    api_key: Optional[str] = env_secret("OPENAI_API_KEY", exclude=True)
+    system_message_greeting: Optional[str] = Field(default=None, exclude=True)
+    system_message_question: Optional[str] = Field(default=None, exclude=True)
+    system_message_merge: Optional[str] = Field(default=None, exclude=True)
+    model: str = Field(default="gpt-4o-mini", exclude=True)
 
     @classmethod
     def builder(cls) -> "MIMOLLMAssistantBuilder":
@@ -120,7 +123,7 @@ class MIMOLLMAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIToolGreeting")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_message_greeting)
                 .build()
@@ -137,7 +140,7 @@ class MIMOLLMAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIToolQuestion")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(self.system_message_question)
                 .build()
@@ -161,7 +164,7 @@ class MIMOLLMAssistant(Assistant):
             .tool(
                 OpenAITool.builder()
                 .name("OpenAIToolMerge")
-                .api_key(self.api_key)
+                .api_key(self.secret_reference("api_key"))
                 .model(self.model)
                 .system_message(
                     self.system_message_merge
@@ -189,7 +192,7 @@ class MIMOLLMAssistant(Assistant):
 class MIMOLLMAssistantBuilder(AssistantBaseBuilder[MIMOLLMAssistant]):
     """Concrete builder for MIMOLLMAssistant."""
 
-    def api_key(self, api_key: str) -> Self:
+    def api_key(self, api_key: SecretInput) -> Self:
         self.kwargs["api_key"] = api_key
         return self
 

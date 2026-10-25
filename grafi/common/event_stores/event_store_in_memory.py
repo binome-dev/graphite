@@ -1,6 +1,7 @@
 """Module for storing and managing events."""
 
 import json
+from typing import Collection
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -8,6 +9,7 @@ from typing import Set
 
 from grafi.common.event_stores.event_store import EventStore
 from grafi.common.events.event import Event
+from grafi.common.events.event import EventType
 from grafi.common.events.topic_events.publish_to_topic_event import PublishToTopicEvent
 
 
@@ -68,20 +70,30 @@ class EventStoreInMemory(EventStore):
                 return event
         return None
 
-    async def get_agent_events(self, assistant_request_id: str) -> List[Event]:
-        """Get all events for a given agent request ID."""
+    async def get_agent_events(
+        self,
+        assistant_request_id: str,
+        *,
+        event_types: Optional[Collection[EventType]] = None,
+    ) -> List[Event]:
         return [
             event
             for event in self.events
             if event.invoke_context.assistant_request_id == assistant_request_id
+            and (event_types is None or event.event_type in event_types)
         ]
 
-    async def get_conversation_events(self, conversation_id: str) -> List[Event]:
-        """Get all events for a given conversation ID."""
+    async def get_conversation_events(
+        self,
+        conversation_id: str,
+        *,
+        event_types: Optional[Collection[EventType]] = None,
+    ) -> List[Event]:
         return [
             event
             for event in self.events
             if event.invoke_context.conversation_id == conversation_id
+            and (event_types is None or event.event_type in event_types)
         ]
 
     async def get_topic_events(self, name: str, offsets: List[int]) -> List[Event]:

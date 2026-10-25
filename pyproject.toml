@@ -7,7 +7,7 @@ license = {text = "Mozilla Public License Version 2.0"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic>=2.13.4",
+    "pydantic>=2.13.4,<3",
     "openai>=2.42.0",
     "docstring-parser>=0.18.0",
     "openinference-instrumentation>=0.1.53",

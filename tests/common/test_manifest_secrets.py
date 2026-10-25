@@ -6,14 +6,17 @@ manifest reads only the variables it is allowed.
 Saving as JSON with ``model_dump`` raises pydantic's PydanticSerializationError,
 holding the ManifestError's message, and ``to_manifest()`` raises the
 ManifestError itself, from the component or any component or field within it.
-The python-mode dump, ``model_dump()``, holds the secrets' values.
+The python-mode dump, ``model_dump()``, holds a secret read from a variable as
+a reference to it, as JSON does: a dump is configuration.
 """
 
 import json
+import os
 import re
 from typing import Any
 from typing import Dict
 from typing import Optional
+from typing import Union
 
 import pytest
 from pydantic import ConfigDict
@@ -21,6 +24,9 @@ from pydantic import Field
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
+from grafi.common.callable_component import CallableComponent
+from grafi.common.callable_ref import CallableRef
+from grafi.common.exceptions import LLMToolException
 from grafi.common.manifest import API_VERSION
 from grafi.common.manifest import Component
 from grafi.common.manifest import ManifestError
@@ -61,8 +67,9 @@ def test_secret_is_saved_as_its_variable(monkeypatch: pytest.MonkeyPatch) -> Non
     assert keyed.model_dump(mode="json")["api_key"] == {"env": SECRET_VAR}
     assert "s3cret-value" not in keyed.model_dump_json()
     assert "s3cret-value" not in json.dumps(keyed.to_manifest())
-    # The python-mode dump holds its value, as pydantic's does.
-    assert keyed.model_dump()["api_key"] == "s3cret-value"
+    # The python-mode dump holds the reference too, which loads in code.
+    assert keyed.model_dump()["api_key"] == {"env": SECRET_VAR}
+    assert Keyed.model_validate(keyed.model_dump()).api_key == "s3cret-value"
 
 
 def test_secret_field_is_marked_outside_its_json_schema() -> None:
@@ -132,13 +139,14 @@ def test_secret_loaded_from_another_variable_is_saved_as_it(
     monkeypatch.setenv(SECRET_VAR, "default-value")
     monkeypatch.setenv(OTHER_VAR, "other-value")
 
-    keyed = Keyed.model_validate({field: {"env": OTHER_VAR}})
+    spec = {"class": import_path(Keyed), field: {"env": OTHER_VAR}}
+    keyed = Keyed.from_manifest(spec, allow_env=[OTHER_VAR])  # A component's JSON.
 
     assert getattr(keyed, field) == "other-value"
     assert keyed.secret_variable(field) == OTHER_VAR
     data = keyed.model_dump(mode="json")
     assert data[field] == {"env": OTHER_VAR}
-    again = Component.model_validate(json.loads(json.dumps(data)))
+    again = Component.from_manifest(json.loads(json.dumps(data)), allow_env=[OTHER_VAR])
     assert type(again) is Keyed
     assert getattr(again, field) == "other-value"
     assert again.model_dump(mode="json")[field] == {"env": OTHER_VAR}
@@ -164,7 +172,7 @@ def test_a_manifest_reads_only_the_variables_it_is_allowed(
     with pytest.raises(ManifestError, match="AWS_SECRET_ACCESS_KEY"):
         Keyed.from_manifest(other)
 
-    allowed = Keyed.from_manifest(other, env=["AWS_SECRET_ACCESS_KEY"])
+    allowed = Keyed.from_manifest(other, allow_env=["AWS_SECRET_ACCESS_KEY"])
     assert allowed.api_key == "fake-aws-secret"
     own = Keyed.from_manifest(_keyed_manifest(api_key={"env": SECRET_VAR}))
     assert own.api_key == "own-value"
@@ -176,9 +184,11 @@ def test_a_secret_without_a_variable_reads_only_one_it_is_allowed(
     monkeypatch.setenv(OTHER_VAR, "other-value")
     manifest = _keyed_manifest(token={"env": OTHER_VAR})
 
-    with pytest.raises(ManifestError, match=rf"{OTHER_VAR}.*env=\['{OTHER_VAR}'\]"):
+    with pytest.raises(
+        ManifestError, match=rf"{OTHER_VAR}.*allow_env=\['{OTHER_VAR}'\]"
+    ):
         Keyed.from_manifest(manifest)
-    assert Keyed.from_manifest(manifest, env=[OTHER_VAR]).token == "other-value"
+    assert Keyed.from_manifest(manifest, allow_env=[OTHER_VAR]).token == "other-value"
 
 
 @pytest.mark.parametrize("field", ["api_key", "token"])
@@ -204,9 +214,15 @@ def test_a_manifest_never_gives_null_for_a_secret_read_from_its_variable(
     assert Keyed.model_validate({"api_key": None}).api_key is None
 
 
-def test_the_variables_a_manifest_may_read_are_a_list_of_names() -> None:
-    with pytest.raises(TypeError, match=rf"env=\['{OTHER_VAR}'\]"):
-        Keyed.from_manifest(_keyed_manifest(), env=OTHER_VAR)
+@pytest.mark.parametrize(
+    "allow_env",
+    [OTHER_VAR, {OTHER_VAR: "value"}, os.environ],
+    ids=["str", "dict", "os.environ"],
+)
+def test_the_variables_a_manifest_may_read_are_a_list_of_names(allow_env: Any) -> None:
+    """Not a mapping: iterating one would allow its keys, all of os.environ's."""
+    with pytest.raises(TypeError, match="allow_env is the names of the variables"):
+        Keyed.from_manifest(_keyed_manifest(), allow_env=allow_env)
 
 
 @pytest.mark.parametrize("alias", ["alias", "serialization_alias", "validation_alias"])
@@ -227,8 +243,13 @@ def test_the_variable_a_secret_field_is_read_from(
     assert keyed.secret_variable("token") is None  # Without one of its own.
     assert keyed.secret_variable("name") is None  # Not a secret.
     assert OpenAITool().secret_variable("api_key") == "OPENAI_API_KEY"
-    renamed = Keyed.model_validate(
-        {"api_key": {"env": OTHER_VAR}, "token": {"env": OTHER_VAR}}
+    renamed = Keyed.from_manifest(
+        {
+            "class": import_path(Keyed),
+            "api_key": {"env": OTHER_VAR},
+            "token": {"env": OTHER_VAR},
+        },
+        allow_env=[OTHER_VAR],
     )
     assert renamed.secret_variable("api_key") == OTHER_VAR
     assert renamed.secret_variable("token") == OTHER_VAR
@@ -261,8 +282,8 @@ def test_a_nested_component_never_gives_a_secret_as_a_value() -> None:
         "spec": {"class": import_path(Box), "keyed": keyed},
     }
 
-    # Refused by the component holding it, before the nested one is loaded.
-    match = "Box.keyed holds a secret, at 'api_key', and a manifest never holds one"
+    # Refused by the nested component's own check, as it is loaded.
+    match = "Keyed.api_key is given a value, and a manifest never holds a secret"
     with pytest.raises(ManifestError, match=match):
         Box.from_manifest(manifest)
 
@@ -272,13 +293,39 @@ def test_loading_in_code_applies_no_manifest_policy(
 ) -> None:
     """model_validate() loads what code gives it, trusted as code is: only
     from_manifest() applies the rules for a manifest."""
-    monkeypatch.setenv(OTHER_VAR, "other-value")
-
-    keyed = Keyed.model_validate({"api_key": "sk-literal", "token": {"env": OTHER_VAR}})
+    keyed = Keyed.model_validate({"api_key": "sk-literal", "token": "t0ken"})
     holder = Holder.model_validate({"item": {"name": "no class"}})
 
-    assert (keyed.api_key, keyed.token) == ("sk-literal", "other-value")
+    assert (keyed.api_key, keyed.token) == ("sk-literal", "t0ken")
     assert type(holder.item) is Gadget
+
+
+@pytest.mark.parametrize("build", ["model_validate", "model_validate_json", "init"])
+@pytest.mark.parametrize("named", [True, False], ids=["with class", "without"])
+def test_code_chooses_a_secrets_variable_and_a_manifest_needs_it_allowed(
+    monkeypatch: pytest.MonkeyPatch, build: str, named: bool
+) -> None:
+    """model_validate and the constructors trust what they are given, as code:
+    a secret reads the variable named, and is saved as it. Data you did not
+    write loads with from_manifest, which reads another only if allowed."""
+    monkeypatch.setenv(OTHER_VAR, "other-value")
+    data: Dict[str, Any] = {"api_key": {"env": OTHER_VAR}}
+    if named:
+        data["class"] = import_path(Keyed)
+    load = {
+        "model_validate": lambda: Keyed.model_validate(data),
+        "model_validate_json": lambda: Keyed.model_validate_json(json.dumps(data)),
+        "init": lambda: Keyed(**data),
+    }[build]
+
+    keyed = load()
+
+    assert keyed.api_key == "other-value"
+    assert keyed.to_manifest()["spec"]["api_key"] == {"env": OTHER_VAR}
+    spec = {**data, "class": import_path(Keyed)}
+    with pytest.raises(ManifestError, match=f"allow_env=\\['{OTHER_VAR}'\\]"):
+        Keyed.from_manifest(spec)
+    assert Keyed.from_manifest(spec, allow_env=[OTHER_VAR]).api_key == "other-value"
 
 
 @pytest.mark.parametrize(
@@ -297,7 +344,7 @@ def test_every_component_in_a_manifest_names_its_class(spec: Dict[str, Any]) -> 
         "spec": spec,
     }
 
-    with pytest.raises(ManifestError, match="names its class.*this Gadget does not"):
+    with pytest.raises(ManifestError, match="names its class.*this Gadget does"):
         Component.from_manifest(manifest)
     assert Component.model_validate(spec)  # Loaded in code, it need not.
 
@@ -305,7 +352,10 @@ def test_every_component_in_a_manifest_names_its_class(spec: Dict[str, Any]) -> 
 def test_secret_loaded_from_an_unset_variable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(OTHER_VAR, raising=False)
 
-    keyed = Keyed.model_validate({"api_key": {"env": OTHER_VAR}})
+    keyed = Keyed.from_manifest(
+        {"class": import_path(Keyed), "api_key": {"env": OTHER_VAR}},
+        allow_env=[OTHER_VAR],
+    )
 
     assert keyed.api_key is None
     assert keyed.model_dump(mode="json")["api_key"] == {"env": OTHER_VAR}
@@ -450,6 +500,257 @@ def test_grafi_tool_settings_holding_a_secret_cannot_be_saved(
         OpenAITool(chat_params=headers).to_manifest()
     with pytest.raises(ManifestError, match="OpenRouterTool.extra_headers holds"):
         OpenRouterTool(extra_headers={"X-Api-Key": "k"}).to_manifest()
+    # Never expanded there: it would be sent as it is.
     referenced = {"extra_headers": {"Authorization": "Bearer ${OPENAI_API_KEY}"}}
-    saved = OpenAITool(chat_params=referenced).to_manifest()
-    assert saved["spec"]["chat_params"] == referenced
+    with pytest.raises(ManifestError, match="only an MCP configuration expands"):
+        OpenAITool(chat_params=referenced).to_manifest()
+
+
+def test_a_refusal_gives_the_advice_that_fits() -> None:
+    """An assistant's build parameter may be left unsaved; "${VAR}" is
+    expanded by MCP alone; a tool's key reads its variable."""
+    from grafi.assistants.assistant import Assistant
+
+    class Built(Assistant):
+        token: str = "t0ken-value"  # A build parameter, saved by mistake.
+
+    with pytest.raises(ManifestError, match="declare it exclude=True") as raised:
+        Built().to_manifest()
+    assert "${VAR}" not in str(raised.value)
+    with pytest.raises(
+        ManifestError, match="only an MCP configuration expands"
+    ) as raised:
+        Formatted(params={"api_key": "${KEY}"}).to_manifest()
+    assert "exclude=True" not in str(raised.value)
+    with pytest.raises(ManifestError, match='as {"env": "VAR"}') as raised:
+        Keyed(api_key="sk-literal").to_manifest()
+    assert "exclude=True" not in str(raised.value)
+
+
+class Region(CallableComponent):
+    """A function configured with a region."""
+
+    region: str = "us-east-1"
+
+    def __call__(self) -> str:
+        return self.region
+
+
+class Signer(Component):
+    """Holds a function under a name like a secret's."""
+
+    credentials: CallableRef = Field(default_factory=Region)
+
+
+class Loose(Component):
+    """A field holding components or text: it is checked."""
+
+    items: Dict[str, Union[Gadget, str]] = Field(default_factory=dict)
+
+
+def test_a_component_in_a_function_field_checks_its_own_secrets() -> None:
+    signer = Signer()
+
+    assert Signer.from_manifest(signer.to_manifest()) == signer
+
+
+def test_a_field_is_left_to_its_values_only_if_all_check_themselves() -> None:
+    with pytest.raises(ManifestError, match="Loose.items holds a secret"):
+        Loose(items={"api_key": "sk-live-123"}).to_manifest()
+
+
+def test_a_key_read_from_its_variable_is_kept_and_saved_as_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The variable set for another user since, or unset, does not change the
+    key a tool was made with; it still saves as its variable."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-alice")
+    alices = OpenAITool()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-bob")
+    bobs = OpenAITool()
+
+    assert (alices.sdk_api_key(), bobs.sdk_api_key()) == ("sk-alice", "sk-bob")
+    assert alices.to_manifest()["spec"]["api_key"] == {"env": "OPENAI_API_KEY"}
+    monkeypatch.delenv("OPENAI_API_KEY")
+    assert alices.sdk_api_key() == "sk-alice"
+
+
+def test_an_empty_key_reads_its_variable_when_used(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As os.getenv("OPENAI_API_KEY", "") gives it, before the variable is set."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    tool = OpenAITool(api_key="")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-later")
+
+    assert tool.sdk_api_key() == "sk-later"
+    assert tool.to_manifest()["spec"]["api_key"] == {"env": "OPENAI_API_KEY"}
+
+
+def test_a_reference_given_to_a_copy_is_refused_when_used() -> None:
+    tool = OpenAITool(api_key="sk-given")
+    copied = tool.model_copy(update={"api_key": {"env": "OTHER_KEY"}})
+
+    with pytest.raises(LLMToolException, match="holds a dict, not a key"):
+        copied.sdk_api_key()
+
+
+@pytest.mark.parametrize("tenant_key", [None, "sk-tenant"], ids=["unset", "set"])
+def test_a_python_dump_keeps_a_tenants_variable(
+    monkeypatch: pytest.MonkeyPatch, tenant_key: Optional[str]
+) -> None:
+    """Loading the dump reads the tenant's variable, never the tool's own."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-default-account")
+    if tenant_key is None:
+        monkeypatch.delenv("TENANT_KEY", raising=False)
+    else:
+        monkeypatch.setenv("TENANT_KEY", tenant_key)
+    tool = OpenAITool.model_validate({"api_key": {"env": "TENANT_KEY"}})
+
+    copy = OpenAITool.model_validate(tool.model_dump())
+
+    assert copy.secret_variable("api_key") == "TENANT_KEY"
+    assert copy.to_manifest()["spec"]["api_key"] == {"env": "TENANT_KEY"}
+
+
+def test_secret_value_reads_only_secret_fields() -> None:
+    with pytest.raises(ValueError, match="OpenAITool.model is not a secret field"):
+        OpenAITool().secret_value("model")
+
+
+def test_every_copy_keeps_the_key_though_the_variable_changed_since(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Set for another user's session since: a copy, and a component given
+    the key passed on, uses this tool's key, never the variable's new one."""
+    import copy
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-user-a")
+    tool = OpenAITool()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-user-b")
+
+    copies = [
+        tool.model_copy(),
+        copy.deepcopy(tool),
+        OpenAITool.builder().api_key(tool.secret_reference("api_key")).build(),
+    ]
+
+    assert [c.sdk_api_key() for c in copies] == ["sk-user-a"] * 3
+    assert tool.to_manifest()["spec"]["api_key"] == {"env": "OPENAI_API_KEY"}
+
+
+def test_a_dump_is_configuration_read_again_when_loaded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As from_manifest reads it: a python dump refers to the variable, never
+    holding the key, and loading it reads the variable as it is then."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-user-a")
+    tool = OpenAITool()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-user-b")
+
+    dump = tool.model_dump()
+
+    assert dump["api_key"] == {"env": "OPENAI_API_KEY"}
+    assert OpenAITool.model_validate(dump).sdk_api_key() == "sk-user-b"
+
+
+def test_a_secret_declared_again_without_env_secret_is_refused() -> None:
+    """As 0.0.36's tools declared their keys: it would be held, and sent, as
+    plain text, and fail only at its first call or save."""
+    from pydantic import Field as PlainField
+
+    with pytest.raises(TypeError, match="Plain.api_key is a secret, as OpenAITool"):
+
+        class Plain(OpenAITool):
+            api_key: Optional[str] = PlainField(default=None)
+
+
+class NoVariable(Component):
+    """A secret with no variable of its own."""
+
+    token: Optional[str] = env_secret()
+
+
+def test_an_empty_secret_without_a_variable_is_saved_as_none() -> None:
+    """As secret_value takes it: none."""
+    assert NoVariable(token="").to_manifest()["spec"]["token"] is None
+
+
+def test_a_secret_field_holds_text() -> None:
+    """A mapping, or SecretStr, could not be read from a variable, nor saved
+    as one: refused when the class is defined."""
+    with pytest.raises(TypeError, match="DictCredentials.credentials is a secret"):
+
+        class DictCredentials(Component):
+            credentials: Optional[Dict[str, str]] = env_secret("GRAFI_TEST_CREDS")
+
+
+@pytest.mark.parametrize("dump", [{"exclude_none": True}, {"exclude_defaults": True}])
+@pytest.mark.parametrize("mode", ["python", "json"])
+def test_a_dump_leaving_out_none_keeps_a_tenants_variable(
+    monkeypatch: pytest.MonkeyPatch, dump: Dict[str, Any], mode: str
+) -> None:
+    """Unset, the tenant's key is none: the dump still names its variable, so
+    loading it never reads the tool's own, another account's."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-default-account")
+    monkeypatch.delenv("TENANT_KEY", raising=False)
+    tool = OpenAITool.model_validate({"api_key": {"env": "TENANT_KEY"}})
+
+    dumped = tool.model_dump(mode=mode, **dump)
+
+    assert dumped["api_key"] == {"env": "TENANT_KEY"}
+    assert OpenAITool.model_validate(dumped).secret_variable("api_key") == "TENANT_KEY"
+
+
+def test_a_dump_leaving_a_tenants_key_out_on_purpose_keeps_it_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TENANT_KEY", raising=False)
+    tool = OpenAITool.model_validate({"api_key": {"env": "TENANT_KEY"}})
+
+    dumped = tool.model_dump(exclude_none=True, exclude={"api_key"})
+
+    assert "api_key" not in dumped
+
+
+@pytest.mark.filterwarnings("ignore:Pydantic serializer warnings")
+@pytest.mark.parametrize("variable", ["OPENAI_API_KEY", "TENANT_KEY"])
+def test_a_reference_given_after_the_tool_was_made_is_refused(variable: str) -> None:
+    """Its own variable's or another's alike: a reference is read when the
+    component is made. Assigning one is refused; a copy given one is refused
+    when saved."""
+    tool = OpenAITool()
+
+    with pytest.raises(TypeError, match="give a reference"):
+        tool.api_key = {"env": variable}  # type: ignore[assignment]
+    copied = tool.model_copy(update={"api_key": {"env": variable}})
+    with pytest.raises(ManifestError, match="given after it was made"):
+        copied.to_manifest()
+
+
+def test_a_secret_with_constraints_is_refused() -> None:
+    """A constraint would apply to a key loaded, not to one read by default,
+    nor when used, so what is saved could not load, or would differ: refused
+    in a union, on the type, and on the field alike."""
+    from typing import Annotated
+
+    from pydantic import StringConstraints
+
+    with pytest.raises(TypeError, match="with no constraint"):
+
+        class InUnion(Component):
+            key: Optional[Annotated[str, StringConstraints(to_lower=True)]] = (
+                env_secret("GRAFI_TEST_CONSTRAINED")
+            )
+
+    with pytest.raises(TypeError, match="with no constraint"):
+
+        class OnType(Component):
+            key: Annotated[str, StringConstraints(min_length=20)] = env_secret(
+                "GRAFI_TEST_CONSTRAINED"
+            )
+
+    with pytest.raises(TypeError, match="with no constraint"):
+
+        class OnField(Component):
+            key: Optional[str] = env_secret("GRAFI_TEST_CONSTRAINED", min_length=20)

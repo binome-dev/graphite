@@ -108,8 +108,8 @@ async def test_invoke_simple_response(monkeypatch, claude_instance, invoke_conte
 
     input_data = [Message(role="user", content="Say hello")]
     result = []
-    async for messages in claude_instance.invoke(invoke_context, input_data):
-        result.extend(messages)
+    messages = await claude_instance.invoke(invoke_context, input_data)
+    result.extend(messages)
 
     assert isinstance(result, List)
     assert result[0].role == "assistant"
@@ -172,8 +172,7 @@ async def test_invoke_function_call(monkeypatch, claude_instance, invoke_context
 
     msgs = [Message(role="user", content="Weather?")]
     claude_instance.add_function_specs(tools)
-    async for _ in claude_instance.invoke(invoke_context, msgs):
-        pass  # Just consume the generator to trigger the API call
+    await claude_instance.invoke(invoke_context, msgs)
 
     kwargs = mock_client.messages.stream.call_args[1]
     assert kwargs["tools"] is not None
@@ -209,10 +208,9 @@ async def test_invoke_api_error(monkeypatch, claude_instance, invoke_context):
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Anthropic async call failed"):
-        async for _ in claude_instance.invoke(
+        await claude_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass  # Exception should be raised before we get any results
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -406,7 +404,7 @@ def test_to_messages_refusal(claude_instance):
         stop_reason="refusal",
         stop_details=Mock(explanation="declined for policy reasons"),
     )
-    messages = claude_instance.to_messages(resp)
+    messages = claude_instance._to_messages(resp)
     assert messages[0].refusal == "declined for policy reasons"
     assert messages[0].content == ""
 
@@ -440,13 +438,9 @@ async def test_client_close_failure_does_not_fail_completed_call(
         cl_module, "AsyncAnthropic", MagicMock(return_value=mock_context_manager)
     )
 
-    result = [
-        message
-        async for batch in claude_instance.invoke(
-            invoke_context, [Message(role="user", content="Hi")]
-        )
-        for message in batch
-    ]
+    result = await claude_instance.invoke(
+        invoke_context, [Message(role="user", content="Hi")]
+    )
     assert [message.content for message in result] == ["done"]
 
 
@@ -496,10 +490,9 @@ async def test_stream_close_failure_does_not_fail_the_call(
     with deltas_to(received.append):
         result = [
             message.content
-            async for batch in tool.invoke(
+            for message in await tool.invoke(
                 invoke_context, [Message(role="user", content="Hi")]
             )
-            for message in batch
         ]
     assert [delta.content for delta in received] == ["a", "b"]
     assert result == ["ab"]
@@ -548,14 +541,11 @@ async def test_a_streamed_answer_is_one_message_with_its_text_and_tool_calls(
     tool = ClaudeTool(api_key="test_api_key")
     received: List[Delta] = []
     with deltas_to(received.append):
-        batches = [
-            batch
-            async for batch in tool.invoke(
-                invoke_context, [Message(role="user", content="Weather in Paris?")]
-            )
-        ]
+        output = await tool.invoke(
+            invoke_context, [Message(role="user", content="Weather in Paris?")]
+        )
 
-    [[call]] = batches
+    [call] = output
     assert [delta.content for delta in received] == ["Checking."]
     assert call.content == "Checking."
     assert call.tool_calls[0].id == "toolu_1"
@@ -569,6 +559,6 @@ def test_a_reply_without_tool_use_has_no_tool_calls() -> None:
     response = SimpleNamespace(
         content=[TextBlock(type="text", text="Hello")], stop_reason="end_turn"
     )
-    [message] = ClaudeTool(api_key="k").to_messages(response)  # type: ignore[arg-type]
+    [message] = ClaudeTool(api_key="k")._to_messages(response)  # type: ignore[arg-type]
     assert message.content == "Hello"
     assert message.tool_calls is None  # Not [], which routes as a tool call.

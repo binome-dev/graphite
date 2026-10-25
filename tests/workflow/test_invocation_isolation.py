@@ -36,7 +36,7 @@ class MarkerTool(Tool):
 
     async def invoke(self, invoke_context, input_data):
         await asyncio.sleep(0.05)
-        yield [
+        return [
             Message(role="assistant", content=f"out:{invoke_context.conversation_id}")
         ]
 

@@ -76,10 +76,10 @@ async def test_invoke_simple_response(monkeypatch, openrouter_instance, invoke_c
     )
 
     result_messages = []
-    async for message_batch in openrouter_instance.invoke(
+    message_batch = await openrouter_instance.invoke(
         invoke_context, [Message(role="user", content="Say hello")]
-    ):
-        result_messages.extend(message_batch)
+    )
+    result_messages.extend(message_batch)
 
     # Assertions on result
     assert isinstance(result_messages, List)
@@ -129,10 +129,10 @@ async def test_invoke_with_extra_headers(
     )
 
     result_messages = []
-    async for message_batch in openrouter_instance.invoke(
+    message_batch = await openrouter_instance.invoke(
         invoke_context, [Message(role="user", content="Hi there")]
-    ):
-        result_messages.extend(message_batch)
+    )
+    result_messages.extend(message_batch)
 
     # ensure headers propagated
     call_kwargs = mock_client.chat.completions.create.call_args[1]
@@ -188,8 +188,8 @@ async def test_invoke_function_call(monkeypatch, openrouter_instance, invoke_con
     input_data = [Message(role="user", content="Weather?")]
     openrouter_instance.add_function_specs(tools)
     result_messages = []
-    async for message_batch in openrouter_instance.invoke(invoke_context, input_data):
-        result_messages.extend(message_batch)
+    message_batch = await openrouter_instance.invoke(invoke_context, input_data)
+    result_messages.extend(message_batch)
 
     assert result_messages[0].tool_calls[0].id == "test_id"
     call_kwargs = mock_client.chat.completions.create.call_args[1]
@@ -210,10 +210,9 @@ async def test_invoke_api_error(monkeypatch, openrouter_instance, invoke_context
     from grafi.common.exceptions import LLMToolException
 
     with pytest.raises(LLMToolException, match="Error code"):
-        async for _ in openrouter_instance.invoke(
+        await openrouter_instance.invoke(
             invoke_context, [Message(role="user", content="Hi")]
-        ):
-            pass
+        )
 
 
 # --------------------------------------------------------------------------- #

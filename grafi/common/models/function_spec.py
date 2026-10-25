@@ -1,8 +1,11 @@
+from typing import Annotated
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
+from pydantic import AfterValidator
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -19,7 +22,10 @@ class ParameterSchema(BaseModel):
       and preserved when dumped to dict.
     """
 
-    # the "type" field: Optional[object] = None, can also be anyOf
+    # A JSON Schema type, or several; absent from the schema when None.
+    type: Optional[Union[str, List[str]]] = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     description: Optional[str] = ""
 
     model_config = ConfigDict(extra="allow")
@@ -69,3 +75,15 @@ class FunctionSpec(BaseModel):
 
 
 FunctionSpecs = List[FunctionSpec]
+
+
+def once_each(specs: FunctionSpecs) -> FunctionSpecs:
+    """The first spec of each name in ``specs``, in order."""
+    first: Dict[str, FunctionSpec] = {}
+    for spec in specs:
+        first.setdefault(spec.name, spec)
+    return list(first.values())
+
+
+# The specs a tool is given, the first of each name kept, as they are checked.
+GivenSpecs = Annotated[FunctionSpecs, AfterValidator(once_each)]
